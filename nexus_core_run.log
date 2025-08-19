@@ -1,0 +1,95 @@
+2025-07-24 12:25:57,902 - INFO     - root                 - Log level set to INFO
+2025-07-24 12:25:57,902 - INFO     - root                 - Project Path: C:\Users\USER\tools\OpenCodeInterpreter\workspace\test_crm_app
+2025-07-24 12:25:57,902 - INFO     - root                 - User Requirement: 簡単なCRMアプリを作成して。ユーザーを追加、表示できること
+2025-07-24 12:25:57,902 - INFO     - root                 - Constitution: このプロジェクトのコードは、常にクリーンで読みやすく、保守性が高いこと。また、すべてのコードには型ヒントとdocstringが付与されている必要がある。
+2025-07-24 12:25:57,902 - INFO     - root                 - Initializing AI agent team...
+2025-07-24 12:25:57,902 - INFO     - ArchitectAgent       - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-24 12:25:57,902 - INFO     - PlannerAgent         - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-24 12:25:57,902 - INFO     - CoderAgent           - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-24 12:25:57,902 - INFO     - TesterAgent          - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-24 12:25:57,902 - INFO     - DebuggerAgent        - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-24 12:25:57,905 - INFO     - DebuggerAgent        - 5 known issues loaded from: fkb_local.json
+2025-07-24 12:25:57,905 - INFO     - GuardianAgent        - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-24 12:25:57,905 - INFO     - PolicyAgent          - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-24 12:25:57,905 - INFO     - PolicyAgent          - Loaded 4 policies from config/policy_rules.json
+2025-07-24 12:25:57,905 - INFO     - PostmortemAgent      - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-24 12:25:57,905 - INFO     - root                 - Initializing Orchestrator...
+2025-07-24 12:25:57,905 - INFO     - Orchestrator         - Production Orchestrator initialized for project: C:\Users\USER\tools\OpenCodeInterpreter\workspace\test_crm_app
+2025-07-24 12:25:57,905 - INFO     - Orchestrator         - Logging to: C:\Users\USER\tools\OpenCodeInterpreter\workspace\test_crm_app\.nexus_logs
+2025-07-24 12:25:57,910 - INFO     - root                 - Starting development process...
+2025-07-24 12:25:57,910 - INFO     - Orchestrator         - --- 📐 Architect Phase ---
+2025-07-24 12:26:12,700 - INFO     - Orchestrator         - Creating project structure at: C:\Users\USER\tools\OpenCodeInterpreter\workspace\test_crm_app
+2025-07-24 12:26:12,700 - INFO     - Orchestrator         - Project structure created at C:\Users\USER\tools\OpenCodeInterpreter\workspace\test_crm_app
+2025-07-24 12:26:12,700 - INFO     - Orchestrator         - --- 🔄 Development Cycle ---
+2025-07-24 12:26:12,700 - INFO     - Orchestrator         - --- 📝 Planner Phase ---
+2025-07-24 12:26:17,170 - INFO     - Orchestrator         - Plan created with 3 tasks.
+2025-07-24 12:26:17,170 - INFO     - Orchestrator         - 
+==================== Task 1/3 ====================
+2025-07-24 12:26:17,170 - INFO     - Orchestrator         - --- 🧑‍💻 Executing Task: add_user ---
+2025-07-24 12:26:17,170 - INFO     - Orchestrator         - --- Quality Improvement Loop: Attempt 1/3 ---
+2025-07-24 12:26:17,170 - INFO     - Orchestrator         - 1. CoderAgent is working on 'add_user'...
+2025-07-24 12:26:23,694 - INFO     - Orchestrator         - Code implemented and saved to 'app/main.py'.
+2025-07-24 12:26:23,694 - INFO     - Orchestrator         - 2. TesterAgent is generating tests...
+2025-07-24 12:26:31,133 - INFO     - Orchestrator         - Tests generated and saved to 'tests/test_main.py'.
+2025-07-24 12:26:31,133 - INFO     - Orchestrator         - 3. Initiating functional validation and self-healing cycle...
+2025-07-24 12:26:31,133 - INFO     - Orchestrator         - Starting self-healing cycle for 'test_main.py'
+2025-07-24 12:26:31,133 - INFO     - Orchestrator         - --- Self-Healing Attempt 1/5 ---
+2025-07-24 12:26:31,767 - WARNING  - Orchestrator         - Tests failed. DebuggerAgent invoked.
+2025-07-24 12:26:31,767 - INFO     - DebuggerAgent        - Debugging error... (log size: 2784 chars)
+2025-07-24 12:26:31,767 - INFO     - DebuggerAgent        - Found known issue: 【一般的なAssertionError】テストの期待値と実際の結果が一致しませんでした。LLMによる診断を開始します。
+2025-07-24 12:26:31,767 - INFO     - DebuggerAgent        - Attempting LLM-based diagnosis and fix...
+2025-07-24 12:26:35,925 - INFO     - DebuggerAgent        - LLM generated a valid-looking patch:
+--- a/app/main.py
++++ b/app/main.py
+@@ -27,10 +27,8 @@
+         user_data["address"] = address
+ 
+     # usersをグローバル変数として使用せず、関数内で辞書を管理するように変更
+-    if 'users' not in globals():
+-        global users
++    if 'users' not in globals():       
+         users = {}
+-
+ 
+     if username in users:
+         return False  # ユーザー名が既に存在する場合はFalseを返す
+@@ -47,7 +45,7 @@
+     Returns:
+         dict: ユーザー情報を含む辞書。存在しない場合は空の辞書を返す。
+     """
+-    if 'users' not in globals():
++    if 'users' not in globals():    
+         return {}  # usersが初期化されていない場合は空の辞書を返す
+     if username in users:
+         return users[username]
+@@ -61,6 +59,6 @@
+     Returns:
+         list: ユーザー情報（辞書）のリストを返す。
+     """
+-    if 'users' not in globals():
++    if 'users' not in globals():    
+         return []  # usersが初期化されていない場合は空のリストを返す
+     return list(users.values())
+
+2025-07-24 12:26:35,927 - INFO     - patch                - file 1/1:	 b'app/main.py'
+2025-07-24 12:26:35,929 - INFO     - patch                -  hunk no.1 doesn't match source file at line 27
+2025-07-24 12:26:35,931 - INFO     - patch                -   expected: b'        user_data["address"] = address'
+2025-07-24 12:26:35,936 - INFO     - patch                -   actual  : b''
+2025-07-24 12:26:35,939 - WARNING  - patch                - source file is different - b'app/main.py'
+2025-07-24 12:26:35,942 - ERROR    - root                 - Failed to apply patch within project: C:\Users\USER\tools\OpenCodeInterpreter\workspace\test_crm_app. The patch may be invalid or already applied.
+2025-07-24 12:26:35,942 - ERROR    - Orchestrator         - PatchApplier failed. Continuing to learning phase.
+2025-07-24 12:26:35,945 - WARNING  - Orchestrator         - No applicable solution found in FKB. Initiating learning cycle.
+2025-07-24 12:26:35,950 - INFO     - PostmortemAgent      - Analyzing failed test to generate new FKB entry (source=app\main.py, test=tests\test_main.py)
+2025-07-24 12:26:40,774 - INFO     - PostmortemAgent      - Successfully generated a new FKB suggestion.
+2025-07-24 12:26:40,790 - ERROR    - Orchestrator         - An error occurred during the development cycle: KnowledgeCuratorAgent.validate_fkb_suggestion() missing 1 required positional argument: 'original_test_output'
+Traceback (most recent call last):
+  File "C:\Users\USER\tools\OpenCodeInterpreter\src\core\orchestrator.py", line 205, in development_cycle
+    self.execute_task(task)
+  File "C:\Users\USER\tools\OpenCodeInterpreter\src\core\orchestrator.py", line 248, in execute_task
+    if not self.self_healing_cycle(test_file_abs_path, source_file_abs_path):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\tools\OpenCodeInterpreter\src\core\orchestrator.py", line 123, in self_healing_cycle
+    is_valid_knowledge = self.knowledge_curator_agent.validate_fkb_suggestion(
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: KnowledgeCuratorAgent.validate_fkb_suggestion() missing 1 required positional argument: 'original_test_output'
+2025-07-24 12:26:40,798 - INFO     - root                 - Development process finished successfully.

@@ -1,0 +1,10 @@
+wget
+appdirs
+tempdir
+multipledispatch
+numpy
+tqdm
+termcolor
+fire
+openai
+tree_sitter_languages

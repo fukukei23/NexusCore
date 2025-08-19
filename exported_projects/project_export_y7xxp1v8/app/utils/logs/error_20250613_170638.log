@@ -1,0 +1,2 @@
+HTTP Error: 400
+{"error":{"message":"Invalid model 'gpt-3.5-turbo'. Permitted models can be found in the documentation at https://docs.perplexity.ai/guides/model-cards.","type":"invalid_model","code":400}}

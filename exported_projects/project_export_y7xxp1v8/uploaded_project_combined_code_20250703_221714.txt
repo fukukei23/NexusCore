@@ -1,0 +1,1764 @@
+
+
+# === File: multi_lang_crawler.py ===
+
+from googletrans import Translator
+from icrawler.builtin import BingImageCrawler, BaiduImageCrawler
+import os
+
+translator = Translator()
+
+product_list = [
+    "アディダス ショルダーバッグ",
+    "ナイキ シューズ"
+]
+
+base_dir = './images'
+
+for product in product_list:
+    # 多言語変換
+    jp = product
+    en = translator.translate(product, src='ja', dest='en').text
+    zh = translator.translate(product, src='ja', dest='zh-cn').text
+
+    print(f"日本語: {jp}, 英語: {en}, 中国語: {zh}")
+
+    # Bing（日本語・英語）
+    for keyword in [jp, en]:
+        folder = os.path.join(base_dir, 'bing', keyword.replace(' ', '_'))
+        os.makedirs(folder, exist_ok=True)
+        crawler = BingImageCrawler(storage={'root_dir': folder}, downloader_threads=8)
+        crawler.crawl(keyword=keyword, max_num=10)
+
+    # Baidu（中国語推奨）
+    folder = os.path.join(base_dir, 'baidu', zh.replace(' ', '_'))
+    os.makedirs(folder, exist_ok=True)
+    crawler = BaiduImageCrawler(storage={'root_dir': folder}, downloader_threads=8)
+    crawler.crawl(keyword=zh, max_num=10)
+
+
+# === File: remove_duplicates.py ===
+
+import os
+from PIL import Image
+import imagehash
+
+def remove_duplicate_images(folder):
+    hashes = {}
+    removed = 0
+    for root, _, files in os.walk(folder):
+        for file in files:
+            if file.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp', '.avif')):
+                path = os.path.join(root, file)
+                try:
+                    img = Image.open(path)
+                    hash = imagehash.phash(img)
+                    if hash in hashes:
+                        print(f"重複画像を削除: {path}")
+                        os.remove(path)
+                        removed += 1
+                    else:
+                        hashes[hash] = path
+                except Exception as e:
+                    print(f"エラー: {path} ({e})")
+    print(f"重複削除数: {removed}")
+
+# 例：imagesフォルダ配下すべてで重複除去
+remove_duplicate_images('./images')
+
+
+# === File: run.py ===
+
+from app import create_app
+
+app = create_app()
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+# === File: uploaded_project_combined_code_20250703_221714.txt ===
+
+
+
+# === File: app\__init__.py ===
+
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_wtf.csrf import CSRFProtect
+
+db = SQLAlchemy()
+migrate = Migrate()
+csrf = CSRFProtect()
+
+def create_app():
+    app = Flask(__name__)
+    app.config.from_object('config.Config')
+    
+    db.init_app(app)
+    migrate.init_app(app, db)
+    csrf.init_app(app)
+    
+    from app.routes.image_crawler_route import bp as image_crawler_bp
+    app.register_blueprint(image_crawler_bp)
+    
+    return app
+
+
+# === File: app\forms.py ===
+
+# app/forms.py
+from flask_wtf import FlaskForm
+from wtforms import StringField, FloatField, BooleanField, SubmitField, URLField
+from wtforms.validators import DataRequired, NumberRange, URL, Optional
+
+class ProductForm(FlaskForm):
+    # 基本情報
+    name = StringField('商品名', validators=[DataRequired()])
+    brand = StringField('ブランド')
+    purchase_price = FloatField('仕入価格', validators=[
+        DataRequired(),
+        NumberRange(min=0, message="0以上の数値を入力してください")
+    ])
+    selling_price = FloatField('販売価格', validators=[
+        DataRequired(),
+        NumberRange(min=0, message="0以上の数値を入力してください")
+    ])
+    
+    # 経費項目（追加部分）
+    transaction_fee = FloatField('取引手数料', validators=[Optional()])
+    shipping_cost = FloatField('送料・梱包費', validators=[Optional()])
+    customs_duty = FloatField('関税・輸入消費税', validators=[Optional()])
+    procurement_fee = FloatField('買付代行料', validators=[Optional()])
+    
+    # URL関連
+    supplier_url = URLField('仕入先URL', validators=[
+        URL(message='有効なURLを入力してください', require_tld=False)
+    ])
+    image_url = URLField('画像URL', validators=[
+        URL(message='有効なURLを入力してください', require_tld=False)
+    ])
+    
+    # 在庫
+    stock_status = BooleanField('在庫あり')
+    
+    submit = SubmitField('登録/更新')
+
+class ProfitFilterForm(FlaskForm):
+    min_profit = FloatField('最低利益額', validators=[
+        NumberRange(min=0, message="0以上の数値を入力してください")
+    ])
+    submit = SubmitField('絞り込み')
+
+
+# === File: app\models.py ===
+
+# app/models.py
+from app import db
+from datetime import datetime
+
+class Product(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), nullable=False)
+    brand = db.Column(db.String(128))
+    purchase_price = db.Column(db.Float, nullable=False)
+    selling_price = db.Column(db.Float, nullable=False)
+    supplier_url = db.Column(db.String(500))
+    image_url = db.Column(db.String(500))
+    stock_status = db.Column(db.Boolean, default=True)
+    profit = db.Column(db.Float)
+    listings = db.relationship('Listing', backref='product', lazy='dynamic')
+
+    # 経費項目
+    transaction_fee = db.Column(db.Float, default=0.0)
+    shipping_cost = db.Column(db.Float, default=0.0)
+    customs_duty = db.Column(db.Float, default=0.0)
+    procurement_fee = db.Column(db.Float, default=0.0)
+
+    def calculate_profit(self, fee_rate=0.15):
+        """None対策済みの利益計算式"""
+        calculated_profit = (
+            (self.selling_price or 0) 
+            - (self.purchase_price or 0)
+            - ((self.selling_price or 0) * fee_rate)
+            - (self.transaction_fee or 0)
+            - (self.shipping_cost or 0)
+            - (self.customs_duty or 0)
+            - (self.procurement_fee or 0)
+        )
+        self.profit = calculated_profit
+        return calculated_profit
+
+    def __repr__(self):
+        return f"<Product {self.name}>"
+
+class Listing(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    platform = db.Column(db.String(50), nullable=False)
+    fee_rate = db.Column(db.Float)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'))
+    listing_date = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
+
+
+# === File: app\models_backup.py ===
+
+# app/models.py
+from app import db # app/__init__.py で定義されたdbオブジェクトをインポート
+
+class Product(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    brand = db.Column(db.String(60))
+    purchase_price = db.Column(db.Float)
+    selling_price = db.Column(db.Float)
+    supplier_url = db.Column(db.String(500))
+    image_url = db.Column(db.String(500))
+    stock_status = db.Column(db.Boolean, default=True)
+    profit_margin = db.Column(db.Float) # これは手動で更新するか、calculate_profitで計算後に保存
+
+    def calculate_profit(self):
+        # 手数料15%仮定。必要であれば、config.py などで設定できるようにしても良い
+        # shipping_costは別途考慮が必要な場合、引数で渡すか、Productモデルに含める
+        return self.selling_price - self.purchase_price - (self.selling_price * 0.15)
+
+    def __repr__(self):
+        return f"<Product {self.name}>"
+
+# === File: app\routes.py ===
+
+from flask import Blueprint, render_template, redirect, url_for, request, flash, Response
+from app import db
+from app.models import Product
+from app.forms import ProductForm
+import csv
+import io
+from datetime import datetime
+
+bp = Blueprint('main', __name__)
+
+@bp.route('/manage', methods=['GET', 'POST'])
+def manage_products():
+    form = ProductForm()
+    if form.validate_on_submit():
+        product = Product(
+            name=form.name.data,
+            brand=form.brand.data,
+            purchase_price=form.purchase_price.data,
+            selling_price=form.selling_price.data,
+            supplier_url=form.supplier_url.data,
+            image_url=form.image_url.data,
+            stock_status=form.stock_status.data,
+            transaction_fee=form.transaction_fee.data,
+            shipping_cost=form.shipping_cost.data,
+            customs_duty=form.customs_duty.data,
+            procurement_fee=form.procurement_fee.data
+        )
+        if hasattr(product, "calculate_profit"):
+            product.profit = product.calculate_profit()
+        db.session.add(product)
+        db.session.commit()
+        flash('商品を登録しました', 'success')
+        return redirect(url_for('main.manage_products'))
+    products = Product.query.all()
+    return render_template('products/manage.html', form=form, products=products)
+
+@bp.route('/products/<int:id>/delete', methods=['POST'])
+def delete_product(id):
+    product = Product.query.get_or_404(id)
+    db.session.delete(product)
+    db.session.commit()
+    flash('商品を削除しました', 'success')
+    return redirect(url_for('main.manage_products'))
+
+@bp.route('/import_csv', methods=['POST'])
+def import_csv():
+    if 'file' not in request.files:
+        flash('ファイルがアップロードされていません', 'error')
+        return redirect(url_for('main.manage_products'))
+    file = request.files['file']
+    if file.filename == '':
+        flash('ファイルが選択されていません', 'error')
+        return redirect(url_for('main.manage_products'))
+    if file and file.filename.endswith('.csv'):
+        try:
+            stream = io.StringIO(file.stream.read().decode('utf-8'))
+            csv_reader = csv.DictReader(stream)
+            count = 0
+            for row in csv_reader:
+                required_fields = ['name', 'purchase_price', 'selling_price']
+                if not all(field in row for field in required_fields):
+                    flash('CSVに必須項目が不足しています', 'error')
+                    return redirect(url_for('main.manage_products'))
+                product = Product(
+                    name=row['name'],
+                    brand=row.get('brand', ''),
+                    purchase_price=float(row['purchase_price']),
+                    selling_price=float(row['selling_price']),
+                    supplier_url=row.get('supplier_url', ''),
+                    image_url=row.get('image_url', ''),
+                    stock_status=row.get('stock_status', 'true').lower() in ['true', '1', 'yes'],
+                    transaction_fee=float(row.get('transaction_fee', 0)),
+                    shipping_cost=float(row.get('shipping_cost', 0)),
+                    customs_duty=float(row.get('customs_duty', 0)),
+                    procurement_fee=float(row.get('procurement_fee', 0))
+                )
+                if hasattr(product, "calculate_profit"):
+                    product.profit = product.calculate_profit()
+                db.session.add(product)
+                count += 1
+            db.session.commit()
+            flash(f'{count}件の商品をインポートしました', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'CSVインポート中にエラーが発生しました: {str(e)}', 'error')
+    else:
+        flash('CSVファイルのみアップロード可能です', 'error')
+    return redirect(url_for('main.manage_products'))
+
+@bp.route('/export_csv')
+def export_csv():
+    try:
+        products = Product.query.all()
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # ヘッダー書き込み
+        writer.writerow([
+            'name', 'brand', 'purchase_price', 'selling_price',
+            'transaction_fee', 'shipping_cost', 'customs_duty', 'procurement_fee',
+            'supplier_url', 'image_url', 'stock_status'
+        ])
+
+        # データ書き込み
+        for product in products:
+            writer.writerow([
+                product.name,
+                product.brand,
+                product.purchase_price,
+                product.selling_price,
+                product.transaction_fee,
+                product.shipping_cost,
+                product.customs_duty,
+                product.procurement_fee,
+                product.supplier_url,
+                product.image_url,
+                'true' if product.stock_status else 'false'
+            ])
+
+        output.seek(0)
+        date_str = datetime.now().strftime('%Y%m%d%H%M%S')
+        # 文字化け対策: BOM付きUTF-8
+        bom = '\ufeff'
+        csv_data = bom + output.getvalue()
+
+        return Response(
+            csv_data,
+            mimetype="text/csv",
+            headers={
+                "Content-Disposition": f"attachment;filename=products_{date_str}.csv",
+                "Content-Type": "text/csv; charset=utf-8"
+            }
+        )
+
+    except Exception as e:
+        flash(f'CSVエクスポート中にエラーが発生しました: {str(e)}', 'error')
+        return redirect(url_for('main.manage_products'))
+
+@bp.route('/products/<int:product_id>/edit', methods=['GET', 'POST'])
+def edit_product(product_id):
+    product = Product.query.get_or_404(product_id)
+    form = ProductForm(obj=product)
+    if form.validate_on_submit():
+        form.populate_obj(product)
+        if hasattr(product, "calculate_profit"):
+            product.profit = product.calculate_profit()
+        db.session.commit()
+        flash('商品情報を更新しました', 'success')
+        return redirect(url_for('main.manage_products'))
+    return render_template('products/edit.html', form=form, product=product)
+
+@bp.route('/')
+def index():
+    return redirect(url_for('main.manage_products'))
+
+
+# === File: app\routes_backup.py ===
+
+# app/routes.py
+@app.route('/products/filter', methods=['GET', 'POST'])
+def filter_products():
+    form = ProfitFilterForm()
+    if form.validate_on_submit():
+        return redirect(url_for('index', min_profit=form.min_profit.data))
+    return render_template('filter.html', form=form)
+
+
+# === File: app\routes\__init__.py ===
+
+
+
+# === File: app\routes\image_crawler_route.py ===
+
+from flask import Blueprint, render_template, request
+from app.utils.image_crawler import crawl_images
+
+bp = Blueprint('image_crawler', __name__)
+
+@bp.route('/image_crawler', methods=['GET', 'POST'])
+def image_crawler():
+    message = ''
+    if request.method == 'POST':
+        keyword = request.form.get('keyword')
+        use_bing = request.form.get('use_bing') == 'on'
+        use_google = request.form.get('use_google') == 'on'
+        engines = []
+        if use_bing:
+            engines.append('bing')
+        if use_google:
+            engines.append('google')
+        if keyword and engines:
+            save_dir = crawl_images(keyword, max_num=50, engines=engines)
+            message = f"「{keyword}」の画像を {', '.join(engines)} で収集し、{save_dir} に保存しました。"
+        elif not engines:
+            message = "検索エンジンを1つ以上選択してください。"
+    return render_template('image_crawler.html', message=message)
+
+
+# === File: app\utils\buyma_catalog_manager.py ===
+
+import os
+import csv
+import time
+import random
+import requests
+import hashlib
+import zipfile
+import gspread
+from datetime import datetime
+from google.oauth2.service_account import Credentials
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium_stealth import stealth
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
+
+# --- 設定（SDカードD:ドライブ・スプレッドシートID設定済み）---
+CONFIG = {
+    'profile_path': r"C:/Users/USER/AppData/Local/Google/Chrome/SeleniumProfile",
+    'base_dir': 'D:/catalog_images',
+    'screenshot_dir': 'D:/screenshots',
+    'csv_path': 'D:/catalog_data.csv',
+    'extracted_images_dir': 'D:/extracted_images',
+    'google_credentials': 'D:/credentials.json',
+    'spreadsheet_id': '1z9_lczAbnbsMYpAEslamfekEMrPQVIM1rfHqNbzze_Y',
+    'worksheet_name': 'catalog_data',
+    'safety': {
+        'max_daily_requests': 500,
+        'request_interval': (5, 10),
+        'error_threshold': 10,
+        'response_time_threshold': 8.0
+    }
+}
+
+class BUYMACatalogManager:
+    def __init__(self):
+        self.driver = self._init_driver()
+        self.request_count = 0
+        self.error_count = 0
+        self.downloaded_hashes = set()
+        self.downloaded_catalog_ids = set()
+        self.csv_records = []
+        self._setup_directories()
+        self._init_google_sheets()
+        self.stop_flag = False
+
+    def _setup_directories(self):
+        directories = [
+            CONFIG['screenshot_dir'],
+            CONFIG['base_dir'],
+            CONFIG['extracted_images_dir']
+        ]
+        for directory in directories:
+            os.makedirs(directory, exist_ok=True)
+            print(f"ディレクトリ作成: {directory}")
+
+    def _init_google_sheets(self):
+        try:
+            scope = [
+                'https://spreadsheets.google.com/feeds',
+                'https://www.googleapis.com/auth/drive'
+            ]
+            creds = Credentials.from_service_account_file(
+                CONFIG['google_credentials'], scopes=scope
+            )
+            self.gc = gspread.authorize(creds)
+            self.worksheet = self.gc.open_by_key(CONFIG['spreadsheet_id']).worksheet(CONFIG['worksheet_name'])
+            print("Googleスプレッドシート接続成功")
+        except Exception as e:
+            print(f"Googleスプレッドシート接続エラー: {e}")
+            self.gc = None
+            self.worksheet = None
+
+    def _init_driver(self):
+        chrome_options = Options()
+        chrome_options.add_argument(f"--user-data-dir={CONFIG['profile_path']}")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_argument("--lang=ja")
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+
+        service = ChromeService(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        stealth(driver,
+            languages=["ja-JP", "ja"],
+            vendor="Google Inc.",
+            platform="Win32",
+            webgl_vendor="Intel Inc.",
+            renderer="Intel Iris OpenGL Engine",
+            fix_hairline=True,
+        )
+        return driver
+
+    def _human_like_delay(self):
+        if self._check_response_time():
+            delay = random.uniform(*CONFIG['safety']['request_interval']) * 1.5
+        else:
+            delay = random.uniform(*CONFIG['safety']['request_interval'])
+        time.sleep(delay)
+
+    def _check_response_time(self):
+        try:
+            navigation_start = self.driver.execute_script("return window.performance.timing.navigationStart")
+            response_start = self.driver.execute_script("return window.performance.timing.responseStart")
+            return (response_start - navigation_start) / 1000 > CONFIG['safety']['response_time_threshold']
+        except Exception:
+            return False
+
+    def _force_close_modals(self):
+        try:
+            close_selectors = [
+                ".catalogs-modal__close",
+                ".modal-close",
+                "//button[contains(text(), '閉じる')]",
+                "//button[contains(text(), 'キャンセル')]"
+            ]
+            for selector in close_selectors:
+                try:
+                    if selector.startswith("//"):
+                        elements = self.driver.find_elements(By.XPATH, selector)
+                    else:
+                        elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for element in elements:
+                        if element.is_displayed() and element.is_enabled():
+                            element.click()
+                            self._human_like_delay()
+                            return True
+                except Exception:
+                    continue
+            self.driver.execute_script("""
+                document.querySelectorAll('.catalogs-modal-table, .modal, .modal-backdrop').forEach(e => e.remove());
+            """)
+            return True
+        except Exception as e:
+            print(f"モーダル閉じエラー: {str(e)[:30]}")
+            return False
+
+    def _extract_images_from_zip(self, zip_path, brand_name, catalog_id):
+        try:
+            extract_dir = os.path.join(CONFIG['extracted_images_dir'], brand_name, catalog_id)
+            os.makedirs(extract_dir, exist_ok=True)
+            
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+            
+            image_files = []
+            for root, dirs, files in os.walk(extract_dir):
+                for file in files:
+                    if file.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp')):
+                        old_path = os.path.join(root, file)
+                        new_filename = f"{brand_name}_{catalog_id}_{len(image_files)+1}_{file}"
+                        new_path = os.path.join(extract_dir, new_filename)
+                        os.rename(old_path, new_path)
+                        image_files.append(new_path)
+            
+            return len(image_files), image_files
+        except Exception as e:
+            print(f"ZIP解凍エラー: {e}")
+            return 0, []
+
+    def _download_file(self, url, brand_name, catalog_id):
+        session = requests.Session()
+        for c in self.driver.get_cookies():
+            session.cookies.set(c['name'], c['value'])
+        headers = {
+            'Referer': self.driver.current_url,
+            'User-Agent': self.driver.execute_script("return navigator.userAgent;")
+        }
+        
+        response = session.get(url, headers=headers)
+        if response.status_code == 200:
+            file_hash = hashlib.md5(response.content).hexdigest()
+            if catalog_id in self.downloaded_catalog_ids or file_hash in self.downloaded_hashes:
+                return False, None
+            
+            save_dir = os.path.join(CONFIG['base_dir'], brand_name, catalog_id)
+            os.makedirs(save_dir, exist_ok=True)
+            zip_path = os.path.join(save_dir, f'catalog_{catalog_id}.zip')
+            
+            with open(zip_path, 'wb') as f:
+                f.write(response.content)
+            
+            image_count, image_files = self._extract_images_from_zip(zip_path, brand_name, catalog_id)
+            
+            record = {
+                'brand': brand_name,
+                'catalog_id': catalog_id,
+                'zip_path': zip_path,
+                'extracted_dir': os.path.join(CONFIG['extracted_images_dir'], brand_name, catalog_id),
+                'download_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'image_count': image_count,
+                'file_size': os.path.getsize(zip_path),
+                'first_image_path': image_files[0] if image_files else '',
+                'all_image_paths': '|'.join(image_files),
+                'status': 'success'
+            }
+            
+            self.csv_records.append(record)
+            self.downloaded_hashes.add(file_hash)
+            self.downloaded_catalog_ids.add(catalog_id)
+            
+            self._add_to_google_sheet(record)
+            
+            return True, record
+        return False, None
+
+    def _add_to_google_sheet(self, record):
+        if self.worksheet:
+            try:
+                row_data = [
+                    record['brand'],
+                    record['catalog_id'],
+                    record['zip_path'],
+                    record['extracted_dir'],
+                    record['download_date'],
+                    record['image_count'],
+                    record['file_size'],
+                    record['first_image_path'],
+                    record['all_image_paths'],
+                    record['status']
+                ]
+                self.worksheet.append_row(row_data)
+                print(f"Googleスプレッドシートに追加: {record['brand']} {record['catalog_id']}")
+            except Exception as e:
+                print(f"Googleスプレッドシート追加エラー: {e}")
+
+    def get_popular_brands(self, limit=50):
+        return {
+            203: "GUCCI",
+            290: "PRADA", 
+            142: "CHANEL",
+            180: "HERMES",
+            195: "LOUIS VUITTON",
+            215: "BOTTEGA VENETA",
+            183: "CELINE",
+            186: "BALENCIAGA",
+            164: "SAINT LAURENT",
+            202: "DIOR",
+            147: "FENDI",
+            167: "VALENTINO",
+            144: "COACH",
+            155: "BURBERRY",
+            172: "MONCLER",
+            149: "MARC JACOBS",
+            222: "MARNI",
+            146: "CHLOE",
+            209: "TORY BURCH",
+            176: "JIMMY CHOO",
+            191: "MICHAEL KORS",
+            214: "VERSACE",
+            141: "BVLGARI",
+            227: "ROBINMAY",
+            204: "LONGCHAMP",
+            225: "GIANNI CHIARINI",
+            228: "MM6 MAISON MARGIELA",
+            148: "MAISON MARGIELA",
+            150: "HAY",
+            299: "NIKE",
+            300: "adidas",
+            301: "PUMA",
+        }
+
+    def process_catalog(self, row, brand_name):
+        try:
+            self._force_close_modals()
+            catalog_id = row.find_element(By.CSS_SELECTOR, 'span.catalogs-table__contents-id').text.strip()
+            
+            image_cell = WebDriverWait(row, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, '.catalogs-table__image-item > .catalogs-table__image'))
+            )
+            ActionChains(self.driver).move_to_element(image_cell).pause(0.5).click().perform()
+            
+            WebDriverWait(self.driver, 15).until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, ".catalogs-modal-table"))
+            )
+            
+            download_link = WebDriverWait(self.driver, 15).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "a.catalogs-modal-table__link"))
+            )
+            download_url = download_link.get_attribute('href')
+            
+            success, record = self._download_file(download_url, brand_name, catalog_id)
+            if success:
+                print(f"成功: {brand_name} {catalog_id} (画像{record['image_count']}枚)")
+            else:
+                print(f"スキップ: {brand_name} {catalog_id}")
+            
+            self._force_close_modals()
+            return True
+            
+        except Exception as e:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.driver.save_screenshot(os.path.join(CONFIG['screenshot_dir'], f'error_{timestamp}.png'))
+            with open(os.path.join(CONFIG['screenshot_dir'], f'error_{timestamp}.html'), 'w', encoding='utf-8') as f:
+                f.write(self.driver.page_source)
+            print(f"エラー発生: {str(e)[:100]}")
+            return False
+
+    def process_pagination(self, base_url, brand_name):
+        page_num = 1
+        while not self.stop_flag:
+            try:
+                self.driver.get(f"{base_url}&page={page_num}" if "?brand_id=" in base_url else f"{base_url}?page={page_num}")
+                WebDriverWait(self.driver, 20).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, 'tr.catalogs-table__row'))
+                )
+                
+                rows = self.driver.find_elements(By.CSS_SELECTOR, 'tr.catalogs-table__row')
+                if not rows:
+                    break
+                    
+                for row in rows:
+                    if self.stop_flag:
+                        return
+                    self.process_catalog(row, brand_name)
+                    self._human_like_delay()
+                
+                try:
+                    next_btn = WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable((By.CSS_SELECTOR, 'a.pagination__next:not([disabled])'))
+                    )
+                    page_num += 1
+                    self._human_like_delay()
+                except (NoSuchElementException, TimeoutException):
+                    print(f"{brand_name} の最終ページに到達")
+                    break
+            except Exception as e:
+                print(f"ページ処理エラー（{brand_name}）: {str(e)}")
+                self.driver.save_screenshot(os.path.join(CONFIG['screenshot_dir'], f'pagination_error_{brand_name}.png'))
+                break
+
+    def _save_csv_summary(self):
+        if not self.csv_records:
+            return
+        
+        fieldnames = [
+            'brand', 'catalog_id', 'zip_path', 'extracted_dir',
+            'download_date', 'image_count', 'file_size',
+            'first_image_path', 'all_image_paths', 'status'  # ← ここに'all_image_paths'を追加
+        ]
+        
+        with open(CONFIG['csv_path'], 'w', newline='', encoding='utf-8-sig') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(self.csv_records)
+        
+        print(f"詳細レポート保存: {CONFIG['csv_path']}")
+        
+        total_downloads = len(self.csv_records)
+        total_images = sum(record['image_count'] for record in self.csv_records)
+        total_size_mb = sum(record['file_size'] for record in self.csv_records) / (1024 * 1024)
+        
+        summary = f"""
+=== ダウンロード完了サマリー ===
+総ダウンロード数: {total_downloads}件
+総画像数: {total_images}枚
+総ファイルサイズ: {total_size_mb:.2f}MB
+保存先: {CONFIG['base_dir']}
+解凍画像: {CONFIG['extracted_images_dir']}
+CSV詳細: {CONFIG['csv_path']}
+Googleスプレッドシート: {'連携済み' if self.worksheet else '未接続'}
+        """
+        print(summary)
+
+    def main_flow(self):
+        try:
+            if self.worksheet:
+                try:
+                    headers = ['Brand', 'Catalog_ID', 'ZIP_Path', 'Extracted_Dir', 
+                             'Download_Date', 'Image_Count', 'File_Size_Bytes', 
+                             'First_Image_Path', 'All_Image_Paths', 'Status']
+                    self.worksheet.clear()
+                    self.worksheet.append_row(headers)
+                    print("Googleスプレッドシートヘッダー設定完了")
+                except Exception as e:
+                    print(f"ヘッダー設定エラー: {e}")
+            
+            self.driver.get('https://www.buyma.com/login/')
+            input("手動ログイン後、Enterを押してください...\n（途中で止めたい場合はCtrl+C）")
+
+            popular_brands = self.get_popular_brands(30)
+            print(f"処理対象ブランド: {list(popular_brands.values())}")
+            
+            for brand_id, brand_name in popular_brands.items():
+                if self._safety_check():
+                    break
+                
+                print(f"\n{brand_name}の処理を開始します...")
+                catalog_url = f'https://www.buyma.com/my/sell/catalogs?brand_id={brand_id}'
+                self.process_pagination(catalog_url, brand_name)
+
+        except KeyboardInterrupt:
+            print("\nユーザー要求により停止しました")
+            self.stop_flag = True
+        except Exception as e:
+            print(f"致命的エラー: {str(e)}")
+        finally:
+            self.cleanup()
+
+    def _safety_check(self):
+        self.request_count += 1
+        if self.request_count >= CONFIG['safety']['max_daily_requests']:
+            print("1日のリクエスト上限に達しました")
+            return True
+        if self.error_count >= CONFIG['safety']['error_threshold']:
+            print("エラーが多発したため停止します")
+            return True
+        return False
+
+    def cleanup(self):
+        self._save_csv_summary()
+        self.driver.quit()
+        print("リソースを解放しました")
+
+# --- 実行部分 ---
+if __name__ == "__main__":
+    print("BUYMA画像自動収集ツール（SDカードD:ドライブ対応版）")
+    print("必要な設定:")
+    print("1. SDカードがD:ドライブとして認識されていること")
+    print("2. credentials.jsonがD:ルートにあること")
+    print("3. スプレッドシートの共有設定（サービスアカウント追加）")
+    print("-" * 50)
+    
+    manager = BUYMACatalogManager()
+    manager.main_flow()
+
+
+# === File: app\utils\csv_handler.py ===
+
+# app/utils/csv_handler.py
+import csv
+from io import TextIOWrapper
+from app import db # dbオブジェクトをインポート
+from app.models import Product # Productモデルをインポート
+
+def import_products_from_csv(file):
+    # ファイルをUTF-8で開く
+    csv_file = TextIOWrapper(file, encoding='utf-8')
+    reader = csv.DictReader(csv_file)
+    
+    # 既存のデータをクリアするか、更新するかは要検討
+    # ここでは単純に追加する例
+
+    for row in reader:
+        try:
+            # CSVの列名とProductモデルの属性名を合わせる
+            # CSVファイルが以下の列を持つと仮定: '商品名', 'ブランド', '仕入価格', '販売価格', '仕入先URL', '画像URL', '在庫状況'
+            product = Product(
+                name=row.get('商品名', ''),
+                brand=row.get('ブランド', ''),
+                purchase_price=float(row.get('仕入価格', 0.0)),
+                selling_price=float(row.get('販売価格', 0.0)),
+                supplier_url=row.get('仕入先URL', ''),
+                image_url=row.get('画像URL', ''),
+                stock_status=(row.get('在庫状況', 'True').lower() == 'true') # 'True'/'False'文字列を真偽値に変換
+            )
+            # 利益率を計算して設定
+            product.profit_margin = product.calculate_profit()
+            db.session.add(product)
+        except ValueError as e:
+            print(f"CSVインポートエラー: 数値変換失敗 - {row}, エラー: {e}")
+            # エラー処理。スキップするか、ログに記録するかなど
+            continue
+        except KeyError as e:
+            print(f"CSVインポートエラー: 必須列が見つかりません - {e}, 行データ: {row}")
+            continue
+
+    db.session.commit()
+
+# === File: app\utils\existing_image_processor.py ===
+
+# ──────────────────────────────────────────────────────────────
+#  existing_image_processor.py  ― 色ズレ・失敗検知・自動停止付き完全版
+# ----------------------------------------------------------------
+#  必要ライブラリ
+#     pip install rembg pillow opencv-python numpy pyoxipng
+# ----------------------------------------------------------------
+import io, sys, zipfile
+from pathlib import Path
+
+import cv2
+import numpy as np
+from PIL import Image
+from rembg import remove, new_session
+
+try:
+    import pyoxipng           # Rust 圧縮ライブラリ
+except ImportError:
+    pyoxipng = None           # 無くても動く（Pillow 圧縮のみ）
+
+# ── 設定 ────────────────────────────────────────────────────
+BASE_DIR        = r"D:\catalog_images"   # 画像&ZIP ルート
+MAX_W           = 1200                  # 横幅リサイズ上限
+MAX_BYTES       = 5_000_000             # 5 MB 超は JPEG にフォールバック
+JPEG_QUAL       = 90                    # JPEG 品質
+
+MAX_CONSEC_FAIL = 5                     # 連続失敗で停止
+MAX_TOTAL_FAIL  = 50                    # 累計失敗で停止
+FAIL_SIZE_KB    = 15                    # 15 KB 未満を失敗とみなす
+# ──────────────────────────────────────────────────────────
+
+
+def cleanup_previous_results(base: Path):
+    """旧 *_bg.* を全削除して再処理"""
+    targets = [*base.rglob("*_bg.png"), *base.rglob("*_bg.jpg")]
+    if targets:
+        print(f"[CLEANUP] 旧結果 {len(targets)} ファイル削除")
+        for f in targets:
+            f.unlink(missing_ok=True)
+
+
+def unzip_all(base: Path):
+    """ZIP 自動展開"""
+    for z in base.rglob("*.zip"):
+        dst = z.with_suffix("")
+        if dst.exists():
+            continue
+        try:
+            print(f"[UNZIP] {z.relative_to(base)}")
+            with zipfile.ZipFile(z) as zf:
+                zf.extractall(dst)
+        except zipfile.BadZipFile:
+            print(f"[WARN] 壊れた ZIP: {z}")
+
+
+def optimize_png(rgba: np.ndarray, out_path: Path):
+    """RGBA numpy → PNG-8 → (任意) oxipng 圧縮"""
+    img = Image.fromarray(rgba, mode="RGBA")
+
+    if img.width > MAX_W:
+        h = int(img.height * MAX_W / img.width)
+        img = img.resize((MAX_W, h), Image.LANCZOS)
+
+    img8 = img.quantize(method=Image.Quantize.FASTOCTREE,
+                        dither=Image.Dither.NONE)
+
+    buf = io.BytesIO()
+    img8.save(buf, format="PNG", optimize=True)
+    data = buf.getvalue()
+
+    if pyoxipng:
+        data = pyoxipng.optimize(data, level=4, strip=True)
+
+    out_path.write_bytes(data)
+
+    if out_path.stat().st_size > MAX_BYTES:
+        raise ValueError("PNG > 5 MB")
+
+
+def save_white_jpeg(rgba: np.ndarray, out_path: Path):
+    """白背景 JPEG 保存（RGB → BGR 変換込み）"""
+    rgb   = rgba[:, :, :3]
+    alpha = rgba[:, :, 3:] / 255.0
+    white = np.full_like(rgb, 255)
+    merged = (alpha * rgb + (1 - alpha) * white).astype(np.uint8)
+    bgr = cv2.cvtColor(merged, cv2.COLOR_RGB2BGR)
+    cv2.imwrite(str(out_path), bgr,
+                [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUAL])
+
+
+def is_failure(file: Path, rgba: np.ndarray) -> bool:
+    """極端に小さい or アルファ全同値なら失敗"""
+    if file.stat().st_size <= FAIL_SIZE_KB * 1024:
+        return True
+    a = rgba[:, :, 3]
+    return a.min() == a.max()
+
+
+def process_single(bgr: np.ndarray, png_out: Path, jpg_out: Path):
+    """色空間を統一して 1 枚処理"""
+    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+    rgba = np.array(remove(Image.fromarray(rgb)))  # RGB→RGBA
+    try:
+        optimize_png(rgba, png_out)
+        return png_out, "PNG", rgba
+    except Exception as e:
+        print(f"[WARN] {e} → JPEG 保存")
+        save_white_jpeg(rgba, jpg_out)
+        return jpg_out, "JPG", rgba
+
+
+def process_images(base_dir: str = BASE_DIR):
+    base = Path(base_dir)
+
+    print("[WARMUP] rembg モデル初期化（初回のみ数十秒）")
+    new_session("u2net")
+    print("[WARMUP] OK\n")
+
+    cleanup_previous_results(base)
+    unzip_all(base)
+
+    files = [*base.rglob("*.jpg"), *base.rglob("*.jpeg")]
+    print(f"[INFO] 処理対象 JPEG: {len(files)} 枚")
+
+    consec_fail = total_fail = 0
+
+    for idx, p in enumerate(files, 1):
+        png_out = p.parent / f"{p.stem}_bg.png"
+        jpg_out = p.parent / f"{p.stem}_bg.jpg"
+
+        bgr = cv2.imread(str(p))
+        if bgr is None:
+            print(f"[SKIP] 読込失敗: {p}")
+            continue
+
+        try:
+            out_file, kind, rgba = process_single(bgr, png_out, jpg_out)
+        except Exception as e:
+            print(f"[ERR] {p.name} → {e}")
+            consec_fail += 1; total_fail += 1
+            continue
+
+        kb = out_file.stat().st_size // 1024
+        print(f"[{idx}] {kind} {out_file.name} {kb} KB")
+
+        if is_failure(out_file, rgba):
+            print(f"[FAIL] {out_file.name} を異常検知")
+            consec_fail += 1; total_fail += 1
+        else:
+            consec_fail = 0
+
+        if consec_fail >= MAX_CONSEC_FAIL:
+            print(f"[ABORT] 連続 {consec_fail} 回失敗 → 停止")
+            sys.exit(1)
+        if total_fail >= MAX_TOTAL_FAIL:
+            print(f"[ABORT] 累計 {total_fail} 件失敗 → 停止")
+            sys.exit(1)
+
+
+if __name__ == "__main__":
+    process_images()
+
+
+# === File: app\utils\generate_descriptions.py ===
+
+import os
+import requests
+import csv
+import time
+import random
+from dotenv import load_dotenv
+from datetime import datetime
+
+# 環境変数の読み込み
+load_dotenv()
+
+class BUYMADescriptionGenerator:
+    def __init__(self):
+        self.api_key = os.getenv("PERPLEXITY_API_KEY")
+        self.endpoint = "https://api.perplexity.ai/chat/completions"
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "BUYMA-Auto-Desc/3.0"
+        }
+        self.model = "sonar-pro"  # 最新有効モデル名
+
+    def _create_log(self, message, log_type="error"):
+        log_dir = os.path.join(os.path.dirname(__file__), "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{log_type}_{timestamp}.log"
+        with open(os.path.join(log_dir, filename), "w", encoding="utf-8") as f:
+            f.write(message)
+
+    def _call_api(self, payload):
+        try:
+            response = requests.post(
+                self.endpoint,
+                headers=self.headers,
+                json=payload,
+                timeout=30
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as e:
+            error_msg = f"HTTP Error: {e.response.status_code}\n{e.response.text}"
+            self._create_log(error_msg)
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Request Failed: {str(e)}"
+            self._create_log(error_msg)
+        except Exception as e:
+            error_msg = f"Unexpected Error: {str(e)}"
+            self._create_log(error_msg)
+        return None
+
+    def generate_description(self, product_info):
+        prompt = f"""
+        あなたはBUYMA専門のプロコピーライターです。
+        以下の条件で商品説明文を日本語で作成してください。
+
+        [要件]
+        1. 300-500文字
+        2. ブランド名とカテゴリを自然に配置
+        3. 商品の特徴を3点箇条書き
+        4. 感情に訴える表現（例: 「上質なレザーの風合い」）
+        5. 急かし表現や「今すぐ」などの強い勧誘は避ける
+        6. 重複表現を避け、情報を簡潔に整理
+        7. 生活シーンや使用イメージを盛り込む
+        8. 読み手に自然に提案する口調で仕上げる
+
+        [商品情報]
+        ブランド: {product_info.get('brand', '')}
+        商品名: {product_info.get('name', '')}
+        カテゴリ: {product_info.get('category', '')}
+        特徴: {product_info.get('features', '')}
+        素材: {product_info.get('materials', '')}
+        サイズ: {product_info.get('size', '')}
+        カラー: {product_info.get('color', '')}
+        対象層: {product_info.get('target', '')}
+        価格帯: {product_info.get('price_range', '')}
+        """
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": "あなたは高級ファッション専門のコピーライターです。"},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.7,
+            "max_tokens": 1000
+        }
+        result = self._call_api(payload)
+        return result['choices'][0]['message']['content'].strip() if result else None
+
+    def batch_process(self, products, retry=3):
+        results = []
+        for idx, product in enumerate(products):
+            attempt = 0
+            while attempt < retry:
+                try:
+                    print(f"処理中 ({idx+1}/{len(products)})")
+                    desc = self.generate_description(product)
+                    if desc:
+                        results.append({**product, "description": desc})
+                        break
+                    else:
+                        attempt += 1
+                        time.sleep(2 ** attempt)
+                except Exception as e:
+                    print(f"エラー: {str(e)}")
+                    attempt += 1
+            time.sleep(random.uniform(1, 3))
+        return results
+
+if __name__ == "__main__":
+    generator = BUYMADescriptionGenerator()
+    sample_products = [
+        {
+            "brand": "PRADA",
+            "name": "シンフォニー トートバッグ",
+            "category": "トートバッグ",
+            "features": "軽量ナイロン素材、大容量収納",
+            "materials": "ナイロン",
+            "size": "W35cm x H25cm x D15cm",
+            "color": "ブラック",
+            "target": "20-30代女性",
+            "price_range": "15-20万円"
+        }
+    ]
+    processed_data = generator.batch_process(sample_products)
+    if processed_data:
+        output_path = os.path.join(os.path.dirname(__file__), 'output.csv')
+        with open(output_path, 'w', newline='', encoding='utf-8-sig') as f:
+            writer = csv.DictWriter(f, fieldnames=processed_data[0].keys())
+            writer.writeheader()
+            writer.writerows(processed_data)
+        print(f"CSVファイルを正常に出力しました: {output_path}")
+    else:
+        print("処理に失敗しました。ログを確認してください。")
+
+
+# === File: app\utils\image_crawler.py ===
+
+# image_crawler.py ─ DeepLab v3 (MobileNetV3-ONNX 版)
+# 依存: torch torchvision onnx opencv-python numpy icrawler requests
+# ------------------------------------------------------------
+from __future__ import annotations
+import cv2, numpy as np, requests
+from icrawler.builtin import BingImageCrawler, GoogleImageCrawler
+from pathlib import Path
+from typing import List
+
+# 1. モデルファイル
+MODEL_DIR  = Path(__file__).parent / "models"
+ONNX_FILE  = MODEL_DIR / "deeplabv3_mnv3.onnx"
+
+# 2. ダウンロード処理は廃止（ローカルに無ければ明示エラー）
+def ensure_model() -> None:
+    if ONNX_FILE.exists():
+        print("✓ DeepLab ONNX モデルは既に存在します")
+        return
+    raise FileNotFoundError(
+        f"{ONNX_FILE.name} がありません。\n"
+        "1) app/utils/models で make_deeplab_onnx.py を実行して生成する\n"
+        "2) 生成した deeplabv3_mnv3.onnx を models フォルダに置いて再実行してください"
+    )
+
+# 3. 深度学習セグメンテーション
+class DeepLabSeg:
+    def __init__(self, onnx: Path, use_cuda=False):
+        self.net = cv2.dnn.readNetFromONNX(str(onnx))
+        backend = cv2.dnn.DNN_BACKEND_CUDA if use_cuda else cv2.dnn.DNN_BACKEND_OPENCV
+        target  = cv2.dnn.DNN_TARGET_CUDA  if use_cuda else cv2.dnn.DNN_TARGET_CPU
+        self.net.setPreferableBackend(backend)
+        self.net.setPreferableTarget(target)
+
+    def remove_bg(self, img: np.ndarray, blur=5) -> np.ndarray:
+        h, w = img.shape[:2]
+        blob = cv2.dnn.blobFromImage(img, 1/127.5, (513, 513), (127.5,)*3, swapRB=True)
+        self.net.setInput(blob)
+        mask = self.net.forward()[0].argmax(0).astype(np.uint8)
+        mask = cv2.resize(mask, (w, h), cv2.INTER_NEAREST)
+        fg_mask = cv2.medianBlur(mask*255, blur) if blur else mask*255
+        fg = cv2.bitwise_and(img, img, mask=fg_mask)
+        return np.where(fg_mask[..., None] == 255, fg, 255)
+
+# 4. 画像検索＋背景除去
+def crawl_and_remove_bg(keyword: str, max_num=30,
+                        engines: List[str] | None = None,
+                        use_cuda=False) -> Path:
+    engines = engines or ["bing", "google"]
+    out_dir = Path(__file__).parent / "images" / keyword.replace(" ", "_")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    if "bing" in engines:
+        BingImageCrawler(storage={"root_dir": str(out_dir)}).crawl(keyword, max_num)
+    if "google" in engines:
+        GoogleImageCrawler(storage={"root_dir": str(out_dir)}).crawl(keyword, max_num)
+
+    ensure_model()
+    seg = DeepLabSeg(ONNX_FILE, use_cuda)
+
+    for p in out_dir.glob("*.jpg"):
+        try:
+            img = cv2.imread(str(p))
+            out_path = p.with_stem(p.stem + "_bg").with_suffix(".png")
+            cv2.imwrite(str(out_path), seg.remove_bg(img))
+            print("✓", p.name)
+        except Exception as e:
+            print("×", p.name, e)
+    return out_dir
+
+def crawl_images(keyword, max_num=50, engines=None):
+    return crawl_and_remove_bg(keyword, max_num, engines or ["bing", "google"])
+
+# 5. CLI
+if __name__ == "__main__":
+    kw = input("検索キーワードを入力してください：")
+    print("完了→", crawl_and_remove_bg(kw, 50, ["bing"]).resolve())
+
+
+# === File: app\utils\pricing_calculator.py ===
+
+# app/utils/pricing_calculator.py
+
+def calculate_profit(purchase_price, selling_price, shipping_cost=0, fee_rate=0.15):
+    """
+    商品の利益を計算します。
+    :param purchase_price: 仕入価格
+    :param selling_price: 販売価格
+    :param shipping_cost: 想定される発送費用 (固定値または動的に計算)
+    :param fee_rate: 販売プラットフォームの手数料率 (例: BUYMAの15%)
+    :return: 利益
+    """
+    fees = selling_price * fee_rate
+    profit = selling_price - purchase_price - fees - shipping_cost
+    return profit
+
+# === File: app\utils\models\make_deeplab_onnx.py ===
+
+# make_deeplab_onnx.py
+import torch, torchvision
+
+# 1) 学習済み DeepLab v3 + MobileNetV3 Large（Cityscapes 21クラス）
+model = torchvision.models.segmentation.deeplabv3_mobilenet_v3_large(weights="DEFAULT")  # PyTorch 2.2 時点で公開[3]
+model.eval()
+
+# 2) ダミー入力（513×513 は元論文の標準解像度）
+dummy = torch.randn(1, 3, 513, 513)
+
+# 3) ONNX にエクスポート
+torch.onnx.export(
+    model, dummy, "deeplabv3_mnv3.onnx",
+    input_names=["input"], output_names=["output"],
+    dynamic_axes={"input": {0: "batch"}, "output": {0: "batch"}},
+    opset_version=12                                            # OpenCV 4.7+ が正式対応[3]
+)
+print("✓ deeplabv3_mnv3.onnx を生成しました")
+
+
+# === File: tools\check_csv.py ===
+
+import pandas as pd
+
+# CSVファイルをcp932で読み込む
+df = pd.read_csv('tools/buyma_products.csv', encoding='cp932')
+
+def check_constraints(product):
+    errors = []
+    # 必要に応じて型変換
+    try:
+        price = float(product.get("価格", 0))
+        weight = float(product.get("重量", 0))
+        battery = str(product.get("電池有無", "")).strip()
+        size_sum = float(product.get("3辺和", 0))
+        insurance = float(product.get("保険金額", 0))
+        region = str(product.get("地域", "")).strip()
+        anonymity = str(product.get("匿名希望", "")).strip() == "あり"
+        shipping = str(product.get("発送方法", "")).strip()
+    except Exception as e:
+        errors.append(f"データ型エラー: {e}")
+        return errors
+
+    if price >= 500000 and shipping == "DHL EXPRESS":
+        errors.append("DHLは50万円以上の商品不可")
+    if weight > 10 and shipping == "DHL EXPRESS":
+        errors.append("DHLは10kg超不可")
+    if battery == "あり" and shipping == "Speedpost":
+        errors.append("Speedpostは電池類不可")
+    if size_sum > 200 and shipping == "BUYMA YAMATO":
+        errors.append("BUYMA YAMATOは3辺和200cm超不可")
+    if insurance > 500 and shipping == "USPS特別割引":
+        errors.append("USPS特別割引は$500超不可")
+    return errors
+
+def select_shipping(product):
+    price = float(product.get("価格", 0))
+    weight = float(product.get("重量", 0))
+    battery = str(product.get("電池有無", "")).strip()
+    region = str(product.get("地域", "")).strip()
+    anonymity = str(product.get("匿名希望", "")).strip() == "あり"
+
+    if price >= 500000 or weight > 10:
+        return "BUYMA YAMATO" if region == "北米" else "個別見積もり"
+    if battery == "あり":
+        return "DHL EXPRESS"
+    if region == "北米" and anonymity:
+        return "BUYMA YAMATO"
+    if price <= 500 and region == "アメリカ":
+        return "USPS特別割引"
+    if region == "香港" and battery != "あり":
+        return "Speedpost"
+    return "標準発送"
+
+# 商品ごとに判定＆チェック
+for idx, row in df.iterrows():
+    product = row.to_dict()
+    product["発送方法"] = select_shipping(product)
+    errors = check_constraints(product)
+    if errors:
+        print(f"エラー: {product.get('商品管理番号', idx+1)} - {', '.join(errors)}")
+    else:
+        print(f"OK: {product.get('商品管理番号', idx+1)} - {product['発送方法']}")
+
+# 必要なら発送方法をファイルに保存
+df["発送方法自動判定"] = df.apply(select_shipping, axis=1)
+df.to_csv('tools/buyma_products_checked.csv', encoding='cp932', index=False)
+print("\n判定結果を 'tools/buyma_products_checked.csv' に保存しました。")
+
+
+# === File: tools\research_tool.py ===
+
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from bs4 import BeautifulSoup
+import csv
+import time
+import random
+import os
+import re
+from urllib.parse import urljoin
+
+# ====================
+# 設定部分（必要に応じて変更）
+# ====================
+BASE_URL = "https://www.buyma.com/r/_%s/"  # ブランド名を%sに挿入
+BRANDS = ["GUCCI", "PRADA"]                # 対象ブランドリスト
+MAX_PAGES = 2                              # 最大取得ページ数
+DELAY_RANGE = (10, 30)                     # ランダム待機時間（秒）
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X)..."
+]
+PROXIES = [
+    "http://proxy1.example.com:8080",
+    "http://proxy2.example.com:8080"
+]
+
+# ====================
+# Chrome設定
+# ====================
+def setup_driver():
+    chrome_options = Options()
+    
+    # Headlessモード
+    chrome_options.add_argument("--headless=new")
+    
+    # プロキシ設定
+    chrome_options.add_argument(f"--proxy-server={random.choice(PROXIES)}")
+    
+    # ユーザーエージェントローテーション
+    chrome_options.add_argument(f"--user-agent={random.choice(USER_AGENTS)}")
+    
+    # 基本設定
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    chrome_options.add_experimental_option("useAutomationExtension", False)
+    
+    return webdriver.Chrome(options=chrome_options)
+
+# ====================
+# 商品詳細取得関数
+# ====================
+def get_product_details(driver, product_url):
+    """商品詳細ページから追加情報を取得"""
+    try:
+        driver.get(product_url)
+        time.sleep(random.uniform(*DELAY_RANGE))
+        
+        WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div.product_detail"))
+        )
+        
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        
+        # 追加情報取得例
+        description = soup.select_one('div.product_description').text.strip()[:200] + "..." if soup.select_one('div.product_description') else ""
+        seller_info = soup.select_one('div.seller_profile').text.strip()[:100] + "..." if soup.select_one('div.seller_profile') else ""
+        
+        return {
+            'description': description,
+            'seller_info': seller_info
+        }
+        
+    except Exception as e:
+        print(f"詳細ページエラー: {str(e)}")
+        return {}
+
+# ====================
+# メインスクレイピング関数
+# ====================
+def scrape_brand(driver, brand):
+    csv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools', f'buyma_{brand.lower()}_products.csv')
+    products = []
+    
+    for page in range(1, MAX_PAGES + 1):
+        try:
+            # ページアクセス
+            url = BASE_URL % brand + f"?pageno={page}"
+            driver.get(url)
+            time.sleep(random.uniform(*DELAY_RANGE))
+            
+            # 商品コンテナ待機
+            WebDriverWait(driver, 30).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "div.product_body"))
+            )
+            
+            # ページネーション確認
+            soup = BeautifulSoup(driver.page_source, 'html.parser')
+            next_page = soup.select_one('a.pagination_next:not(.disabled)')
+            if not next_page and page != 1:
+                break
+                
+            # 商品情報取得
+            for item in soup.select('div.product_body'):
+                # 基本情報
+                name_elem = item.select_one('div.product_name')
+                name = name_elem.text.strip()[:50] + "..." if name_elem else "商品名不明"
+                name = re.sub(r'★|即発送|SALE\!|即納|新品', '', name).strip()
+
+                # 価格
+                price_elem = item.select_one('span.Price_Txt') or \
+                            item.select_one('div.product_price span') or \
+                            item.select_one('.price')
+                price = re.sub(r'[^\d,]', '', price_elem.text.strip()).replace(',', '') if price_elem else "0"
+
+                # 画像URL
+                image_elem = item.select_one('img[loading="lazy"]')
+                image_url = ""
+                if image_elem:
+                    image_url = image_elem.get('data-src') or image_elem.get('src')
+                    if image_url.startswith('//'):
+                        image_url = 'https:' + image_url
+                    elif image_url.startswith('/'):
+                        image_url = urljoin(url, image_url)
+
+                # 詳細情報（確率制限）
+                details = {}
+                if random.random() < 0.3:
+                    detail_link = item.select_one('a.product_name')['href']
+                    details = get_product_details(driver, urljoin(url, detail_link)) if detail_link else {}
+                
+                products.append({
+                    'brand': brand,
+                    'name': name,
+                    'price': price,
+                    'image_url': image_url,
+                    **details
+                })
+
+        except Exception as e:
+            print(f"ページ{page}処理中にエラー: {str(e)}")
+            continue
+
+    # CSV保存
+    if products:
+        with open(csv_path, 'w', newline='', encoding='cp932', errors='replace') as f:
+            writer = csv.DictWriter(f, fieldnames=['brand', 'name', 'price', 'image_url', 'description', 'seller_info'])
+            writer.writeheader()
+            writer.writerows(products)
+        print(f"{brand} - {len(products)}件の商品を保存しました")
+    else:
+        print(f"{brand} - 商品データが0件のため保存をスキップしました")
+
+# ====================
+# メイン実行
+# ====================
+def main():
+    driver = setup_driver()
+    try:
+        for brand in BRANDS:
+            start_time = time.time()
+            scrape_brand(driver, brand)
+            elapsed_time = time.time() - start_time
+            sleep_time = max(random.randint(*DELAY_RANGE) - elapsed_time, 5)
+            time.sleep(sleep_time)
+    finally:
+        driver.quit()
+
+if __name__ == "__main__":
+    main()
+
+
+# === File: tools\scripts\inventory_manager.py ===
+
+import pandas as pd
+import json
+from datetime import datetime
+import os
+
+# 設定
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CSV_PATH = os.path.join(BASE_DIR, 'tools', 'buyma_products.csv')
+INVENTORY_FILE = os.path.join(BASE_DIR, 'tools', 'inventory.json')
+
+class InventoryManager:
+    """在庫管理システム"""
+    def __init__(self):
+        self.inventory = {}
+        self.load_inventory()
+    
+    def load_inventory(self):
+        try:
+            with open(INVENTORY_FILE, 'r', encoding='utf-8') as f:
+                self.inventory = json.load(f)
+        except FileNotFoundError:
+            self.inventory = {}
+    
+    def save_inventory(self):
+        with open(INVENTORY_FILE, 'w', encoding='utf-8') as f:
+            json.dump(self.inventory, f, ensure_ascii=False, indent=2)
+    
+    def update_stock(self, item_id, quantity):
+        self.inventory[item_id] = {
+            "quantity": quantity,
+            "last_updated": datetime.now().isoformat(),
+            "status": "在庫あり" if quantity > 0 else "在庫切れ"
+        }
+        self.save_inventory()
+    
+    def get_stock(self, item_id):
+        return self.inventory.get(item_id, {"quantity": 0, "status": "未登録"})
+
+def detect_category(text):
+    """カテゴリ自動判定ロジック（テキストのみ）"""
+    if not isinstance(text, str):
+        text = str(text)  # 念のため型変換
+    text = text.lower()
+    categories = {
+        "バッグ": ["bag", "バッグ", "トート", "ショルダー"],
+        "財布": ["wallet", "財布", "コインケース"],
+        "時計": ["watch", "時計", "クロノグラフ"],
+        "アクセサリー": ["jewelry", "ネックレス", "ブレスレット"],
+        "服飾": ["coat", "ジャケット", "ドレス", "スカート"]
+    }
+    for cat, keywords in categories.items():
+        if any(kw in text for kw in keywords):
+            return cat
+    return "その他"
+
+def process_products(inventory):
+    """商品データ処理メインロジック（自動アクセスなし）"""
+    df = pd.read_csv(CSV_PATH, encoding='cp932')
+    results = []
+    
+    for idx, row in df.iterrows():
+        product = row.to_dict()
+        item_id = product.get("商品管理番号", f"ITEM-{idx+1:03d}")
+        
+        # 在庫情報取得
+        stock = inventory.get_stock(item_id)
+        
+        # カテゴリ自動判定（商品名や説明から）
+        category = detect_category(product.get("商品名", "") + " " + product.get("商品説明", ""))
+        
+        # 発送方法判定
+        price = product.get("販売価格", 0)
+        weight = product.get("重量", 0)
+        if price >= 500000:
+            shipping_method = "DHL EXPRESS"
+        elif weight > 10:
+            shipping_method = "特別大型便"
+        elif category == "バッグ":
+            shipping_method = "BUYMA YAMATO"
+        else:
+            shipping_method = "標準発送"
+        
+        # データ統合
+        processed = {
+            **product,
+            "在庫数": stock["quantity"],
+            "在庫ステータス": stock["status"],
+            "カテゴリ（自動判定）": category,
+            "発送方法（自動判定）": shipping_method
+        }
+        results.append(processed)
+        
+        # 在庫更新（サンプル実装）
+        inventory.update_stock(item_id, processed.get("在庫数", 0))
+        
+    return pd.DataFrame(results)
+
+def main():
+    inventory = InventoryManager()
+    
+    processed_df = process_products(inventory)
+    output_path = os.path.join(BASE_DIR, 'tools', 'processed_products.csv')
+    processed_df.to_csv(output_path, index=False, encoding='cp932')
+    print(f"処理完了: {len(processed_df)}件の商品を出力")
+    
+    # 在庫アラート
+    low_stock = [k for k,v in inventory.inventory.items() if v['quantity'] < 5]
+    if low_stock:
+        print(f"警告: 在庫不足商品 {len(low_stock)}件")
+    
+    inventory.save_inventory()
+
+if __name__ == "__main__":
+    main()
+
+
+# === File: tools\scripts\shipping_checker.py ===
+
+import pandas as pd
+
+# CSVファイルをcp932で読み込む（正しいパスに修正）
+df = pd.read_csv('../buyma_products.csv', encoding='cp932')
+
+def check_constraints(product):
+    errors = []
+    # 必要に応じて型変換
+    try:
+        price = float(product.get("価格", 0))
+        weight = float(product.get("重量", 0))
+        battery = str(product.get("電池有無", "")).strip()
+        size_sum = float(product.get("3辺和", 0))
+        insurance = float(product.get("保険金額", 0))
+        region = str(product.get("地域", "")).strip()
+        anonymity = str(product.get("匿名希望", "")).strip() == "あり"
+        shipping = str(product.get("発送方法", "")).strip()
+    except Exception as e:
+        errors.append(f"データ型エラー: {e}")
+        return errors
+
+    if price >= 500000 and shipping == "DHL EXPRESS":
+        errors.append("DHLは50万円以上の商品不可")
+    if weight > 10 and shipping == "DHL EXPRESS":
+        errors.append("DHLは10kg超不可")
+    if battery == "あり" and shipping == "Speedpost":
+        errors.append("Speedpostは電池類不可")
+    if size_sum > 200 and shipping == "BUYMA YAMATO":
+        errors.append("BUYMA YAMATOは3辺和200cm超不可")
+    if insurance > 500 and shipping == "USPS特別割引":
+        errors.append("USPS特別割引は$500超不可")
+    return errors
+
+def select_shipping(product):
+    price = float(product.get("価格", 0))
+    weight = float(product.get("重量", 0))
+    battery = str(product.get("電池有無", "")).strip()
+    region = str(product.get("地域", "")).strip()
+    anonymity = str(product.get("匿名希望", "")).strip() == "あり"
+
+    if price >= 500000 or weight > 10:
+        return "BUYMA YAMATO" if region == "北米" else "個別見積もり"
+    if battery == "あり":
+        return "DHL EXPRESS"
+    if region == "北米" and anonymity:
+        return "BUYMA YAMATO"
+    if price <= 500 and region == "アメリカ":
+        return "USPS特別割引"
+    if region == "香港" and battery != "あり":
+        return "Speedpost"
+    return "標準発送"
+
+# 商品ごとに判定＆チェック
+for idx, row in df.iterrows():
+    product = row.to_dict()
+    product["発送方法自動判定"] = select_shipping(product)
+    errors = check_constraints(product)
+    if errors:
+        print(f"エラー: {product.get('商品管理番号', idx+1)} - {', '.join(errors)}")
+    else:
+        print(f"OK: {product.get('商品管理番号', idx+1)} - {product['発送方法自動判定']}")
+
+# 発送方法自動判定をCSVに保存
+df["発送方法自動判定"] = df.apply(select_shipping, axis=1)
+df.to_csv('../buyma_products_checked.csv', encoding='cp932', index=False)
+print("\n判定結果を '../buyma_products_checked.csv' に保存しました。")

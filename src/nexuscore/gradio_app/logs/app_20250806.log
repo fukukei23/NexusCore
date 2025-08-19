@@ -1,0 +1,44 @@
+2025-08-06 12:46:55,042 - INFO - [<module>] - ==================================================
+2025-08-06 12:46:55,042 - INFO - [<module>] - 🚀 アプリケーション起動: Context Agent統合システム (v2)
+2025-08-06 12:46:55,042 - INFO - [<module>] - ==================================================
+2025-08-06 12:46:55,042 - INFO - [load_api_key] - ✅ APIキーを環境変数から読み込みました。
+2025-08-06 12:46:55,042 - INFO - [<module>] - 🔗 Context Agent統合システム初期化中...
+2025-08-06 12:46:55,043 - INFO - [<module>] - 🔍 Context Agent検索中...
+2025-08-06 12:46:55,056 - WARNING - [<module>] - 完全版Context Agent失敗: (unicode error) 'unicodeescape' codec can't decode bytes in position 200-201: truncated \UXXXXXXXX escape (context_agent.py, line 5), Simple版にフォールバックします。
+2025-08-06 12:46:55,062 - INFO - [<module>] - ✅ Simple Context Agent フォールバック成功
+2025-08-06 12:46:55,062 - INFO - [<module>] - 🔗 Context Agent統合状況: [エージェント: Simple版]
+2025-08-06 12:46:55,063 - INFO - [<module>] - アプリケーションのメインブロックを実行します。
+2025-08-06 12:46:55,063 - INFO - [tab_streamlit_port] - Gradioタブの初期化を開始します。
+2025-08-06 12:46:56,022 - INFO - [_send_single_request] - HTTP Request: GET https://api.gradio.app/pkg-version "HTTP/1.1 200 OK"
+2025-08-06 13:33:28,602 - INFO - [<module>] - ==================================================
+2025-08-06 13:33:28,603 - INFO - [<module>] - 🚀 アプリケーション起動: Context Agent統合システム (v2.1)
+2025-08-06 13:33:28,603 - INFO - [<module>] - ==================================================
+2025-08-06 13:33:28,603 - INFO - [load_api_key] - ✅ APIキーを環境変数から読み込みました。
+2025-08-06 13:33:28,603 - INFO - [<module>] - 🔗 Context Agent統合システム初期化中...
+2025-08-06 13:33:28,603 - INFO - [<module>] - 🔍 Context Agent検索中...
+2025-08-06 13:33:28,605 - WARNING - [<module>] - 完全版Context Agent失敗: (unicode error) 'unicodeescape' codec can't decode bytes in position 200-201: truncated \UXXXXXXXX escape (context_agent.py, line 5), Simple版にフォールバックします。
+2025-08-06 13:33:28,614 - INFO - [<module>] - ✅ Simple Context Agent フォールバック成功
+2025-08-06 13:33:28,614 - INFO - [<module>] - 🔗 Context Agent統合状況: [エージェント: Simple版]
+2025-08-06 13:33:28,614 - INFO - [<module>] - アプリケーションのメインブロックを実行します。
+2025-08-06 13:33:28,614 - INFO - [tab_streamlit_port] - Gradioタブの初期化を開始します。
+2025-08-06 13:33:28,750 - INFO - [<module>] - Gradioアプリケーションを起動します... [http://127.0.0.1:7860](http://127.0.0.1:7860)
+2025-08-06 13:33:29,054 - INFO - [_send_single_request] - HTTP Request: GET http://127.0.0.1:7860/gradio_api/startup-events "HTTP/1.1 200 OK"
+2025-08-06 13:33:29,184 - INFO - [_send_single_request] - HTTP Request: HEAD http://127.0.0.1:7860/ "HTTP/1.1 200 OK"
+2025-08-06 13:33:29,557 - INFO - [_send_single_request] - HTTP Request: GET https://api.gradio.app/pkg-version "HTTP/1.1 200 OK"
+2025-08-06 13:38:14,998 - INFO - [generate_code_with_context_awareness] - コード生成開始: Context Agent(Simple版)使用
+2025-08-06 13:38:15,758 - INFO - [call_gpt_async] - GPT API呼び出し開始 (Model: gpt-4o-mini)
+2025-08-06 13:38:16,567 - INFO - [_send_single_request] - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+2025-08-06 13:38:16,568 - ERROR - [call_gpt_async] - GPT API エラー: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************H9wA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+Traceback (most recent call last):
+  File "C:\Users\USER\tools\NexusCore\src\nexuscore\gradio_app\streamlit_migrated_tab.py", line 150, in call_gpt_async
+    response = await client.chat.completions.create(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\tools\NexusCore\.venv\Lib\site-packages\openai\resources\chat\completions\completions.py", line 2544, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\tools\NexusCore\.venv\Lib\site-packages\openai\_base_client.py", line 1791, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\tools\NexusCore\.venv\Lib\site-packages\openai\_base_client.py", line 1591, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.AuthenticationError: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************H9wA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}

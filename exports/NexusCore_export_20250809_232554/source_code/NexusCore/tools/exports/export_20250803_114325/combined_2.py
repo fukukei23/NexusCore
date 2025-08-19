@@ -1,0 +1,15451 @@
+
+# === NexusCore/data_collection\Local-Code-Interpreter\src\bot_backend.py ===
+import json
+import copy
+import shutil
+from jupyter_backend import *
+from tools import *
+from typing import *
+from notebook_serializer import add_markdown_to_notebook, add_code_cell_to_notebook
+
+functions = [
+    {
+        "name": "execute_code",
+        "description": "This function allows you to execute Python code and retrieve the terminal output. If the code "
+                       "generates image output, the function will return the text '[image]'. The code is sent to a "
+                       "Jupyter kernel for execution. The kernel will remain active after execution, retaining all "
+                       "variables in memory.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": "The code text"
+                }
+            },
+            "required": ["code"],
+        }
+    },
+]
+
+system_msg = '''You are an AI code interpreter.
+Your goal is to help users do a variety of jobs by executing Python code.
+
+You should:
+1. Comprehend the user's requirements carefully & to the letter.
+2. Give a brief description for what you plan to do & call the provided function to run code.
+3. Provide results analysis based on the execution output.
+4. If error occurred, try to fix it.
+5. Response in the same language as the user.
+
+Note: If the user uploads a file, you will receive a system message "User uploaded a file: filename". Use the filename as the path in the code. '''
+
+with open('config.json') as f:
+    config = json.load(f)
+
+if not config['API_KEY']:
+    config['API_KEY'] = os.getenv('OPENAI_API_KEY')
+    os.unsetenv('OPENAI_API_KEY')
+
+
+def get_config():
+    return config
+
+
+def config_openai_api(api_type, api_base, api_version, api_key):
+    openai.api_type = api_type
+    openai.api_base = api_base
+    openai.api_version = api_version
+    openai.api_key = api_key
+
+
+class GPTResponseLog:
+    def __init__(self):
+        self.assistant_role_name = ''
+        self.content = ''
+        self.function_name = None
+        self.function_args_str = ''
+        self.code_str = ''
+        self.display_code_block = ''
+        self.finish_reason = 'stop'
+        self.bot_history = None
+        self.stop_generating = False
+        self.code_executing = False
+        self.interrupt_signal_sent = False
+
+    def reset_gpt_response_log_values(self, exclude=None):
+        if exclude is None:
+            exclude = []
+
+        attributes = {'assistant_role_name': '',
+                      'content': '',
+                      'function_name': None,
+                      'function_args_str': '',
+                      'code_str': '',
+                      'display_code_block': '',
+                      'finish_reason': 'stop',
+                      'bot_history': None,
+                      'stop_generating': False,
+                      'code_executing': False,
+                      'interrupt_signal_sent': False}
+
+        for attr_name in exclude:
+            del attributes[attr_name]
+        for attr_name, value in attributes.items():
+            setattr(self, attr_name, value)
+
+    def set_assistant_role_name(self, assistant_role_name: str):
+        self.assistant_role_name = assistant_role_name
+
+    def add_content(self, content: str):
+        self.content += content
+
+    def set_function_name(self, function_name: str):
+        self.function_name = function_name
+
+    def copy_current_bot_history(self, bot_history: List):
+        self.bot_history = copy.deepcopy(bot_history)
+
+    def add_function_args_str(self, function_args_str: str):
+        self.function_args_str += function_args_str
+
+    def update_code_str(self, code_str: str):
+        self.code_str = code_str
+
+    def update_display_code_block(self, display_code_block):
+        self.display_code_block = display_code_block
+
+    def update_finish_reason(self, finish_reason: str):
+        self.finish_reason = finish_reason
+
+    def update_stop_generating_state(self, stop_generating: bool):
+        self.stop_generating = stop_generating
+
+    def update_code_executing_state(self, code_executing: bool):
+        self.code_executing = code_executing
+
+    def update_interrupt_signal_sent(self, interrupt_signal_sent: bool):
+        self.interrupt_signal_sent = interrupt_signal_sent
+
+
+class BotBackend(GPTResponseLog):
+    def __init__(self):
+        super().__init__()
+        self.unique_id = hash(id(self))
+        self.jupyter_work_dir = f'cache/work_dir_{self.unique_id}'
+        self.tool_log = f'cache/tool_{self.unique_id}.log'
+        self.jupyter_kernel = JupyterKernel(work_dir=self.jupyter_work_dir)
+        self.gpt_model_choice = "GPT-3.5"
+        self.revocable_files = []
+        self.system_msg = system_msg
+        self.functions = copy.deepcopy(functions)
+        self._init_api_config()
+        self._init_tools()
+        self._init_conversation()
+        self._init_kwargs_for_chat_completion()
+
+    def _init_conversation(self):
+        first_system_msg = {'role': 'system', 'content': self.system_msg}
+        self.context_window_tokens = 0  # num of tokens actually sent to GPT
+        self.sliced = False  # whether the conversion is sliced
+        if hasattr(self, 'conversation'):
+            self.conversation.clear()
+            self.conversation.append(first_system_msg)
+        else:
+            self.conversation: List[Dict] = [first_system_msg]
+
+    def _init_api_config(self):
+        self.config = get_config()
+        api_type = self.config['API_TYPE']
+        api_base = self.config['API_base']
+        api_version = self.config['API_VERSION']
+        api_key = config['API_KEY']
+        config_openai_api(api_type, api_base, api_version, api_key)
+
+    def _init_tools(self):
+        self.additional_tools = {}
+
+        tool_datas = get_available_tools(self.config)
+        if tool_datas:
+            self.system_msg += '\n\nAdditional tools:'
+
+        for tool_data in tool_datas:
+            system_prompt = tool_data['system_prompt']
+            tool_name = tool_data['tool_name']
+            tool_description = tool_data['tool_description']
+
+            self.system_msg += f'\n{tool_name}: {system_prompt}'
+
+            self.functions.append(tool_description)
+            self.additional_tools[tool_name] = {
+                'tool': tool_data['tool'],
+                'additional_parameters': copy.deepcopy(tool_data['additional_parameters'])
+            }
+            for parameter, value in self.additional_tools[tool_name]['additional_parameters'].items():
+                if callable(value):
+                    self.additional_tools[tool_name]['additional_parameters'][parameter] = value(self)
+
+    def _init_kwargs_for_chat_completion(self):
+        self.kwargs_for_chat_completion = {
+            'stream': True,
+            'messages': self.conversation,
+            'functions': self.functions,
+            'function_call': 'auto'
+        }
+
+        model_name = self.config['model'][self.gpt_model_choice]['model_name']
+
+        if self.config['API_TYPE'] == 'azure':
+            self.kwargs_for_chat_completion['engine'] = model_name
+        else:
+            self.kwargs_for_chat_completion['model'] = model_name
+
+    def _backup_all_files_in_work_dir(self):
+        count = 1
+        backup_dir = f'cache/backup_{self.unique_id}'
+        while os.path.exists(backup_dir):
+            count += 1
+            backup_dir = f'cache/backup_{self.unique_id}_{count}'
+        shutil.copytree(src=self.jupyter_work_dir, dst=backup_dir)
+
+    def _clear_all_files_in_work_dir(self, backup=True):
+        if backup:
+            self._backup_all_files_in_work_dir()
+        for filename in os.listdir(self.jupyter_work_dir):
+            path = os.path.join(self.jupyter_work_dir, filename)
+            if os.path.isdir(path):
+                shutil.rmtree(path)
+            else:
+                os.remove(path)
+
+    def _save_tool_log(self, tool_response):
+        with open(self.tool_log, 'a', encoding='utf-8') as log_file:
+            log_file.write(f'Previous conversion: {self.conversation}\n')
+            log_file.write(f'Model choice: {self.gpt_model_choice}\n')
+            log_file.write(f'Tool name: {self.function_name}\n')
+            log_file.write(f'Parameters: {self.function_args_str}\n')
+            log_file.write(f'Response: {tool_response}\n')
+            log_file.write('----------\n\n')
+
+    def add_gpt_response_content_message(self):
+        self.conversation.append(
+            {'role': self.assistant_role_name, 'content': self.content}
+        )
+        add_markdown_to_notebook(self.content, title="Assistant")
+
+    def add_text_message(self, user_text):
+        self.conversation.append(
+            {'role': 'user', 'content': user_text}
+        )
+        self.revocable_files.clear()
+        self.update_finish_reason(finish_reason='new_input')
+        add_markdown_to_notebook(user_text, title="User")
+
+    def add_file_message(self, path, bot_msg):
+        filename = os.path.basename(path)
+        work_dir = self.jupyter_work_dir
+
+        shutil.copy(path, work_dir)
+
+        gpt_msg = {'role': 'system', 'content': f'User uploaded a file: {filename}'}
+        self.conversation.append(gpt_msg)
+        self.revocable_files.append(
+            {
+                'bot_msg': bot_msg,
+                'gpt_msg': gpt_msg,
+                'path': os.path.join(work_dir, filename)
+            }
+        )
+
+    def add_function_call_response_message(self, function_response: Union[str, None], save_tokens=True):
+        if self.code_str is not None:
+            add_code_cell_to_notebook(self.code_str)
+
+        self.conversation.append(
+            {
+                "role": self.assistant_role_name,
+                "name": self.function_name,
+                "content": self.function_args_str
+            }
+        )
+        if function_response is not None:
+            if save_tokens and len(function_response) > 500:
+                function_response = f'{function_response[:200]}\n[Output too much, the middle part output is omitted]\n ' \
+                                    f'End part of output:\n{function_response[-200:]}'
+            self.conversation.append(
+                {
+                    "role": "function",
+                    "name": self.function_name,
+                    "content": function_response,
+                }
+            )
+        self._save_tool_log(tool_response=function_response)
+
+    def append_system_msg(self, prompt):
+        self.conversation.append(
+            {'role': 'system', 'content': prompt}
+        )
+
+    def revoke_file(self):
+        if self.revocable_files:
+            file = self.revocable_files[-1]
+            bot_msg = file['bot_msg']
+            gpt_msg = file['gpt_msg']
+            path = file['path']
+
+            assert self.conversation[-1] is gpt_msg
+            del self.conversation[-1]
+
+            os.remove(path)
+
+            del self.revocable_files[-1]
+
+            return bot_msg
+        else:
+            return None
+
+    def update_gpt_model_choice(self, model_choice):
+        self.gpt_model_choice = model_choice
+        self._init_kwargs_for_chat_completion()
+
+    def update_token_count(self, num_tokens):
+        self.__setattr__('context_window_tokens', num_tokens)
+
+    def update_sliced_state(self, sliced):
+        self.__setattr__('sliced', sliced)
+
+    def send_interrupt_signal(self):
+        self.jupyter_kernel.send_interrupt_signal()
+        self.update_interrupt_signal_sent(interrupt_signal_sent=True)
+
+    def restart(self):
+        self.revocable_files.clear()
+        self._init_conversation()
+        self.reset_gpt_response_log_values()
+        self.jupyter_kernel.restart_jupyter_kernel()
+        self._clear_all_files_in_work_dir()
+
+# === NexusCore/src\core\orchestrator.py ===
+# ==============================================================================
+# フォルダ: src/core
+# ファイル名: orchestrator.py
+# メモ: 【知識伝達強化版】自己学習サイクルで新しい知識が検証された後、
+#      ファイルに書き込むだけでなく、DebuggerAgentインスタンスに直接
+#      その知識を記憶させる(`add_knowledge`)ように修正。
+# ==============================================================================
+import os
+import json
+import re
+import logging
+import subprocess
+import sys
+from dataclasses import dataclass, field
+from typing import List, Dict
+from pathlib import Path
+
+# 依存エージェントとユーティリティをインポート
+from src.agents.planner_agent import PlannerAgent
+from src.agents.coder_agent import CoderAgent
+from src.agents.tester_agent import TesterAgent
+from src.agents.guardian_agent import GuardianAgent
+from src.agents.architect_agent import ArchitectAgent
+from src.agents.debugger_agent import DebuggerAgent
+from src.agents.postmortem_agent import PostmortemAgent
+from src.agents.knowledge_curator_agent import KnowledgeCuratorAgent
+from src.agents.patch_applier import PatchApplier
+from src.agents.policy_agent import PolicyAgent
+from src.utils import code_analyzer
+
+def clean_llm_output(text: str) -> str:
+    # (この関数は変更なし)
+    if not text:
+        return ""
+    match = re.search(r"```(?:python\n)?(.*)```", text, re.DOTALL)
+    return match.group(1).strip() if match else text.strip()
+
+@dataclass
+class Orchestrator:
+    # (クラス属性は変更なし)
+    project_path: str
+    constitution: Dict
+    architect: ArchitectAgent
+    planner: PlannerAgent
+    coder: CoderAgent
+    tester: TesterAgent
+    debugger: DebuggerAgent
+    guardian: GuardianAgent
+    policy_agent: PolicyAgent
+    postmortem_agent: PostmortemAgent
+    knowledge_curator_agent: KnowledgeCuratorAgent
+    max_retries: int = 5
+    max_quality_retries: int = 3
+    logger: logging.Logger = field(init=False)
+    log_dir: str = field(init=False)
+
+    def __post_init__(self):
+        # (このメソッドは変更なし)
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.log_dir = os.path.join(self.project_path, ".nexus_logs")
+        os.makedirs(self.log_dir, exist_ok=True)
+        self.logger.info(f"Production Orchestrator initialized for project: {self.project_path}")
+        self.logger.info(f"Logging to: {self.log_dir}")
+
+    def run_tests(self, test_file_path):
+        # (このメソッドは変更なし)
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "pytest", os.path.relpath(test_file_path, self.project_path)],
+                cwd=self.project_path,
+                capture_output=True, text=True, encoding='utf-8', errors='replace', check=False
+            )
+            return result.returncode == 0, result.stdout + "\n" + result.stderr
+        except Exception as e:
+            self.logger.error(f"An error occurred while running tests: {e}", exc_info=True)
+            return False, str(e)
+
+    def self_healing_cycle(self, test_file_path: str, source_file_path: str) -> bool:
+        self.logger.info(f"Starting self-healing cycle for '{os.path.basename(test_file_path)}'")
+        
+        for attempt in range(self.max_retries):
+            self.logger.info(f"--- Self-Healing Attempt {attempt + 1}/{self.max_retries} ---")
+            tests_passed, test_output = self.run_tests(test_file_path)
+
+            if tests_passed:
+                self.logger.info("✅ Tests passed. Self-healing cycle successful.")
+                return True
+
+            self.logger.warning("Tests failed. DebuggerAgent invoked.")
+            
+            files_context = {"source_file": source_file_path, "test_file": test_file_path}
+            debug_result = self.debugger.debug(test_output, files_context)
+
+            if debug_result and "patch" in debug_result:
+                patch_str = debug_result["patch"]
+                patcher = PatchApplier()
+                was_applied = patcher.apply(patch_str, self.project_path)
+                if was_applied:
+                    self.logger.info("Patch applied successfully. Retrying tests...")
+                    continue
+                self.logger.error("PatchApplier failed. Continuing to learning phase.")
+
+            self.logger.warning("No applicable solution found in FKB. Initiating learning cycle.")
+            fkb_suggestion = self.postmortem_agent.analyze_failure_and_suggest_fkb_entry(
+                error_log=test_output,
+                source_code=Path(source_file_path).read_text(encoding='utf-8'),
+                test_code=Path(test_file_path).read_text(encoding='utf-8'),
+                source_file_path=os.path.relpath(source_file_path, self.project_path),
+                test_file_path=os.path.relpath(test_file_path, self.project_path)
+            )
+
+            if not isinstance(fkb_suggestion, dict):
+                self.logger.error("PostmortemAgent failed to generate a valid suggestion. Aborting.")
+                return False
+
+            is_valid_knowledge = self.knowledge_curator_agent.validate_fkb_suggestion(
+                suggestion=fkb_suggestion,
+                original_project_path=self.project_path,
+                failed_test_path=test_file_path,
+                related_source_path=source_file_path,
+                original_test_output=test_output
+            )
+
+            if is_valid_knowledge:
+                self.logger.info("Knowledge validation successful. Updating FKB automatically.")
+                fkb_path = os.path.join(self.project_path, "fkb_local.json")
+                try:
+                    with open(fkb_path, 'r+', encoding='utf-8') as f:
+                        fkb_data = json.load(f)
+                        fkb_data.append(fkb_suggestion)
+                        f.seek(0)
+                        json.dump(fkb_data, f, ensure_ascii=False, indent=2)
+                        f.truncate()
+                    self.logger.info("✅ fkb_local.json has been automatically updated.")
+                    
+                    # ▼▼▼▼▼ ここからが最重要修正点 ▼▼▼▼▼
+                    # DebuggerAgentインスタンスに、新しい知識を直接記憶させる
+                    self.debugger.add_knowledge(fkb_suggestion)
+                    # ▲▲▲▲▲ ここまでが最重要修正点 ▲▲▲▲▲
+                    
+                    self.logger.info("Retrying self-healing cycle with new knowledge.")
+                    continue
+                except (IOError, json.JSONDecodeError) as e:
+                    self.logger.error(f"Failed to auto-update FKB: {e}", exc_info=True)
+            else:
+                self.logger.error("Knowledge validation failed. The suggestion will be logged but not applied.")
+                suggestion_log_path = os.path.join(self.log_dir, "fkb_suggestions_rejected.jsonl")
+                with open(suggestion_log_path, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(fkb_suggestion, ensure_ascii=False) + '\n')
+
+            self.logger.error("Could not repair the code in this attempt.")
+            return False
+
+        self.logger.error(f"Self-healing cycle failed after {self.max_retries} attempts.")
+        return False
+    
+    # (以降のメソッド _create_project_structure, design_phase, development_cycle, _run_quality_gate, execute_task, _create_feedback_for_coder は変更なし)
+    def _create_project_structure(self, files: list):
+        root = Path(self.project_path)
+        self.logger.info(f"Creating project structure at: {root}")
+        root.mkdir(parents=True, exist_ok=True)
+        if not isinstance(files, list):
+            self.logger.error(f"Invalid 'files' format. Expected a list, but got {type(files)}")
+            return
+        for item in files:
+            item_path_str = item.get("name")
+            item_type = item.get("type")
+            if not item_path_str or not item_type:
+                self.logger.warning(f"Skipping invalid item in design data: {item}")
+                continue
+            normalized_path = item_path_str.replace("\\", "/").lstrip("/")
+            full_path = root / normalized_path
+            try:
+                if item_type == 'folder':
+                    full_path.mkdir(parents=True, exist_ok=True)
+                elif item_type == 'file':
+                    full_path.parent.mkdir(parents=True, exist_ok=True)
+                    content = item.get("content", "")
+                    full_path.write_text(content, encoding='utf-8')
+            except IOError as e:
+                self.logger.error(f"Failed to create {item_type} at {full_path}: {e}", exc_info=True)
+
+    def design_phase(self, user_requirement: str):
+        self.logger.info("--- 📐 Architect Phase ---")
+        try:
+            design_json_str = self.architect.design_project_structure(user_requirement)
+            design_data = json.loads(design_json_str)
+            self._create_project_structure(design_data.get("project", {}).get("files", []))
+            self.logger.info(f"Project structure created at {self.project_path}")
+        except json.JSONDecodeError:
+            self.logger.error("ArchitectAgent did not return valid JSON. Skipping structure creation.")
+        except Exception as e:
+            self.logger.error(f"An error occurred during the design phase: {e}", exc_info=True)
+
+    def development_cycle(self, user_requirement: str):
+        self.logger.info("--- 🔄 Development Cycle ---")
+        self.logger.info("--- 📝 Planner Phase ---")
+        try:
+            plan_json_str = self.planner.create_plan(user_requirement)
+            plan = json.loads(plan_json_str)
+            tasks = plan.get("functions_to_implement", [])
+            self.logger.info(f"Plan created with {len(tasks)} tasks.")
+            for i, task in enumerate(tasks):
+                self.logger.info(f"\n{'='*20} Task {i+1}/{len(tasks)} {'='*20}")
+                self.execute_task(task)
+        except json.JSONDecodeError:
+            self.logger.error("PlannerAgent did not return valid JSON. Cannot proceed.")
+        except Exception as e:
+            self.logger.error(f"An error occurred during the development cycle: {e}", exc_info=True)
+
+    def _run_quality_gate(self, source_file_path: str) -> tuple[bool, str]:
+        self.logger.info("---  GATE: Running Quality Gate ---")
+        gate_config = self.constitution.get("quality_gate", {})
+        min_coverage = gate_config.get("MIN_COVERAGE", 90)
+        min_pylint_score = gate_config.get("MIN_PYLINT_SCORE", 8.0)
+        violations = []
+        self.logger.info(f"Checking test coverage (min: {min_coverage}%)")
+        coverage = code_analyzer.run_pytest_cov(self.project_path)
+        if coverage < min_coverage:
+            msg = f"Test coverage is {coverage}%, which is below the required {min_coverage}%."
+            violations.append(msg)
+            self.logger.warning(f"QUALITY GATE VIOLATION: {msg}")
+        self.logger.info(f"Checking Pylint score (min: {min_pylint_score}/10)")
+        pylint_score = code_analyzer.run_pylint(source_file_path)
+        if pylint_score < min_pylint_score:
+            msg = f"Pylint score is {pylint_score}/10, which is below the required {min_pylint_score}/10."
+            violations.append(msg)
+            self.logger.warning(f"QUALITY GATE VIOLATION: {msg}")
+        self.logger.info("Checking MyPy for type errors...")
+        mypy_ok, mypy_errors = code_analyzer.run_mypy(source_file_path)
+        if not mypy_ok:
+            msg = f"MyPy found type errors:\n{mypy_errors}"
+            violations.append(msg)
+            self.logger.warning(f"QUALITY GATE VIOLATION: {msg}")
+        if not violations:
+            self.logger.info("✅✅ Quality Gate PASSED!")
+            return True, "All quality checks passed."
+        feedback = "The code is functionally correct but failed the quality gate. Please fix the following issues:\n- " + "\n- ".join(violations)
+        return False, feedback
+
+    def execute_task(self, task: Dict):
+        task_name = task.get('name', 'Unnamed Task')
+        self.logger.info(f"--- 🧑‍💻 Executing Task: {task_name} ---")
+        module_name = task.get('module', 'main')
+        source_file_rel_path = f"app/{module_name}.py"
+        test_file_rel_path = f"tests/test_{module_name}.py"
+        source_file_abs_path = os.path.join(self.project_path, source_file_rel_path)
+        test_file_abs_path = os.path.join(self.project_path, test_file_rel_path)
+        current_task_description = json.dumps(task, ensure_ascii=False)
+        for attempt in range(self.max_quality_retries):
+            self.logger.info(f"--- Quality Improvement Loop: Attempt {attempt + 1}/{self.max_quality_retries} ---")
+            try:
+                self.logger.info(f"1. CoderAgent is working on '{task_name}'...")
+                existing_code = Path(source_file_abs_path).read_text(encoding='utf-8') if Path(source_file_abs_path).exists() else ""
+                implemented_code_raw = self.coder.implement_code(current_task_description, existing_code)
+                implemented_code = clean_llm_output(implemented_code_raw)
+                Path(source_file_abs_path).parent.mkdir(parents=True, exist_ok=True)
+                Path(source_file_abs_path).write_text(implemented_code, encoding='utf-8')
+                self.logger.info(f"Code implemented and saved to '{source_file_rel_path}'.")
+                self.logger.info("2. TesterAgent is generating tests...")
+                module_path = source_file_rel_path.replace(os.path.sep, '.').removesuffix('.py')
+                test_gen_raw = self.tester.generate_tests_from_plan(task, module_path)
+                test_gen_data = json.loads(test_gen_raw)
+                test_code = clean_llm_output(test_gen_data.get("test_code", ""))
+                testimony = test_gen_data.get("testimony", "No testimony provided.")
+                Path(test_file_abs_path).parent.mkdir(parents=True, exist_ok=True)
+                Path(test_file_abs_path).write_text(test_code, encoding='utf-8')
+                self.logger.info(f"Tests generated and saved to '{test_file_rel_path}'.")
+                self.logger.info("3. Initiating functional validation and self-healing cycle...")
+                if not self.self_healing_cycle(test_file_abs_path, source_file_abs_path):
+                     self.logger.error("Functional tests failed and could not be self-healed. Aborting task.")
+                     return
+                self.logger.info("4. PolicyAgent is auditing the code...")
+                final_code_for_audit = Path(source_file_abs_path).read_text(encoding='utf-8')
+                files_for_audit = [{"path": source_file_rel_path, "content": final_code_for_audit}]
+                policy_result = self.policy_agent.audit(files_for_audit)
+                if policy_result.get("result") == "REJECTED":
+                    self.logger.warning("❌ Policy check REJECTED. Looping back to CoderAgent...")
+                    feedback = self._create_feedback_for_coder(policy_result.get("violations", []))
+                    current_task_description = f"{json.dumps(task, ensure_ascii=False)}\n\n[Orchestratorからの具体的指示]:\n前回の試行は以下のポリシー違反により失敗しました。これらの問題をすべて修正してください。\n{feedback}"
+                    if attempt + 1 >= self.max_quality_retries:
+                        self.logger.error("Max quality retries reached for policy violations. Aborting task.")
+                        return
+                    continue
+                self.logger.info("✅ Policy check passed.")
+                quality_gate_passed, feedback = self._run_quality_gate(source_file_abs_path)
+                if quality_gate_passed:
+                    self.logger.info("✅✅✅ All checks passed! Proceeding to Guardian review.")
+                    break
+                self.logger.warning("❌ Quality Gate FAILED. Looping back to CoderAgent...")
+                current_task_description = f"{json.dumps(task, ensure_ascii=False)}\n\n[Orchestratorからの具体的指示]:\n{feedback}"
+                if attempt + 1 >= self.max_quality_retries:
+                    self.logger.error("Max quality retries reached for quality gate. Aborting task.")
+                    return
+            except (IOError, json.JSONDecodeError) as e:
+                self.logger.error(f"An error occurred during task execution loop: {e}", exc_info=True)
+                return
+        else: 
+            self.logger.error("Could not satisfy requirements after all attempts.")
+            return
+        self.logger.info("6. GuardianAgent is reviewing the final changes...")
+        final_code = Path(source_file_abs_path).read_text(encoding='utf-8')
+        final_test_code = Path(test_file_abs_path).read_text(encoding='utf-8')
+        _, final_test_output = self.run_tests(test_file_abs_path)
+        constitution_text = self.constitution.get("description", "")
+        review_result = self.guardian.review_and_commit(
+            code_draft=final_code, test_code=final_test_code, test_result=final_test_output,
+            testimony=testimony, constitution=constitution_text,
+            task_description=json.dumps(task, ensure_ascii=False),
+            changed_files=[source_file_abs_path, test_file_abs_path], debug_info={}
+        )
+        if review_result.get("decision") == "APPROVE":
+            self.logger.info(f"✅✅✅ Task '{task_name}' APPROVED and committed!")
+        else:
+            self.logger.warning(f"❌ Task '{task_name}' REJECTED by GuardianAgent.")
+
+    def _create_feedback_for_coder(self, violations: list) -> str:
+        feedback_lines = [
+            f"- ファイル '{v.get('file_path')}' の {v.get('line_number')}行目: {v.get('description')} (ルール: {v.get('policy_id')}). 提案: {v.get('suggestion')}"
+            for v in violations
+        ]
+        return "\n".join(feedback_lines)
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+# === NexusCore/data_collection\Local-Code-Interpreter\src\web_ui.py ===
+import gradio as gr
+from response_parser import *
+
+
+def initialization(state_dict: Dict) -> None:
+    if not os.path.exists('cache'):
+        os.mkdir('cache')
+    if state_dict["bot_backend"] is None:
+        state_dict["bot_backend"] = BotBackend()
+        if 'OPENAI_API_KEY' in os.environ:
+            del os.environ['OPENAI_API_KEY']
+
+
+def get_bot_backend(state_dict: Dict) -> BotBackend:
+    return state_dict["bot_backend"]
+
+
+def switch_to_gpt4(state_dict: Dict, whether_switch: bool) -> None:
+    bot_backend = get_bot_backend(state_dict)
+    if whether_switch:
+        bot_backend.update_gpt_model_choice("GPT-4")
+    else:
+        bot_backend.update_gpt_model_choice("GPT-3.5")
+
+
+def add_text(state_dict: Dict, history: List, text: str) -> Tuple[List, Dict]:
+    bot_backend = get_bot_backend(state_dict)
+    bot_backend.add_text_message(user_text=text)
+
+    history = history + [(text, None)]
+
+    return history, gr.update(value="", interactive=False)
+
+
+def add_file(state_dict: Dict, history: List, files) -> List:
+    bot_backend = get_bot_backend(state_dict)
+    for file in files:
+        path = file.name
+        filename = os.path.basename(path)
+
+        bot_msg = [f'📁[{filename}]', None]
+        history.append(bot_msg)
+
+        bot_backend.add_file_message(path=path, bot_msg=bot_msg)
+
+        _, suffix = os.path.splitext(filename)
+        if suffix in {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}:
+            copied_file_path = f'{bot_backend.jupyter_work_dir}/{filename}'
+            width, height = get_image_size(copied_file_path)
+            bot_msg[0] += \
+                f'\n<img src=\"file={copied_file_path}\" style=\'{"" if width < 800 else "width: 800px;"} max-width' \
+                f':none; max-height:none\'> '
+
+    return history
+
+
+def undo_upload_file(state_dict: Dict, history: List) -> Tuple[List, Dict]:
+    bot_backend = get_bot_backend(state_dict)
+    bot_msg = bot_backend.revoke_file()
+
+    if bot_msg is None:
+        return history, gr.Button.update(interactive=False)
+
+    else:
+        assert history[-1] == bot_msg
+        del history[-1]
+        if bot_backend.revocable_files:
+            return history, gr.Button.update(interactive=True)
+        else:
+            return history, gr.Button.update(interactive=False)
+
+
+def refresh_file_display(state_dict: Dict) -> List[str]:
+    bot_backend = get_bot_backend(state_dict)
+    work_dir = bot_backend.jupyter_work_dir
+    filenames = os.listdir(work_dir)
+    paths = []
+    for filename in filenames:
+        path = os.path.join(work_dir, filename)
+        if not os.path.isdir(path):
+            paths.append(path)
+    return paths
+
+
+def refresh_token_count(state_dict: Dict):
+    bot_backend = get_bot_backend(state_dict)
+    model_choice = bot_backend.gpt_model_choice
+    sliced = bot_backend.sliced
+    token_count = bot_backend.context_window_tokens
+    token_limit = config['model_context_window'][config['model'][model_choice]['model_name']]
+    display_text = f"**Context token:** {token_count}/{token_limit}"
+    if sliced:
+        display_text += '\\\nToken limit exceeded, conversion has been sliced.'
+    return gr.Markdown.update(value=display_text)
+
+
+def restart_ui(history: List) -> Tuple[List, Dict, Dict, Dict, Dict, Dict, Dict]:
+    history.clear()
+    return (
+        history,
+        gr.Textbox.update(value="", interactive=False),
+        gr.Button.update(interactive=False),
+        gr.Button.update(interactive=False),
+        gr.Button.update(interactive=False),
+        gr.Button.update(interactive=False),
+        gr.Button.update(visible=False)
+    )
+
+
+def restart_bot_backend(state_dict: Dict) -> None:
+    bot_backend = get_bot_backend(state_dict)
+    bot_backend.restart()
+
+
+def stop_generating(state_dict: Dict) -> None:
+    bot_backend = get_bot_backend(state_dict)
+    if bot_backend.code_executing:
+        bot_backend.send_interrupt_signal()
+    else:
+        bot_backend.update_stop_generating_state(stop_generating=True)
+
+
+def bot(state_dict: Dict, history: List) -> List:
+    bot_backend = get_bot_backend(state_dict)
+
+    while bot_backend.finish_reason in ('new_input', 'function_call'):
+        if history[-1][1]:
+            history.append([None, ""])
+        else:
+            history[-1][1] = ""
+
+        try:
+            response = chat_completion(bot_backend=bot_backend)
+            for chunk in response:
+                if chunk['choices'] and chunk['choices'][0]['finish_reason'] == 'function_call':
+                    if bot_backend.function_name in bot_backend.jupyter_kernel.available_functions:
+                        yield history, gr.Button.update(value='⏹️ Interrupt execution'), gr.Button.update(visible=False)
+                    else:
+                        yield history, gr.Button.update(interactive=False), gr.Button.update(visible=False)
+
+                if bot_backend.stop_generating:
+                    response.close()
+                    if bot_backend.content:
+                        bot_backend.add_gpt_response_content_message()
+                    if bot_backend.display_code_block:
+                        bot_backend.update_display_code_block(
+                            display_code_block="\n⚫Stopped:\n```python\n{}\n```".format(bot_backend.code_str)
+                        )
+                        history = copy.deepcopy(bot_backend.bot_history)
+                        history[-1][1] += bot_backend.display_code_block
+                        bot_backend.add_function_call_response_message(function_response=None)
+
+                    bot_backend.reset_gpt_response_log_values()
+                    break
+
+                history, weather_exit = parse_response(
+                    chunk=chunk,
+                    history=history,
+                    bot_backend=bot_backend
+                )
+
+                yield (
+                    history,
+                    gr.Button.update(
+                        interactive=False if bot_backend.stop_generating else True,
+                        value='⏹️ Stop generating'
+                    ),
+                    gr.Button.update(visible=False)
+                )
+                if weather_exit:
+                    exit(-1)
+        except openai.OpenAIError as openai_error:
+            bot_backend.reset_gpt_response_log_values(exclude=['finish_reason'])
+            yield history, gr.Button.update(interactive=False), gr.Button.update(visible=True)
+            raise openai_error
+
+    yield history, gr.Button.update(interactive=False, value='⏹️ Stop generating'), gr.Button.update(visible=False)
+
+
+if __name__ == '__main__':
+    config = get_config()
+    with gr.Blocks(theme=gr.themes.Base()) as block:
+        """
+        Reference: https://www.gradio.app/guides/creating-a-chatbot-fast
+        """
+        # UI components
+        state = gr.State(value={"bot_backend": None})
+        with gr.Tab("Chat"):
+            chatbot = gr.Chatbot([], elem_id="chatbot", label="Local Code Interpreter", height=750)
+            with gr.Row():
+                with gr.Column(scale=0.85):
+                    text_box = gr.Textbox(
+                        show_label=False,
+                        placeholder="Enter text and press enter, or upload a file",
+                        container=False
+                    )
+                with gr.Column(scale=0.15, min_width=0):
+                    file_upload_button = gr.UploadButton("📁", file_count='multiple', file_types=['file'])
+            with gr.Row(equal_height=True):
+                with gr.Column(scale=0.08, min_width=0):
+                    check_box = gr.Checkbox(label="Use GPT-4", interactive=config['model']['GPT-4']['available'])
+                with gr.Column(scale=0.314, min_width=0):
+                    model_token_limit = config['model_context_window'][config['model']['GPT-3.5']['model_name']]
+                    token_count_display_text = f"**Context token:** 0/{model_token_limit}"
+                    token_monitor = gr.Markdown(value=token_count_display_text)
+                with gr.Column(scale=0.15, min_width=0):
+                    retry_button = gr.Button(value='🔂OpenAI Error, click here to retry', visible=False)
+                with gr.Column(scale=0.15, min_width=0):
+                    stop_generation_button = gr.Button(value='⏹️ Stop generating', interactive=False)
+                with gr.Column(scale=0.15, min_width=0):
+                    restart_button = gr.Button(value='🔄 Restart')
+                with gr.Column(scale=0.15, min_width=0):
+                    undo_file_button = gr.Button(value="↩️Undo upload file", interactive=False)
+        with gr.Tab("Files"):
+            file_output = gr.Files()
+
+        # Components function binding
+        txt_msg = text_box.submit(add_text, [state, chatbot, text_box], [chatbot, text_box], queue=False).then(
+            lambda: gr.Button.update(interactive=False), None, [undo_file_button], queue=False
+        ).then(
+            bot, [state, chatbot], [chatbot, stop_generation_button, retry_button]
+        )
+        txt_msg.then(fn=refresh_file_display, inputs=[state], outputs=[file_output])
+        txt_msg.then(lambda: gr.update(interactive=True), None, [text_box], queue=False)
+        txt_msg.then(fn=refresh_token_count, inputs=[state], outputs=[token_monitor])
+
+        retry_button.click(lambda: gr.Button.update(visible=False), None, [retry_button], queue=False).then(
+            bot, [state, chatbot], [chatbot, stop_generation_button, retry_button]
+        ).then(
+            fn=refresh_file_display, inputs=[state], outputs=[file_output]
+        ).then(
+            lambda: gr.update(interactive=True), None, [text_box], queue=False
+        ).then(
+            fn=refresh_token_count, inputs=[state], outputs=[token_monitor]
+        )
+
+        check_box.change(fn=switch_to_gpt4, inputs=[state, check_box]).then(
+            fn=refresh_token_count, inputs=[state], outputs=[token_monitor]
+        )
+
+        file_msg = file_upload_button.upload(
+            add_file, [state, chatbot, file_upload_button], [chatbot], queue=False
+        )
+        file_msg.then(lambda: gr.Button.update(interactive=True), None, [undo_file_button], queue=False)
+        file_msg.then(fn=refresh_file_display, inputs=[state], outputs=[file_output])
+
+        undo_file_button.click(
+            fn=undo_upload_file, inputs=[state, chatbot], outputs=[chatbot, undo_file_button]
+        ).then(
+            fn=refresh_file_display, inputs=[state], outputs=[file_output]
+        )
+
+        stop_generation_button.click(fn=stop_generating, inputs=[state], queue=False).then(
+            fn=lambda: gr.Button.update(interactive=False), inputs=None, outputs=[stop_generation_button], queue=False
+        )
+
+        restart_button.click(
+            fn=restart_ui, inputs=[chatbot],
+            outputs=[
+                chatbot, text_box, restart_button, file_upload_button, undo_file_button, stop_generation_button,
+                retry_button
+            ]
+        ).then(
+            fn=restart_bot_backend, inputs=[state], queue=False
+        ).then(
+            fn=refresh_file_display, inputs=[state], outputs=[file_output]
+        ).then(
+            fn=lambda: (gr.Textbox.update(interactive=True), gr.Button.update(interactive=True),
+                        gr.Button.update(interactive=True)),
+            inputs=None, outputs=[text_box, restart_button, file_upload_button], queue=False
+        ).then(
+            fn=refresh_token_count,
+            inputs=[state], outputs=[token_monitor]
+        )
+
+        block.load(fn=initialization, inputs=[state])
+
+    block.queue()
+    block.launch(inbrowser=True)
+
+# === NexusCore/data_collection\Local-Code-Interpreter\src\response_parser.py ===
+from functional import *
+
+
+class ChoiceStrategy(metaclass=ABCMeta):
+    def __init__(self, choice):
+        self.choice = choice
+        self.delta = choice['delta']
+
+    @abstractmethod
+    def support(self):
+        pass
+
+    @abstractmethod
+    def execute(self, bot_backend: BotBackend, history: List, whether_exit: bool):
+        pass
+
+
+class RoleChoiceStrategy(ChoiceStrategy):
+
+    def support(self):
+        return 'role' in self.delta
+
+    def execute(self, bot_backend: BotBackend, history: List, whether_exit: bool):
+        bot_backend.set_assistant_role_name(assistant_role_name=self.delta['role'])
+        return history, whether_exit
+
+
+class ContentChoiceStrategy(ChoiceStrategy):
+    def support(self):
+        return 'content' in self.delta and self.delta['content'] is not None
+        # null value of content often occur in function call:
+        #     {
+        #       "role": "assistant",
+        #       "content": null,
+        #       "function_call": {
+        #         "name": "python",
+        #         "arguments": ""
+        #       }
+        #     }
+
+    def execute(self, bot_backend: BotBackend, history: List, whether_exit: bool):
+        bot_backend.add_content(content=self.delta.get('content', ''))
+        history[-1][1] = bot_backend.content
+        return history, whether_exit
+
+
+class NameFunctionCallChoiceStrategy(ChoiceStrategy):
+    def support(self):
+        return 'function_call' in self.delta and 'name' in self.delta['function_call']
+
+    def execute(self, bot_backend: BotBackend, history: List, whether_exit: bool):
+        python_function_dict = bot_backend.jupyter_kernel.available_functions
+        additional_tools = bot_backend.additional_tools
+        bot_backend.set_function_name(function_name=self.delta['function_call']['name'])
+        bot_backend.copy_current_bot_history(bot_history=history)
+        if bot_backend.function_name not in python_function_dict and bot_backend.function_name not in additional_tools:
+            history.append(
+                [
+                    None,
+                    f'GPT attempted to call a function that does '
+                    f'not exist: {bot_backend.function_name}\n '
+                ]
+            )
+            whether_exit = True
+
+        return history, whether_exit
+
+
+class ArgumentsFunctionCallChoiceStrategy(ChoiceStrategy):
+
+    def support(self):
+        return 'function_call' in self.delta and 'arguments' in self.delta['function_call']
+
+    def execute(self, bot_backend: BotBackend, history: List, whether_exit: bool):
+        bot_backend.add_function_args_str(function_args_str=self.delta['function_call']['arguments'])
+
+        if bot_backend.function_name == 'python':  # handle hallucinatory function calls
+            """
+            In practice, we have noticed that GPT, especially GPT-3.5, may occasionally produce hallucinatory
+            function calls. These calls involve a non-existent function named `python` with arguments consisting 
+            solely of raw code text (not a JSON format).
+            """
+            temp_code_str = bot_backend.function_args_str
+            bot_backend.update_code_str(code_str=temp_code_str)
+            bot_backend.update_display_code_block(
+                display_code_block="\n🔴Working:\n```python\n{}\n```".format(temp_code_str)
+            )
+            history = copy.deepcopy(bot_backend.bot_history)
+            history[-1][1] += bot_backend.display_code_block
+        elif bot_backend.function_name == 'execute_code':
+            temp_code_str = parse_json(function_args=bot_backend.function_args_str, finished=False)
+            if temp_code_str is not None:
+                bot_backend.update_code_str(code_str=temp_code_str)
+                bot_backend.update_display_code_block(
+                    display_code_block="\n🔴Working:\n```python\n{}\n```".format(
+                        temp_code_str
+                    )
+                )
+                history = copy.deepcopy(bot_backend.bot_history)
+                history[-1][1] += bot_backend.display_code_block
+            else:
+                history = copy.deepcopy(bot_backend.bot_history)
+                history[-1][1] += bot_backend.display_code_block
+        else:
+            pass
+
+        return history, whether_exit
+
+
+class FinishReasonChoiceStrategy(ChoiceStrategy):
+    def support(self):
+        return self.choice['finish_reason'] is not None
+
+    def execute(self, bot_backend: BotBackend, history: List, whether_exit: bool):
+
+        if bot_backend.content:
+            bot_backend.add_gpt_response_content_message()
+
+        bot_backend.update_finish_reason(finish_reason=self.choice['finish_reason'])
+        if bot_backend.finish_reason == 'function_call':
+
+            if bot_backend.function_name in bot_backend.jupyter_kernel.available_functions:
+                history, whether_exit = self.handle_execute_code_finish_reason(
+                    bot_backend=bot_backend, history=history, whether_exit=whether_exit
+                )
+            else:
+                history, whether_exit = self.handle_tool_finish_reason(
+                    bot_backend=bot_backend, history=history, whether_exit=whether_exit
+                )
+
+        bot_backend.reset_gpt_response_log_values(exclude=['finish_reason'])
+
+        return history, whether_exit
+
+    def handle_execute_code_finish_reason(self, bot_backend: BotBackend, history: List, whether_exit: bool):
+        function_dict = bot_backend.jupyter_kernel.available_functions
+        try:
+
+            code_str = self.get_code_str(bot_backend)
+
+            bot_backend.update_code_str(code_str=code_str)
+            bot_backend.update_display_code_block(
+                display_code_block="\n🟢Finished:\n```python\n{}\n```".format(code_str)
+            )
+            history = copy.deepcopy(bot_backend.bot_history)
+            history[-1][1] += bot_backend.display_code_block
+
+            # function response
+            bot_backend.update_code_executing_state(code_executing=True)
+            text_to_gpt, content_to_display = function_dict[
+                bot_backend.function_name
+            ](code_str)
+            bot_backend.update_code_executing_state(code_executing=False)
+
+            # add function call to conversion
+            bot_backend.add_function_call_response_message(function_response=text_to_gpt, save_tokens=True)
+
+            if bot_backend.interrupt_signal_sent:
+                bot_backend.append_system_msg(prompt='Code execution is manually stopped by user, no need to fix.')
+
+            add_code_execution_result_to_bot_history(
+                content_to_display=content_to_display, history=history, unique_id=bot_backend.unique_id
+            )
+            return history, whether_exit
+
+        except json.JSONDecodeError:
+            history.append(
+                [None, f"GPT generate wrong function args: {bot_backend.function_args_str}"]
+            )
+            whether_exit = True
+            return history, whether_exit
+
+        except KeyError as key_error:
+            history.append([None, f'Backend key_error: {key_error}'])
+            whether_exit = True
+            return history, whether_exit
+
+        except Exception as e:
+            history.append([None, f'Backend error: {e}'])
+            whether_exit = True
+            return history, whether_exit
+
+    @staticmethod
+    def handle_tool_finish_reason(bot_backend: BotBackend, history: List, whether_exit: bool):
+        function_dict = bot_backend.additional_tools
+        function_name = bot_backend.function_name
+        function = function_dict[function_name]['tool']
+
+        # parser function args
+        try:
+            kwargs = json.loads(bot_backend.function_args_str)
+            kwargs.update(function_dict[function_name]['additional_parameters'])
+        except json.JSONDecodeError:
+            history.append(
+                [None, f"GPT generate wrong function args: {bot_backend.function_args_str}"]
+            )
+            whether_exit = True
+            return history, whether_exit
+
+        else:
+            # function response
+            function_response, hypertext_to_display = function(**kwargs)
+
+            # add function call to conversion
+            bot_backend.add_function_call_response_message(function_response=function_response, save_tokens=False)
+
+            # add hypertext response to bot history
+            add_function_response_to_bot_history(hypertext_to_display=hypertext_to_display, history=history)
+
+            return history, whether_exit
+
+    @staticmethod
+    def get_code_str(bot_backend):
+        if bot_backend.function_name == 'python':
+            code_str = bot_backend.function_args_str
+        else:
+            code_str = parse_json(function_args=bot_backend.function_args_str, finished=True)
+            if code_str is None:
+                raise json.JSONDecodeError
+        return code_str
+
+
+class ChoiceHandler:
+    strategies = [
+        RoleChoiceStrategy, ContentChoiceStrategy, NameFunctionCallChoiceStrategy,
+        ArgumentsFunctionCallChoiceStrategy, FinishReasonChoiceStrategy
+    ]
+
+    def __init__(self, choice):
+        self.choice = choice
+
+    def handle(self, bot_backend: BotBackend, history: List, whether_exit: bool):
+        for Strategy in self.strategies:
+            strategy_instance = Strategy(choice=self.choice)
+            if not strategy_instance.support():
+                continue
+            history, whether_exit = strategy_instance.execute(
+                bot_backend=bot_backend,
+                history=history,
+                whether_exit=whether_exit
+            )
+        return history, whether_exit
+
+
+def parse_response(chunk, history: List, bot_backend: BotBackend):
+    """
+    :return: history, whether_exit
+    """
+    whether_exit = False
+    if chunk['choices']:
+        choice = chunk['choices'][0]
+        choice_handler = ChoiceHandler(choice=choice)
+        history, whether_exit = choice_handler.handle(
+            history=history,
+            bot_backend=bot_backend,
+            whether_exit=whether_exit
+        )
+
+    return history, whether_exit
+
+# === NexusCore/openenv\Lib\site-packages\pythonwin\pywin\Demos\app\basictimerapp.py ===
+# basictimerapp - a really simple timer application.
+# This should be run using the command line:
+# pythonwin /app demos\basictimerapp.py
+import sys
+import time
+
+import timer
+import win32api
+import win32con
+import win32ui
+from pywin.framework import dlgappcore
+
+
+class TimerAppDialog(dlgappcore.AppDialog):
+    softspace = 1
+
+    def __init__(self, appName=""):
+        dlgappcore.AppDialog.__init__(self, win32ui.IDD_GENERAL_STATUS)
+        self.timerAppName = appName
+        self.argOff = 0
+        if len(self.timerAppName) == 0:
+            if len(sys.argv) > 1 and sys.argv[1][0] != "/":
+                self.timerAppName = sys.argv[1]
+                self.argOff = 1
+
+    def PreDoModal(self):
+        # 		sys.stderr = sys.stdout
+        pass
+
+    def ProcessArgs(self, args):
+        for arg in args:
+            if arg == "/now":
+                self.OnOK()
+
+    def OnInitDialog(self):
+        win32ui.SetProfileFileName("pytimer.ini")
+        self.title = win32ui.GetProfileVal(
+            self.timerAppName, "Title", "Remote System Timer"
+        )
+        self.buildTimer = win32ui.GetProfileVal(
+            self.timerAppName, "Timer", "EachMinuteIntervaler()"
+        )
+        self.doWork = win32ui.GetProfileVal(self.timerAppName, "Work", "DoDemoWork()")
+        # replace "\n" with real \n.
+        self.doWork = self.doWork.replace("\\n", "\n")
+        dlgappcore.AppDialog.OnInitDialog(self)
+
+        self.SetWindowText(self.title)
+        self.prompt1 = self.GetDlgItem(win32ui.IDC_PROMPT1)
+        self.prompt2 = self.GetDlgItem(win32ui.IDC_PROMPT2)
+        self.prompt3 = self.GetDlgItem(win32ui.IDC_PROMPT3)
+        self.butOK = self.GetDlgItem(win32con.IDOK)
+        self.butCancel = self.GetDlgItem(win32con.IDCANCEL)
+        self.prompt1.SetWindowText("Python Timer App")
+        self.prompt2.SetWindowText("")
+        self.prompt3.SetWindowText("")
+        self.butOK.SetWindowText("Do it now")
+        self.butCancel.SetWindowText("Close")
+
+        self.timerManager = TimerManager(self)
+        self.ProcessArgs(sys.argv[self.argOff :])
+        self.timerManager.go()
+        return 1
+
+    def OnDestroy(self, msg):
+        dlgappcore.AppDialog.OnDestroy(self, msg)
+        self.timerManager.stop()
+
+    def OnOK(self):
+        # stop the timer, then restart after setting special boolean
+        self.timerManager.stop()
+        self.timerManager.bConnectNow = 1
+        self.timerManager.go()
+        return
+
+
+# 	def OnCancel(self): default behaviour - cancel == close.
+# 		return
+
+
+class TimerManager:
+    def __init__(self, dlg):
+        self.dlg = dlg
+        self.timerId = None
+        self.intervaler = eval(self.dlg.buildTimer)
+        self.bConnectNow = 0
+        self.bHaveSetPrompt1 = 0
+
+    def CaptureOutput(self):
+        self.oldOut = sys.stdout
+        self.oldErr = sys.stderr
+        sys.stdout = sys.stderr = self
+        self.bHaveSetPrompt1 = 0
+
+    def ReleaseOutput(self):
+        sys.stdout = self.oldOut
+        sys.stderr = self.oldErr
+
+    def write(self, str):
+        s = str.strip()
+        if len(s):
+            if self.bHaveSetPrompt1:
+                dest = self.dlg.prompt3
+            else:
+                dest = self.dlg.prompt1
+                self.bHaveSetPrompt1 = 1
+            dest.SetWindowText(s)
+
+    def go(self):
+        self.OnTimer(None, None)
+
+    def stop(self):
+        if self.timerId:
+            timer.kill_timer(self.timerId)
+        self.timerId = None
+
+    def OnTimer(self, id, timeVal):
+        if id:
+            timer.kill_timer(id)
+        if self.intervaler.IsTime() or self.bConnectNow:
+            # do the work.
+            try:
+                self.dlg.SetWindowText(self.dlg.title + " - Working...")
+                self.dlg.butOK.EnableWindow(0)
+                self.dlg.butCancel.EnableWindow(0)
+                self.CaptureOutput()
+                try:
+                    exec(self.dlg.doWork)
+                    print("The last operation completed successfully.")
+                except:
+                    t, v, tb = sys.exc_info()
+                    str = f"Failed: {t}: {v!r}"
+                    print(str)
+                    self.oldErr.write(str)
+                    tb = None  # Prevent cycle
+            finally:
+                self.ReleaseOutput()
+                self.dlg.butOK.EnableWindow()
+                self.dlg.butCancel.EnableWindow()
+                self.dlg.SetWindowText(self.dlg.title)
+        else:
+            now = time.time()
+            nextTime = self.intervaler.GetNextTime()
+            if nextTime:
+                timeDiffSeconds = nextTime - now
+                timeDiffMinutes = int(timeDiffSeconds / 60)
+                timeDiffSeconds %= 60
+                timeDiffHours = int(timeDiffMinutes / 60)
+                timeDiffMinutes %= 60
+                self.dlg.prompt1.SetWindowText(
+                    "Next connection due in %02d:%02d:%02d"
+                    % (timeDiffHours, timeDiffMinutes, timeDiffSeconds)
+                )
+        self.timerId = timer.set_timer(
+            self.intervaler.GetWakeupInterval(), self.OnTimer
+        )
+        self.bConnectNow = 0
+
+
+class TimerIntervaler:
+    def __init__(self):
+        self.nextTime = None
+        self.wakeUpInterval = 2000
+
+    def GetWakeupInterval(self):
+        return self.wakeUpInterval
+
+    def GetNextTime(self):
+        return self.nextTime
+
+    def IsTime(self):
+        now = time.time()
+        if self.nextTime is None:
+            self.nextTime = self.SetFirstTime(now)
+        ret = 0
+        if now >= self.nextTime:
+            ret = 1
+            self.nextTime = self.SetNextTime(self.nextTime, now)
+            # do the work.
+        return ret
+
+
+class EachAnyIntervaler(TimerIntervaler):
+    def __init__(self, timeAt, timePos, timeAdd, wakeUpInterval=None):
+        TimerIntervaler.__init__(self)
+        self.timeAt = timeAt
+        self.timePos = timePos
+        self.timeAdd = timeAdd
+        if wakeUpInterval:
+            self.wakeUpInterval = wakeUpInterval
+
+    def SetFirstTime(self, now):
+        timeTup = time.localtime(now)
+        lst = []
+        for item in timeTup:
+            lst.append(item)
+        bAdd = timeTup[self.timePos] > self.timeAt
+        lst[self.timePos] = self.timeAt
+        for pos in range(self.timePos + 1, 6):
+            lst[pos] = 0
+        ret = time.mktime(tuple(lst))
+        if bAdd:
+            ret += self.timeAdd
+        return ret
+
+    def SetNextTime(self, lastTime, now):
+        return lastTime + self.timeAdd
+
+
+class EachMinuteIntervaler(EachAnyIntervaler):
+    def __init__(self, at=0):
+        EachAnyIntervaler.__init__(self, at, 5, 60, 2000)
+
+
+class EachHourIntervaler(EachAnyIntervaler):
+    def __init__(self, at=0):
+        EachAnyIntervaler.__init__(self, at, 4, 3600, 10000)
+
+
+class EachDayIntervaler(EachAnyIntervaler):
+    def __init__(self, at=0):
+        EachAnyIntervaler.__init__(self, at, 3, 86400, 10000)
+
+
+class TimerDialogApp(dlgappcore.DialogApp):
+    def CreateDialog(self):
+        return TimerAppDialog()
+
+
+def DoDemoWork():
+    print("Doing the work...")
+    print("About to connect")
+    win32api.MessageBeep(win32con.MB_ICONASTERISK)
+    win32api.Sleep(2000)
+    print("Doing something else...")
+    win32api.MessageBeep(win32con.MB_ICONEXCLAMATION)
+    win32api.Sleep(2000)
+    print("More work.")
+    win32api.MessageBeep(win32con.MB_ICONHAND)
+    win32api.Sleep(2000)
+    print("The last bit.")
+    win32api.MessageBeep(win32con.MB_OK)
+    win32api.Sleep(2000)
+
+
+app = TimerDialogApp()
+
+
+def t():
+    t = TimerAppDialog("Test Dialog")
+    t.DoModal()
+    return t
+
+
+if __name__ == "__main__":
+    import demoutils
+
+    demoutils.NeedApp()
+
+# === NexusCore/openenv\Lib\site-packages\win32\lib\winerror.py ===
+"""Error related constants for win32
+
+Generated from winerror.h and cderror.h"""
+
+import warnings
+
+
+# Private so h2py ignored it
+def __HRESULT_FROM_WIN32(x: int) -> int:
+    return x if x <= 0 else ((x & 0x0000FFFF) | (FACILITY_WIN32 << 16) | -2147483648)
+
+
+def __HRESULT_FROM_SETUPAPI(x: int):
+    APPLICATION_ERROR_MASK = 0x20000000  # From winnt.h
+    ERROR_SEVERITY_ERROR = -1073741824  # From winnt.h
+    return (
+        ((x & 0x0000FFFF) | (FACILITY_SETUPAPI << 16) | -2147483648)
+        if (
+            (x & (APPLICATION_ERROR_MASK | ERROR_SEVERITY_ERROR))
+            == (APPLICATION_ERROR_MASK | ERROR_SEVERITY_ERROR)
+        )
+        else HRESULT_FROM_WIN32(x)
+    )
+
+
+# Was previously found in this module, but no longer seems to exists anywhere
+def __getattr__(name: str) -> int:
+    if attr := {
+        "ERROR_INSTALL_SERVICE": 1601,
+        "ERROR_BAD_DATABASE_VERSION": 1613,
+        "win16_E_NOTIMPL": -2147483647,
+        "win16_E_OUTOFMEMORY": -2147483646,
+        "win16_E_INVALIDARG": -2147483645,
+        "win16_E_NOINTERFACE": -2147483644,
+        "win16_E_POINTER": -2147483643,
+        "win16_E_HANDLE": -2147483642,
+        "win16_E_ABORT": -2147483641,
+        "win16_E_FAIL": -2147483640,
+        "win16_E_ACCESSDENIED": -2147483639,
+        "CERTDB_E_JET_ERROR": -2146873344,
+    }.get(name):
+        warnings.warn(
+            DeprecationWarning(
+                f"Constant '{name}' is no longer part of Windows' SDK and may be removed eventually. "
+                + f"If you believe this is incorrect or are still using '{name}', "
+                + "please raise an issue at https://github.com/mhammond/pywin32/issues"
+            ),
+            stacklevel=2,
+        )
+        return attr
+    else:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+# Everything below is autogenerated
+# Then manually removed all `_HRESULT_TYPEDEF_` and `_NDIS_ERROR_TYPEDEF_` since they're private AND calling them is a waste of resources
+# Fixed the ASSERT to an assert
+# Fixed redefined names with a different value due to a condition in winerror.h
+# ! NO OTHER MANUAL CHANGES BELOW !
+
+# Generated by h2py from C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\shared\winerror.h
+FACILITY_NULL = 0
+FACILITY_RPC = 1
+FACILITY_DISPATCH = 2
+FACILITY_STORAGE = 3
+FACILITY_ITF = 4
+FACILITY_WIN32 = 7
+FACILITY_WINDOWS = 8
+FACILITY_SSPI = 9
+FACILITY_SECURITY = 9
+FACILITY_CONTROL = 10
+FACILITY_CERT = 11
+FACILITY_INTERNET = 12
+FACILITY_MEDIASERVER = 13
+FACILITY_MSMQ = 14
+FACILITY_SETUPAPI = 15
+FACILITY_SCARD = 16
+FACILITY_COMPLUS = 17
+FACILITY_AAF = 18
+FACILITY_URT = 19
+FACILITY_ACS = 20
+FACILITY_DPLAY = 21
+FACILITY_UMI = 22
+FACILITY_SXS = 23
+FACILITY_WINDOWS_CE = 24
+FACILITY_HTTP = 25
+FACILITY_USERMODE_COMMONLOG = 26
+FACILITY_WER = 27
+FACILITY_USERMODE_FILTER_MANAGER = 31
+FACILITY_BACKGROUNDCOPY = 32
+FACILITY_CONFIGURATION = 33
+FACILITY_WIA = 33
+FACILITY_STATE_MANAGEMENT = 34
+FACILITY_METADIRECTORY = 35
+FACILITY_WINDOWSUPDATE = 36
+FACILITY_DIRECTORYSERVICE = 37
+FACILITY_GRAPHICS = 38
+FACILITY_SHELL = 39
+FACILITY_NAP = 39
+FACILITY_TPM_SERVICES = 40
+FACILITY_TPM_SOFTWARE = 41
+FACILITY_UI = 42
+FACILITY_XAML = 43
+FACILITY_ACTION_QUEUE = 44
+FACILITY_PLA = 48
+FACILITY_WINDOWS_SETUP = 48
+FACILITY_FVE = 49
+FACILITY_FWP = 50
+FACILITY_WINRM = 51
+FACILITY_NDIS = 52
+FACILITY_USERMODE_HYPERVISOR = 53
+FACILITY_CMI = 54
+FACILITY_USERMODE_VIRTUALIZATION = 55
+FACILITY_USERMODE_VOLMGR = 56
+FACILITY_BCD = 57
+FACILITY_USERMODE_VHD = 58
+FACILITY_USERMODE_HNS = 59
+FACILITY_SDIAG = 60
+FACILITY_WEBSERVICES = 61
+FACILITY_WINPE = 61
+FACILITY_WPN = 62
+FACILITY_WINDOWS_STORE = 63
+FACILITY_INPUT = 64
+FACILITY_QUIC = 65
+FACILITY_EAP = 66
+FACILITY_IORING = 70
+FACILITY_WINDOWS_DEFENDER = 80
+FACILITY_OPC = 81
+FACILITY_XPS = 82
+FACILITY_MBN = 84
+FACILITY_POWERSHELL = 84
+FACILITY_RAS = 83
+FACILITY_P2P_INT = 98
+FACILITY_P2P = 99
+FACILITY_DAF = 100
+FACILITY_BLUETOOTH_ATT = 101
+FACILITY_AUDIO = 102
+FACILITY_STATEREPOSITORY = 103
+FACILITY_VISUALCPP = 109
+FACILITY_SCRIPT = 112
+FACILITY_PARSE = 113
+FACILITY_BLB = 120
+FACILITY_BLB_CLI = 121
+FACILITY_WSBAPP = 122
+FACILITY_BLBUI = 128
+FACILITY_USN = 129
+FACILITY_USERMODE_VOLSNAP = 130
+FACILITY_TIERING = 131
+FACILITY_WSB_ONLINE = 133
+FACILITY_ONLINE_ID = 134
+FACILITY_DEVICE_UPDATE_AGENT = 135
+FACILITY_DRVSERVICING = 136
+FACILITY_DLS = 153
+FACILITY_DELIVERY_OPTIMIZATION = 208
+FACILITY_USERMODE_SPACES = 231
+FACILITY_USER_MODE_SECURITY_CORE = 232
+FACILITY_USERMODE_LICENSING = 234
+FACILITY_SOS = 160
+FACILITY_OCP_UPDATE_AGENT = 173
+FACILITY_DEBUGGERS = 176
+FACILITY_SPP = 256
+FACILITY_RESTORE = 256
+FACILITY_DMSERVER = 256
+FACILITY_DEPLOYMENT_SERVICES_SERVER = 257
+FACILITY_DEPLOYMENT_SERVICES_IMAGING = 258
+FACILITY_DEPLOYMENT_SERVICES_MANAGEMENT = 259
+FACILITY_DEPLOYMENT_SERVICES_UTIL = 260
+FACILITY_DEPLOYMENT_SERVICES_BINLSVC = 261
+FACILITY_DEPLOYMENT_SERVICES_PXE = 263
+FACILITY_DEPLOYMENT_SERVICES_TFTP = 264
+FACILITY_DEPLOYMENT_SERVICES_TRANSPORT_MANAGEMENT = 272
+FACILITY_DEPLOYMENT_SERVICES_DRIVER_PROVISIONING = 278
+FACILITY_DEPLOYMENT_SERVICES_MULTICAST_SERVER = 289
+FACILITY_DEPLOYMENT_SERVICES_MULTICAST_CLIENT = 290
+FACILITY_DEPLOYMENT_SERVICES_CONTENT_PROVIDER = 293
+FACILITY_HSP_SERVICES = 296
+FACILITY_HSP_SOFTWARE = 297
+FACILITY_LINGUISTIC_SERVICES = 305
+FACILITY_AUDIOSTREAMING = 1094
+FACILITY_TTD = 1490
+FACILITY_ACCELERATOR = 1536
+FACILITY_WMAAECMA = 1996
+FACILITY_DIRECTMUSIC = 2168
+FACILITY_DIRECT3D10 = 2169
+FACILITY_DXGI = 2170
+FACILITY_DXGI_DDI = 2171
+FACILITY_DIRECT3D11 = 2172
+FACILITY_DIRECT3D11_DEBUG = 2173
+FACILITY_DIRECT3D12 = 2174
+FACILITY_DIRECT3D12_DEBUG = 2175
+FACILITY_DXCORE = 2176
+FACILITY_PRESENTATION = 2177
+FACILITY_LEAP = 2184
+FACILITY_AUDCLNT = 2185
+FACILITY_WINCODEC_DWRITE_DWM = 2200
+FACILITY_WINML = 2192
+FACILITY_DIRECT2D = 2201
+FACILITY_DEFRAG = 2304
+FACILITY_USERMODE_SDBUS = 2305
+FACILITY_JSCRIPT = 2306
+FACILITY_PIDGENX = 2561
+FACILITY_EAS = 85
+FACILITY_WEB = 885
+FACILITY_WEB_SOCKET = 886
+FACILITY_MOBILE = 1793
+FACILITY_SQLITE = 1967
+FACILITY_SERVICE_FABRIC = 1968
+FACILITY_UTC = 1989
+FACILITY_WEP = 2049
+FACILITY_SYNCENGINE = 2050
+FACILITY_XBOX = 2339
+FACILITY_GAME = 2340
+FACILITY_PIX = 2748
+ERROR_SUCCESS = 0
+NO_ERROR = 0
+SEC_E_OK = 0x00000000
+ERROR_INVALID_FUNCTION = 1
+ERROR_FILE_NOT_FOUND = 2
+ERROR_PATH_NOT_FOUND = 3
+ERROR_TOO_MANY_OPEN_FILES = 4
+ERROR_ACCESS_DENIED = 5
+ERROR_INVALID_HANDLE = 6
+ERROR_ARENA_TRASHED = 7
+ERROR_NOT_ENOUGH_MEMORY = 8
+ERROR_INVALID_BLOCK = 9
+ERROR_BAD_ENVIRONMENT = 10
+ERROR_BAD_FORMAT = 11
+ERROR_INVALID_ACCESS = 12
+ERROR_INVALID_DATA = 13
+ERROR_OUTOFMEMORY = 14
+ERROR_INVALID_DRIVE = 15
+ERROR_CURRENT_DIRECTORY = 16
+ERROR_NOT_SAME_DEVICE = 17
+ERROR_NO_MORE_FILES = 18
+ERROR_WRITE_PROTECT = 19
+ERROR_BAD_UNIT = 20
+ERROR_NOT_READY = 21
+ERROR_BAD_COMMAND = 22
+ERROR_CRC = 23
+ERROR_BAD_LENGTH = 24
+ERROR_SEEK = 25
+ERROR_NOT_DOS_DISK = 26
+ERROR_SECTOR_NOT_FOUND = 27
+ERROR_OUT_OF_PAPER = 28
+ERROR_WRITE_FAULT = 29
+ERROR_READ_FAULT = 30
+ERROR_GEN_FAILURE = 31
+ERROR_SHARING_VIOLATION = 32
+ERROR_LOCK_VIOLATION = 33
+ERROR_WRONG_DISK = 34
+ERROR_SHARING_BUFFER_EXCEEDED = 36
+ERROR_HANDLE_EOF = 38
+ERROR_HANDLE_DISK_FULL = 39
+ERROR_NOT_SUPPORTED = 50
+ERROR_REM_NOT_LIST = 51
+ERROR_DUP_NAME = 52
+ERROR_BAD_NETPATH = 53
+ERROR_NETWORK_BUSY = 54
+ERROR_DEV_NOT_EXIST = 55
+ERROR_TOO_MANY_CMDS = 56
+ERROR_ADAP_HDW_ERR = 57
+ERROR_BAD_NET_RESP = 58
+ERROR_UNEXP_NET_ERR = 59
+ERROR_BAD_REM_ADAP = 60
+ERROR_PRINTQ_FULL = 61
+ERROR_NO_SPOOL_SPACE = 62
+ERROR_PRINT_CANCELLED = 63
+ERROR_NETNAME_DELETED = 64
+ERROR_NETWORK_ACCESS_DENIED = 65
+ERROR_BAD_DEV_TYPE = 66
+ERROR_BAD_NET_NAME = 67
+ERROR_TOO_MANY_NAMES = 68
+ERROR_TOO_MANY_SESS = 69
+ERROR_SHARING_PAUSED = 70
+ERROR_REQ_NOT_ACCEP = 71
+ERROR_REDIR_PAUSED = 72
+ERROR_FILE_EXISTS = 80
+ERROR_CANNOT_MAKE = 82
+ERROR_FAIL_I24 = 83
+ERROR_OUT_OF_STRUCTURES = 84
+ERROR_ALREADY_ASSIGNED = 85
+ERROR_INVALID_PASSWORD = 86
+ERROR_INVALID_PARAMETER = 87
+ERROR_NET_WRITE_FAULT = 88
+ERROR_NO_PROC_SLOTS = 89
+ERROR_TOO_MANY_SEMAPHORES = 100
+ERROR_EXCL_SEM_ALREADY_OWNED = 101
+ERROR_SEM_IS_SET = 102
+ERROR_TOO_MANY_SEM_REQUESTS = 103
+ERROR_INVALID_AT_INTERRUPT_TIME = 104
+ERROR_SEM_OWNER_DIED = 105
+ERROR_SEM_USER_LIMIT = 106
+ERROR_DISK_CHANGE = 107
+ERROR_DRIVE_LOCKED = 108
+ERROR_BROKEN_PIPE = 109
+ERROR_OPEN_FAILED = 110
+ERROR_BUFFER_OVERFLOW = 111
+ERROR_DISK_FULL = 112
+ERROR_NO_MORE_SEARCH_HANDLES = 113
+ERROR_INVALID_TARGET_HANDLE = 114
+ERROR_INVALID_CATEGORY = 117
+ERROR_INVALID_VERIFY_SWITCH = 118
+ERROR_BAD_DRIVER_LEVEL = 119
+ERROR_CALL_NOT_IMPLEMENTED = 120
+ERROR_SEM_TIMEOUT = 121
+ERROR_INSUFFICIENT_BUFFER = 122
+ERROR_INVALID_NAME = 123
+ERROR_INVALID_LEVEL = 124
+ERROR_NO_VOLUME_LABEL = 125
+ERROR_MOD_NOT_FOUND = 126
+ERROR_PROC_NOT_FOUND = 127
+ERROR_WAIT_NO_CHILDREN = 128
+ERROR_CHILD_NOT_COMPLETE = 129
+ERROR_DIRECT_ACCESS_HANDLE = 130
+ERROR_NEGATIVE_SEEK = 131
+ERROR_SEEK_ON_DEVICE = 132
+ERROR_IS_JOIN_TARGET = 133
+ERROR_IS_JOINED = 134
+ERROR_IS_SUBSTED = 135
+ERROR_NOT_JOINED = 136
+ERROR_NOT_SUBSTED = 137
+ERROR_JOIN_TO_JOIN = 138
+ERROR_SUBST_TO_SUBST = 139
+ERROR_JOIN_TO_SUBST = 140
+ERROR_SUBST_TO_JOIN = 141
+ERROR_BUSY_DRIVE = 142
+ERROR_SAME_DRIVE = 143
+ERROR_DIR_NOT_ROOT = 144
+ERROR_DIR_NOT_EMPTY = 145
+ERROR_IS_SUBST_PATH = 146
+ERROR_IS_JOIN_PATH = 147
+ERROR_PATH_BUSY = 148
+ERROR_IS_SUBST_TARGET = 149
+ERROR_SYSTEM_TRACE = 150
+ERROR_INVALID_EVENT_COUNT = 151
+ERROR_TOO_MANY_MUXWAITERS = 152
+ERROR_INVALID_LIST_FORMAT = 153
+ERROR_LABEL_TOO_LONG = 154
+ERROR_TOO_MANY_TCBS = 155
+ERROR_SIGNAL_REFUSED = 156
+ERROR_DISCARDED = 157
+ERROR_NOT_LOCKED = 158
+ERROR_BAD_THREADID_ADDR = 159
+ERROR_BAD_ARGUMENTS = 160
+ERROR_BAD_PATHNAME = 161
+ERROR_SIGNAL_PENDING = 162
+ERROR_MAX_THRDS_REACHED = 164
+ERROR_LOCK_FAILED = 167
+ERROR_BUSY = 170
+ERROR_DEVICE_SUPPORT_IN_PROGRESS = 171
+ERROR_CANCEL_VIOLATION = 173
+ERROR_ATOMIC_LOCKS_NOT_SUPPORTED = 174
+ERROR_INVALID_SEGMENT_NUMBER = 180
+ERROR_INVALID_ORDINAL = 182
+ERROR_ALREADY_EXISTS = 183
+ERROR_INVALID_FLAG_NUMBER = 186
+ERROR_SEM_NOT_FOUND = 187
+ERROR_INVALID_STARTING_CODESEG = 188
+ERROR_INVALID_STACKSEG = 189
+ERROR_INVALID_MODULETYPE = 190
+ERROR_INVALID_EXE_SIGNATURE = 191
+ERROR_EXE_MARKED_INVALID = 192
+ERROR_BAD_EXE_FORMAT = 193
+ERROR_ITERATED_DATA_EXCEEDS_64k = 194
+ERROR_INVALID_MINALLOCSIZE = 195
+ERROR_DYNLINK_FROM_INVALID_RING = 196
+ERROR_IOPL_NOT_ENABLED = 197
+ERROR_INVALID_SEGDPL = 198
+ERROR_AUTODATASEG_EXCEEDS_64k = 199
+ERROR_RING2SEG_MUST_BE_MOVABLE = 200
+ERROR_RELOC_CHAIN_XEEDS_SEGLIM = 201
+ERROR_INFLOOP_IN_RELOC_CHAIN = 202
+ERROR_ENVVAR_NOT_FOUND = 203
+ERROR_NO_SIGNAL_SENT = 205
+ERROR_FILENAME_EXCED_RANGE = 206
+ERROR_RING2_STACK_IN_USE = 207
+ERROR_META_EXPANSION_TOO_LONG = 208
+ERROR_INVALID_SIGNAL_NUMBER = 209
+ERROR_THREAD_1_INACTIVE = 210
+ERROR_LOCKED = 212
+ERROR_TOO_MANY_MODULES = 214
+ERROR_NESTING_NOT_ALLOWED = 215
+ERROR_EXE_MACHINE_TYPE_MISMATCH = 216
+ERROR_EXE_CANNOT_MODIFY_SIGNED_BINARY = 217
+ERROR_EXE_CANNOT_MODIFY_STRONG_SIGNED_BINARY = 218
+ERROR_FILE_CHECKED_OUT = 220
+ERROR_CHECKOUT_REQUIRED = 221
+ERROR_BAD_FILE_TYPE = 222
+ERROR_FILE_TOO_LARGE = 223
+ERROR_FORMS_AUTH_REQUIRED = 224
+ERROR_VIRUS_INFECTED = 225
+ERROR_VIRUS_DELETED = 226
+ERROR_PIPE_LOCAL = 229
+ERROR_BAD_PIPE = 230
+ERROR_PIPE_BUSY = 231
+ERROR_NO_DATA = 232
+ERROR_PIPE_NOT_CONNECTED = 233
+ERROR_MORE_DATA = 234
+ERROR_NO_WORK_DONE = 235
+ERROR_VC_DISCONNECTED = 240
+ERROR_INVALID_EA_NAME = 254
+ERROR_EA_LIST_INCONSISTENT = 255
+WAIT_TIMEOUT = 258
+ERROR_NO_MORE_ITEMS = 259
+ERROR_CANNOT_COPY = 266
+ERROR_DIRECTORY = 267
+ERROR_EAS_DIDNT_FIT = 275
+ERROR_EA_FILE_CORRUPT = 276
+ERROR_EA_TABLE_FULL = 277
+ERROR_INVALID_EA_HANDLE = 278
+ERROR_EAS_NOT_SUPPORTED = 282
+ERROR_NOT_OWNER = 288
+ERROR_TOO_MANY_POSTS = 298
+ERROR_PARTIAL_COPY = 299
+ERROR_OPLOCK_NOT_GRANTED = 300
+ERROR_INVALID_OPLOCK_PROTOCOL = 301
+ERROR_DISK_TOO_FRAGMENTED = 302
+ERROR_DELETE_PENDING = 303
+ERROR_INCOMPATIBLE_WITH_GLOBAL_SHORT_NAME_REGISTRY_SETTING = 304
+ERROR_SHORT_NAMES_NOT_ENABLED_ON_VOLUME = 305
+ERROR_SECURITY_STREAM_IS_INCONSISTENT = 306
+ERROR_INVALID_LOCK_RANGE = 307
+ERROR_IMAGE_SUBSYSTEM_NOT_PRESENT = 308
+ERROR_NOTIFICATION_GUID_ALREADY_DEFINED = 309
+ERROR_INVALID_EXCEPTION_HANDLER = 310
+ERROR_DUPLICATE_PRIVILEGES = 311
+ERROR_NO_RANGES_PROCESSED = 312
+ERROR_NOT_ALLOWED_ON_SYSTEM_FILE = 313
+ERROR_DISK_RESOURCES_EXHAUSTED = 314
+ERROR_INVALID_TOKEN = 315
+ERROR_DEVICE_FEATURE_NOT_SUPPORTED = 316
+ERROR_MR_MID_NOT_FOUND = 317
+ERROR_SCOPE_NOT_FOUND = 318
+ERROR_UNDEFINED_SCOPE = 319
+ERROR_INVALID_CAP = 320
+ERROR_DEVICE_UNREACHABLE = 321
+ERROR_DEVICE_NO_RESOURCES = 322
+ERROR_DATA_CHECKSUM_ERROR = 323
+ERROR_INTERMIXED_KERNEL_EA_OPERATION = 324
+ERROR_FILE_LEVEL_TRIM_NOT_SUPPORTED = 326
+ERROR_OFFSET_ALIGNMENT_VIOLATION = 327
+ERROR_INVALID_FIELD_IN_PARAMETER_LIST = 328
+ERROR_OPERATION_IN_PROGRESS = 329
+ERROR_BAD_DEVICE_PATH = 330
+ERROR_TOO_MANY_DESCRIPTORS = 331
+ERROR_SCRUB_DATA_DISABLED = 332
+ERROR_NOT_REDUNDANT_STORAGE = 333
+ERROR_RESIDENT_FILE_NOT_SUPPORTED = 334
+ERROR_COMPRESSED_FILE_NOT_SUPPORTED = 335
+ERROR_DIRECTORY_NOT_SUPPORTED = 336
+ERROR_NOT_READ_FROM_COPY = 337
+ERROR_FT_WRITE_FAILURE = 338
+ERROR_FT_DI_SCAN_REQUIRED = 339
+ERROR_INVALID_KERNEL_INFO_VERSION = 340
+ERROR_INVALID_PEP_INFO_VERSION = 341
+ERROR_OBJECT_NOT_EXTERNALLY_BACKED = 342
+ERROR_EXTERNAL_BACKING_PROVIDER_UNKNOWN = 343
+ERROR_COMPRESSION_NOT_BENEFICIAL = 344
+ERROR_STORAGE_TOPOLOGY_ID_MISMATCH = 345
+ERROR_BLOCKED_BY_PARENTAL_CONTROLS = 346
+ERROR_BLOCK_TOO_MANY_REFERENCES = 347
+ERROR_MARKED_TO_DISALLOW_WRITES = 348
+ERROR_ENCLAVE_FAILURE = 349
+ERROR_FAIL_NOACTION_REBOOT = 350
+ERROR_FAIL_SHUTDOWN = 351
+ERROR_FAIL_RESTART = 352
+ERROR_MAX_SESSIONS_REACHED = 353
+ERROR_NETWORK_ACCESS_DENIED_EDP = 354
+ERROR_DEVICE_HINT_NAME_BUFFER_TOO_SMALL = 355
+ERROR_EDP_POLICY_DENIES_OPERATION = 356
+ERROR_EDP_DPL_POLICY_CANT_BE_SATISFIED = 357
+ERROR_CLOUD_FILE_SYNC_ROOT_METADATA_CORRUPT = 358
+ERROR_DEVICE_IN_MAINTENANCE = 359
+ERROR_NOT_SUPPORTED_ON_DAX = 360
+ERROR_DAX_MAPPING_EXISTS = 361
+ERROR_CLOUD_FILE_PROVIDER_NOT_RUNNING = 362
+ERROR_CLOUD_FILE_METADATA_CORRUPT = 363
+ERROR_CLOUD_FILE_METADATA_TOO_LARGE = 364
+ERROR_CLOUD_FILE_PROPERTY_BLOB_TOO_LARGE = 365
+ERROR_CLOUD_FILE_PROPERTY_BLOB_CHECKSUM_MISMATCH = 366
+ERROR_CHILD_PROCESS_BLOCKED = 367
+ERROR_STORAGE_LOST_DATA_PERSISTENCE = 368
+ERROR_FILE_SYSTEM_VIRTUALIZATION_UNAVAILABLE = 369
+ERROR_FILE_SYSTEM_VIRTUALIZATION_METADATA_CORRUPT = 370
+ERROR_FILE_SYSTEM_VIRTUALIZATION_BUSY = 371
+ERROR_FILE_SYSTEM_VIRTUALIZATION_PROVIDER_UNKNOWN = 372
+ERROR_GDI_HANDLE_LEAK = 373
+ERROR_CLOUD_FILE_TOO_MANY_PROPERTY_BLOBS = 374
+ERROR_CLOUD_FILE_PROPERTY_VERSION_NOT_SUPPORTED = 375
+ERROR_NOT_A_CLOUD_FILE = 376
+ERROR_CLOUD_FILE_NOT_IN_SYNC = 377
+ERROR_CLOUD_FILE_ALREADY_CONNECTED = 378
+ERROR_CLOUD_FILE_NOT_SUPPORTED = 379
+ERROR_CLOUD_FILE_INVALID_REQUEST = 380
+ERROR_CLOUD_FILE_READ_ONLY_VOLUME = 381
+ERROR_CLOUD_FILE_CONNECTED_PROVIDER_ONLY = 382
+ERROR_CLOUD_FILE_VALIDATION_FAILED = 383
+ERROR_SMB1_NOT_AVAILABLE = 384
+ERROR_FILE_SYSTEM_VIRTUALIZATION_INVALID_OPERATION = 385
+ERROR_CLOUD_FILE_AUTHENTICATION_FAILED = 386
+ERROR_CLOUD_FILE_INSUFFICIENT_RESOURCES = 387
+ERROR_CLOUD_FILE_NETWORK_UNAVAILABLE = 388
+ERROR_CLOUD_FILE_UNSUCCESSFUL = 389
+ERROR_CLOUD_FILE_NOT_UNDER_SYNC_ROOT = 390
+ERROR_CLOUD_FILE_IN_USE = 391
+ERROR_CLOUD_FILE_PINNED = 392
+ERROR_CLOUD_FILE_REQUEST_ABORTED = 393
+ERROR_CLOUD_FILE_PROPERTY_CORRUPT = 394
+ERROR_CLOUD_FILE_ACCESS_DENIED = 395
+ERROR_CLOUD_FILE_INCOMPATIBLE_HARDLINKS = 396
+ERROR_CLOUD_FILE_PROPERTY_LOCK_CONFLICT = 397
+ERROR_CLOUD_FILE_REQUEST_CANCELED = 398
+ERROR_EXTERNAL_SYSKEY_NOT_SUPPORTED = 399
+ERROR_THREAD_MODE_ALREADY_BACKGROUND = 400
+ERROR_THREAD_MODE_NOT_BACKGROUND = 401
+ERROR_PROCESS_MODE_ALREADY_BACKGROUND = 402
+ERROR_PROCESS_MODE_NOT_BACKGROUND = 403
+ERROR_CLOUD_FILE_PROVIDER_TERMINATED = 404
+ERROR_NOT_A_CLOUD_SYNC_ROOT = 405
+ERROR_FILE_PROTECTED_UNDER_DPL = 406
+ERROR_VOLUME_NOT_CLUSTER_ALIGNED = 407
+ERROR_NO_PHYSICALLY_ALIGNED_FREE_SPACE_FOUND = 408
+ERROR_APPX_FILE_NOT_ENCRYPTED = 409
+ERROR_RWRAW_ENCRYPTED_FILE_NOT_ENCRYPTED = 410
+ERROR_RWRAW_ENCRYPTED_INVALID_EDATAINFO_FILEOFFSET = 411
+ERROR_RWRAW_ENCRYPTED_INVALID_EDATAINFO_FILERANGE = 412
+ERROR_RWRAW_ENCRYPTED_INVALID_EDATAINFO_PARAMETER = 413
+ERROR_LINUX_SUBSYSTEM_NOT_PRESENT = 414
+ERROR_FT_READ_FAILURE = 415
+ERROR_STORAGE_RESERVE_ID_INVALID = 416
+ERROR_STORAGE_RESERVE_DOES_NOT_EXIST = 417
+ERROR_STORAGE_RESERVE_ALREADY_EXISTS = 418
+ERROR_STORAGE_RESERVE_NOT_EMPTY = 419
+ERROR_NOT_A_DAX_VOLUME = 420
+ERROR_NOT_DAX_MAPPABLE = 421
+ERROR_TIME_SENSITIVE_THREAD = 422
+ERROR_DPL_NOT_SUPPORTED_FOR_USER = 423
+ERROR_CASE_DIFFERING_NAMES_IN_DIR = 424
+ERROR_FILE_NOT_SUPPORTED = 425
+ERROR_CLOUD_FILE_REQUEST_TIMEOUT = 426
+ERROR_NO_TASK_QUEUE = 427
+ERROR_SRC_SRV_DLL_LOAD_FAILED = 428
+ERROR_NOT_SUPPORTED_WITH_BTT = 429
+ERROR_ENCRYPTION_DISABLED = 430
+ERROR_ENCRYPTING_METADATA_DISALLOWED = 431
+ERROR_CANT_CLEAR_ENCRYPTION_FLAG = 432
+ERROR_NO_SUCH_DEVICE = 433
+ERROR_CLOUD_FILE_DEHYDRATION_DISALLOWED = 434
+ERROR_FILE_SNAP_IN_PROGRESS = 435
+ERROR_FILE_SNAP_USER_SECTION_NOT_SUPPORTED = 436
+ERROR_FILE_SNAP_MODIFY_NOT_SUPPORTED = 437
+ERROR_FILE_SNAP_IO_NOT_COORDINATED = 438
+ERROR_FILE_SNAP_UNEXPECTED_ERROR = 439
+ERROR_FILE_SNAP_INVALID_PARAMETER = 440
+ERROR_UNSATISFIED_DEPENDENCIES = 441
+ERROR_CASE_SENSITIVE_PATH = 442
+ERROR_UNEXPECTED_NTCACHEMANAGER_ERROR = 443
+ERROR_LINUX_SUBSYSTEM_UPDATE_REQUIRED = 444
+ERROR_DLP_POLICY_WARNS_AGAINST_OPERATION = 445
+ERROR_DLP_POLICY_DENIES_OPERATION = 446
+ERROR_SECURITY_DENIES_OPERATION = 447
+ERROR_UNTRUSTED_MOUNT_POINT = 448
+ERROR_DLP_POLICY_SILENTLY_FAIL = 449
+ERROR_CAPAUTHZ_NOT_DEVUNLOCKED = 450
+ERROR_CAPAUTHZ_CHANGE_TYPE = 451
+ERROR_CAPAUTHZ_NOT_PROVISIONED = 452
+ERROR_CAPAUTHZ_NOT_AUTHORIZED = 453
+ERROR_CAPAUTHZ_NO_POLICY = 454
+ERROR_CAPAUTHZ_DB_CORRUPTED = 455
+ERROR_CAPAUTHZ_SCCD_INVALID_CATALOG = 456
+ERROR_CAPAUTHZ_SCCD_NO_AUTH_ENTITY = 457
+ERROR_CAPAUTHZ_SCCD_PARSE_ERROR = 458
+ERROR_CAPAUTHZ_SCCD_DEV_MODE_REQUIRED = 459
+ERROR_CAPAUTHZ_SCCD_NO_CAPABILITY_MATCH = 460
+ERROR_CIMFS_IMAGE_CORRUPT = 470
+ERROR_CIMFS_IMAGE_VERSION_NOT_SUPPORTED = 471
+ERROR_STORAGE_STACK_ACCESS_DENIED = 472
+ERROR_INSUFFICIENT_VIRTUAL_ADDR_RESOURCES = 473
+ERROR_INDEX_OUT_OF_BOUNDS = 474
+ERROR_CLOUD_FILE_US_MESSAGE_TIMEOUT = 475
+ERROR_NOT_A_DEV_VOLUME = 476
+ERROR_FS_GUID_MISMATCH = 477
+ERROR_CANT_ATTACH_TO_DEV_VOLUME = 478
+ERROR_INVALID_CONFIG_VALUE = 479
+ERROR_PNP_QUERY_REMOVE_DEVICE_TIMEOUT = 480
+ERROR_PNP_QUERY_REMOVE_RELATED_DEVICE_TIMEOUT = 481
+ERROR_PNP_QUERY_REMOVE_UNRELATED_DEVICE_TIMEOUT = 482
+ERROR_DEVICE_HARDWARE_ERROR = 483
+ERROR_INVALID_ADDRESS = 487
+ERROR_HAS_SYSTEM_CRITICAL_FILES = 488
+ERROR_ENCRYPTED_FILE_NOT_SUPPORTED = 489
+ERROR_SPARSE_FILE_NOT_SUPPORTED = 490
+ERROR_PAGEFILE_NOT_SUPPORTED = 491
+ERROR_VOLUME_NOT_SUPPORTED = 492
+ERROR_NOT_SUPPORTED_WITH_BYPASSIO = 493
+ERROR_NO_BYPASSIO_DRIVER_SUPPORT = 494
+ERROR_NOT_SUPPORTED_WITH_ENCRYPTION = 495
+ERROR_NOT_SUPPORTED_WITH_COMPRESSION = 496
+ERROR_NOT_SUPPORTED_WITH_REPLICATION = 497
+ERROR_NOT_SUPPORTED_WITH_DEDUPLICATION = 498
+ERROR_NOT_SUPPORTED_WITH_AUDITING = 499
+ERROR_USER_PROFILE_LOAD = 500
+ERROR_SESSION_KEY_TOO_SHORT = 501
+ERROR_ACCESS_DENIED_APPDATA = 502
+ERROR_NOT_SUPPORTED_WITH_MONITORING = 503
+ERROR_NOT_SUPPORTED_WITH_SNAPSHOT = 504
+ERROR_NOT_SUPPORTED_WITH_VIRTUALIZATION = 505
+ERROR_BYPASSIO_FLT_NOT_SUPPORTED = 506
+ERROR_DEVICE_RESET_REQUIRED = 507
+ERROR_VOLUME_WRITE_ACCESS_DENIED = 508
+ERROR_NOT_SUPPORTED_WITH_CACHED_HANDLE = 509
+ERROR_FS_METADATA_INCONSISTENT = 510
+ERROR_BLOCK_WEAK_REFERENCE_INVALID = 511
+ERROR_BLOCK_SOURCE_WEAK_REFERENCE_INVALID = 512
+ERROR_BLOCK_TARGET_WEAK_REFERENCE_INVALID = 513
+ERROR_BLOCK_SHARED = 514
+ERROR_VOLUME_UPGRADE_NOT_NEEDED = 515
+ERROR_VOLUME_UPGRADE_PENDING = 516
+ERROR_VOLUME_UPGRADE_DISABLED = 517
+ERROR_VOLUME_UPGRADE_DISABLED_TILL_OS_DOWNGRADE_EXPIRED = 518
+ERROR_ARITHMETIC_OVERFLOW = 534
+ERROR_PIPE_CONNECTED = 535
+ERROR_PIPE_LISTENING = 536
+ERROR_VERIFIER_STOP = 537
+ERROR_ABIOS_ERROR = 538
+ERROR_WX86_WARNING = 539
+ERROR_WX86_ERROR = 540
+ERROR_TIMER_NOT_CANCELED = 541
+ERROR_UNWIND = 542
+ERROR_BAD_STACK = 543
+ERROR_INVALID_UNWIND_TARGET = 544
+ERROR_INVALID_PORT_ATTRIBUTES = 545
+ERROR_PORT_MESSAGE_TOO_LONG = 546
+ERROR_INVALID_QUOTA_LOWER = 547
+ERROR_DEVICE_ALREADY_ATTACHED = 548
+ERROR_INSTRUCTION_MISALIGNMENT = 549
+ERROR_PROFILING_NOT_STARTED = 550
+ERROR_PROFILING_NOT_STOPPED = 551
+ERROR_COULD_NOT_INTERPRET = 552
+ERROR_PROFILING_AT_LIMIT = 553
+ERROR_CANT_WAIT = 554
+ERROR_CANT_TERMINATE_SELF = 555
+ERROR_UNEXPECTED_MM_CREATE_ERR = 556
+ERROR_UNEXPECTED_MM_MAP_ERROR = 557
+ERROR_UNEXPECTED_MM_EXTEND_ERR = 558
+ERROR_BAD_FUNCTION_TABLE = 559
+ERROR_NO_GUID_TRANSLATION = 560
+ERROR_INVALID_LDT_SIZE = 561
+ERROR_INVALID_LDT_OFFSET = 563
+ERROR_INVALID_LDT_DESCRIPTOR = 564
+ERROR_TOO_MANY_THREADS = 565
+ERROR_THREAD_NOT_IN_PROCESS = 566
+ERROR_PAGEFILE_QUOTA_EXCEEDED = 567
+ERROR_LOGON_SERVER_CONFLICT = 568
+ERROR_SYNCHRONIZATION_REQUIRED = 569
+ERROR_NET_OPEN_FAILED = 570
+ERROR_IO_PRIVILEGE_FAILED = 571
+ERROR_CONTROL_C_EXIT = 572
+ERROR_MISSING_SYSTEMFILE = 573
+ERROR_UNHANDLED_EXCEPTION = 574
+ERROR_APP_INIT_FAILURE = 575
+ERROR_PAGEFILE_CREATE_FAILED = 576
+ERROR_INVALID_IMAGE_HASH = 577
+ERROR_NO_PAGEFILE = 578
+ERROR_ILLEGAL_FLOAT_CONTEXT = 579
+ERROR_NO_EVENT_PAIR = 580
+ERROR_DOMAIN_CTRLR_CONFIG_ERROR = 581
+ERROR_ILLEGAL_CHARACTER = 582
+ERROR_UNDEFINED_CHARACTER = 583
+ERROR_FLOPPY_VOLUME = 584
+ERROR_BIOS_FAILED_TO_CONNECT_INTERRUPT = 585
+ERROR_BACKUP_CONTROLLER = 586
+ERROR_MUTANT_LIMIT_EXCEEDED = 587
+ERROR_FS_DRIVER_REQUIRED = 588
+ERROR_CANNOT_LOAD_REGISTRY_FILE = 589
+ERROR_DEBUG_ATTACH_FAILED = 590
+ERROR_SYSTEM_PROCESS_TERMINATED = 591
+ERROR_DATA_NOT_ACCEPTED = 592
+ERROR_VDM_HARD_ERROR = 593
+ERROR_DRIVER_CANCEL_TIMEOUT = 594
+ERROR_REPLY_MESSAGE_MISMATCH = 595
+ERROR_LOST_WRITEBEHIND_DATA = 596
+ERROR_CLIENT_SERVER_PARAMETERS_INVALID = 597
+ERROR_NOT_TINY_STREAM = 598
+ERROR_STACK_OVERFLOW_READ = 599
+ERROR_CONVERT_TO_LARGE = 600
+ERROR_FOUND_OUT_OF_SCOPE = 601
+ERROR_ALLOCATE_BUCKET = 602
+ERROR_MARSHALL_OVERFLOW = 603
+ERROR_INVALID_VARIANT = 604
+ERROR_BAD_COMPRESSION_BUFFER = 605
+ERROR_AUDIT_FAILED = 606
+ERROR_TIMER_RESOLUTION_NOT_SET = 607
+ERROR_INSUFFICIENT_LOGON_INFO = 608
+ERROR_BAD_DLL_ENTRYPOINT = 609
+ERROR_BAD_SERVICE_ENTRYPOINT = 610
+ERROR_IP_ADDRESS_CONFLICT1 = 611
+ERROR_IP_ADDRESS_CONFLICT2 = 612
+ERROR_REGISTRY_QUOTA_LIMIT = 613
+ERROR_NO_CALLBACK_ACTIVE = 614
+ERROR_PWD_TOO_SHORT = 615
+ERROR_PWD_TOO_RECENT = 616
+ERROR_PWD_HISTORY_CONFLICT = 617
+ERROR_UNSUPPORTED_COMPRESSION = 618
+ERROR_INVALID_HW_PROFILE = 619
+ERROR_INVALID_PLUGPLAY_DEVICE_PATH = 620
+ERROR_QUOTA_LIST_INCONSISTENT = 621
+ERROR_EVALUATION_EXPIRATION = 622
+ERROR_ILLEGAL_DLL_RELOCATION = 623
+ERROR_DLL_INIT_FAILED_LOGOFF = 624
+ERROR_VALIDATE_CONTINUE = 625
+ERROR_NO_MORE_MATCHES = 626
+ERROR_RANGE_LIST_CONFLICT = 627
+ERROR_SERVER_SID_MISMATCH = 628
+ERROR_CANT_ENABLE_DENY_ONLY = 629
+ERROR_FLOAT_MULTIPLE_FAULTS = 630
+ERROR_FLOAT_MULTIPLE_TRAPS = 631
+ERROR_NOINTERFACE = 632
+ERROR_DRIVER_FAILED_SLEEP = 633
+ERROR_CORRUPT_SYSTEM_FILE = 634
+ERROR_COMMITMENT_MINIMUM = 635
+ERROR_PNP_RESTART_ENUMERATION = 636
+ERROR_SYSTEM_IMAGE_BAD_SIGNATURE = 637
+ERROR_PNP_REBOOT_REQUIRED = 638
+ERROR_INSUFFICIENT_POWER = 639
+ERROR_MULTIPLE_FAULT_VIOLATION = 640
+ERROR_SYSTEM_SHUTDOWN = 641
+ERROR_PORT_NOT_SET = 642
+ERROR_DS_VERSION_CHECK_FAILURE = 643
+ERROR_RANGE_NOT_FOUND = 644
+ERROR_NOT_SAFE_MODE_DRIVER = 646
+ERROR_FAILED_DRIVER_ENTRY = 647
+ERROR_DEVICE_ENUMERATION_ERROR = 648
+ERROR_MOUNT_POINT_NOT_RESOLVED = 649
+ERROR_INVALID_DEVICE_OBJECT_PARAMETER = 650
+ERROR_MCA_OCCURED = 651
+ERROR_DRIVER_DATABASE_ERROR = 652
+ERROR_SYSTEM_HIVE_TOO_LARGE = 653
+ERROR_DRIVER_FAILED_PRIOR_UNLOAD = 654
+ERROR_VOLSNAP_PREPARE_HIBERNATE = 655
+ERROR_HIBERNATION_FAILURE = 656
+ERROR_PWD_TOO_LONG = 657
+ERROR_FILE_SYSTEM_LIMITATION = 665
+ERROR_ASSERTION_FAILURE = 668
+ERROR_ACPI_ERROR = 669
+ERROR_WOW_ASSERTION = 670
+ERROR_PNP_BAD_MPS_TABLE = 671
+ERROR_PNP_TRANSLATION_FAILED = 672
+ERROR_PNP_IRQ_TRANSLATION_FAILED = 673
+ERROR_PNP_INVALID_ID = 674
+ERROR_WAKE_SYSTEM_DEBUGGER = 675
+ERROR_HANDLES_CLOSED = 676
+ERROR_EXTRANEOUS_INFORMATION = 677
+ERROR_RXACT_COMMIT_NECESSARY = 678
+ERROR_MEDIA_CHECK = 679
+ERROR_GUID_SUBSTITUTION_MADE = 680
+ERROR_STOPPED_ON_SYMLINK = 681
+ERROR_LONGJUMP = 682
+ERROR_PLUGPLAY_QUERY_VETOED = 683
+ERROR_UNWIND_CONSOLIDATE = 684
+ERROR_REGISTRY_HIVE_RECOVERED = 685
+ERROR_DLL_MIGHT_BE_INSECURE = 686
+ERROR_DLL_MIGHT_BE_INCOMPATIBLE = 687
+ERROR_DBG_EXCEPTION_NOT_HANDLED = 688
+ERROR_DBG_REPLY_LATER = 689
+ERROR_DBG_UNABLE_TO_PROVIDE_HANDLE = 690
+ERROR_DBG_TERMINATE_THREAD = 691
+ERROR_DBG_TERMINATE_PROCESS = 692
+ERROR_DBG_CONTROL_C = 693
+ERROR_DBG_PRINTEXCEPTION_C = 694
+ERROR_DBG_RIPEXCEPTION = 695
+ERROR_DBG_CONTROL_BREAK = 696
+ERROR_DBG_COMMAND_EXCEPTION = 697
+ERROR_OBJECT_NAME_EXISTS = 698
+ERROR_THREAD_WAS_SUSPENDED = 699
+ERROR_IMAGE_NOT_AT_BASE = 700
+ERROR_RXACT_STATE_CREATED = 701
+ERROR_SEGMENT_NOTIFICATION = 702
+ERROR_BAD_CURRENT_DIRECTORY = 703
+ERROR_FT_READ_RECOVERY_FROM_BACKUP = 704
+ERROR_FT_WRITE_RECOVERY = 705
+ERROR_IMAGE_MACHINE_TYPE_MISMATCH = 706
+ERROR_RECEIVE_PARTIAL = 707
+ERROR_RECEIVE_EXPEDITED = 708
+ERROR_RECEIVE_PARTIAL_EXPEDITED = 709
+ERROR_EVENT_DONE = 710
+ERROR_EVENT_PENDING = 711
+ERROR_CHECKING_FILE_SYSTEM = 712
+ERROR_FATAL_APP_EXIT = 713
+ERROR_PREDEFINED_HANDLE = 714
+ERROR_WAS_UNLOCKED = 715
+ERROR_SERVICE_NOTIFICATION = 716
+ERROR_WAS_LOCKED = 717
+ERROR_LOG_HARD_ERROR = 718
+ERROR_ALREADY_WIN32 = 719
+ERROR_IMAGE_MACHINE_TYPE_MISMATCH_EXE = 720
+ERROR_NO_YIELD_PERFORMED = 721
+ERROR_TIMER_RESUME_IGNORED = 722
+ERROR_ARBITRATION_UNHANDLED = 723
+ERROR_CARDBUS_NOT_SUPPORTED = 724
+ERROR_MP_PROCESSOR_MISMATCH = 725
+ERROR_HIBERNATED = 726
+ERROR_RESUME_HIBERNATION = 727
+ERROR_FIRMWARE_UPDATED = 728
+ERROR_DRIVERS_LEAKING_LOCKED_PAGES = 729
+ERROR_WAKE_SYSTEM = 730
+ERROR_WAIT_1 = 731
+ERROR_WAIT_2 = 732
+ERROR_WAIT_3 = 733
+ERROR_WAIT_63 = 734
+ERROR_ABANDONED_WAIT_0 = 735
+ERROR_ABANDONED_WAIT_63 = 736
+ERROR_USER_APC = 737
+ERROR_KERNEL_APC = 738
+ERROR_ALERTED = 739
+ERROR_ELEVATION_REQUIRED = 740
+ERROR_REPARSE = 741
+ERROR_OPLOCK_BREAK_IN_PROGRESS = 742
+ERROR_VOLUME_MOUNTED = 743
+ERROR_RXACT_COMMITTED = 744
+ERROR_NOTIFY_CLEANUP = 745
+ERROR_PRIMARY_TRANSPORT_CONNECT_FAILED = 746
+ERROR_PAGE_FAULT_TRANSITION = 747
+ERROR_PAGE_FAULT_DEMAND_ZERO = 748
+ERROR_PAGE_FAULT_COPY_ON_WRITE = 749
+ERROR_PAGE_FAULT_GUARD_PAGE = 750
+ERROR_PAGE_FAULT_PAGING_FILE = 751
+ERROR_CACHE_PAGE_LOCKED = 752
+ERROR_CRASH_DUMP = 753
+ERROR_BUFFER_ALL_ZEROS = 754
+ERROR_REPARSE_OBJECT = 755
+ERROR_RESOURCE_REQUIREMENTS_CHANGED = 756
+ERROR_TRANSLATION_COMPLETE = 757
+ERROR_NOTHING_TO_TERMINATE = 758
+ERROR_PROCESS_NOT_IN_JOB = 759
+ERROR_PROCESS_IN_JOB = 760
+ERROR_VOLSNAP_HIBERNATE_READY = 761
+ERROR_FSFILTER_OP_COMPLETED_SUCCESSFULLY = 762
+ERROR_INTERRUPT_VECTOR_ALREADY_CONNECTED = 763
+ERROR_INTERRUPT_STILL_CONNECTED = 764
+ERROR_WAIT_FOR_OPLOCK = 765
+ERROR_DBG_EXCEPTION_HANDLED = 766
+ERROR_DBG_CONTINUE = 767
+ERROR_CALLBACK_POP_STACK = 768
+ERROR_COMPRESSION_DISABLED = 769
+ERROR_CANTFETCHBACKWARDS = 770
+ERROR_CANTSCROLLBACKWARDS = 771
+ERROR_ROWSNOTRELEASED = 772
+ERROR_BAD_ACCESSOR_FLAGS = 773
+ERROR_ERRORS_ENCOUNTERED = 774
+ERROR_NOT_CAPABLE = 775
+ERROR_REQUEST_OUT_OF_SEQUENCE = 776
+ERROR_VERSION_PARSE_ERROR = 777
+ERROR_BADSTARTPOSITION = 778
+ERROR_MEMORY_HARDWARE = 779
+ERROR_DISK_REPAIR_DISABLED = 780
+ERROR_INSUFFICIENT_RESOURCE_FOR_SPECIFIED_SHARED_SECTION_SIZE = 781
+ERROR_SYSTEM_POWERSTATE_TRANSITION = 782
+ERROR_SYSTEM_POWERSTATE_COMPLEX_TRANSITION = 783
+ERROR_MCA_EXCEPTION = 784
+ERROR_ACCESS_AUDIT_BY_POLICY = 785
+ERROR_ACCESS_DISABLED_NO_SAFER_UI_BY_POLICY = 786
+ERROR_ABANDON_HIBERFILE = 787
+ERROR_LOST_WRITEBEHIND_DATA_NETWORK_DISCONNECTED = 788
+ERROR_LOST_WRITEBEHIND_DATA_NETWORK_SERVER_ERROR = 789
+ERROR_LOST_WRITEBEHIND_DATA_LOCAL_DISK_ERROR = 790
+ERROR_BAD_MCFG_TABLE = 791
+ERROR_DISK_REPAIR_REDIRECTED = 792
+ERROR_DISK_REPAIR_UNSUCCESSFUL = 793
+ERROR_CORRUPT_LOG_OVERFULL = 794
+ERROR_CORRUPT_LOG_CORRUPTED = 795
+ERROR_CORRUPT_LOG_UNAVAILABLE = 796
+ERROR_CORRUPT_LOG_DELETED_FULL = 797
+ERROR_CORRUPT_LOG_CLEARED = 798
+ERROR_ORPHAN_NAME_EXHAUSTED = 799
+ERROR_OPLOCK_SWITCHED_TO_NEW_HANDLE = 800
+ERROR_CANNOT_GRANT_REQUESTED_OPLOCK = 801
+ERROR_CANNOT_BREAK_OPLOCK = 802
+ERROR_OPLOCK_HANDLE_CLOSED = 803
+ERROR_NO_ACE_CONDITION = 804
+ERROR_INVALID_ACE_CONDITION = 805
+ERROR_FILE_HANDLE_REVOKED = 806
+ERROR_IMAGE_AT_DIFFERENT_BASE = 807
+ERROR_ENCRYPTED_IO_NOT_POSSIBLE = 808
+ERROR_FILE_METADATA_OPTIMIZATION_IN_PROGRESS = 809
+ERROR_QUOTA_ACTIVITY = 810
+ERROR_HANDLE_REVOKED = 811
+ERROR_CALLBACK_INVOKE_INLINE = 812
+ERROR_CPU_SET_INVALID = 813
+ERROR_ENCLAVE_NOT_TERMINATED = 814
+ERROR_ENCLAVE_VIOLATION = 815
+ERROR_SERVER_TRANSPORT_CONFLICT = 816
+ERROR_CERTIFICATE_VALIDATION_PREFERENCE_CONFLICT = 817
+ERROR_FT_READ_FROM_COPY_FAILURE = 818
+ERROR_SECTION_DIRECT_MAP_ONLY = 819
+ERROR_EA_ACCESS_DENIED = 994
+ERROR_OPERATION_ABORTED = 995
+ERROR_IO_INCOMPLETE = 996
+ERROR_IO_PENDING = 997
+ERROR_NOACCESS = 998
+ERROR_SWAPERROR = 999
+ERROR_STACK_OVERFLOW = 1001
+ERROR_INVALID_MESSAGE = 1002
+ERROR_CAN_NOT_COMPLETE = 1003
+ERROR_INVALID_FLAGS = 1004
+ERROR_UNRECOGNIZED_VOLUME = 1005
+ERROR_FILE_INVALID = 1006
+ERROR_FULLSCREEN_MODE = 1007
+ERROR_NO_TOKEN = 1008
+ERROR_BADDB = 1009
+ERROR_BADKEY = 1010
+ERROR_CANTOPEN = 1011
+ERROR_CANTREAD = 1012
+ERROR_CANTWRITE = 1013
+ERROR_REGISTRY_RECOVERED = 1014
+ERROR_REGISTRY_CORRUPT = 1015
+ERROR_REGISTRY_IO_FAILED = 1016
+ERROR_NOT_REGISTRY_FILE = 1017
+ERROR_KEY_DELETED = 1018
+ERROR_NO_LOG_SPACE = 1019
+ERROR_KEY_HAS_CHILDREN = 1020
+ERROR_CHILD_MUST_BE_VOLATILE = 1021
+ERROR_NOTIFY_ENUM_DIR = 1022
+ERROR_DEPENDENT_SERVICES_RUNNING = 1051
+ERROR_INVALID_SERVICE_CONTROL = 1052
+ERROR_SERVICE_REQUEST_TIMEOUT = 1053
+ERROR_SERVICE_NO_THREAD = 1054
+ERROR_SERVICE_DATABASE_LOCKED = 1055
+ERROR_SERVICE_ALREADY_RUNNING = 1056
+ERROR_INVALID_SERVICE_ACCOUNT = 1057
+ERROR_SERVICE_DISABLED = 1058
+ERROR_CIRCULAR_DEPENDENCY = 1059
+ERROR_SERVICE_DOES_NOT_EXIST = 1060
+ERROR_SERVICE_CANNOT_ACCEPT_CTRL = 1061
+ERROR_SERVICE_NOT_ACTIVE = 1062
+ERROR_FAILED_SERVICE_CONTROLLER_CONNECT = 1063
+ERROR_EXCEPTION_IN_SERVICE = 1064
+ERROR_DATABASE_DOES_NOT_EXIST = 1065
+ERROR_SERVICE_SPECIFIC_ERROR = 1066
+ERROR_PROCESS_ABORTED = 1067
+ERROR_SERVICE_DEPENDENCY_FAIL = 1068
+ERROR_SERVICE_LOGON_FAILED = 1069
+ERROR_SERVICE_START_HANG = 1070
+ERROR_INVALID_SERVICE_LOCK = 1071
+ERROR_SERVICE_MARKED_FOR_DELETE = 1072
+ERROR_SERVICE_EXISTS = 1073
+ERROR_ALREADY_RUNNING_LKG = 1074
+ERROR_SERVICE_DEPENDENCY_DELETED = 1075
+ERROR_BOOT_ALREADY_ACCEPTED = 1076
+ERROR_SERVICE_NEVER_STARTED = 1077
+ERROR_DUPLICATE_SERVICE_NAME = 1078
+ERROR_DIFFERENT_SERVICE_ACCOUNT = 1079
+ERROR_CANNOT_DETECT_DRIVER_FAILURE = 1080
+ERROR_CANNOT_DETECT_PROCESS_ABORT = 1081
+ERROR_NO_RECOVERY_PROGRAM = 1082
+ERROR_SERVICE_NOT_IN_EXE = 1083
+ERROR_NOT_SAFEBOOT_SERVICE = 1084
+ERROR_END_OF_MEDIA = 1100
+ERROR_FILEMARK_DETECTED = 1101
+ERROR_BEGINNING_OF_MEDIA = 1102
+ERROR_SETMARK_DETECTED = 1103
+ERROR_NO_DATA_DETECTED = 1104
+ERROR_PARTITION_FAILURE = 1105
+ERROR_INVALID_BLOCK_LENGTH = 1106
+ERROR_DEVICE_NOT_PARTITIONED = 1107
+ERROR_UNABLE_TO_LOCK_MEDIA = 1108
+ERROR_UNABLE_TO_UNLOAD_MEDIA = 1109
+ERROR_MEDIA_CHANGED = 1110
+ERROR_BUS_RESET = 1111
+ERROR_NO_MEDIA_IN_DRIVE = 1112
+ERROR_NO_UNICODE_TRANSLATION = 1113
+ERROR_DLL_INIT_FAILED = 1114
+ERROR_SHUTDOWN_IN_PROGRESS = 1115
+ERROR_NO_SHUTDOWN_IN_PROGRESS = 1116
+ERROR_IO_DEVICE = 1117
+ERROR_SERIAL_NO_DEVICE = 1118
+ERROR_IRQ_BUSY = 1119
+ERROR_MORE_WRITES = 1120
+ERROR_COUNTER_TIMEOUT = 1121
+ERROR_FLOPPY_ID_MARK_NOT_FOUND = 1122
+ERROR_FLOPPY_WRONG_CYLINDER = 1123
+ERROR_FLOPPY_UNKNOWN_ERROR = 1124
+ERROR_FLOPPY_BAD_REGISTERS = 1125
+ERROR_DISK_RECALIBRATE_FAILED = 1126
+ERROR_DISK_OPERATION_FAILED = 1127
+ERROR_DISK_RESET_FAILED = 1128
+ERROR_EOM_OVERFLOW = 1129
+ERROR_NOT_ENOUGH_SERVER_MEMORY = 1130
+ERROR_POSSIBLE_DEADLOCK = 1131
+ERROR_MAPPED_ALIGNMENT = 1132
+ERROR_SET_POWER_STATE_VETOED = 1140
+ERROR_SET_POWER_STATE_FAILED = 1141
+ERROR_TOO_MANY_LINKS = 1142
+ERROR_OLD_WIN_VERSION = 1150
+ERROR_APP_WRONG_OS = 1151
+ERROR_SINGLE_INSTANCE_APP = 1152
+ERROR_RMODE_APP = 1153
+ERROR_INVALID_DLL = 1154
+ERROR_NO_ASSOCIATION = 1155
+ERROR_DDE_FAIL = 1156
+ERROR_DLL_NOT_FOUND = 1157
+ERROR_NO_MORE_USER_HANDLES = 1158
+ERROR_MESSAGE_SYNC_ONLY = 1159
+ERROR_SOURCE_ELEMENT_EMPTY = 1160
+ERROR_DESTINATION_ELEMENT_FULL = 1161
+ERROR_ILLEGAL_ELEMENT_ADDRESS = 1162
+ERROR_MAGAZINE_NOT_PRESENT = 1163
+ERROR_DEVICE_REINITIALIZATION_NEEDED = 1164
+ERROR_DEVICE_REQUIRES_CLEANING = 1165
+ERROR_DEVICE_DOOR_OPEN = 1166
+ERROR_DEVICE_NOT_CONNECTED = 1167
+ERROR_NOT_FOUND = 1168
+ERROR_NO_MATCH = 1169
+ERROR_SET_NOT_FOUND = 1170
+ERROR_POINT_NOT_FOUND = 1171
+ERROR_NO_TRACKING_SERVICE = 1172
+ERROR_NO_VOLUME_ID = 1173
+ERROR_UNABLE_TO_REMOVE_REPLACED = 1175
+ERROR_UNABLE_TO_MOVE_REPLACEMENT = 1176
+ERROR_UNABLE_TO_MOVE_REPLACEMENT_2 = 1177
+ERROR_JOURNAL_DELETE_IN_PROGRESS = 1178
+ERROR_JOURNAL_NOT_ACTIVE = 1179
+ERROR_POTENTIAL_FILE_FOUND = 1180
+ERROR_JOURNAL_ENTRY_DELETED = 1181
+ERROR_PARTITION_TERMINATING = 1184
+ERROR_SHUTDOWN_IS_SCHEDULED = 1190
+ERROR_SHUTDOWN_USERS_LOGGED_ON = 1191
+ERROR_SHUTDOWN_DISKS_NOT_IN_MAINTENANCE_MODE = 1192
+ERROR_BAD_DEVICE = 1200
+ERROR_CONNECTION_UNAVAIL = 1201
+ERROR_DEVICE_ALREADY_REMEMBERED = 1202
+ERROR_NO_NET_OR_BAD_PATH = 1203
+ERROR_BAD_PROVIDER = 1204
+ERROR_CANNOT_OPEN_PROFILE = 1205
+ERROR_BAD_PROFILE = 1206
+ERROR_NOT_CONTAINER = 1207
+ERROR_EXTENDED_ERROR = 1208
+ERROR_INVALID_GROUPNAME = 1209
+ERROR_INVALID_COMPUTERNAME = 1210
+ERROR_INVALID_EVENTNAME = 1211
+ERROR_INVALID_DOMAINNAME = 1212
+ERROR_INVALID_SERVICENAME = 1213
+ERROR_INVALID_NETNAME = 1214
+ERROR_INVALID_SHARENAME = 1215
+ERROR_INVALID_PASSWORDNAME = 1216
+ERROR_INVALID_MESSAGENAME = 1217
+ERROR_INVALID_MESSAGEDEST = 1218
+ERROR_SESSION_CREDENTIAL_CONFLICT = 1219
+ERROR_REMOTE_SESSION_LIMIT_EXCEEDED = 1220
+ERROR_DUP_DOMAINNAME = 1221
+ERROR_NO_NETWORK = 1222
+ERROR_CANCELLED = 1223
+ERROR_USER_MAPPED_FILE = 1224
+ERROR_CONNECTION_REFUSED = 1225
+ERROR_GRACEFUL_DISCONNECT = 1226
+ERROR_ADDRESS_ALREADY_ASSOCIATED = 1227
+ERROR_ADDRESS_NOT_ASSOCIATED = 1228
+ERROR_CONNECTION_INVALID = 1229
+ERROR_CONNECTION_ACTIVE = 1230
+ERROR_NETWORK_UNREACHABLE = 1231
+ERROR_HOST_UNREACHABLE = 1232
+ERROR_PROTOCOL_UNREACHABLE = 1233
+ERROR_PORT_UNREACHABLE = 1234
+ERROR_REQUEST_ABORTED = 1235
+ERROR_CONNECTION_ABORTED = 1236
+ERROR_RETRY = 1237
+ERROR_CONNECTION_COUNT_LIMIT = 1238
+ERROR_LOGIN_TIME_RESTRICTION = 1239
+ERROR_LOGIN_WKSTA_RESTRICTION = 1240
+ERROR_INCORRECT_ADDRESS = 1241
+ERROR_ALREADY_REGISTERED = 1242
+ERROR_SERVICE_NOT_FOUND = 1243
+ERROR_NOT_AUTHENTICATED = 1244
+ERROR_NOT_LOGGED_ON = 1245
+ERROR_CONTINUE = 1246
+ERROR_ALREADY_INITIALIZED = 1247
+ERROR_NO_MORE_DEVICES = 1248
+ERROR_NO_SUCH_SITE = 1249
+ERROR_DOMAIN_CONTROLLER_EXISTS = 1250
+ERROR_ONLY_IF_CONNECTED = 1251
+ERROR_OVERRIDE_NOCHANGES = 1252
+ERROR_BAD_USER_PROFILE = 1253
+ERROR_NOT_SUPPORTED_ON_SBS = 1254
+ERROR_SERVER_SHUTDOWN_IN_PROGRESS = 1255
+ERROR_HOST_DOWN = 1256
+ERROR_NON_ACCOUNT_SID = 1257
+ERROR_NON_DOMAIN_SID = 1258
+ERROR_APPHELP_BLOCK = 1259
+ERROR_ACCESS_DISABLED_BY_POLICY = 1260
+ERROR_REG_NAT_CONSUMPTION = 1261
+ERROR_CSCSHARE_OFFLINE = 1262
+ERROR_PKINIT_FAILURE = 1263
+ERROR_SMARTCARD_SUBSYSTEM_FAILURE = 1264
+ERROR_DOWNGRADE_DETECTED = 1265
+ERROR_MACHINE_LOCKED = 1271
+ERROR_SMB_GUEST_LOGON_BLOCKED = 1272
+ERROR_CALLBACK_SUPPLIED_INVALID_DATA = 1273
+ERROR_SYNC_FOREGROUND_REFRESH_REQUIRED = 1274
+ERROR_DRIVER_BLOCKED = 1275
+ERROR_INVALID_IMPORT_OF_NON_DLL = 1276
+ERROR_ACCESS_DISABLED_WEBBLADE = 1277
+ERROR_ACCESS_DISABLED_WEBBLADE_TAMPER = 1278
+ERROR_RECOVERY_FAILURE = 1279
+ERROR_ALREADY_FIBER = 1280
+ERROR_ALREADY_THREAD = 1281
+ERROR_STACK_BUFFER_OVERRUN = 1282
+ERROR_PARAMETER_QUOTA_EXCEEDED = 1283
+ERROR_DEBUGGER_INACTIVE = 1284
+ERROR_DELAY_LOAD_FAILED = 1285
+ERROR_VDM_DISALLOWED = 1286
+ERROR_UNIDENTIFIED_ERROR = 1287
+ERROR_INVALID_CRUNTIME_PARAMETER = 1288
+ERROR_BEYOND_VDL = 1289
+ERROR_INCOMPATIBLE_SERVICE_SID_TYPE = 1290
+ERROR_DRIVER_PROCESS_TERMINATED = 1291
+ERROR_IMPLEMENTATION_LIMIT = 1292
+ERROR_PROCESS_IS_PROTECTED = 1293
+ERROR_SERVICE_NOTIFY_CLIENT_LAGGING = 1294
+ERROR_DISK_QUOTA_EXCEEDED = 1295
+ERROR_CONTENT_BLOCKED = 1296
+ERROR_INCOMPATIBLE_SERVICE_PRIVILEGE = 1297
+ERROR_APP_HANG = 1298
+ERROR_INVALID_LABEL = 1299
+ERROR_NOT_ALL_ASSIGNED = 1300
+ERROR_SOME_NOT_MAPPED = 1301
+ERROR_NO_QUOTAS_FOR_ACCOUNT = 1302
+ERROR_LOCAL_USER_SESSION_KEY = 1303
+ERROR_NULL_LM_PASSWORD = 1304
+ERROR_UNKNOWN_REVISION = 1305
+ERROR_REVISION_MISMATCH = 1306
+ERROR_INVALID_OWNER = 1307
+ERROR_INVALID_PRIMARY_GROUP = 1308
+ERROR_NO_IMPERSONATION_TOKEN = 1309
+ERROR_CANT_DISABLE_MANDATORY = 1310
+ERROR_NO_LOGON_SERVERS = 1311
+ERROR_NO_SUCH_LOGON_SESSION = 1312
+ERROR_NO_SUCH_PRIVILEGE = 1313
+ERROR_PRIVILEGE_NOT_HELD = 1314
+ERROR_INVALID_ACCOUNT_NAME = 1315
+ERROR_USER_EXISTS = 1316
+ERROR_NO_SUCH_USER = 1317
+ERROR_GROUP_EXISTS = 1318
+ERROR_NO_SUCH_GROUP = 1319
+ERROR_MEMBER_IN_GROUP = 1320
+ERROR_MEMBER_NOT_IN_GROUP = 1321
+ERROR_LAST_ADMIN = 1322
+ERROR_WRONG_PASSWORD = 1323
+ERROR_ILL_FORMED_PASSWORD = 1324
+ERROR_PASSWORD_RESTRICTION = 1325
+ERROR_LOGON_FAILURE = 1326
+ERROR_ACCOUNT_RESTRICTION = 1327
+ERROR_INVALID_LOGON_HOURS = 1328
+ERROR_INVALID_WORKSTATION = 1329
+ERROR_PASSWORD_EXPIRED = 1330
+ERROR_ACCOUNT_DISABLED = 1331
+ERROR_NONE_MAPPED = 1332
+ERROR_TOO_MANY_LUIDS_REQUESTED = 1333
+ERROR_LUIDS_EXHAUSTED = 1334
+ERROR_INVALID_SUB_AUTHORITY = 1335
+ERROR_INVALID_ACL = 1336
+ERROR_INVALID_SID = 1337
+ERROR_INVALID_SECURITY_DESCR = 1338
+ERROR_BAD_INHERITANCE_ACL = 1340
+ERROR_SERVER_DISABLED = 1341
+ERROR_SERVER_NOT_DISABLED = 1342
+ERROR_INVALID_ID_AUTHORITY = 1343
+ERROR_ALLOTTED_SPACE_EXCEEDED = 1344
+ERROR_INVALID_GROUP_ATTRIBUTES = 1345
+ERROR_BAD_IMPERSONATION_LEVEL = 1346
+ERROR_CANT_OPEN_ANONYMOUS = 1347
+ERROR_BAD_VALIDATION_CLASS = 1348
+ERROR_BAD_TOKEN_TYPE = 1349
+ERROR_NO_SECURITY_ON_OBJECT = 1350
+ERROR_CANT_ACCESS_DOMAIN_INFO = 1351
+ERROR_INVALID_SERVER_STATE = 1352
+ERROR_INVALID_DOMAIN_STATE = 1353
+ERROR_INVALID_DOMAIN_ROLE = 1354
+ERROR_NO_SUCH_DOMAIN = 1355
+ERROR_DOMAIN_EXISTS = 1356
+ERROR_DOMAIN_LIMIT_EXCEEDED = 1357
+ERROR_INTERNAL_DB_CORRUPTION = 1358
+ERROR_INTERNAL_ERROR = 1359
+ERROR_GENERIC_NOT_MAPPED = 1360
+ERROR_BAD_DESCRIPTOR_FORMAT = 1361
+ERROR_NOT_LOGON_PROCESS = 1362
+ERROR_LOGON_SESSION_EXISTS = 1363
+ERROR_NO_SUCH_PACKAGE = 1364
+ERROR_BAD_LOGON_SESSION_STATE = 1365
+ERROR_LOGON_SESSION_COLLISION = 1366
+ERROR_INVALID_LOGON_TYPE = 1367
+ERROR_CANNOT_IMPERSONATE = 1368
+ERROR_RXACT_INVALID_STATE = 1369
+ERROR_RXACT_COMMIT_FAILURE = 1370
+ERROR_SPECIAL_ACCOUNT = 1371
+ERROR_SPECIAL_GROUP = 1372
+ERROR_SPECIAL_USER = 1373
+ERROR_MEMBERS_PRIMARY_GROUP = 1374
+ERROR_TOKEN_ALREADY_IN_USE = 1375
+ERROR_NO_SUCH_ALIAS = 1376
+ERROR_MEMBER_NOT_IN_ALIAS = 1377
+ERROR_MEMBER_IN_ALIAS = 1378
+ERROR_ALIAS_EXISTS = 1379
+ERROR_LOGON_NOT_GRANTED = 1380
+ERROR_TOO_MANY_SECRETS = 1381
+ERROR_SECRET_TOO_LONG = 1382
+ERROR_INTERNAL_DB_ERROR = 1383
+ERROR_TOO_MANY_CONTEXT_IDS = 1384
+ERROR_LOGON_TYPE_NOT_GRANTED = 1385
+ERROR_NT_CROSS_ENCRYPTION_REQUIRED = 1386
+ERROR_NO_SUCH_MEMBER = 1387
+ERROR_INVALID_MEMBER = 1388
+ERROR_TOO_MANY_SIDS = 1389
+ERROR_LM_CROSS_ENCRYPTION_REQUIRED = 1390
+ERROR_NO_INHERITANCE = 1391
+ERROR_FILE_CORRUPT = 1392
+ERROR_DISK_CORRUPT = 1393
+ERROR_NO_USER_SESSION_KEY = 1394
+ERROR_LICENSE_QUOTA_EXCEEDED = 1395
+ERROR_WRONG_TARGET_NAME = 1396
+ERROR_MUTUAL_AUTH_FAILED = 1397
+ERROR_TIME_SKEW = 1398
+ERROR_CURRENT_DOMAIN_NOT_ALLOWED = 1399
+ERROR_INVALID_WINDOW_HANDLE = 1400
+ERROR_INVALID_MENU_HANDLE = 1401
+ERROR_INVALID_CURSOR_HANDLE = 1402
+ERROR_INVALID_ACCEL_HANDLE = 1403
+ERROR_INVALID_HOOK_HANDLE = 1404
+ERROR_INVALID_DWP_HANDLE = 1405
+ERROR_TLW_WITH_WSCHILD = 1406
+ERROR_CANNOT_FIND_WND_CLASS = 1407
+ERROR_WINDOW_OF_OTHER_THREAD = 1408
+ERROR_HOTKEY_ALREADY_REGISTERED = 1409
+ERROR_CLASS_ALREADY_EXISTS = 1410
+ERROR_CLASS_DOES_NOT_EXIST = 1411
+ERROR_CLASS_HAS_WINDOWS = 1412
+ERROR_INVALID_INDEX = 1413
+ERROR_INVALID_ICON_HANDLE = 1414
+ERROR_PRIVATE_DIALOG_INDEX = 1415
+ERROR_LISTBOX_ID_NOT_FOUND = 1416
+ERROR_NO_WILDCARD_CHARACTERS = 1417
+ERROR_CLIPBOARD_NOT_OPEN = 1418
+ERROR_HOTKEY_NOT_REGISTERED = 1419
+ERROR_WINDOW_NOT_DIALOG = 1420
+ERROR_CONTROL_ID_NOT_FOUND = 1421
+ERROR_INVALID_COMBOBOX_MESSAGE = 1422
+ERROR_WINDOW_NOT_COMBOBOX = 1423
+ERROR_INVALID_EDIT_HEIGHT = 1424
+ERROR_DC_NOT_FOUND = 1425
+ERROR_INVALID_HOOK_FILTER = 1426
+ERROR_INVALID_FILTER_PROC = 1427
+ERROR_HOOK_NEEDS_HMOD = 1428
+ERROR_GLOBAL_ONLY_HOOK = 1429
+ERROR_JOURNAL_HOOK_SET = 1430
+ERROR_HOOK_NOT_INSTALLED = 1431
+ERROR_INVALID_LB_MESSAGE = 1432
+ERROR_SETCOUNT_ON_BAD_LB = 1433
+ERROR_LB_WITHOUT_TABSTOPS = 1434
+ERROR_DESTROY_OBJECT_OF_OTHER_THREAD = 1435
+ERROR_CHILD_WINDOW_MENU = 1436
+ERROR_NO_SYSTEM_MENU = 1437
+ERROR_INVALID_MSGBOX_STYLE = 1438
+ERROR_INVALID_SPI_VALUE = 1439
+ERROR_SCREEN_ALREADY_LOCKED = 1440
+ERROR_HWNDS_HAVE_DIFF_PARENT = 1441
+ERROR_NOT_CHILD_WINDOW = 1442
+ERROR_INVALID_GW_COMMAND = 1443
+ERROR_INVALID_THREAD_ID = 1444
+ERROR_NON_MDICHILD_WINDOW = 1445
+ERROR_POPUP_ALREADY_ACTIVE = 1446
+ERROR_NO_SCROLLBARS = 1447
+ERROR_INVALID_SCROLLBAR_RANGE = 1448
+ERROR_INVALID_SHOWWIN_COMMAND = 1449
+ERROR_NO_SYSTEM_RESOURCES = 1450
+ERROR_NONPAGED_SYSTEM_RESOURCES = 1451
+ERROR_PAGED_SYSTEM_RESOURCES = 1452
+ERROR_WORKING_SET_QUOTA = 1453
+ERROR_PAGEFILE_QUOTA = 1454
+ERROR_COMMITMENT_LIMIT = 1455
+ERROR_MENU_ITEM_NOT_FOUND = 1456
+ERROR_INVALID_KEYBOARD_HANDLE = 1457
+ERROR_HOOK_TYPE_NOT_ALLOWED = 1458
+ERROR_REQUIRES_INTERACTIVE_WINDOWSTATION = 1459
+ERROR_TIMEOUT = 1460
+ERROR_INVALID_MONITOR_HANDLE = 1461
+ERROR_INCORRECT_SIZE = 1462
+ERROR_SYMLINK_CLASS_DISABLED = 1463
+ERROR_SYMLINK_NOT_SUPPORTED = 1464
+ERROR_XML_PARSE_ERROR = 1465
+ERROR_XMLDSIG_ERROR = 1466
+ERROR_RESTART_APPLICATION = 1467
+ERROR_WRONG_COMPARTMENT = 1468
+ERROR_AUTHIP_FAILURE = 1469
+ERROR_NO_NVRAM_RESOURCES = 1470
+ERROR_NOT_GUI_PROCESS = 1471
+ERROR_EVENTLOG_FILE_CORRUPT = 1500
+ERROR_EVENTLOG_CANT_START = 1501
+ERROR_LOG_FILE_FULL = 1502
+ERROR_EVENTLOG_FILE_CHANGED = 1503
+ERROR_CONTAINER_ASSIGNED = 1504
+ERROR_JOB_NO_CONTAINER = 1505
+ERROR_INVALID_TASK_NAME = 1550
+ERROR_INVALID_TASK_INDEX = 1551
+ERROR_THREAD_ALREADY_IN_TASK = 1552
+ERROR_INSTALL_SERVICE_FAILURE = 1601
+ERROR_INSTALL_USEREXIT = 1602
+ERROR_INSTALL_FAILURE = 1603
+ERROR_INSTALL_SUSPEND = 1604
+ERROR_UNKNOWN_PRODUCT = 1605
+ERROR_UNKNOWN_FEATURE = 1606
+ERROR_UNKNOWN_COMPONENT = 1607
+ERROR_UNKNOWN_PROPERTY = 1608
+ERROR_INVALID_HANDLE_STATE = 1609
+ERROR_BAD_CONFIGURATION = 1610
+ERROR_INDEX_ABSENT = 1611
+ERROR_INSTALL_SOURCE_ABSENT = 1612
+ERROR_INSTALL_PACKAGE_VERSION = 1613
+ERROR_PRODUCT_UNINSTALLED = 1614
+ERROR_BAD_QUERY_SYNTAX = 1615
+ERROR_INVALID_FIELD = 1616
+ERROR_DEVICE_REMOVED = 1617
+ERROR_INSTALL_ALREADY_RUNNING = 1618
+ERROR_INSTALL_PACKAGE_OPEN_FAILED = 1619
+ERROR_INSTALL_PACKAGE_INVALID = 1620
+ERROR_INSTALL_UI_FAILURE = 1621
+ERROR_INSTALL_LOG_FAILURE = 1622
+ERROR_INSTALL_LANGUAGE_UNSUPPORTED = 1623
+ERROR_INSTALL_TRANSFORM_FAILURE = 1624
+ERROR_INSTALL_PACKAGE_REJECTED = 1625
+ERROR_FUNCTION_NOT_CALLED = 1626
+ERROR_FUNCTION_FAILED = 1627
+ERROR_INVALID_TABLE = 1628
+ERROR_DATATYPE_MISMATCH = 1629
+ERROR_UNSUPPORTED_TYPE = 1630
+ERROR_CREATE_FAILED = 1631
+ERROR_INSTALL_TEMP_UNWRITABLE = 1632
+ERROR_INSTALL_PLATFORM_UNSUPPORTED = 1633
+ERROR_INSTALL_NOTUSED = 1634
+ERROR_PATCH_PACKAGE_OPEN_FAILED = 1635
+ERROR_PATCH_PACKAGE_INVALID = 1636
+ERROR_PATCH_PACKAGE_UNSUPPORTED = 1637
+ERROR_PRODUCT_VERSION = 1638
+ERROR_INVALID_COMMAND_LINE = 1639
+ERROR_INSTALL_REMOTE_DISALLOWED = 1640
+ERROR_SUCCESS_REBOOT_INITIATED = 1641
+ERROR_PATCH_TARGET_NOT_FOUND = 1642
+ERROR_PATCH_PACKAGE_REJECTED = 1643
+ERROR_INSTALL_TRANSFORM_REJECTED = 1644
+ERROR_INSTALL_REMOTE_PROHIBITED = 1645
+ERROR_PATCH_REMOVAL_UNSUPPORTED = 1646
+ERROR_UNKNOWN_PATCH = 1647
+ERROR_PATCH_NO_SEQUENCE = 1648
+ERROR_PATCH_REMOVAL_DISALLOWED = 1649
+ERROR_INVALID_PATCH_XML = 1650
+ERROR_PATCH_MANAGED_ADVERTISED_PRODUCT = 1651
+ERROR_INSTALL_SERVICE_SAFEBOOT = 1652
+ERROR_FAIL_FAST_EXCEPTION = 1653
+ERROR_INSTALL_REJECTED = 1654
+ERROR_DYNAMIC_CODE_BLOCKED = 1655
+ERROR_NOT_SAME_OBJECT = 1656
+ERROR_STRICT_CFG_VIOLATION = 1657
+ERROR_SET_CONTEXT_DENIED = 1660
+ERROR_CROSS_PARTITION_VIOLATION = 1661
+ERROR_RETURN_ADDRESS_HIJACK_ATTEMPT = 1662
+RPC_S_INVALID_STRING_BINDING = 1700
+RPC_S_WRONG_KIND_OF_BINDING = 1701
+RPC_S_INVALID_BINDING = 1702
+RPC_S_PROTSEQ_NOT_SUPPORTED = 1703
+RPC_S_INVALID_RPC_PROTSEQ = 1704
+RPC_S_INVALID_STRING_UUID = 1705
+RPC_S_INVALID_ENDPOINT_FORMAT = 1706
+RPC_S_INVALID_NET_ADDR = 1707
+RPC_S_NO_ENDPOINT_FOUND = 1708
+RPC_S_INVALID_TIMEOUT = 1709
+RPC_S_OBJECT_NOT_FOUND = 1710
+RPC_S_ALREADY_REGISTERED = 1711
+RPC_S_TYPE_ALREADY_REGISTERED = 1712
+RPC_S_ALREADY_LISTENING = 1713
+RPC_S_NO_PROTSEQS_REGISTERED = 1714
+RPC_S_NOT_LISTENING = 1715
+RPC_S_UNKNOWN_MGR_TYPE = 1716
+RPC_S_UNKNOWN_IF = 1717
+RPC_S_NO_BINDINGS = 1718
+RPC_S_NO_PROTSEQS = 1719
+RPC_S_CANT_CREATE_ENDPOINT = 1720
+RPC_S_OUT_OF_RESOURCES = 1721
+RPC_S_SERVER_UNAVAILABLE = 1722
+RPC_S_SERVER_TOO_BUSY = 1723
+RPC_S_INVALID_NETWORK_OPTIONS = 1724
+RPC_S_NO_CALL_ACTIVE = 1725
+RPC_S_CALL_FAILED = 1726
+RPC_S_CALL_FAILED_DNE = 1727
+RPC_S_PROTOCOL_ERROR = 1728
+RPC_S_PROXY_ACCESS_DENIED = 1729
+RPC_S_UNSUPPORTED_TRANS_SYN = 1730
+RPC_S_UNSUPPORTED_TYPE = 1732
+RPC_S_INVALID_TAG = 1733
+RPC_S_INVALID_BOUND = 1734
+RPC_S_NO_ENTRY_NAME = 1735
+RPC_S_INVALID_NAME_SYNTAX = 1736
+RPC_S_UNSUPPORTED_NAME_SYNTAX = 1737
+RPC_S_UUID_NO_ADDRESS = 1739
+RPC_S_DUPLICATE_ENDPOINT = 1740
+RPC_S_UNKNOWN_AUTHN_TYPE = 1741
+RPC_S_MAX_CALLS_TOO_SMALL = 1742
+RPC_S_STRING_TOO_LONG = 1743
+RPC_S_PROTSEQ_NOT_FOUND = 1744
+RPC_S_PROCNUM_OUT_OF_RANGE = 1745
+RPC_S_BINDING_HAS_NO_AUTH = 1746
+RPC_S_UNKNOWN_AUTHN_SERVICE = 1747
+RPC_S_UNKNOWN_AUTHN_LEVEL = 1748
+RPC_S_INVALID_AUTH_IDENTITY = 1749
+RPC_S_UNKNOWN_AUTHZ_SERVICE = 1750
+EPT_S_INVALID_ENTRY = 1751
+EPT_S_CANT_PERFORM_OP = 1752
+EPT_S_NOT_REGISTERED = 1753
+RPC_S_NOTHING_TO_EXPORT = 1754
+RPC_S_INCOMPLETE_NAME = 1755
+RPC_S_INVALID_VERS_OPTION = 1756
+RPC_S_NO_MORE_MEMBERS = 1757
+RPC_S_NOT_ALL_OBJS_UNEXPORTED = 1758
+RPC_S_INTERFACE_NOT_FOUND = 1759
+RPC_S_ENTRY_ALREADY_EXISTS = 1760
+RPC_S_ENTRY_NOT_FOUND = 1761
+RPC_S_NAME_SERVICE_UNAVAILABLE = 1762
+RPC_S_INVALID_NAF_ID = 1763
+RPC_S_CANNOT_SUPPORT = 1764
+RPC_S_NO_CONTEXT_AVAILABLE = 1765
+RPC_S_INTERNAL_ERROR = 1766
+RPC_S_ZERO_DIVIDE = 1767
+RPC_S_ADDRESS_ERROR = 1768
+RPC_S_FP_DIV_ZERO = 1769
+RPC_S_FP_UNDERFLOW = 1770
+RPC_S_FP_OVERFLOW = 1771
+RPC_X_NO_MORE_ENTRIES = 1772
+RPC_X_SS_CHAR_TRANS_OPEN_FAIL = 1773
+RPC_X_SS_CHAR_TRANS_SHORT_FILE = 1774
+RPC_X_SS_IN_NULL_CONTEXT = 1775
+RPC_X_SS_CONTEXT_DAMAGED = 1777
+RPC_X_SS_HANDLES_MISMATCH = 1778
+RPC_X_SS_CANNOT_GET_CALL_HANDLE = 1779
+RPC_X_NULL_REF_POINTER = 1780
+RPC_X_ENUM_VALUE_OUT_OF_RANGE = 1781
+RPC_X_BYTE_COUNT_TOO_SMALL = 1782
+RPC_X_BAD_STUB_DATA = 1783
+ERROR_INVALID_USER_BUFFER = 1784
+ERROR_UNRECOGNIZED_MEDIA = 1785
+ERROR_NO_TRUST_LSA_SECRET = 1786
+ERROR_NO_TRUST_SAM_ACCOUNT = 1787
+ERROR_TRUSTED_DOMAIN_FAILURE = 1788
+ERROR_TRUSTED_RELATIONSHIP_FAILURE = 1789
+ERROR_TRUST_FAILURE = 1790
+RPC_S_CALL_IN_PROGRESS = 1791
+ERROR_NETLOGON_NOT_STARTED = 1792
+ERROR_ACCOUNT_EXPIRED = 1793
+ERROR_REDIRECTOR_HAS_OPEN_HANDLES = 1794
+ERROR_PRINTER_DRIVER_ALREADY_INSTALLED = 1795
+ERROR_UNKNOWN_PORT = 1796
+ERROR_UNKNOWN_PRINTER_DRIVER = 1797
+ERROR_UNKNOWN_PRINTPROCESSOR = 1798
+ERROR_INVALID_SEPARATOR_FILE = 1799
+ERROR_INVALID_PRIORITY = 1800
+ERROR_INVALID_PRINTER_NAME = 1801
+ERROR_PRINTER_ALREADY_EXISTS = 1802
+ERROR_INVALID_PRINTER_COMMAND = 1803
+ERROR_INVALID_DATATYPE = 1804
+ERROR_INVALID_ENVIRONMENT = 1805
+RPC_S_NO_MORE_BINDINGS = 1806
+ERROR_NOLOGON_INTERDOMAIN_TRUST_ACCOUNT = 1807
+ERROR_NOLOGON_WORKSTATION_TRUST_ACCOUNT = 1808
+ERROR_NOLOGON_SERVER_TRUST_ACCOUNT = 1809
+ERROR_DOMAIN_TRUST_INCONSISTENT = 1810
+ERROR_SERVER_HAS_OPEN_HANDLES = 1811
+ERROR_RESOURCE_DATA_NOT_FOUND = 1812
+ERROR_RESOURCE_TYPE_NOT_FOUND = 1813
+ERROR_RESOURCE_NAME_NOT_FOUND = 1814
+ERROR_RESOURCE_LANG_NOT_FOUND = 1815
+ERROR_NOT_ENOUGH_QUOTA = 1816
+RPC_S_NO_INTERFACES = 1817
+RPC_S_CALL_CANCELLED = 1818
+RPC_S_BINDING_INCOMPLETE = 1819
+RPC_S_COMM_FAILURE = 1820
+RPC_S_UNSUPPORTED_AUTHN_LEVEL = 1821
+RPC_S_NO_PRINC_NAME = 1822
+RPC_S_NOT_RPC_ERROR = 1823
+RPC_S_UUID_LOCAL_ONLY = 1824
+RPC_S_SEC_PKG_ERROR = 1825
+RPC_S_NOT_CANCELLED = 1826
+RPC_X_INVALID_ES_ACTION = 1827
+RPC_X_WRONG_ES_VERSION = 1828
+RPC_X_WRONG_STUB_VERSION = 1829
+RPC_X_INVALID_PIPE_OBJECT = 1830
+RPC_X_WRONG_PIPE_ORDER = 1831
+RPC_X_WRONG_PIPE_VERSION = 1832
+RPC_S_COOKIE_AUTH_FAILED = 1833
+RPC_S_DO_NOT_DISTURB = 1834
+RPC_S_SYSTEM_HANDLE_COUNT_EXCEEDED = 1835
+RPC_S_SYSTEM_HANDLE_TYPE_MISMATCH = 1836
+RPC_S_GROUP_MEMBER_NOT_FOUND = 1898
+EPT_S_CANT_CREATE = 1899
+RPC_S_INVALID_OBJECT = 1900
+ERROR_INVALID_TIME = 1901
+ERROR_INVALID_FORM_NAME = 1902
+ERROR_INVALID_FORM_SIZE = 1903
+ERROR_ALREADY_WAITING = 1904
+ERROR_PRINTER_DELETED = 1905
+ERROR_INVALID_PRINTER_STATE = 1906
+ERROR_PASSWORD_MUST_CHANGE = 1907
+ERROR_DOMAIN_CONTROLLER_NOT_FOUND = 1908
+ERROR_ACCOUNT_LOCKED_OUT = 1909
+OR_INVALID_OXID = 1910
+OR_INVALID_OID = 1911
+OR_INVALID_SET = 1912
+RPC_S_SEND_INCOMPLETE = 1913
+RPC_S_INVALID_ASYNC_HANDLE = 1914
+RPC_S_INVALID_ASYNC_CALL = 1915
+RPC_X_PIPE_CLOSED = 1916
+RPC_X_PIPE_DISCIPLINE_ERROR = 1917
+RPC_X_PIPE_EMPTY = 1918
+ERROR_NO_SITENAME = 1919
+ERROR_CANT_ACCESS_FILE = 1920
+ERROR_CANT_RESOLVE_FILENAME = 1921
+RPC_S_ENTRY_TYPE_MISMATCH = 1922
+RPC_S_NOT_ALL_OBJS_EXPORTED = 1923
+RPC_S_INTERFACE_NOT_EXPORTED = 1924
+RPC_S_PROFILE_NOT_ADDED = 1925
+RPC_S_PRF_ELT_NOT_ADDED = 1926
+RPC_S_PRF_ELT_NOT_REMOVED = 1927
+RPC_S_GRP_ELT_NOT_ADDED = 1928
+RPC_S_GRP_ELT_NOT_REMOVED = 1929
+ERROR_KM_DRIVER_BLOCKED = 1930
+ERROR_CONTEXT_EXPIRED = 1931
+ERROR_PER_USER_TRUST_QUOTA_EXCEEDED = 1932
+ERROR_ALL_USER_TRUST_QUOTA_EXCEEDED = 1933
+ERROR_USER_DELETE_TRUST_QUOTA_EXCEEDED = 1934
+ERROR_AUTHENTICATION_FIREWALL_FAILED = 1935
+ERROR_REMOTE_PRINT_CONNECTIONS_BLOCKED = 1936
+ERROR_NTLM_BLOCKED = 1937
+ERROR_PASSWORD_CHANGE_REQUIRED = 1938
+ERROR_LOST_MODE_LOGON_RESTRICTION = 1939
+ERROR_INVALID_PIXEL_FORMAT = 2000
+ERROR_BAD_DRIVER = 2001
+ERROR_INVALID_WINDOW_STYLE = 2002
+ERROR_METAFILE_NOT_SUPPORTED = 2003
+ERROR_TRANSFORM_NOT_SUPPORTED = 2004
+ERROR_CLIPPING_NOT_SUPPORTED = 2005
+ERROR_INVALID_CMM = 2010
+ERROR_INVALID_PROFILE = 2011
+ERROR_TAG_NOT_FOUND = 2012
+ERROR_TAG_NOT_PRESENT = 2013
+ERROR_DUPLICATE_TAG = 2014
+ERROR_PROFILE_NOT_ASSOCIATED_WITH_DEVICE = 2015
+ERROR_PROFILE_NOT_FOUND = 2016
+ERROR_INVALID_COLORSPACE = 2017
+ERROR_ICM_NOT_ENABLED = 2018
+ERROR_DELETING_ICM_XFORM = 2019
+ERROR_INVALID_TRANSFORM = 2020
+ERROR_COLORSPACE_MISMATCH = 2021
+ERROR_INVALID_COLORINDEX = 2022
+ERROR_PROFILE_DOES_NOT_MATCH_DEVICE = 2023
+ERROR_CONNECTED_OTHER_PASSWORD = 2108
+ERROR_CONNECTED_OTHER_PASSWORD_DEFAULT = 2109
+ERROR_BAD_USERNAME = 2202
+ERROR_NOT_CONNECTED = 2250
+ERROR_OPEN_FILES = 2401
+ERROR_ACTIVE_CONNECTIONS = 2402
+ERROR_DEVICE_IN_USE = 2404
+ERROR_UNKNOWN_PRINT_MONITOR = 3000
+ERROR_PRINTER_DRIVER_IN_USE = 3001
+ERROR_SPOOL_FILE_NOT_FOUND = 3002
+ERROR_SPL_NO_STARTDOC = 3003
+ERROR_SPL_NO_ADDJOB = 3004
+ERROR_PRINT_PROCESSOR_ALREADY_INSTALLED = 3005
+ERROR_PRINT_MONITOR_ALREADY_INSTALLED = 3006
+ERROR_INVALID_PRINT_MONITOR = 3007
+ERROR_PRINT_MONITOR_IN_USE = 3008
+ERROR_PRINTER_HAS_JOBS_QUEUED = 3009
+ERROR_SUCCESS_REBOOT_REQUIRED = 3010
+ERROR_SUCCESS_RESTART_REQUIRED = 3011
+ERROR_PRINTER_NOT_FOUND = 3012
+ERROR_PRINTER_DRIVER_WARNED = 3013
+ERROR_PRINTER_DRIVER_BLOCKED = 3014
+ERROR_PRINTER_DRIVER_PACKAGE_IN_USE = 3015
+ERROR_CORE_DRIVER_PACKAGE_NOT_FOUND = 3016
+ERROR_FAIL_REBOOT_REQUIRED = 3017
+ERROR_FAIL_REBOOT_INITIATED = 3018
+ERROR_PRINTER_DRIVER_DOWNLOAD_NEEDED = 3019
+ERROR_PRINT_JOB_RESTART_REQUIRED = 3020
+ERROR_INVALID_PRINTER_DRIVER_MANIFEST = 3021
+ERROR_PRINTER_NOT_SHAREABLE = 3022
+ERROR_SERVER_SERVICE_CALL_REQUIRES_SMB1 = 3023
+ERROR_NETWORK_AUTHENTICATION_PROMPT_CANCELED = 3024
+ERROR_REQUEST_PAUSED = 3050
+ERROR_APPEXEC_CONDITION_NOT_SATISFIED = 3060
+ERROR_APPEXEC_HANDLE_INVALIDATED = 3061
+ERROR_APPEXEC_INVALID_HOST_GENERATION = 3062
+ERROR_APPEXEC_UNEXPECTED_PROCESS_REGISTRATION = 3063
+ERROR_APPEXEC_INVALID_HOST_STATE = 3064
+ERROR_APPEXEC_NO_DONOR = 3065
+ERROR_APPEXEC_HOST_ID_MISMATCH = 3066
+ERROR_APPEXEC_UNKNOWN_USER = 3067
+ERROR_APPEXEC_APP_COMPAT_BLOCK = 3068
+ERROR_APPEXEC_CALLER_WAIT_TIMEOUT = 3069
+ERROR_APPEXEC_CALLER_WAIT_TIMEOUT_TERMINATION = 3070
+ERROR_APPEXEC_CALLER_WAIT_TIMEOUT_LICENSING = 3071
+ERROR_APPEXEC_CALLER_WAIT_TIMEOUT_RESOURCES = 3072
+ERROR_VRF_VOLATILE_CFG_AND_IO_ENABLED = 3080
+ERROR_VRF_VOLATILE_NOT_STOPPABLE = 3081
+ERROR_VRF_VOLATILE_SAFE_MODE = 3082
+ERROR_VRF_VOLATILE_NOT_RUNNABLE_SYSTEM = 3083
+ERROR_VRF_VOLATILE_NOT_SUPPORTED_RULECLASS = 3084
+ERROR_VRF_VOLATILE_PROTECTED_DRIVER = 3085
+ERROR_VRF_VOLATILE_NMI_REGISTERED = 3086
+ERROR_VRF_VOLATILE_SETTINGS_CONFLICT = 3087
+ERROR_DIF_IOCALLBACK_NOT_REPLACED = 3190
+ERROR_DIF_LIVEDUMP_LIMIT_EXCEEDED = 3191
+ERROR_DIF_VOLATILE_SECTION_NOT_LOCKED = 3192
+ERROR_DIF_VOLATILE_DRIVER_HOTPATCHED = 3193
+ERROR_DIF_VOLATILE_INVALID_INFO = 3194
+ERROR_DIF_VOLATILE_DRIVER_IS_NOT_RUNNING = 3195
+ERROR_DIF_VOLATILE_PLUGIN_IS_NOT_RUNNING = 3196
+ERROR_DIF_VOLATILE_PLUGIN_CHANGE_NOT_ALLOWED = 3197
+ERROR_DIF_VOLATILE_NOT_ALLOWED = 3198
+ERROR_DIF_BINDING_API_NOT_FOUND = 3199
+ERROR_IO_REISSUE_AS_CACHED = 3950
+ERROR_WINS_INTERNAL = 4000
+ERROR_CAN_NOT_DEL_LOCAL_WINS = 4001
+ERROR_STATIC_INIT = 4002
+ERROR_INC_BACKUP = 4003
+ERROR_FULL_BACKUP = 4004
+ERROR_REC_NON_EXISTENT = 4005
+ERROR_RPL_NOT_ALLOWED = 4006
+PEERDIST_ERROR_CONTENTINFO_VERSION_UNSUPPORTED = 4050
+PEERDIST_ERROR_CANNOT_PARSE_CONTENTINFO = 4051
+PEERDIST_ERROR_MISSING_DATA = 4052
+PEERDIST_ERROR_NO_MORE = 4053
+PEERDIST_ERROR_NOT_INITIALIZED = 4054
+PEERDIST_ERROR_ALREADY_INITIALIZED = 4055
+PEERDIST_ERROR_SHUTDOWN_IN_PROGRESS = 4056
+PEERDIST_ERROR_INVALIDATED = 4057
+PEERDIST_ERROR_ALREADY_EXISTS = 4058
+PEERDIST_ERROR_OPERATION_NOTFOUND = 4059
+PEERDIST_ERROR_ALREADY_COMPLETED = 4060
+PEERDIST_ERROR_OUT_OF_BOUNDS = 4061
+PEERDIST_ERROR_VERSION_UNSUPPORTED = 4062
+PEERDIST_ERROR_INVALID_CONFIGURATION = 4063
+PEERDIST_ERROR_NOT_LICENSED = 4064
+PEERDIST_ERROR_SERVICE_UNAVAILABLE = 4065
+PEERDIST_ERROR_TRUST_FAILURE = 4066
+ERROR_DHCP_ADDRESS_CONFLICT = 4100
+ERROR_WMI_GUID_NOT_FOUND = 4200
+ERROR_WMI_INSTANCE_NOT_FOUND = 4201
+ERROR_WMI_ITEMID_NOT_FOUND = 4202
+ERROR_WMI_TRY_AGAIN = 4203
+ERROR_WMI_DP_NOT_FOUND = 4204
+ERROR_WMI_UNRESOLVED_INSTANCE_REF = 4205
+ERROR_WMI_ALREADY_ENABLED = 4206
+ERROR_WMI_GUID_DISCONNECTED = 4207
+ERROR_WMI_SERVER_UNAVAILABLE = 4208
+ERROR_WMI_DP_FAILED = 4209
+ERROR_WMI_INVALID_MOF = 4210
+ERROR_WMI_INVALID_REGINFO = 4211
+ERROR_WMI_ALREADY_DISABLED = 4212
+ERROR_WMI_READ_ONLY = 4213
+ERROR_WMI_SET_FAILURE = 4214
+ERROR_NOT_APPCONTAINER = 4250
+ERROR_APPCONTAINER_REQUIRED = 4251
+ERROR_NOT_SUPPORTED_IN_APPCONTAINER = 4252
+ERROR_INVALID_PACKAGE_SID_LENGTH = 4253
+ERROR_INVALID_MEDIA = 4300
+ERROR_INVALID_LIBRARY = 4301
+ERROR_INVALID_MEDIA_POOL = 4302
+ERROR_DRIVE_MEDIA_MISMATCH = 4303
+ERROR_MEDIA_OFFLINE = 4304
+ERROR_LIBRARY_OFFLINE = 4305
+ERROR_EMPTY = 4306
+ERROR_NOT_EMPTY = 4307
+ERROR_MEDIA_UNAVAILABLE = 4308
+ERROR_RESOURCE_DISABLED = 4309
+ERROR_INVALID_CLEANER = 4310
+ERROR_UNABLE_TO_CLEAN = 4311
+ERROR_OBJECT_NOT_FOUND = 4312
+ERROR_DATABASE_FAILURE = 4313
+ERROR_DATABASE_FULL = 4314
+ERROR_MEDIA_INCOMPATIBLE = 4315
+ERROR_RESOURCE_NOT_PRESENT = 4316
+ERROR_INVALID_OPERATION = 4317
+ERROR_MEDIA_NOT_AVAILABLE = 4318
+ERROR_DEVICE_NOT_AVAILABLE = 4319
+ERROR_REQUEST_REFUSED = 4320
+ERROR_INVALID_DRIVE_OBJECT = 4321
+ERROR_LIBRARY_FULL = 4322
+ERROR_MEDIUM_NOT_ACCESSIBLE = 4323
+ERROR_UNABLE_TO_LOAD_MEDIUM = 4324
+ERROR_UNABLE_TO_INVENTORY_DRIVE = 4325
+ERROR_UNABLE_TO_INVENTORY_SLOT = 4326
+ERROR_UNABLE_TO_INVENTORY_TRANSPORT = 4327
+ERROR_TRANSPORT_FULL = 4328
+ERROR_CONTROLLING_IEPORT = 4329
+ERROR_UNABLE_TO_EJECT_MOUNTED_MEDIA = 4330
+ERROR_CLEANER_SLOT_SET = 4331
+ERROR_CLEANER_SLOT_NOT_SET = 4332
+ERROR_CLEANER_CARTRIDGE_SPENT = 4333
+ERROR_UNEXPECTED_OMID = 4334
+ERROR_CANT_DELETE_LAST_ITEM = 4335
+ERROR_MESSAGE_EXCEEDS_MAX_SIZE = 4336
+ERROR_VOLUME_CONTAINS_SYS_FILES = 4337
+ERROR_INDIGENOUS_TYPE = 4338
+ERROR_NO_SUPPORTING_DRIVES = 4339
+ERROR_CLEANER_CARTRIDGE_INSTALLED = 4340
+ERROR_IEPORT_FULL = 4341
+ERROR_FILE_OFFLINE = 4350
+ERROR_REMOTE_STORAGE_NOT_ACTIVE = 4351
+ERROR_REMOTE_STORAGE_MEDIA_ERROR = 4352
+ERROR_NOT_A_REPARSE_POINT = 4390
+ERROR_REPARSE_ATTRIBUTE_CONFLICT = 4391
+ERROR_INVALID_REPARSE_DATA = 4392
+ERROR_REPARSE_TAG_INVALID = 4393
+ERROR_REPARSE_TAG_MISMATCH = 4394
+ERROR_REPARSE_POINT_ENCOUNTERED = 4395
+ERROR_APP_DATA_NOT_FOUND = 4400
+ERROR_APP_DATA_EXPIRED = 4401
+ERROR_APP_DATA_CORRUPT = 4402
+ERROR_APP_DATA_LIMIT_EXCEEDED = 4403
+ERROR_APP_DATA_REBOOT_REQUIRED = 4404
+ERROR_SECUREBOOT_ROLLBACK_DETECTED = 4420
+ERROR_SECUREBOOT_POLICY_VIOLATION = 4421
+ERROR_SECUREBOOT_INVALID_POLICY = 4422
+ERROR_SECUREBOOT_POLICY_PUBLISHER_NOT_FOUND = 4423
+ERROR_SECUREBOOT_POLICY_NOT_SIGNED = 4424
+ERROR_SECUREBOOT_NOT_ENABLED = 4425
+ERROR_SECUREBOOT_FILE_REPLACED = 4426
+ERROR_SECUREBOOT_POLICY_NOT_AUTHORIZED = 4427
+ERROR_SECUREBOOT_POLICY_UNKNOWN = 4428
+ERROR_SECUREBOOT_POLICY_MISSING_ANTIROLLBACKVERSION = 4429
+ERROR_SECUREBOOT_PLATFORM_ID_MISMATCH = 4430
+ERROR_SECUREBOOT_POLICY_ROLLBACK_DETECTED = 4431
+ERROR_SECUREBOOT_POLICY_UPGRADE_MISMATCH = 4432
+ERROR_SECUREBOOT_REQUIRED_POLICY_FILE_MISSING = 4433
+ERROR_SECUREBOOT_NOT_BASE_POLICY = 4434
+ERROR_SECUREBOOT_NOT_SUPPLEMENTAL_POLICY = 4435
+ERROR_OFFLOAD_READ_FLT_NOT_SUPPORTED = 4440
+ERROR_OFFLOAD_WRITE_FLT_NOT_SUPPORTED = 4441
+ERROR_OFFLOAD_READ_FILE_NOT_SUPPORTED = 4442
+ERROR_OFFLOAD_WRITE_FILE_NOT_SUPPORTED = 4443
+ERROR_ALREADY_HAS_STREAM_ID = 4444
+ERROR_SMR_GARBAGE_COLLECTION_REQUIRED = 4445
+ERROR_WOF_WIM_HEADER_CORRUPT = 4446
+ERROR_WOF_WIM_RESOURCE_TABLE_CORRUPT = 4447
+ERROR_WOF_FILE_RESOURCE_TABLE_CORRUPT = 4448
+ERROR_OBJECT_IS_IMMUTABLE = 4449
+ERROR_VOLUME_NOT_SIS_ENABLED = 4500
+ERROR_SYSTEM_INTEGRITY_ROLLBACK_DETECTED = 4550
+ERROR_SYSTEM_INTEGRITY_POLICY_VIOLATION = 4551
+ERROR_SYSTEM_INTEGRITY_INVALID_POLICY = 4552
+ERROR_SYSTEM_INTEGRITY_POLICY_NOT_SIGNED = 4553
+ERROR_SYSTEM_INTEGRITY_TOO_MANY_POLICIES = 4554
+ERROR_SYSTEM_INTEGRITY_SUPPLEMENTAL_POLICY_NOT_AUTHORIZED = 4555
+ERROR_SYSTEM_INTEGRITY_REPUTATION_MALICIOUS = 4556
+ERROR_SYSTEM_INTEGRITY_REPUTATION_PUA = 4557
+ERROR_SYSTEM_INTEGRITY_REPUTATION_DANGEROUS_EXT = 4558
+ERROR_SYSTEM_INTEGRITY_REPUTATION_OFFLINE = 4559
+ERROR_VSM_NOT_INITIALIZED = 4560
+ERROR_VSM_DMA_PROTECTION_NOT_IN_USE = 4561
+ERROR_PLATFORM_MANIFEST_NOT_AUTHORIZED = 4570
+ERROR_PLATFORM_MANIFEST_INVALID = 4571
+ERROR_PLATFORM_MANIFEST_FILE_NOT_AUTHORIZED = 4572
+ERROR_PLATFORM_MANIFEST_CATALOG_NOT_AUTHORIZED = 4573
+ERROR_PLATFORM_MANIFEST_BINARY_ID_NOT_FOUND = 4574
+ERROR_PLATFORM_MANIFEST_NOT_ACTIVE = 4575
+ERROR_PLATFORM_MANIFEST_NOT_SIGNED = 4576
+ERROR_SYSTEM_INTEGRITY_REPUTATION_UNFRIENDLY_FILE = 4580
+ERROR_SYSTEM_INTEGRITY_REPUTATION_UNATTAINABLE = 4581
+ERROR_SYSTEM_INTEGRITY_REPUTATION_EXPLICIT_DENY_FILE = 4582
+ERROR_DEPENDENT_RESOURCE_EXISTS = 5001
+ERROR_DEPENDENCY_NOT_FOUND = 5002
+ERROR_DEPENDENCY_ALREADY_EXISTS = 5003
+ERROR_RESOURCE_NOT_ONLINE = 5004
+ERROR_HOST_NODE_NOT_AVAILABLE = 5005
+ERROR_RESOURCE_NOT_AVAILABLE = 5006
+ERROR_RESOURCE_NOT_FOUND = 5007
+ERROR_SHUTDOWN_CLUSTER = 5008
+ERROR_CANT_EVICT_ACTIVE_NODE = 5009
+ERROR_OBJECT_ALREADY_EXISTS = 5010
+ERROR_OBJECT_IN_LIST = 5011
+ERROR_GROUP_NOT_AVAILABLE = 5012
+ERROR_GROUP_NOT_FOUND = 5013
+ERROR_GROUP_NOT_ONLINE = 5014
+ERROR_HOST_NODE_NOT_RESOURCE_OWNER = 5015
+ERROR_HOST_NODE_NOT_GROUP_OWNER = 5016
+ERROR_RESMON_CREATE_FAILED = 5017
+ERROR_RESMON_ONLINE_FAILED = 5018
+ERROR_RESOURCE_ONLINE = 5019
+ERROR_QUORUM_RESOURCE = 5020
+ERROR_NOT_QUORUM_CAPABLE = 5021
+ERROR_CLUSTER_SHUTTING_DOWN = 5022
+ERROR_INVALID_STATE = 5023
+ERROR_RESOURCE_PROPERTIES_STORED = 5024
+ERROR_NOT_QUORUM_CLASS = 5025
+ERROR_CORE_RESOURCE = 5026
+ERROR_QUORUM_RESOURCE_ONLINE_FAILED = 5027
+ERROR_QUORUMLOG_OPEN_FAILED = 5028
+ERROR_CLUSTERLOG_CORRUPT = 5029
+ERROR_CLUSTERLOG_RECORD_EXCEEDS_MAXSIZE = 5030
+ERROR_CLUSTERLOG_EXCEEDS_MAXSIZE = 5031
+ERROR_CLUSTERLOG_CHKPOINT_NOT_FOUND = 5032
+ERROR_CLUSTERLOG_NOT_ENOUGH_SPACE = 5033
+ERROR_QUORUM_OWNER_ALIVE = 5034
+ERROR_NETWORK_NOT_AVAILABLE = 5035
+ERROR_NODE_NOT_AVAILABLE = 5036
+ERROR_ALL_NODES_NOT_AVAILABLE = 5037
+ERROR_RESOURCE_FAILED = 5038
+ERROR_CLUSTER_INVALID_NODE = 5039
+ERROR_CLUSTER_NODE_EXISTS = 5040
+ERROR_CLUSTER_JOIN_IN_PROGRESS = 5041
+ERROR_CLUSTER_NODE_NOT_FOUND = 5042
+ERROR_CLUSTER_LOCAL_NODE_NOT_FOUND = 5043
+ERROR_CLUSTER_NETWORK_EXISTS = 5044
+ERROR_CLUSTER_NETWORK_NOT_FOUND = 5045
+ERROR_CLUSTER_NETINTERFACE_EXISTS = 5046
+ERROR_CLUSTER_NETINTERFACE_NOT_FOUND = 5047
+ERROR_CLUSTER_INVALID_REQUEST = 5048
+ERROR_CLUSTER_INVALID_NETWORK_PROVIDER = 5049
+ERROR_CLUSTER_NODE_DOWN = 5050
+ERROR_CLUSTER_NODE_UNREACHABLE = 5051
+ERROR_CLUSTER_NODE_NOT_MEMBER = 5052
+ERROR_CLUSTER_JOIN_NOT_IN_PROGRESS = 5053
+ERROR_CLUSTER_INVALID_NETWORK = 5054
+ERROR_CLUSTER_NODE_UP = 5056
+ERROR_CLUSTER_IPADDR_IN_USE = 5057
+ERROR_CLUSTER_NODE_NOT_PAUSED = 5058
+ERROR_CLUSTER_NO_SECURITY_CONTEXT = 5059
+ERROR_CLUSTER_NETWORK_NOT_INTERNAL = 5060
+ERROR_CLUSTER_NODE_ALREADY_UP = 5061
+ERROR_CLUSTER_NODE_ALREADY_DOWN = 5062
+ERROR_CLUSTER_NETWORK_ALREADY_ONLINE = 5063
+ERROR_CLUSTER_NETWORK_ALREADY_OFFLINE = 5064
+ERROR_CLUSTER_NODE_ALREADY_MEMBER = 5065
+ERROR_CLUSTER_LAST_INTERNAL_NETWORK = 5066
+ERROR_CLUSTER_NETWORK_HAS_DEPENDENTS = 5067
+ERROR_INVALID_OPERATION_ON_QUORUM = 5068
+ERROR_DEPENDENCY_NOT_ALLOWED = 5069
+ERROR_CLUSTER_NODE_PAUSED = 5070
+ERROR_NODE_CANT_HOST_RESOURCE = 5071
+ERROR_CLUSTER_NODE_NOT_READY = 5072
+ERROR_CLUSTER_NODE_SHUTTING_DOWN = 5073
+ERROR_CLUSTER_JOIN_ABORTED = 5074
+ERROR_CLUSTER_INCOMPATIBLE_VERSIONS = 5075
+ERROR_CLUSTER_MAXNUM_OF_RESOURCES_EXCEEDED = 5076
+ERROR_CLUSTER_SYSTEM_CONFIG_CHANGED = 5077
+ERROR_CLUSTER_RESOURCE_TYPE_NOT_FOUND = 5078
+ERROR_CLUSTER_RESTYPE_NOT_SUPPORTED = 5079
+ERROR_CLUSTER_RESNAME_NOT_FOUND = 5080
+ERROR_CLUSTER_NO_RPC_PACKAGES_REGISTERED = 5081
+ERROR_CLUSTER_OWNER_NOT_IN_PREFLIST = 5082
+ERROR_CLUSTER_DATABASE_SEQMISMATCH = 5083
+ERROR_RESMON_INVALID_STATE = 5084
+ERROR_CLUSTER_GUM_NOT_LOCKER = 5085
+ERROR_QUORUM_DISK_NOT_FOUND = 5086
+ERROR_DATABASE_BACKUP_CORRUPT = 5087
+ERROR_CLUSTER_NODE_ALREADY_HAS_DFS_ROOT = 5088
+ERROR_RESOURCE_PROPERTY_UNCHANGEABLE = 5089
+ERROR_NO_ADMIN_ACCESS_POINT = 5090
+ERROR_CLUSTER_MEMBERSHIP_INVALID_STATE = 5890
+ERROR_CLUSTER_QUORUMLOG_NOT_FOUND = 5891
+ERROR_CLUSTER_MEMBERSHIP_HALT = 5892
+ERROR_CLUSTER_INSTANCE_ID_MISMATCH = 5893
+ERROR_CLUSTER_NETWORK_NOT_FOUND_FOR_IP = 5894
+ERROR_CLUSTER_PROPERTY_DATA_TYPE_MISMATCH = 5895
+ERROR_CLUSTER_EVICT_WITHOUT_CLEANUP = 5896
+ERROR_CLUSTER_PARAMETER_MISMATCH = 5897
+ERROR_NODE_CANNOT_BE_CLUSTERED = 5898
+ERROR_CLUSTER_WRONG_OS_VERSION = 5899
+ERROR_CLUSTER_CANT_CREATE_DUP_CLUSTER_NAME = 5900
+ERROR_CLUSCFG_ALREADY_COMMITTED = 5901
+ERROR_CLUSCFG_ROLLBACK_FAILED = 5902
+ERROR_CLUSCFG_SYSTEM_DISK_DRIVE_LETTER_CONFLICT = 5903
+ERROR_CLUSTER_OLD_VERSION = 5904
+ERROR_CLUSTER_MISMATCHED_COMPUTER_ACCT_NAME = 5905
+ERROR_CLUSTER_NO_NET_ADAPTERS = 5906
+ERROR_CLUSTER_POISONED = 5907
+ERROR_CLUSTER_GROUP_MOVING = 5908
+ERROR_CLUSTER_RESOURCE_TYPE_BUSY = 5909
+ERROR_RESOURCE_CALL_TIMED_OUT = 5910
+ERROR_INVALID_CLUSTER_IPV6_ADDRESS = 5911
+ERROR_CLUSTER_INTERNAL_INVALID_FUNCTION = 5912
+ERROR_CLUSTER_PARAMETER_OUT_OF_BOUNDS = 5913
+ERROR_CLUSTER_PARTIAL_SEND = 5914
+ERROR_CLUSTER_REGISTRY_INVALID_FUNCTION = 5915
+ERROR_CLUSTER_INVALID_STRING_TERMINATION = 5916
+ERROR_CLUSTER_INVALID_STRING_FORMAT = 5917
+ERROR_CLUSTER_DATABASE_TRANSACTION_IN_PROGRESS = 5918
+ERROR_CLUSTER_DATABASE_TRANSACTION_NOT_IN_PROGRESS = 5919
+ERROR_CLUSTER_NULL_DATA = 5920
+ERROR_CLUSTER_PARTIAL_READ = 5921
+ERROR_CLUSTER_PARTIAL_WRITE = 5922
+ERROR_CLUSTER_CANT_DESERIALIZE_DATA = 5923
+ERROR_DEPENDENT_RESOURCE_PROPERTY_CONFLICT = 5924
+ERROR_CLUSTER_NO_QUORUM = 5925
+ERROR_CLUSTER_INVALID_IPV6_NETWORK = 5926
+ERROR_CLUSTER_INVALID_IPV6_TUNNEL_NETWORK = 5927
+ERROR_QUORUM_NOT_ALLOWED_IN_THIS_GROUP = 5928
+ERROR_DEPENDENCY_TREE_TOO_COMPLEX = 5929
+ERROR_EXCEPTION_IN_RESOURCE_CALL = 5930
+ERROR_CLUSTER_RHS_FAILED_INITIALIZATION = 5931
+ERROR_CLUSTER_NOT_INSTALLED = 5932
+ERROR_CLUSTER_RESOURCES_MUST_BE_ONLINE_ON_THE_SAME_NODE = 5933
+ERROR_CLUSTER_MAX_NODES_IN_CLUSTER = 5934
+ERROR_CLUSTER_TOO_MANY_NODES = 5935
+ERROR_CLUSTER_OBJECT_ALREADY_USED = 5936
+ERROR_NONCORE_GROUPS_FOUND = 5937
+ERROR_FILE_SHARE_RESOURCE_CONFLICT = 5938
+ERROR_CLUSTER_EVICT_INVALID_REQUEST = 5939
+ERROR_CLUSTER_SINGLETON_RESOURCE = 5940
+ERROR_CLUSTER_GROUP_SINGLETON_RESOURCE = 5941
+ERROR_CLUSTER_RESOURCE_PROVIDER_FAILED = 5942
+ERROR_CLUSTER_RESOURCE_CONFIGURATION_ERROR = 5943
+ERROR_CLUSTER_GROUP_BUSY = 5944
+ERROR_CLUSTER_NOT_SHARED_VOLUME = 5945
+ERROR_CLUSTER_INVALID_SECURITY_DESCRIPTOR = 5946
+ERROR_CLUSTER_SHARED_VOLUMES_IN_USE = 5947
+ERROR_CLUSTER_USE_SHARED_VOLUMES_API = 5948
+ERROR_CLUSTER_BACKUP_IN_PROGRESS = 5949
+ERROR_NON_CSV_PATH = 5950
+ERROR_CSV_VOLUME_NOT_LOCAL = 5951
+ERROR_CLUSTER_WATCHDOG_TERMINATING = 5952
+ERROR_CLUSTER_RESOURCE_VETOED_MOVE_INCOMPATIBLE_NODES = 5953
+ERROR_CLUSTER_INVALID_NODE_WEIGHT = 5954
+ERROR_CLUSTER_RESOURCE_VETOED_CALL = 5955
+ERROR_RESMON_SYSTEM_RESOURCES_LACKING = 5956
+ERROR_CLUSTER_RESOURCE_VETOED_MOVE_NOT_ENOUGH_RESOURCES_ON_DESTINATION = 5957
+ERROR_CLUSTER_RESOURCE_VETOED_MOVE_NOT_ENOUGH_RESOURCES_ON_SOURCE = 5958
+ERROR_CLUSTER_GROUP_QUEUED = 5959
+ERROR_CLUSTER_RESOURCE_LOCKED_STATUS = 5960
+ERROR_CLUSTER_SHARED_VOLUME_FAILOVER_NOT_ALLOWED = 5961
+ERROR_CLUSTER_NODE_DRAIN_IN_PROGRESS = 5962
+ERROR_CLUSTER_DISK_NOT_CONNECTED = 5963
+ERROR_DISK_NOT_CSV_CAPABLE = 5964
+ERROR_RESOURCE_NOT_IN_AVAILABLE_STORAGE = 5965
+ERROR_CLUSTER_SHARED_VOLUME_REDIRECTED = 5966
+ERROR_CLUSTER_SHARED_VOLUME_NOT_REDIRECTED = 5967
+ERROR_CLUSTER_CANNOT_RETURN_PROPERTIES = 5968
+ERROR_CLUSTER_RESOURCE_CONTAINS_UNSUPPORTED_DIFF_AREA_FOR_SHARED_VOLUMES = 5969
+ERROR_CLUSTER_RESOURCE_IS_IN_MAINTENANCE_MODE = 5970
+ERROR_CLUSTER_AFFINITY_CONFLICT = 5971
+ERROR_CLUSTER_RESOURCE_IS_REPLICA_VIRTUAL_MACHINE = 5972
+ERROR_CLUSTER_UPGRADE_INCOMPATIBLE_VERSIONS = 5973
+ERROR_CLUSTER_UPGRADE_FIX_QUORUM_NOT_SUPPORTED = 5974
+ERROR_CLUSTER_UPGRADE_RESTART_REQUIRED = 5975
+ERROR_CLUSTER_UPGRADE_IN_PROGRESS = 5976
+ERROR_CLUSTER_UPGRADE_INCOMPLETE = 5977
+ERROR_CLUSTER_NODE_IN_GRACE_PERIOD = 5978
+ERROR_CLUSTER_CSV_IO_PAUSE_TIMEOUT = 5979
+ERROR_NODE_NOT_ACTIVE_CLUSTER_MEMBER = 5980
+ERROR_CLUSTER_RESOURCE_NOT_MONITORED = 5981
+ERROR_CLUSTER_RESOURCE_DOES_NOT_SUPPORT_UNMONITORED = 5982
+ERROR_CLUSTER_RESOURCE_IS_REPLICATED = 5983
+ERROR_CLUSTER_NODE_ISOLATED = 5984
+ERROR_CLUSTER_NODE_QUARANTINED = 5985
+ERROR_CLUSTER_DATABASE_UPDATE_CONDITION_FAILED = 5986
+ERROR_CLUSTER_SPACE_DEGRADED = 5987
+ERROR_CLUSTER_TOKEN_DELEGATION_NOT_SUPPORTED = 5988
+ERROR_CLUSTER_CSV_INVALID_HANDLE = 5989
+ERROR_CLUSTER_CSV_SUPPORTED_ONLY_ON_COORDINATOR = 5990
+ERROR_GROUPSET_NOT_AVAILABLE = 5991
+ERROR_GROUPSET_NOT_FOUND = 5992
+ERROR_GROUPSET_CANT_PROVIDE = 5993
+ERROR_CLUSTER_FAULT_DOMAIN_PARENT_NOT_FOUND = 5994
+ERROR_CLUSTER_FAULT_DOMAIN_INVALID_HIERARCHY = 5995
+ERROR_CLUSTER_FAULT_DOMAIN_FAILED_S2D_VALIDATION = 5996
+ERROR_CLUSTER_FAULT_DOMAIN_S2D_CONNECTIVITY_LOSS = 5997
+ERROR_CLUSTER_INVALID_INFRASTRUCTURE_FILESERVER_NAME = 5998
+ERROR_CLUSTERSET_MANAGEMENT_CLUSTER_UNREACHABLE = 5999
+ERROR_ENCRYPTION_FAILED = 6000
+ERROR_DECRYPTION_FAILED = 6001
+ERROR_FILE_ENCRYPTED = 6002
+ERROR_NO_RECOVERY_POLICY = 6003
+ERROR_NO_EFS = 6004
+ERROR_WRONG_EFS = 6005
+ERROR_NO_USER_KEYS = 6006
+ERROR_FILE_NOT_ENCRYPTED = 6007
+ERROR_NOT_EXPORT_FORMAT = 6008
+ERROR_FILE_READ_ONLY = 6009
+ERROR_DIR_EFS_DISALLOWED = 6010
+ERROR_EFS_SERVER_NOT_TRUSTED = 6011
+ERROR_BAD_RECOVERY_POLICY = 6012
+ERROR_EFS_ALG_BLOB_TOO_BIG = 6013
+ERROR_VOLUME_NOT_SUPPORT_EFS = 6014
+ERROR_EFS_DISABLED = 6015
+ERROR_EFS_VERSION_NOT_SUPPORT = 6016
+ERROR_CS_ENCRYPTION_INVALID_SERVER_RESPONSE = 6017
+ERROR_CS_ENCRYPTION_UNSUPPORTED_SERVER = 6018
+ERROR_CS_ENCRYPTION_EXISTING_ENCRYPTED_FILE = 6019
+ERROR_CS_ENCRYPTION_NEW_ENCRYPTED_FILE = 6020
+ERROR_CS_ENCRYPTION_FILE_NOT_CSE = 6021
+ERROR_ENCRYPTION_POLICY_DENIES_OPERATION = 6022
+ERROR_WIP_ENCRYPTION_FAILED = 6023
+ERROR_NO_BROWSER_SERVERS_FOUND = 6118
+SCHED_E_SERVICE_NOT_LOCALSYSTEM = 6200
+ERROR_CLUSTER_OBJECT_IS_CLUSTER_SET_VM = 6250
+ERROR_LOG_SECTOR_INVALID = 6600
+ERROR_LOG_SECTOR_PARITY_INVALID = 6601
+ERROR_LOG_SECTOR_REMAPPED = 6602
+ERROR_LOG_BLOCK_INCOMPLETE = 6603
+ERROR_LOG_INVALID_RANGE = 6604
+ERROR_LOG_BLOCKS_EXHAUSTED = 6605
+ERROR_LOG_READ_CONTEXT_INVALID = 6606
+ERROR_LOG_RESTART_INVALID = 6607
+ERROR_LOG_BLOCK_VERSION = 6608
+ERROR_LOG_BLOCK_INVALID = 6609
+ERROR_LOG_READ_MODE_INVALID = 6610
+ERROR_LOG_NO_RESTART = 6611
+ERROR_LOG_METADATA_CORRUPT = 6612
+ERROR_LOG_METADATA_INVALID = 6613
+ERROR_LOG_METADATA_INCONSISTENT = 6614
+ERROR_LOG_RESERVATION_INVALID = 6615
+ERROR_LOG_CANT_DELETE = 6616
+ERROR_LOG_CONTAINER_LIMIT_EXCEEDED = 6617
+ERROR_LOG_START_OF_LOG = 6618
+ERROR_LOG_POLICY_ALREADY_INSTALLED = 6619
+ERROR_LOG_POLICY_NOT_INSTALLED = 6620
+ERROR_LOG_POLICY_INVALID = 6621
+ERROR_LOG_POLICY_CONFLICT = 6622
+ERROR_LOG_PINNED_ARCHIVE_TAIL = 6623
+ERROR_LOG_RECORD_NONEXISTENT = 6624
+ERROR_LOG_RECORDS_RESERVED_INVALID = 6625
+ERROR_LOG_SPACE_RESERVED_INVALID = 6626
+ERROR_LOG_TAIL_INVALID = 6627
+ERROR_LOG_FULL = 6628
+ERROR_COULD_NOT_RESIZE_LOG = 6629
+ERROR_LOG_MULTIPLEXED = 6630
+ERROR_LOG_DEDICATED = 6631
+ERROR_LOG_ARCHIVE_NOT_IN_PROGRESS = 6632
+ERROR_LOG_ARCHIVE_IN_PROGRESS = 6633
+ERROR_LOG_EPHEMERAL = 6634
+ERROR_LOG_NOT_ENOUGH_CONTAINERS = 6635
+ERROR_LOG_CLIENT_ALREADY_REGISTERED = 6636
+ERROR_LOG_CLIENT_NOT_REGISTERED = 6637
+ERROR_LOG_FULL_HANDLER_IN_PROGRESS = 6638
+ERROR_LOG_CONTAINER_READ_FAILED = 6639
+ERROR_LOG_CONTAINER_WRITE_FAILED = 6640
+ERROR_LOG_CONTAINER_OPEN_FAILED = 6641
+ERROR_LOG_CONTAINER_STATE_INVALID = 6642
+ERROR_LOG_STATE_INVALID = 6643
+ERROR_LOG_PINNED = 6644
+ERROR_LOG_METADATA_FLUSH_FAILED = 6645
+ERROR_LOG_INCONSISTENT_SECURITY = 6646
+ERROR_LOG_APPENDED_FLUSH_FAILED = 6647
+ERROR_LOG_PINNED_RESERVATION = 6648
+ERROR_INVALID_TRANSACTION = 6700
+ERROR_TRANSACTION_NOT_ACTIVE = 6701
+ERROR_TRANSACTION_REQUEST_NOT_VALID = 6702
+ERROR_TRANSACTION_NOT_REQUESTED = 6703
+ERROR_TRANSACTION_ALREADY_ABORTED = 6704
+ERROR_TRANSACTION_ALREADY_COMMITTED = 6705
+ERROR_TM_INITIALIZATION_FAILED = 6706
+ERROR_RESOURCEMANAGER_READ_ONLY = 6707
+ERROR_TRANSACTION_NOT_JOINED = 6708
+ERROR_TRANSACTION_SUPERIOR_EXISTS = 6709
+ERROR_CRM_PROTOCOL_ALREADY_EXISTS = 6710
+ERROR_TRANSACTION_PROPAGATION_FAILED = 6711
+ERROR_CRM_PROTOCOL_NOT_FOUND = 6712
+ERROR_TRANSACTION_INVALID_MARSHALL_BUFFER = 6713
+ERROR_CURRENT_TRANSACTION_NOT_VALID = 6714
+ERROR_TRANSACTION_NOT_FOUND = 6715
+ERROR_RESOURCEMANAGER_NOT_FOUND = 6716
+ERROR_ENLISTMENT_NOT_FOUND = 6717
+ERROR_TRANSACTIONMANAGER_NOT_FOUND = 6718
+ERROR_TRANSACTIONMANAGER_NOT_ONLINE = 6719
+ERROR_TRANSACTIONMANAGER_RECOVERY_NAME_COLLISION = 6720
+ERROR_TRANSACTION_NOT_ROOT = 6721
+ERROR_TRANSACTION_OBJECT_EXPIRED = 6722
+ERROR_TRANSACTION_RESPONSE_NOT_ENLISTED = 6723
+ERROR_TRANSACTION_RECORD_TOO_LONG = 6724
+ERROR_IMPLICIT_TRANSACTION_NOT_SUPPORTED = 6725
+ERROR_TRANSACTION_INTEGRITY_VIOLATED = 6726
+ERROR_TRANSACTIONMANAGER_IDENTITY_MISMATCH = 6727
+ERROR_RM_CANNOT_BE_FROZEN_FOR_SNAPSHOT = 6728
+ERROR_TRANSACTION_MUST_WRITETHROUGH = 6729
+ERROR_TRANSACTION_NO_SUPERIOR = 6730
+ERROR_HEURISTIC_DAMAGE_POSSIBLE = 6731
+ERROR_TRANSACTIONAL_CONFLICT = 6800
+ERROR_RM_NOT_ACTIVE = 6801
+ERROR_RM_METADATA_CORRUPT = 6802
+ERROR_DIRECTORY_NOT_RM = 6803
+ERROR_TRANSACTIONS_UNSUPPORTED_REMOTE = 6805
+ERROR_LOG_RESIZE_INVALID_SIZE = 6806
+ERROR_OBJECT_NO_LONGER_EXISTS = 6807
+ERROR_STREAM_MINIVERSION_NOT_FOUND = 6808
+ERROR_STREAM_MINIVERSION_NOT_VALID = 6809
+ERROR_MINIVERSION_INACCESSIBLE_FROM_SPECIFIED_TRANSACTION = 6810
+ERROR_CANT_OPEN_MINIVERSION_WITH_MODIFY_INTENT = 6811
+ERROR_CANT_CREATE_MORE_STREAM_MINIVERSIONS = 6812
+ERROR_REMOTE_FILE_VERSION_MISMATCH = 6814
+ERROR_HANDLE_NO_LONGER_VALID = 6815
+ERROR_NO_TXF_METADATA = 6816
+ERROR_LOG_CORRUPTION_DETECTED = 6817
+ERROR_CANT_RECOVER_WITH_HANDLE_OPEN = 6818
+ERROR_RM_DISCONNECTED = 6819
+ERROR_ENLISTMENT_NOT_SUPERIOR = 6820
+ERROR_RECOVERY_NOT_NEEDED = 6821
+ERROR_RM_ALREADY_STARTED = 6822
+ERROR_FILE_IDENTITY_NOT_PERSISTENT = 6823
+ERROR_CANT_BREAK_TRANSACTIONAL_DEPENDENCY = 6824
+ERROR_CANT_CROSS_RM_BOUNDARY = 6825
+ERROR_TXF_DIR_NOT_EMPTY = 6826
+ERROR_INDOUBT_TRANSACTIONS_EXIST = 6827
+ERROR_TM_VOLATILE = 6828
+ERROR_ROLLBACK_TIMER_EXPIRED = 6829
+ERROR_TXF_ATTRIBUTE_CORRUPT = 6830
+ERROR_EFS_NOT_ALLOWED_IN_TRANSACTION = 6831
+ERROR_TRANSACTIONAL_OPEN_NOT_ALLOWED = 6832
+ERROR_LOG_GROWTH_FAILED = 6833
+ERROR_TRANSACTED_MAPPING_UNSUPPORTED_REMOTE = 6834
+ERROR_TXF_METADATA_ALREADY_PRESENT = 6835
+ERROR_TRANSACTION_SCOPE_CALLBACKS_NOT_SET = 6836
+ERROR_TRANSACTION_REQUIRED_PROMOTION = 6837
+ERROR_CANNOT_EXECUTE_FILE_IN_TRANSACTION = 6838
+ERROR_TRANSACTIONS_NOT_FROZEN = 6839
+ERROR_TRANSACTION_FREEZE_IN_PROGRESS = 6840
+ERROR_NOT_SNAPSHOT_VOLUME = 6841
+ERROR_NO_SAVEPOINT_WITH_OPEN_FILES = 6842
+ERROR_DATA_LOST_REPAIR = 6843
+ERROR_SPARSE_NOT_ALLOWED_IN_TRANSACTION = 6844
+ERROR_TM_IDENTITY_MISMATCH = 6845
+ERROR_FLOATED_SECTION = 6846
+ERROR_CANNOT_ACCEPT_TRANSACTED_WORK = 6847
+ERROR_CANNOT_ABORT_TRANSACTIONS = 6848
+ERROR_BAD_CLUSTERS = 6849
+ERROR_COMPRESSION_NOT_ALLOWED_IN_TRANSACTION = 6850
+ERROR_VOLUME_DIRTY = 6851
+ERROR_NO_LINK_TRACKING_IN_TRANSACTION = 6852
+ERROR_OPERATION_NOT_SUPPORTED_IN_TRANSACTION = 6853
+ERROR_EXPIRED_HANDLE = 6854
+ERROR_TRANSACTION_NOT_ENLISTED = 6855
+ERROR_CTX_WINSTATION_NAME_INVALID = 7001
+ERROR_CTX_INVALID_PD = 7002
+ERROR_CTX_PD_NOT_FOUND = 7003
+ERROR_CTX_WD_NOT_FOUND = 7004
+ERROR_CTX_CANNOT_MAKE_EVENTLOG_ENTRY = 7005
+ERROR_CTX_SERVICE_NAME_COLLISION = 7006
+ERROR_CTX_CLOSE_PENDING = 7007
+ERROR_CTX_NO_OUTBUF = 7008
+ERROR_CTX_MODEM_INF_NOT_FOUND = 7009
+ERROR_CTX_INVALID_MODEMNAME = 7010
+ERROR_CTX_MODEM_RESPONSE_ERROR = 7011
+ERROR_CTX_MODEM_RESPONSE_TIMEOUT = 7012
+ERROR_CTX_MODEM_RESPONSE_NO_CARRIER = 7013
+ERROR_CTX_MODEM_RESPONSE_NO_DIALTONE = 7014
+ERROR_CTX_MODEM_RESPONSE_BUSY = 7015
+ERROR_CTX_MODEM_RESPONSE_VOICE = 7016
+ERROR_CTX_TD_ERROR = 7017
+ERROR_CTX_WINSTATION_NOT_FOUND = 7022
+ERROR_CTX_WINSTATION_ALREADY_EXISTS = 7023
+ERROR_CTX_WINSTATION_BUSY = 7024
+ERROR_CTX_BAD_VIDEO_MODE = 7025
+ERROR_CTX_GRAPHICS_INVALID = 7035
+ERROR_CTX_LOGON_DISABLED = 7037
+ERROR_CTX_NOT_CONSOLE = 7038
+ERROR_CTX_CLIENT_QUERY_TIMEOUT = 7040
+ERROR_CTX_CONSOLE_DISCONNECT = 7041
+ERROR_CTX_CONSOLE_CONNECT = 7042
+ERROR_CTX_SHADOW_DENIED = 7044
+ERROR_CTX_WINSTATION_ACCESS_DENIED = 7045
+ERROR_CTX_INVALID_WD = 7049
+ERROR_CTX_SHADOW_INVALID = 7050
+ERROR_CTX_SHADOW_DISABLED = 7051
+ERROR_CTX_CLIENT_LICENSE_IN_USE = 7052
+ERROR_CTX_CLIENT_LICENSE_NOT_SET = 7053
+ERROR_CTX_LICENSE_NOT_AVAILABLE = 7054
+ERROR_CTX_LICENSE_CLIENT_INVALID = 7055
+ERROR_CTX_LICENSE_EXPIRED = 7056
+ERROR_CTX_SHADOW_NOT_RUNNING = 7057
+ERROR_CTX_SHADOW_ENDED_BY_MODE_CHANGE = 7058
+ERROR_ACTIVATION_COUNT_EXCEEDED = 7059
+ERROR_CTX_WINSTATIONS_DISABLED = 7060
+ERROR_CTX_ENCRYPTION_LEVEL_REQUIRED = 7061
+ERROR_CTX_SESSION_IN_USE = 7062
+ERROR_CTX_NO_FORCE_LOGOFF = 7063
+ERROR_CTX_ACCOUNT_RESTRICTION = 7064
+ERROR_RDP_PROTOCOL_ERROR = 7065
+ERROR_CTX_CDM_CONNECT = 7066
+ERROR_CTX_CDM_DISCONNECT = 7067
+ERROR_CTX_SECURITY_LAYER_ERROR = 7068
+ERROR_TS_INCOMPATIBLE_SESSIONS = 7069
+ERROR_TS_VIDEO_SUBSYSTEM_ERROR = 7070
+FRS_ERR_INVALID_API_SEQUENCE = 8001
+FRS_ERR_STARTING_SERVICE = 8002
+FRS_ERR_STOPPING_SERVICE = 8003
+FRS_ERR_INTERNAL_API = 8004
+FRS_ERR_INTERNAL = 8005
+FRS_ERR_SERVICE_COMM = 8006
+FRS_ERR_INSUFFICIENT_PRIV = 8007
+FRS_ERR_AUTHENTICATION = 8008
+FRS_ERR_PARENT_INSUFFICIENT_PRIV = 8009
+FRS_ERR_PARENT_AUTHENTICATION = 8010
+FRS_ERR_CHILD_TO_PARENT_COMM = 8011
+FRS_ERR_PARENT_TO_CHILD_COMM = 8012
+FRS_ERR_SYSVOL_POPULATE = 8013
+FRS_ERR_SYSVOL_POPULATE_TIMEOUT = 8014
+FRS_ERR_SYSVOL_IS_BUSY = 8015
+FRS_ERR_SYSVOL_DEMOTE = 8016
+FRS_ERR_INVALID_SERVICE_PARAMETER = 8017
+DS_S_SUCCESS = NO_ERROR
+ERROR_DS_NOT_INSTALLED = 8200
+ERROR_DS_MEMBERSHIP_EVALUATED_LOCALLY = 8201
+ERROR_DS_NO_ATTRIBUTE_OR_VALUE = 8202
+ERROR_DS_INVALID_ATTRIBUTE_SYNTAX = 8203
+ERROR_DS_ATTRIBUTE_TYPE_UNDEFINED = 8204
+ERROR_DS_ATTRIBUTE_OR_VALUE_EXISTS = 8205
+ERROR_DS_BUSY = 8206
+ERROR_DS_UNAVAILABLE = 8207
+ERROR_DS_NO_RIDS_ALLOCATED = 8208
+ERROR_DS_NO_MORE_RIDS = 8209
+ERROR_DS_INCORRECT_ROLE_OWNER = 8210
+ERROR_DS_RIDMGR_INIT_ERROR = 8211
+ERROR_DS_OBJ_CLASS_VIOLATION = 8212
+ERROR_DS_CANT_ON_NON_LEAF = 8213
+ERROR_DS_CANT_ON_RDN = 8214
+ERROR_DS_CANT_MOD_OBJ_CLASS = 8215
+ERROR_DS_CROSS_DOM_MOVE_ERROR = 8216
+ERROR_DS_GC_NOT_AVAILABLE = 8217
+ERROR_SHARED_POLICY = 8218
+ERROR_POLICY_OBJECT_NOT_FOUND = 8219
+ERROR_POLICY_ONLY_IN_DS = 8220
+ERROR_PROMOTION_ACTIVE = 8221
+ERROR_NO_PROMOTION_ACTIVE = 8222
+ERROR_DS_OPERATIONS_ERROR = 8224
+ERROR_DS_PROTOCOL_ERROR = 8225
+ERROR_DS_TIMELIMIT_EXCEEDED = 8226
+ERROR_DS_SIZELIMIT_EXCEEDED = 8227
+ERROR_DS_ADMIN_LIMIT_EXCEEDED = 8228
+ERROR_DS_COMPARE_FALSE = 8229
+ERROR_DS_COMPARE_TRUE = 8230
+ERROR_DS_AUTH_METHOD_NOT_SUPPORTED = 8231
+ERROR_DS_STRONG_AUTH_REQUIRED = 8232
+ERROR_DS_INAPPROPRIATE_AUTH = 8233
+ERROR_DS_AUTH_UNKNOWN = 8234
+ERROR_DS_REFERRAL = 8235
+ERROR_DS_UNAVAILABLE_CRIT_EXTENSION = 8236
+ERROR_DS_CONFIDENTIALITY_REQUIRED = 8237
+ERROR_DS_INAPPROPRIATE_MATCHING = 8238
+ERROR_DS_CONSTRAINT_VIOLATION = 8239
+ERROR_DS_NO_SUCH_OBJECT = 8240
+ERROR_DS_ALIAS_PROBLEM = 8241
+ERROR_DS_INVALID_DN_SYNTAX = 8242
+ERROR_DS_IS_LEAF = 8243
+ERROR_DS_ALIAS_DEREF_PROBLEM = 8244
+ERROR_DS_UNWILLING_TO_PERFORM = 8245
+ERROR_DS_LOOP_DETECT = 8246
+ERROR_DS_NAMING_VIOLATION = 8247
+ERROR_DS_OBJECT_RESULTS_TOO_LARGE = 8248
+ERROR_DS_AFFECTS_MULTIPLE_DSAS = 8249
+ERROR_DS_SERVER_DOWN = 8250
+ERROR_DS_LOCAL_ERROR = 8251
+ERROR_DS_ENCODING_ERROR = 8252
+ERROR_DS_DECODING_ERROR = 8253
+ERROR_DS_FILTER_UNKNOWN = 8254
+ERROR_DS_PARAM_ERROR = 8255
+ERROR_DS_NOT_SUPPORTED = 8256
+ERROR_DS_NO_RESULTS_RETURNED = 8257
+ERROR_DS_CONTROL_NOT_FOUND = 8258
+ERROR_DS_CLIENT_LOOP = 8259
+ERROR_DS_REFERRAL_LIMIT_EXCEEDED = 8260
+ERROR_DS_SORT_CONTROL_MISSING = 8261
+ERROR_DS_OFFSET_RANGE_ERROR = 8262
+ERROR_DS_RIDMGR_DISABLED = 8263
+ERROR_DS_ROOT_MUST_BE_NC = 8301
+ERROR_DS_ADD_REPLICA_INHIBITED = 8302
+ERROR_DS_ATT_NOT_DEF_IN_SCHEMA = 8303
+ERROR_DS_MAX_OBJ_SIZE_EXCEEDED = 8304
+ERROR_DS_OBJ_STRING_NAME_EXISTS = 8305
+ERROR_DS_NO_RDN_DEFINED_IN_SCHEMA = 8306
+ERROR_DS_RDN_DOESNT_MATCH_SCHEMA = 8307
+ERROR_DS_NO_REQUESTED_ATTS_FOUND = 8308
+ERROR_DS_USER_BUFFER_TO_SMALL = 8309
+ERROR_DS_ATT_IS_NOT_ON_OBJ = 8310
+ERROR_DS_ILLEGAL_MOD_OPERATION = 8311
+ERROR_DS_OBJ_TOO_LARGE = 8312
+ERROR_DS_BAD_INSTANCE_TYPE = 8313
+ERROR_DS_MASTERDSA_REQUIRED = 8314
+ERROR_DS_OBJECT_CLASS_REQUIRED = 8315
+ERROR_DS_MISSING_REQUIRED_ATT = 8316
+ERROR_DS_ATT_NOT_DEF_FOR_CLASS = 8317
+ERROR_DS_ATT_ALREADY_EXISTS = 8318
+ERROR_DS_CANT_ADD_ATT_VALUES = 8320
+ERROR_DS_SINGLE_VALUE_CONSTRAINT = 8321
+ERROR_DS_RANGE_CONSTRAINT = 8322
+ERROR_DS_ATT_VAL_ALREADY_EXISTS = 8323
+ERROR_DS_CANT_REM_MISSING_ATT = 8324
+ERROR_DS_CANT_REM_MISSING_ATT_VAL = 8325
+ERROR_DS_ROOT_CANT_BE_SUBREF = 8326
+ERROR_DS_NO_CHAINING = 8327
+ERROR_DS_NO_CHAINED_EVAL = 8328
+ERROR_DS_NO_PARENT_OBJECT = 8329
+ERROR_DS_PARENT_IS_AN_ALIAS = 8330
+ERROR_DS_CANT_MIX_MASTER_AND_REPS = 8331
+ERROR_DS_CHILDREN_EXIST = 8332
+ERROR_DS_OBJ_NOT_FOUND = 8333
+ERROR_DS_ALIASED_OBJ_MISSING = 8334
+ERROR_DS_BAD_NAME_SYNTAX = 8335
+ERROR_DS_ALIAS_POINTS_TO_ALIAS = 8336
+ERROR_DS_CANT_DEREF_ALIAS = 8337
+ERROR_DS_OUT_OF_SCOPE = 8338
+ERROR_DS_OBJECT_BEING_REMOVED = 8339
+ERROR_DS_CANT_DELETE_DSA_OBJ = 8340
+ERROR_DS_GENERIC_ERROR = 8341
+ERROR_DS_DSA_MUST_BE_INT_MASTER = 8342
+ERROR_DS_CLASS_NOT_DSA = 8343
+ERROR_DS_INSUFF_ACCESS_RIGHTS = 8344
+ERROR_DS_ILLEGAL_SUPERIOR = 8345
+ERROR_DS_ATTRIBUTE_OWNED_BY_SAM = 8346
+ERROR_DS_NAME_TOO_MANY_PARTS = 8347
+ERROR_DS_NAME_TOO_LONG = 8348
+ERROR_DS_NAME_VALUE_TOO_LONG = 8349
+ERROR_DS_NAME_UNPARSEABLE = 8350
+ERROR_DS_NAME_TYPE_UNKNOWN = 8351
+ERROR_DS_NOT_AN_OBJECT = 8352
+ERROR_DS_SEC_DESC_TOO_SHORT = 8353
+ERROR_DS_SEC_DESC_INVALID = 8354
+ERROR_DS_NO_DELETED_NAME = 8355
+ERROR_DS_SUBREF_MUST_HAVE_PARENT = 8356
+ERROR_DS_NCNAME_MUST_BE_NC = 8357
+ERROR_DS_CANT_ADD_SYSTEM_ONLY = 8358
+ERROR_DS_CLASS_MUST_BE_CONCRETE = 8359
+ERROR_DS_INVALID_DMD = 8360
+ERROR_DS_OBJ_GUID_EXISTS = 8361
+ERROR_DS_NOT_ON_BACKLINK = 8362
+ERROR_DS_NO_CROSSREF_FOR_NC = 8363
+ERROR_DS_SHUTTING_DOWN = 8364
+ERROR_DS_UNKNOWN_OPERATION = 8365
+ERROR_DS_INVALID_ROLE_OWNER = 8366
+ERROR_DS_COULDNT_CONTACT_FSMO = 8367
+ERROR_DS_CROSS_NC_DN_RENAME = 8368
+ERROR_DS_CANT_MOD_SYSTEM_ONLY = 8369
+ERROR_DS_REPLICATOR_ONLY = 8370
+ERROR_DS_OBJ_CLASS_NOT_DEFINED = 8371
+ERROR_DS_OBJ_CLASS_NOT_SUBCLASS = 8372
+ERROR_DS_NAME_REFERENCE_INVALID = 8373
+ERROR_DS_CROSS_REF_EXISTS = 8374
+ERROR_DS_CANT_DEL_MASTER_CROSSREF = 8375
+ERROR_DS_SUBTREE_NOTIFY_NOT_NC_HEAD = 8376
+ERROR_DS_NOTIFY_FILTER_TOO_COMPLEX = 8377
+ERROR_DS_DUP_RDN = 8378
+ERROR_DS_DUP_OID = 8379
+ERROR_DS_DUP_MAPI_ID = 8380
+ERROR_DS_DUP_SCHEMA_ID_GUID = 8381
+ERROR_DS_DUP_LDAP_DISPLAY_NAME = 8382
+ERROR_DS_SEMANTIC_ATT_TEST = 8383
+ERROR_DS_SYNTAX_MISMATCH = 8384
+ERROR_DS_EXISTS_IN_MUST_HAVE = 8385
+ERROR_DS_EXISTS_IN_MAY_HAVE = 8386
+ERROR_DS_NONEXISTENT_MAY_HAVE = 8387
+ERROR_DS_NONEXISTENT_MUST_HAVE = 8388
+ERROR_DS_AUX_CLS_TEST_FAIL = 8389
+ERROR_DS_NONEXISTENT_POSS_SUP = 8390
+ERROR_DS_SUB_CLS_TEST_FAIL = 8391
+ERROR_DS_BAD_RDN_ATT_ID_SYNTAX = 8392
+ERROR_DS_EXISTS_IN_AUX_CLS = 8393
+ERROR_DS_EXISTS_IN_SUB_CLS = 8394
+ERROR_DS_EXISTS_IN_POSS_SUP = 8395
+ERROR_DS_RECALCSCHEMA_FAILED = 8396
+ERROR_DS_TREE_DELETE_NOT_FINISHED = 8397
+ERROR_DS_CANT_DELETE = 8398
+ERROR_DS_ATT_SCHEMA_REQ_ID = 8399
+ERROR_DS_BAD_ATT_SCHEMA_SYNTAX = 8400
+ERROR_DS_CANT_CACHE_ATT = 8401
+ERROR_DS_CANT_CACHE_CLASS = 8402
+ERROR_DS_CANT_REMOVE_ATT_CACHE = 8403
+ERROR_DS_CANT_REMOVE_CLASS_CACHE = 8404
+ERROR_DS_CANT_RETRIEVE_DN = 8405
+ERROR_DS_MISSING_SUPREF = 8406
+ERROR_DS_CANT_RETRIEVE_INSTANCE = 8407
+ERROR_DS_CODE_INCONSISTENCY = 8408
+ERROR_DS_DATABASE_ERROR = 8409
+ERROR_DS_GOVERNSID_MISSING = 8410
+ERROR_DS_MISSING_EXPECTED_ATT = 8411
+ERROR_DS_NCNAME_MISSING_CR_REF = 8412
+ERROR_DS_SECURITY_CHECKING_ERROR = 8413
+ERROR_DS_SCHEMA_NOT_LOADED = 8414
+ERROR_DS_SCHEMA_ALLOC_FAILED = 8415
+ERROR_DS_ATT_SCHEMA_REQ_SYNTAX = 8416
+ERROR_DS_GCVERIFY_ERROR = 8417
+ERROR_DS_DRA_SCHEMA_MISMATCH = 8418
+ERROR_DS_CANT_FIND_DSA_OBJ = 8419
+ERROR_DS_CANT_FIND_EXPECTED_NC = 8420
+ERROR_DS_CANT_FIND_NC_IN_CACHE = 8421
+ERROR_DS_CANT_RETRIEVE_CHILD = 8422
+ERROR_DS_SECURITY_ILLEGAL_MODIFY = 8423
+ERROR_DS_CANT_REPLACE_HIDDEN_REC = 8424
+ERROR_DS_BAD_HIERARCHY_FILE = 8425
+ERROR_DS_BUILD_HIERARCHY_TABLE_FAILED = 8426
+ERROR_DS_CONFIG_PARAM_MISSING = 8427
+ERROR_DS_COUNTING_AB_INDICES_FAILED = 8428
+ERROR_DS_HIERARCHY_TABLE_MALLOC_FAILED = 8429
+ERROR_DS_INTERNAL_FAILURE = 8430
+ERROR_DS_UNKNOWN_ERROR = 8431
+ERROR_DS_ROOT_REQUIRES_CLASS_TOP = 8432
+ERROR_DS_REFUSING_FSMO_ROLES = 8433
+ERROR_DS_MISSING_FSMO_SETTINGS = 8434
+ERROR_DS_UNABLE_TO_SURRENDER_ROLES = 8435
+ERROR_DS_DRA_GENERIC = 8436
+ERROR_DS_DRA_INVALID_PARAMETER = 8437
+ERROR_DS_DRA_BUSY = 8438
+ERROR_DS_DRA_BAD_DN = 8439
+ERROR_DS_DRA_BAD_NC = 8440
+ERROR_DS_DRA_DN_EXISTS = 8441
+ERROR_DS_DRA_INTERNAL_ERROR = 8442
+ERROR_DS_DRA_INCONSISTENT_DIT = 8443
+ERROR_DS_DRA_CONNECTION_FAILED = 8444
+ERROR_DS_DRA_BAD_INSTANCE_TYPE = 8445
+ERROR_DS_DRA_OUT_OF_MEM = 8446
+ERROR_DS_DRA_MAIL_PROBLEM = 8447
+ERROR_DS_DRA_REF_ALREADY_EXISTS = 8448
+ERROR_DS_DRA_REF_NOT_FOUND = 8449
+ERROR_DS_DRA_OBJ_IS_REP_SOURCE = 8450
+ERROR_DS_DRA_DB_ERROR = 8451
+ERROR_DS_DRA_NO_REPLICA = 8452
+ERROR_DS_DRA_ACCESS_DENIED = 8453
+ERROR_DS_DRA_NOT_SUPPORTED = 8454
+ERROR_DS_DRA_RPC_CANCELLED = 8455
+ERROR_DS_DRA_SOURCE_DISABLED = 8456
+ERROR_DS_DRA_SINK_DISABLED = 8457
+ERROR_DS_DRA_NAME_COLLISION = 8458
+ERROR_DS_DRA_SOURCE_REINSTALLED = 8459
+ERROR_DS_DRA_MISSING_PARENT = 8460
+ERROR_DS_DRA_PREEMPTED = 8461
+ERROR_DS_DRA_ABANDON_SYNC = 8462
+ERROR_DS_DRA_SHUTDOWN = 8463
+ERROR_DS_DRA_INCOMPATIBLE_PARTIAL_SET = 8464
+ERROR_DS_DRA_SOURCE_IS_PARTIAL_REPLICA = 8465
+ERROR_DS_DRA_EXTN_CONNECTION_FAILED = 8466
+ERROR_DS_INSTALL_SCHEMA_MISMATCH = 8467
+ERROR_DS_DUP_LINK_ID = 8468
+ERROR_DS_NAME_ERROR_RESOLVING = 8469
+ERROR_DS_NAME_ERROR_NOT_FOUND = 8470
+ERROR_DS_NAME_ERROR_NOT_UNIQUE = 8471
+ERROR_DS_NAME_ERROR_NO_MAPPING = 8472
+ERROR_DS_NAME_ERROR_DOMAIN_ONLY = 8473
+ERROR_DS_NAME_ERROR_NO_SYNTACTICAL_MAPPING = 8474
+ERROR_DS_CONSTRUCTED_ATT_MOD = 8475
+ERROR_DS_WRONG_OM_OBJ_CLASS = 8476
+ERROR_DS_DRA_REPL_PENDING = 8477
+ERROR_DS_DS_REQUIRED = 8478
+ERROR_DS_INVALID_LDAP_DISPLAY_NAME = 8479
+ERROR_DS_NON_BASE_SEARCH = 8480
+ERROR_DS_CANT_RETRIEVE_ATTS = 8481
+ERROR_DS_BACKLINK_WITHOUT_LINK = 8482
+ERROR_DS_EPOCH_MISMATCH = 8483
+ERROR_DS_SRC_NAME_MISMATCH = 8484
+ERROR_DS_SRC_AND_DST_NC_IDENTICAL = 8485
+ERROR_DS_DST_NC_MISMATCH = 8486
+ERROR_DS_NOT_AUTHORITIVE_FOR_DST_NC = 8487
+ERROR_DS_SRC_GUID_MISMATCH = 8488
+ERROR_DS_CANT_MOVE_DELETED_OBJECT = 8489
+ERROR_DS_PDC_OPERATION_IN_PROGRESS = 8490
+ERROR_DS_CROSS_DOMAIN_CLEANUP_REQD = 8491
+ERROR_DS_ILLEGAL_XDOM_MOVE_OPERATION = 8492
+ERROR_DS_CANT_WITH_ACCT_GROUP_MEMBERSHPS = 8493
+ERROR_DS_NC_MUST_HAVE_NC_PARENT = 8494
+ERROR_DS_CR_IMPOSSIBLE_TO_VALIDATE = 8495
+ERROR_DS_DST_DOMAIN_NOT_NATIVE = 8496
+ERROR_DS_MISSING_INFRASTRUCTURE_CONTAINER = 8497
+ERROR_DS_CANT_MOVE_ACCOUNT_GROUP = 8498
+ERROR_DS_CANT_MOVE_RESOURCE_GROUP = 8499
+ERROR_DS_INVALID_SEARCH_FLAG = 8500
+ERROR_DS_NO_TREE_DELETE_ABOVE_NC = 8501
+ERROR_DS_COULDNT_LOCK_TREE_FOR_DELETE = 8502
+ERROR_DS_COULDNT_IDENTIFY_OBJECTS_FOR_TREE_DELETE = 8503
+ERROR_DS_SAM_INIT_FAILURE = 8504
+ERROR_DS_SENSITIVE_GROUP_VIOLATION = 8505
+ERROR_DS_CANT_MOD_PRIMARYGROUPID = 8506
+ERROR_DS_ILLEGAL_BASE_SCHEMA_MOD = 8507
+ERROR_DS_NONSAFE_SCHEMA_CHANGE = 8508
+ERROR_DS_SCHEMA_UPDATE_DISALLOWED = 8509
+ERROR_DS_CANT_CREATE_UNDER_SCHEMA = 8510
+ERROR_DS_INSTALL_NO_SRC_SCH_VERSION = 8511
+ERROR_DS_INSTALL_NO_SCH_VERSION_IN_INIFILE = 8512
+ERROR_DS_INVALID_GROUP_TYPE = 8513
+ERROR_DS_NO_NEST_GLOBALGROUP_IN_MIXEDDOMAIN = 8514
+ERROR_DS_NO_NEST_LOCALGROUP_IN_MIXEDDOMAIN = 8515
+ERROR_DS_GLOBAL_CANT_HAVE_LOCAL_MEMBER = 8516
+ERROR_DS_GLOBAL_CANT_HAVE_UNIVERSAL_MEMBER = 8517
+ERROR_DS_UNIVERSAL_CANT_HAVE_LOCAL_MEMBER = 8518
+ERROR_DS_GLOBAL_CANT_HAVE_CROSSDOMAIN_MEMBER = 8519
+ERROR_DS_LOCAL_CANT_HAVE_CROSSDOMAIN_LOCAL_MEMBER = 8520
+ERROR_DS_HAVE_PRIMARY_MEMBERS = 8521
+ERROR_DS_STRING_SD_CONVERSION_FAILED = 8522
+ERROR_DS_NAMING_MASTER_GC = 8523
+ERROR_DS_DNS_LOOKUP_FAILURE = 8524
+ERROR_DS_COULDNT_UPDATE_SPNS = 8525
+ERROR_DS_CANT_RETRIEVE_SD = 8526
+ERROR_DS_KEY_NOT_UNIQUE = 8527
+ERROR_DS_WRONG_LINKED_ATT_SYNTAX = 8528
+ERROR_DS_SAM_NEED_BOOTKEY_PASSWORD = 8529
+ERROR_DS_SAM_NEED_BOOTKEY_FLOPPY = 8530
+ERROR_DS_CANT_START = 8531
+ERROR_DS_INIT_FAILURE = 8532
+ERROR_DS_NO_PKT_PRIVACY_ON_CONNECTION = 8533
+ERROR_DS_SOURCE_DOMAIN_IN_FOREST = 8534
+ERROR_DS_DESTINATION_DOMAIN_NOT_IN_FOREST = 8535
+ERROR_DS_DESTINATION_AUDITING_NOT_ENABLED = 8536
+ERROR_DS_CANT_FIND_DC_FOR_SRC_DOMAIN = 8537
+ERROR_DS_SRC_OBJ_NOT_GROUP_OR_USER = 8538
+ERROR_DS_SRC_SID_EXISTS_IN_FOREST = 8539
+ERROR_DS_SRC_AND_DST_OBJECT_CLASS_MISMATCH = 8540
+ERROR_SAM_INIT_FAILURE = 8541
+ERROR_DS_DRA_SCHEMA_INFO_SHIP = 8542
+ERROR_DS_DRA_SCHEMA_CONFLICT = 8543
+ERROR_DS_DRA_EARLIER_SCHEMA_CONFLICT = 8544
+ERROR_DS_DRA_OBJ_NC_MISMATCH = 8545
+ERROR_DS_NC_STILL_HAS_DSAS = 8546
+ERROR_DS_GC_REQUIRED = 8547
+ERROR_DS_LOCAL_MEMBER_OF_LOCAL_ONLY = 8548
+ERROR_DS_NO_FPO_IN_UNIVERSAL_GROUPS = 8549
+ERROR_DS_CANT_ADD_TO_GC = 8550
+ERROR_DS_NO_CHECKPOINT_WITH_PDC = 8551
+ERROR_DS_SOURCE_AUDITING_NOT_ENABLED = 8552
+ERROR_DS_CANT_CREATE_IN_NONDOMAIN_NC = 8553
+ERROR_DS_INVALID_NAME_FOR_SPN = 8554
+ERROR_DS_FILTER_USES_CONTRUCTED_ATTRS = 8555
+ERROR_DS_UNICODEPWD_NOT_IN_QUOTES = 8556
+ERROR_DS_MACHINE_ACCOUNT_QUOTA_EXCEEDED = 8557
+ERROR_DS_MUST_BE_RUN_ON_DST_DC = 8558
+ERROR_DS_SRC_DC_MUST_BE_SP4_OR_GREATER = 8559
+ERROR_DS_CANT_TREE_DELETE_CRITICAL_OBJ = 8560
+ERROR_DS_INIT_FAILURE_CONSOLE = 8561
+ERROR_DS_SAM_INIT_FAILURE_CONSOLE = 8562
+ERROR_DS_FOREST_VERSION_TOO_HIGH = 8563
+ERROR_DS_DOMAIN_VERSION_TOO_HIGH = 8564
+ERROR_DS_FOREST_VERSION_TOO_LOW = 8565
+ERROR_DS_DOMAIN_VERSION_TOO_LOW = 8566
+ERROR_DS_INCOMPATIBLE_VERSION = 8567
+ERROR_DS_LOW_DSA_VERSION = 8568
+ERROR_DS_NO_BEHAVIOR_VERSION_IN_MIXEDDOMAIN = 8569
+ERROR_DS_NOT_SUPPORTED_SORT_ORDER = 8570
+ERROR_DS_NAME_NOT_UNIQUE = 8571
+ERROR_DS_MACHINE_ACCOUNT_CREATED_PRENT4 = 8572
+ERROR_DS_OUT_OF_VERSION_STORE = 8573
+ERROR_DS_INCOMPATIBLE_CONTROLS_USED = 8574
+ERROR_DS_NO_REF_DOMAIN = 8575
+ERROR_DS_RESERVED_LINK_ID = 8576
+ERROR_DS_LINK_ID_NOT_AVAILABLE = 8577
+ERROR_DS_AG_CANT_HAVE_UNIVERSAL_MEMBER = 8578
+ERROR_DS_MODIFYDN_DISALLOWED_BY_INSTANCE_TYPE = 8579
+ERROR_DS_NO_OBJECT_MOVE_IN_SCHEMA_NC = 8580
+ERROR_DS_MODIFYDN_DISALLOWED_BY_FLAG = 8581
+ERROR_DS_MODIFYDN_WRONG_GRANDPARENT = 8582
+ERROR_DS_NAME_ERROR_TRUST_REFERRAL = 8583
+ERROR_NOT_SUPPORTED_ON_STANDARD_SERVER = 8584
+ERROR_DS_CANT_ACCESS_REMOTE_PART_OF_AD = 8585
+ERROR_DS_CR_IMPOSSIBLE_TO_VALIDATE_V2 = 8586
+ERROR_DS_THREAD_LIMIT_EXCEEDED = 8587
+ERROR_DS_NOT_CLOSEST = 8588
+ERROR_DS_CANT_DERIVE_SPN_WITHOUT_SERVER_REF = 8589
+ERROR_DS_SINGLE_USER_MODE_FAILED = 8590
+ERROR_DS_NTDSCRIPT_SYNTAX_ERROR = 8591
+ERROR_DS_NTDSCRIPT_PROCESS_ERROR = 8592
+ERROR_DS_DIFFERENT_REPL_EPOCHS = 8593
+ERROR_DS_DRS_EXTENSIONS_CHANGED = 8594
+ERROR_DS_REPLICA_SET_CHANGE_NOT_ALLOWED_ON_DISABLED_CR = 8595
+ERROR_DS_NO_MSDS_INTID = 8596
+ERROR_DS_DUP_MSDS_INTID = 8597
+ERROR_DS_EXISTS_IN_RDNATTID = 8598
+ERROR_DS_AUTHORIZATION_FAILED = 8599
+ERROR_DS_INVALID_SCRIPT = 8600
+ERROR_DS_REMOTE_CROSSREF_OP_FAILED = 8601
+ERROR_DS_CROSS_REF_BUSY = 8602
+ERROR_DS_CANT_DERIVE_SPN_FOR_DELETED_DOMAIN = 8603
+ERROR_DS_CANT_DEMOTE_WITH_WRITEABLE_NC = 8604
+ERROR_DS_DUPLICATE_ID_FOUND = 8605
+ERROR_DS_INSUFFICIENT_ATTR_TO_CREATE_OBJECT = 8606
+ERROR_DS_GROUP_CONVERSION_ERROR = 8607
+ERROR_DS_CANT_MOVE_APP_BASIC_GROUP = 8608
+ERROR_DS_CANT_MOVE_APP_QUERY_GROUP = 8609
+ERROR_DS_ROLE_NOT_VERIFIED = 8610
+ERROR_DS_WKO_CONTAINER_CANNOT_BE_SPECIAL = 8611
+ERROR_DS_DOMAIN_RENAME_IN_PROGRESS = 8612
+ERROR_DS_EXISTING_AD_CHILD_NC = 8613
+ERROR_DS_REPL_LIFETIME_EXCEEDED = 8614
+ERROR_DS_DISALLOWED_IN_SYSTEM_CONTAINER = 8615
+ERROR_DS_LDAP_SEND_QUEUE_FULL = 8616
+ERROR_DS_DRA_OUT_SCHEDULE_WINDOW = 8617
+ERROR_DS_POLICY_NOT_KNOWN = 8618
+ERROR_NO_SITE_SETTINGS_OBJECT = 8619
+ERROR_NO_SECRETS = 8620
+ERROR_NO_WRITABLE_DC_FOUND = 8621
+ERROR_DS_NO_SERVER_OBJECT = 8622
+ERROR_DS_NO_NTDSA_OBJECT = 8623
+ERROR_DS_NON_ASQ_SEARCH = 8624
+ERROR_DS_AUDIT_FAILURE = 8625
+ERROR_DS_INVALID_SEARCH_FLAG_SUBTREE = 8626
+ERROR_DS_INVALID_SEARCH_FLAG_TUPLE = 8627
+ERROR_DS_HIERARCHY_TABLE_TOO_DEEP = 8628
+ERROR_DS_DRA_CORRUPT_UTD_VECTOR = 8629
+ERROR_DS_DRA_SECRETS_DENIED = 8630
+ERROR_DS_RESERVED_MAPI_ID = 8631
+ERROR_DS_MAPI_ID_NOT_AVAILABLE = 8632
+ERROR_DS_DRA_MISSING_KRBTGT_SECRET = 8633
+ERROR_DS_DOMAIN_NAME_EXISTS_IN_FOREST = 8634
+ERROR_DS_FLAT_NAME_EXISTS_IN_FOREST = 8635
+ERROR_INVALID_USER_PRINCIPAL_NAME = 8636
+ERROR_DS_OID_MAPPED_GROUP_CANT_HAVE_MEMBERS = 8637
+ERROR_DS_OID_NOT_FOUND = 8638
+ERROR_DS_DRA_RECYCLED_TARGET = 8639
+ERROR_DS_DISALLOWED_NC_REDIRECT = 8640
+ERROR_DS_HIGH_ADLDS_FFL = 8641
+ERROR_DS_HIGH_DSA_VERSION = 8642
+ERROR_DS_LOW_ADLDS_FFL = 8643
+ERROR_DOMAIN_SID_SAME_AS_LOCAL_WORKSTATION = 8644
+ERROR_DS_UNDELETE_SAM_VALIDATION_FAILED = 8645
+ERROR_INCORRECT_ACCOUNT_TYPE = 8646
+ERROR_DS_SPN_VALUE_NOT_UNIQUE_IN_FOREST = 8647
+ERROR_DS_UPN_VALUE_NOT_UNIQUE_IN_FOREST = 8648
+ERROR_DS_MISSING_FOREST_TRUST = 8649
+ERROR_DS_VALUE_KEY_NOT_UNIQUE = 8650
+ERROR_WEAK_WHFBKEY_BLOCKED = 8651
+ERROR_DS_PER_ATTRIBUTE_AUTHZ_FAILED_DURING_ADD = 8652
+ERROR_LOCAL_POLICY_MODIFICATION_NOT_SUPPORTED = 8653
+ERROR_POLICY_CONTROLLED_ACCOUNT = 8654
+ERROR_LAPS_LEGACY_SCHEMA_MISSING = 8655
+ERROR_LAPS_SCHEMA_MISSING = 8656
+ERROR_LAPS_ENCRYPTION_REQUIRES_2016_DFL = 8657
+DNS_ERROR_RESPONSE_CODES_BASE = 9000
+DNS_ERROR_RCODE_NO_ERROR = NO_ERROR
+DNS_ERROR_MASK = 0x00002328
+DNS_ERROR_RCODE_FORMAT_ERROR = 9001
+DNS_ERROR_RCODE_SERVER_FAILURE = 9002
+DNS_ERROR_RCODE_NAME_ERROR = 9003
+DNS_ERROR_RCODE_NOT_IMPLEMENTED = 9004
+DNS_ERROR_RCODE_REFUSED = 9005
+DNS_ERROR_RCODE_YXDOMAIN = 9006
+DNS_ERROR_RCODE_YXRRSET = 9007
+DNS_ERROR_RCODE_NXRRSET = 9008
+DNS_ERROR_RCODE_NOTAUTH = 9009
+DNS_ERROR_RCODE_NOTZONE = 9010
+DNS_ERROR_RCODE_BADSIG = 9016
+DNS_ERROR_RCODE_BADKEY = 9017
+DNS_ERROR_RCODE_BADTIME = 9018
+DNS_ERROR_RCODE_LAST = DNS_ERROR_RCODE_BADTIME
+DNS_ERROR_DNSSEC_BASE = 9100
+DNS_ERROR_KEYMASTER_REQUIRED = 9101
+DNS_ERROR_NOT_ALLOWED_ON_SIGNED_ZONE = 9102
+DNS_ERROR_NSEC3_INCOMPATIBLE_WITH_RSA_SHA1 = 9103
+DNS_ERROR_NOT_ENOUGH_SIGNING_KEY_DESCRIPTORS = 9104
+DNS_ERROR_UNSUPPORTED_ALGORITHM = 9105
+DNS_ERROR_INVALID_KEY_SIZE = 9106
+DNS_ERROR_SIGNING_KEY_NOT_ACCESSIBLE = 9107
+DNS_ERROR_KSP_DOES_NOT_SUPPORT_PROTECTION = 9108
+DNS_ERROR_UNEXPECTED_DATA_PROTECTION_ERROR = 9109
+DNS_ERROR_UNEXPECTED_CNG_ERROR = 9110
+DNS_ERROR_UNKNOWN_SIGNING_PARAMETER_VERSION = 9111
+DNS_ERROR_KSP_NOT_ACCESSIBLE = 9112
+DNS_ERROR_TOO_MANY_SKDS = 9113
+DNS_ERROR_INVALID_ROLLOVER_PERIOD = 9114
+DNS_ERROR_INVALID_INITIAL_ROLLOVER_OFFSET = 9115
+DNS_ERROR_ROLLOVER_IN_PROGRESS = 9116
+DNS_ERROR_STANDBY_KEY_NOT_PRESENT = 9117
+DNS_ERROR_NOT_ALLOWED_ON_ZSK = 9118
+DNS_ERROR_NOT_ALLOWED_ON_ACTIVE_SKD = 9119
+DNS_ERROR_ROLLOVER_ALREADY_QUEUED = 9120
+DNS_ERROR_NOT_ALLOWED_ON_UNSIGNED_ZONE = 9121
+DNS_ERROR_BAD_KEYMASTER = 9122
+DNS_ERROR_INVALID_SIGNATURE_VALIDITY_PERIOD = 9123
+DNS_ERROR_INVALID_NSEC3_ITERATION_COUNT = 9124
+DNS_ERROR_DNSSEC_IS_DISABLED = 9125
+DNS_ERROR_INVALID_XML = 9126
+DNS_ERROR_NO_VALID_TRUST_ANCHORS = 9127
+DNS_ERROR_ROLLOVER_NOT_POKEABLE = 9128
+DNS_ERROR_NSEC3_NAME_COLLISION = 9129
+DNS_ERROR_NSEC_INCOMPATIBLE_WITH_NSEC3_RSA_SHA1 = 9130
+DNS_ERROR_PACKET_FMT_BASE = 9500
+DNS_INFO_NO_RECORDS = 9501
+DNS_ERROR_BAD_PACKET = 9502
+DNS_ERROR_NO_PACKET = 9503
+DNS_ERROR_RCODE = 9504
+DNS_ERROR_UNSECURE_PACKET = 9505
+DNS_STATUS_PACKET_UNSECURE = DNS_ERROR_UNSECURE_PACKET
+DNS_REQUEST_PENDING = 9506
+DNS_ERROR_NO_MEMORY = ERROR_OUTOFMEMORY
+DNS_ERROR_INVALID_NAME = ERROR_INVALID_NAME
+DNS_ERROR_INVALID_DATA = ERROR_INVALID_DATA
+DNS_ERROR_GENERAL_API_BASE = 9550
+DNS_ERROR_INVALID_TYPE = 9551
+DNS_ERROR_INVALID_IP_ADDRESS = 9552
+DNS_ERROR_INVALID_PROPERTY = 9553
+DNS_ERROR_TRY_AGAIN_LATER = 9554
+DNS_ERROR_NOT_UNIQUE = 9555
+DNS_ERROR_NON_RFC_NAME = 9556
+DNS_STATUS_FQDN = 9557
+DNS_STATUS_DOTTED_NAME = 9558
+DNS_STATUS_SINGLE_PART_NAME = 9559
+DNS_ERROR_INVALID_NAME_CHAR = 9560
+DNS_ERROR_NUMERIC_NAME = 9561
+DNS_ERROR_NOT_ALLOWED_ON_ROOT_SERVER = 9562
+DNS_ERROR_NOT_ALLOWED_UNDER_DELEGATION = 9563
+DNS_ERROR_CANNOT_FIND_ROOT_HINTS = 9564
+DNS_ERROR_INCONSISTENT_ROOT_HINTS = 9565
+DNS_ERROR_DWORD_VALUE_TOO_SMALL = 9566
+DNS_ERROR_DWORD_VALUE_TOO_LARGE = 9567
+DNS_ERROR_BACKGROUND_LOADING = 9568
+DNS_ERROR_NOT_ALLOWED_ON_RODC = 9569
+DNS_ERROR_NOT_ALLOWED_UNDER_DNAME = 9570
+DNS_ERROR_DELEGATION_REQUIRED = 9571
+DNS_ERROR_INVALID_POLICY_TABLE = 9572
+DNS_ERROR_ADDRESS_REQUIRED = 9573
+DNS_ERROR_ZONE_BASE = 9600
+DNS_ERROR_ZONE_DOES_NOT_EXIST = 9601
+DNS_ERROR_NO_ZONE_INFO = 9602
+DNS_ERROR_INVALID_ZONE_OPERATION = 9603
+DNS_ERROR_ZONE_CONFIGURATION_ERROR = 9604
+DNS_ERROR_ZONE_HAS_NO_SOA_RECORD = 9605
+DNS_ERROR_ZONE_HAS_NO_NS_RECORDS = 9606
+DNS_ERROR_ZONE_LOCKED = 9607
+DNS_ERROR_ZONE_CREATION_FAILED = 9608
+DNS_ERROR_ZONE_ALREADY_EXISTS = 9609
+DNS_ERROR_AUTOZONE_ALREADY_EXISTS = 9610
+DNS_ERROR_INVALID_ZONE_TYPE = 9611
+DNS_ERROR_SECONDARY_REQUIRES_MASTER_IP = 9612
+DNS_ERROR_ZONE_NOT_SECONDARY = 9613
+DNS_ERROR_NEED_SECONDARY_ADDRESSES = 9614
+DNS_ERROR_WINS_INIT_FAILED = 9615
+DNS_ERROR_NEED_WINS_SERVERS = 9616
+DNS_ERROR_NBSTAT_INIT_FAILED = 9617
+DNS_ERROR_SOA_DELETE_INVALID = 9618
+DNS_ERROR_FORWARDER_ALREADY_EXISTS = 9619
+DNS_ERROR_ZONE_REQUIRES_MASTER_IP = 9620
+DNS_ERROR_ZONE_IS_SHUTDOWN = 9621
+DNS_ERROR_ZONE_LOCKED_FOR_SIGNING = 9622
+DNS_ERROR_DATAFILE_BASE = 9650
+DNS_ERROR_PRIMARY_REQUIRES_DATAFILE = 9651
+DNS_ERROR_INVALID_DATAFILE_NAME = 9652
+DNS_ERROR_DATAFILE_OPEN_FAILURE = 9653
+DNS_ERROR_FILE_WRITEBACK_FAILED = 9654
+DNS_ERROR_DATAFILE_PARSING = 9655
+DNS_ERROR_DATABASE_BASE = 9700
+DNS_ERROR_RECORD_DOES_NOT_EXIST = 9701
+DNS_ERROR_RECORD_FORMAT = 9702
+DNS_ERROR_NODE_CREATION_FAILED = 9703
+DNS_ERROR_UNKNOWN_RECORD_TYPE = 9704
+DNS_ERROR_RECORD_TIMED_OUT = 9705
+DNS_ERROR_NAME_NOT_IN_ZONE = 9706
+DNS_ERROR_CNAME_LOOP = 9707
+DNS_ERROR_NODE_IS_CNAME = 9708
+DNS_ERROR_CNAME_COLLISION = 9709
+DNS_ERROR_RECORD_ONLY_AT_ZONE_ROOT = 9710
+DNS_ERROR_RECORD_ALREADY_EXISTS = 9711
+DNS_ERROR_SECONDARY_DATA = 9712
+DNS_ERROR_NO_CREATE_CACHE_DATA = 9713
+DNS_ERROR_NAME_DOES_NOT_EXIST = 9714
+DNS_WARNING_PTR_CREATE_FAILED = 9715
+DNS_WARNING_DOMAIN_UNDELETED = 9716
+DNS_ERROR_DS_UNAVAILABLE = 9717
+DNS_ERROR_DS_ZONE_ALREADY_EXISTS = 9718
+DNS_ERROR_NO_BOOTFILE_IF_DS_ZONE = 9719
+DNS_ERROR_NODE_IS_DNAME = 9720
+DNS_ERROR_DNAME_COLLISION = 9721
+DNS_ERROR_ALIAS_LOOP = 9722
+DNS_ERROR_OPERATION_BASE = 9750
+DNS_INFO_AXFR_COMPLETE = 9751
+DNS_ERROR_AXFR = 9752
+DNS_INFO_ADDED_LOCAL_WINS = 9753
+DNS_ERROR_SECURE_BASE = 9800
+DNS_STATUS_CONTINUE_NEEDED = 9801
+DNS_ERROR_SETUP_BASE = 9850
+DNS_ERROR_NO_TCPIP = 9851
+DNS_ERROR_NO_DNS_SERVERS = 9852
+DNS_ERROR_DP_BASE = 9900
+DNS_ERROR_DP_DOES_NOT_EXIST = 9901
+DNS_ERROR_DP_ALREADY_EXISTS = 9902
+DNS_ERROR_DP_NOT_ENLISTED = 9903
+DNS_ERROR_DP_ALREADY_ENLISTED = 9904
+DNS_ERROR_DP_NOT_AVAILABLE = 9905
+DNS_ERROR_DP_FSMO_ERROR = 9906
+DNS_ERROR_RRL_NOT_ENABLED = 9911
+DNS_ERROR_RRL_INVALID_WINDOW_SIZE = 9912
+DNS_ERROR_RRL_INVALID_IPV4_PREFIX = 9913
+DNS_ERROR_RRL_INVALID_IPV6_PREFIX = 9914
+DNS_ERROR_RRL_INVALID_TC_RATE = 9915
+DNS_ERROR_RRL_INVALID_LEAK_RATE = 9916
+DNS_ERROR_RRL_LEAK_RATE_LESSTHAN_TC_RATE = 9917
+DNS_ERROR_VIRTUALIZATION_INSTANCE_ALREADY_EXISTS = 9921
+DNS_ERROR_VIRTUALIZATION_INSTANCE_DOES_NOT_EXIST = 9922
+DNS_ERROR_VIRTUALIZATION_TREE_LOCKED = 9923
+DNS_ERROR_INVAILD_VIRTUALIZATION_INSTANCE_NAME = 9924
+DNS_ERROR_DEFAULT_VIRTUALIZATION_INSTANCE = 9925
+DNS_ERROR_ZONESCOPE_ALREADY_EXISTS = 9951
+DNS_ERROR_ZONESCOPE_DOES_NOT_EXIST = 9952
+DNS_ERROR_DEFAULT_ZONESCOPE = 9953
+DNS_ERROR_INVALID_ZONESCOPE_NAME = 9954
+DNS_ERROR_NOT_ALLOWED_WITH_ZONESCOPES = 9955
+DNS_ERROR_LOAD_ZONESCOPE_FAILED = 9956
+DNS_ERROR_ZONESCOPE_FILE_WRITEBACK_FAILED = 9957
+DNS_ERROR_INVALID_SCOPE_NAME = 9958
+DNS_ERROR_SCOPE_DOES_NOT_EXIST = 9959
+DNS_ERROR_DEFAULT_SCOPE = 9960
+DNS_ERROR_INVALID_SCOPE_OPERATION = 9961
+DNS_ERROR_SCOPE_LOCKED = 9962
+DNS_ERROR_SCOPE_ALREADY_EXISTS = 9963
+DNS_ERROR_POLICY_ALREADY_EXISTS = 9971
+DNS_ERROR_POLICY_DOES_NOT_EXIST = 9972
+DNS_ERROR_POLICY_INVALID_CRITERIA = 9973
+DNS_ERROR_POLICY_INVALID_SETTINGS = 9974
+DNS_ERROR_CLIENT_SUBNET_IS_ACCESSED = 9975
+DNS_ERROR_CLIENT_SUBNET_DOES_NOT_EXIST = 9976
+DNS_ERROR_CLIENT_SUBNET_ALREADY_EXISTS = 9977
+DNS_ERROR_SUBNET_DOES_NOT_EXIST = 9978
+DNS_ERROR_SUBNET_ALREADY_EXISTS = 9979
+DNS_ERROR_POLICY_LOCKED = 9980
+DNS_ERROR_POLICY_INVALID_WEIGHT = 9981
+DNS_ERROR_POLICY_INVALID_NAME = 9982
+DNS_ERROR_POLICY_MISSING_CRITERIA = 9983
+DNS_ERROR_INVALID_CLIENT_SUBNET_NAME = 9984
+DNS_ERROR_POLICY_PROCESSING_ORDER_INVALID = 9985
+DNS_ERROR_POLICY_SCOPE_MISSING = 9986
+DNS_ERROR_POLICY_SCOPE_NOT_ALLOWED = 9987
+DNS_ERROR_SERVERSCOPE_IS_REFERENCED = 9988
+DNS_ERROR_ZONESCOPE_IS_REFERENCED = 9989
+DNS_ERROR_POLICY_INVALID_CRITERIA_CLIENT_SUBNET = 9990
+DNS_ERROR_POLICY_INVALID_CRITERIA_TRANSPORT_PROTOCOL = 9991
+DNS_ERROR_POLICY_INVALID_CRITERIA_NETWORK_PROTOCOL = 9992
+DNS_ERROR_POLICY_INVALID_CRITERIA_INTERFACE = 9993
+DNS_ERROR_POLICY_INVALID_CRITERIA_FQDN = 9994
+DNS_ERROR_POLICY_INVALID_CRITERIA_QUERY_TYPE = 9995
+DNS_ERROR_POLICY_INVALID_CRITERIA_TIME_OF_DAY = 9996
+WSABASEERR = 10000
+WSAEINTR = 10004
+WSAEBADF = 10009
+WSAEACCES = 10013
+WSAEFAULT = 10014
+WSAEINVAL = 10022
+WSAEMFILE = 10024
+WSAEWOULDBLOCK = 10035
+WSAEINPROGRESS = 10036
+WSAEALREADY = 10037
+WSAENOTSOCK = 10038
+WSAEDESTADDRREQ = 10039
+WSAEMSGSIZE = 10040
+WSAEPROTOTYPE = 10041
+WSAENOPROTOOPT = 10042
+WSAEPROTONOSUPPORT = 10043
+WSAESOCKTNOSUPPORT = 10044
+WSAEOPNOTSUPP = 10045
+WSAEPFNOSUPPORT = 10046
+WSAEAFNOSUPPORT = 10047
+WSAEADDRINUSE = 10048
+WSAEADDRNOTAVAIL = 10049
+WSAENETDOWN = 10050
+WSAENETUNREACH = 10051
+WSAENETRESET = 10052
+WSAECONNABORTED = 10053
+WSAECONNRESET = 10054
+WSAENOBUFS = 10055
+WSAEISCONN = 10056
+WSAENOTCONN = 10057
+WSAESHUTDOWN = 10058
+WSAETOOMANYREFS = 10059
+WSAETIMEDOUT = 10060
+WSAECONNREFUSED = 10061
+WSAELOOP = 10062
+WSAENAMETOOLONG = 10063
+WSAEHOSTDOWN = 10064
+WSAEHOSTUNREACH = 10065
+WSAENOTEMPTY = 10066
+WSAEPROCLIM = 10067
+WSAEUSERS = 10068
+WSAEDQUOT = 10069
+WSAESTALE = 10070
+WSAEREMOTE = 10071
+WSASYSNOTREADY = 10091
+WSAVERNOTSUPPORTED = 10092
+WSANOTINITIALISED = 10093
+WSAEDISCON = 10101
+WSAENOMORE = 10102
+WSAECANCELLED = 10103
+WSAEINVALIDPROCTABLE = 10104
+WSAEINVALIDPROVIDER = 10105
+WSAEPROVIDERFAILEDINIT = 10106
+WSASYSCALLFAILURE = 10107
+WSASERVICE_NOT_FOUND = 10108
+WSATYPE_NOT_FOUND = 10109
+WSA_E_NO_MORE = 10110
+WSA_E_CANCELLED = 10111
+WSAEREFUSED = 10112
+WSAHOST_NOT_FOUND = 11001
+WSATRY_AGAIN = 11002
+WSANO_RECOVERY = 11003
+WSANO_DATA = 11004
+WSA_QOS_RECEIVERS = 11005
+WSA_QOS_SENDERS = 11006
+WSA_QOS_NO_SENDERS = 11007
+WSA_QOS_NO_RECEIVERS = 11008
+WSA_QOS_REQUEST_CONFIRMED = 11009
+WSA_QOS_ADMISSION_FAILURE = 11010
+WSA_QOS_POLICY_FAILURE = 11011
+WSA_QOS_BAD_STYLE = 11012
+WSA_QOS_BAD_OBJECT = 11013
+WSA_QOS_TRAFFIC_CTRL_ERROR = 11014
+WSA_QOS_GENERIC_ERROR = 11015
+WSA_QOS_ESERVICETYPE = 11016
+WSA_QOS_EFLOWSPEC = 11017
+WSA_QOS_EPROVSPECBUF = 11018
+WSA_QOS_EFILTERSTYLE = 11019
+WSA_QOS_EFILTERTYPE = 11020
+WSA_QOS_EFILTERCOUNT = 11021
+WSA_QOS_EOBJLENGTH = 11022
+WSA_QOS_EFLOWCOUNT = 11023
+WSA_QOS_EUNKOWNPSOBJ = 11024
+WSA_QOS_EPOLICYOBJ = 11025
+WSA_QOS_EFLOWDESC = 11026
+WSA_QOS_EPSFLOWSPEC = 11027
+WSA_QOS_EPSFILTERSPEC = 11028
+WSA_QOS_ESDMODEOBJ = 11029
+WSA_QOS_ESHAPERATEOBJ = 11030
+WSA_QOS_RESERVED_PETYPE = 11031
+WSA_SECURE_HOST_NOT_FOUND = 11032
+WSA_IPSEC_NAME_POLICY_ERROR = 11033
+ERROR_IPSEC_QM_POLICY_EXISTS = 13000
+ERROR_IPSEC_QM_POLICY_NOT_FOUND = 13001
+ERROR_IPSEC_QM_POLICY_IN_USE = 13002
+ERROR_IPSEC_MM_POLICY_EXISTS = 13003
+ERROR_IPSEC_MM_POLICY_NOT_FOUND = 13004
+ERROR_IPSEC_MM_POLICY_IN_USE = 13005
+ERROR_IPSEC_MM_FILTER_EXISTS = 13006
+ERROR_IPSEC_MM_FILTER_NOT_FOUND = 13007
+ERROR_IPSEC_TRANSPORT_FILTER_EXISTS = 13008
+ERROR_IPSEC_TRANSPORT_FILTER_NOT_FOUND = 13009
+ERROR_IPSEC_MM_AUTH_EXISTS = 13010
+ERROR_IPSEC_MM_AUTH_NOT_FOUND = 13011
+ERROR_IPSEC_MM_AUTH_IN_USE = 13012
+ERROR_IPSEC_DEFAULT_MM_POLICY_NOT_FOUND = 13013
+ERROR_IPSEC_DEFAULT_MM_AUTH_NOT_FOUND = 13014
+ERROR_IPSEC_DEFAULT_QM_POLICY_NOT_FOUND = 13015
+ERROR_IPSEC_TUNNEL_FILTER_EXISTS = 13016
+ERROR_IPSEC_TUNNEL_FILTER_NOT_FOUND = 13017
+ERROR_IPSEC_MM_FILTER_PENDING_DELETION = 13018
+ERROR_IPSEC_TRANSPORT_FILTER_PENDING_DELETION = 13019
+ERROR_IPSEC_TUNNEL_FILTER_PENDING_DELETION = 13020
+ERROR_IPSEC_MM_POLICY_PENDING_DELETION = 13021
+ERROR_IPSEC_MM_AUTH_PENDING_DELETION = 13022
+ERROR_IPSEC_QM_POLICY_PENDING_DELETION = 13023
+WARNING_IPSEC_MM_POLICY_PRUNED = 13024
+WARNING_IPSEC_QM_POLICY_PRUNED = 13025
+ERROR_IPSEC_IKE_NEG_STATUS_BEGIN = 13800
+ERROR_IPSEC_IKE_AUTH_FAIL = 13801
+ERROR_IPSEC_IKE_ATTRIB_FAIL = 13802
+ERROR_IPSEC_IKE_NEGOTIATION_PENDING = 13803
+ERROR_IPSEC_IKE_GENERAL_PROCESSING_ERROR = 13804
+ERROR_IPSEC_IKE_TIMED_OUT = 13805
+ERROR_IPSEC_IKE_NO_CERT = 13806
+ERROR_IPSEC_IKE_SA_DELETED = 13807
+ERROR_IPSEC_IKE_SA_REAPED = 13808
+ERROR_IPSEC_IKE_MM_ACQUIRE_DROP = 13809
+ERROR_IPSEC_IKE_QM_ACQUIRE_DROP = 13810
+ERROR_IPSEC_IKE_QUEUE_DROP_MM = 13811
+ERROR_IPSEC_IKE_QUEUE_DROP_NO_MM = 13812
+ERROR_IPSEC_IKE_DROP_NO_RESPONSE = 13813
+ERROR_IPSEC_IKE_MM_DELAY_DROP = 13814
+ERROR_IPSEC_IKE_QM_DELAY_DROP = 13815
+ERROR_IPSEC_IKE_ERROR = 13816
+ERROR_IPSEC_IKE_CRL_FAILED = 13817
+ERROR_IPSEC_IKE_INVALID_KEY_USAGE = 13818
+ERROR_IPSEC_IKE_INVALID_CERT_TYPE = 13819
+ERROR_IPSEC_IKE_NO_PRIVATE_KEY = 13820
+ERROR_IPSEC_IKE_SIMULTANEOUS_REKEY = 13821
+ERROR_IPSEC_IKE_DH_FAIL = 13822
+ERROR_IPSEC_IKE_CRITICAL_PAYLOAD_NOT_RECOGNIZED = 13823
+ERROR_IPSEC_IKE_INVALID_HEADER = 13824
+ERROR_IPSEC_IKE_NO_POLICY = 13825
+ERROR_IPSEC_IKE_INVALID_SIGNATURE = 13826
+ERROR_IPSEC_IKE_KERBEROS_ERROR = 13827
+ERROR_IPSEC_IKE_NO_PUBLIC_KEY = 13828
+ERROR_IPSEC_IKE_PROCESS_ERR = 13829
+ERROR_IPSEC_IKE_PROCESS_ERR_SA = 13830
+ERROR_IPSEC_IKE_PROCESS_ERR_PROP = 13831
+ERROR_IPSEC_IKE_PROCESS_ERR_TRANS = 13832
+ERROR_IPSEC_IKE_PROCESS_ERR_KE = 13833
+ERROR_IPSEC_IKE_PROCESS_ERR_ID = 13834
+ERROR_IPSEC_IKE_PROCESS_ERR_CERT = 13835
+ERROR_IPSEC_IKE_PROCESS_ERR_CERT_REQ = 13836
+ERROR_IPSEC_IKE_PROCESS_ERR_HASH = 13837
+ERROR_IPSEC_IKE_PROCESS_ERR_SIG = 13838
+ERROR_IPSEC_IKE_PROCESS_ERR_NONCE = 13839
+ERROR_IPSEC_IKE_PROCESS_ERR_NOTIFY = 13840
+ERROR_IPSEC_IKE_PROCESS_ERR_DELETE = 13841
+ERROR_IPSEC_IKE_PROCESS_ERR_VENDOR = 13842
+ERROR_IPSEC_IKE_INVALID_PAYLOAD = 13843
+ERROR_IPSEC_IKE_LOAD_SOFT_SA = 13844
+ERROR_IPSEC_IKE_SOFT_SA_TORN_DOWN = 13845
+ERROR_IPSEC_IKE_INVALID_COOKIE = 13846
+ERROR_IPSEC_IKE_NO_PEER_CERT = 13847
+ERROR_IPSEC_IKE_PEER_CRL_FAILED = 13848
+ERROR_IPSEC_IKE_POLICY_CHANGE = 13849
+ERROR_IPSEC_IKE_NO_MM_POLICY = 13850
+ERROR_IPSEC_IKE_NOTCBPRIV = 13851
+ERROR_IPSEC_IKE_SECLOADFAIL = 13852
+ERROR_IPSEC_IKE_FAILSSPINIT = 13853
+ERROR_IPSEC_IKE_FAILQUERYSSP = 13854
+ERROR_IPSEC_IKE_SRVACQFAIL = 13855
+ERROR_IPSEC_IKE_SRVQUERYCRED = 13856
+ERROR_IPSEC_IKE_GETSPIFAIL = 13857
+ERROR_IPSEC_IKE_INVALID_FILTER = 13858
+ERROR_IPSEC_IKE_OUT_OF_MEMORY = 13859
+ERROR_IPSEC_IKE_ADD_UPDATE_KEY_FAILED = 13860
+ERROR_IPSEC_IKE_INVALID_POLICY = 13861
+ERROR_IPSEC_IKE_UNKNOWN_DOI = 13862
+ERROR_IPSEC_IKE_INVALID_SITUATION = 13863
+ERROR_IPSEC_IKE_DH_FAILURE = 13864
+ERROR_IPSEC_IKE_INVALID_GROUP = 13865
+ERROR_IPSEC_IKE_ENCRYPT = 13866
+ERROR_IPSEC_IKE_DECRYPT = 13867
+ERROR_IPSEC_IKE_POLICY_MATCH = 13868
+ERROR_IPSEC_IKE_UNSUPPORTED_ID = 13869
+ERROR_IPSEC_IKE_INVALID_HASH = 13870
+ERROR_IPSEC_IKE_INVALID_HASH_ALG = 13871
+ERROR_IPSEC_IKE_INVALID_HASH_SIZE = 13872
+ERROR_IPSEC_IKE_INVALID_ENCRYPT_ALG = 13873
+ERROR_IPSEC_IKE_INVALID_AUTH_ALG = 13874
+ERROR_IPSEC_IKE_INVALID_SIG = 13875
+ERROR_IPSEC_IKE_LOAD_FAILED = 13876
+ERROR_IPSEC_IKE_RPC_DELETE = 13877
+ERROR_IPSEC_IKE_BENIGN_REINIT = 13878
+ERROR_IPSEC_IKE_INVALID_RESPONDER_LIFETIME_NOTIFY = 13879
+ERROR_IPSEC_IKE_INVALID_MAJOR_VERSION = 13880
+ERROR_IPSEC_IKE_INVALID_CERT_KEYLEN = 13881
+ERROR_IPSEC_IKE_MM_LIMIT = 13882
+ERROR_IPSEC_IKE_NEGOTIATION_DISABLED = 13883
+ERROR_IPSEC_IKE_QM_LIMIT = 13884
+ERROR_IPSEC_IKE_MM_EXPIRED = 13885
+ERROR_IPSEC_IKE_PEER_MM_ASSUMED_INVALID = 13886
+ERROR_IPSEC_IKE_CERT_CHAIN_POLICY_MISMATCH = 13887
+ERROR_IPSEC_IKE_UNEXPECTED_MESSAGE_ID = 13888
+ERROR_IPSEC_IKE_INVALID_AUTH_PAYLOAD = 13889
+ERROR_IPSEC_IKE_DOS_COOKIE_SENT = 13890
+ERROR_IPSEC_IKE_SHUTTING_DOWN = 13891
+ERROR_IPSEC_IKE_CGA_AUTH_FAILED = 13892
+ERROR_IPSEC_IKE_PROCESS_ERR_NATOA = 13893
+ERROR_IPSEC_IKE_INVALID_MM_FOR_QM = 13894
+ERROR_IPSEC_IKE_QM_EXPIRED = 13895
+ERROR_IPSEC_IKE_TOO_MANY_FILTERS = 13896
+ERROR_IPSEC_IKE_NEG_STATUS_END = 13897
+ERROR_IPSEC_IKE_KILL_DUMMY_NAP_TUNNEL = 13898
+ERROR_IPSEC_IKE_INNER_IP_ASSIGNMENT_FAILURE = 13899
+ERROR_IPSEC_IKE_REQUIRE_CP_PAYLOAD_MISSING = 13900
+ERROR_IPSEC_KEY_MODULE_IMPERSONATION_NEGOTIATION_PENDING = 13901
+ERROR_IPSEC_IKE_COEXISTENCE_SUPPRESS = 13902
+ERROR_IPSEC_IKE_RATELIMIT_DROP = 13903
+ERROR_IPSEC_IKE_PEER_DOESNT_SUPPORT_MOBIKE = 13904
+ERROR_IPSEC_IKE_AUTHORIZATION_FAILURE = 13905
+ERROR_IPSEC_IKE_STRONG_CRED_AUTHORIZATION_FAILURE = 13906
+ERROR_IPSEC_IKE_AUTHORIZATION_FAILURE_WITH_OPTIONAL_RETRY = 13907
+ERROR_IPSEC_IKE_STRONG_CRED_AUTHORIZATION_AND_CERTMAP_FAILURE = 13908
+ERROR_IPSEC_IKE_NEG_STATUS_EXTENDED_END = 13909
+ERROR_IPSEC_BAD_SPI = 13910
+ERROR_IPSEC_SA_LIFETIME_EXPIRED = 13911
+ERROR_IPSEC_WRONG_SA = 13912
+ERROR_IPSEC_REPLAY_CHECK_FAILED = 13913
+ERROR_IPSEC_INVALID_PACKET = 13914
+ERROR_IPSEC_INTEGRITY_CHECK_FAILED = 13915
+ERROR_IPSEC_CLEAR_TEXT_DROP = 13916
+ERROR_IPSEC_AUTH_FIREWALL_DROP = 13917
+ERROR_IPSEC_THROTTLE_DROP = 13918
+ERROR_IPSEC_DOSP_BLOCK = 13925
+ERROR_IPSEC_DOSP_RECEIVED_MULTICAST = 13926
+ERROR_IPSEC_DOSP_INVALID_PACKET = 13927
+ERROR_IPSEC_DOSP_STATE_LOOKUP_FAILED = 13928
+ERROR_IPSEC_DOSP_MAX_ENTRIES = 13929
+ERROR_IPSEC_DOSP_KEYMOD_NOT_ALLOWED = 13930
+ERROR_IPSEC_DOSP_NOT_INSTALLED = 13931
+ERROR_IPSEC_DOSP_MAX_PER_IP_RATELIMIT_QUEUES = 13932
+ERROR_SXS_SECTION_NOT_FOUND = 14000
+ERROR_SXS_CANT_GEN_ACTCTX = 14001
+ERROR_SXS_INVALID_ACTCTXDATA_FORMAT = 14002
+ERROR_SXS_ASSEMBLY_NOT_FOUND = 14003
+ERROR_SXS_MANIFEST_FORMAT_ERROR = 14004
+ERROR_SXS_MANIFEST_PARSE_ERROR = 14005
+ERROR_SXS_ACTIVATION_CONTEXT_DISABLED = 14006
+ERROR_SXS_KEY_NOT_FOUND = 14007
+ERROR_SXS_VERSION_CONFLICT = 14008
+ERROR_SXS_WRONG_SECTION_TYPE = 14009
+ERROR_SXS_THREAD_QUERIES_DISABLED = 14010
+ERROR_SXS_PROCESS_DEFAULT_ALREADY_SET = 14011
+ERROR_SXS_UNKNOWN_ENCODING_GROUP = 14012
+ERROR_SXS_UNKNOWN_ENCODING = 14013
+ERROR_SXS_INVALID_XML_NAMESPACE_URI = 14014
+ERROR_SXS_ROOT_MANIFEST_DEPENDENCY_NOT_INSTALLED = 14015
+ERROR_SXS_LEAF_MANIFEST_DEPENDENCY_NOT_INSTALLED = 14016
+ERROR_SXS_INVALID_ASSEMBLY_IDENTITY_ATTRIBUTE = 14017
+ERROR_SXS_MANIFEST_MISSING_REQUIRED_DEFAULT_NAMESPACE = 14018
+ERROR_SXS_MANIFEST_INVALID_REQUIRED_DEFAULT_NAMESPACE = 14019
+ERROR_SXS_PRIVATE_MANIFEST_CROSS_PATH_WITH_REPARSE_POINT = 14020
+ERROR_SXS_DUPLICATE_DLL_NAME = 14021
+ERROR_SXS_DUPLICATE_WINDOWCLASS_NAME = 14022
+ERROR_SXS_DUPLICATE_CLSID = 14023
+ERROR_SXS_DUPLICATE_IID = 14024
+ERROR_SXS_DUPLICATE_TLBID = 14025
+ERROR_SXS_DUPLICATE_PROGID = 14026
+ERROR_SXS_DUPLICATE_ASSEMBLY_NAME = 14027
+ERROR_SXS_FILE_HASH_MISMATCH = 14028
+ERROR_SXS_POLICY_PARSE_ERROR = 14029
+ERROR_SXS_XML_E_MISSINGQUOTE = 14030
+ERROR_SXS_XML_E_COMMENTSYNTAX = 14031
+ERROR_SXS_XML_E_BADSTARTNAMECHAR = 14032
+ERROR_SXS_XML_E_BADNAMECHAR = 14033
+ERROR_SXS_XML_E_BADCHARINSTRING = 14034
+ERROR_SXS_XML_E_XMLDECLSYNTAX = 14035
+ERROR_SXS_XML_E_BADCHARDATA = 14036
+ERROR_SXS_XML_E_MISSINGWHITESPACE = 14037
+ERROR_SXS_XML_E_EXPECTINGTAGEND = 14038
+ERROR_SXS_XML_E_MISSINGSEMICOLON = 14039
+ERROR_SXS_XML_E_UNBALANCEDPAREN = 14040
+ERROR_SXS_XML_E_INTERNALERROR = 14041
+ERROR_SXS_XML_E_UNEXPECTED_WHITESPACE = 14042
+ERROR_SXS_XML_E_INCOMPLETE_ENCODING = 14043
+ERROR_SXS_XML_E_MISSING_PAREN = 14044
+ERROR_SXS_XML_E_EXPECTINGCLOSEQUOTE = 14045
+ERROR_SXS_XML_E_MULTIPLE_COLONS = 14046
+ERROR_SXS_XML_E_INVALID_DECIMAL = 14047
+ERROR_SXS_XML_E_INVALID_HEXIDECIMAL = 14048
+ERROR_SXS_XML_E_INVALID_UNICODE = 14049
+ERROR_SXS_XML_E_WHITESPACEORQUESTIONMARK = 14050
+ERROR_SXS_XML_E_UNEXPECTEDENDTAG = 14051
+ERROR_SXS_XML_E_UNCLOSEDTAG = 14052
+ERROR_SXS_XML_E_DUPLICATEATTRIBUTE = 14053
+ERROR_SXS_XML_E_MULTIPLEROOTS = 14054
+ERROR_SXS_XML_E_INVALIDATROOTLEVEL = 14055
+ERROR_SXS_XML_E_BADXMLDECL = 14056
+ERROR_SXS_XML_E_MISSINGROOT = 14057
+ERROR_SXS_XML_E_UNEXPECTEDEOF = 14058
+ERROR_SXS_XML_E_BADPEREFINSUBSET = 14059
+ERROR_SXS_XML_E_UNCLOSEDSTARTTAG = 14060
+ERROR_SXS_XML_E_UNCLOSEDENDTAG = 14061
+ERROR_SXS_XML_E_UNCLOSEDSTRING = 14062
+ERROR_SXS_XML_E_UNCLOSEDCOMMENT = 14063
+ERROR_SXS_XML_E_UNCLOSEDDECL = 14064
+ERROR_SXS_XML_E_UNCLOSEDCDATA = 14065
+ERROR_SXS_XML_E_RESERVEDNAMESPACE = 14066
+ERROR_SXS_XML_E_INVALIDENCODING = 14067
+ERROR_SXS_XML_E_INVALIDSWITCH = 14068
+ERROR_SXS_XML_E_BADXMLCASE = 14069
+ERROR_SXS_XML_E_INVALID_STANDALONE = 14070
+ERROR_SXS_XML_E_UNEXPECTED_STANDALONE = 14071
+ERROR_SXS_XML_E_INVALID_VERSION = 14072
+ERROR_SXS_XML_E_MISSINGEQUALS = 14073
+ERROR_SXS_PROTECTION_RECOVERY_FAILED = 14074
+ERROR_SXS_PROTECTION_PUBLIC_KEY_TOO_SHORT = 14075
+ERROR_SXS_PROTECTION_CATALOG_NOT_VALID = 14076
+ERROR_SXS_UNTRANSLATABLE_HRESULT = 14077
+ERROR_SXS_PROTECTION_CATALOG_FILE_MISSING = 14078
+ERROR_SXS_MISSING_ASSEMBLY_IDENTITY_ATTRIBUTE = 14079
+ERROR_SXS_INVALID_ASSEMBLY_IDENTITY_ATTRIBUTE_NAME = 14080
+ERROR_SXS_ASSEMBLY_MISSING = 14081
+ERROR_SXS_CORRUPT_ACTIVATION_STACK = 14082
+ERROR_SXS_CORRUPTION = 14083
+ERROR_SXS_EARLY_DEACTIVATION = 14084
+ERROR_SXS_INVALID_DEACTIVATION = 14085
+ERROR_SXS_MULTIPLE_DEACTIVATION = 14086
+ERROR_SXS_PROCESS_TERMINATION_REQUESTED = 14087
+ERROR_SXS_RELEASE_ACTIVATION_CONTEXT = 14088
+ERROR_SXS_SYSTEM_DEFAULT_ACTIVATION_CONTEXT_EMPTY = 14089
+ERROR_SXS_INVALID_IDENTITY_ATTRIBUTE_VALUE = 14090
+ERROR_SXS_INVALID_IDENTITY_ATTRIBUTE_NAME = 14091
+ERROR_SXS_IDENTITY_DUPLICATE_ATTRIBUTE = 14092
+ERROR_SXS_IDENTITY_PARSE_ERROR = 14093
+ERROR_MALFORMED_SUBSTITUTION_STRING = 14094
+ERROR_SXS_INCORRECT_PUBLIC_KEY_TOKEN = 14095
+ERROR_UNMAPPED_SUBSTITUTION_STRING = 14096
+ERROR_SXS_ASSEMBLY_NOT_LOCKED = 14097
+ERROR_SXS_COMPONENT_STORE_CORRUPT = 14098
+ERROR_ADVANCED_INSTALLER_FAILED = 14099
+ERROR_XML_ENCODING_MISMATCH = 14100
+ERROR_SXS_MANIFEST_IDENTITY_SAME_BUT_CONTENTS_DIFFERENT = 14101
+ERROR_SXS_IDENTITIES_DIFFERENT = 14102
+ERROR_SXS_ASSEMBLY_IS_NOT_A_DEPLOYMENT = 14103
+ERROR_SXS_FILE_NOT_PART_OF_ASSEMBLY = 14104
+ERROR_SXS_MANIFEST_TOO_BIG = 14105
+ERROR_SXS_SETTING_NOT_REGISTERED = 14106
+ERROR_SXS_TRANSACTION_CLOSURE_INCOMPLETE = 14107
+ERROR_SMI_PRIMITIVE_INSTALLER_FAILED = 14108
+ERROR_GENERIC_COMMAND_FAILED = 14109
+ERROR_SXS_FILE_HASH_MISSING = 14110
+ERROR_SXS_DUPLICATE_ACTIVATABLE_CLASS = 14111
+ERROR_EVT_INVALID_CHANNEL_PATH = 15000
+ERROR_EVT_INVALID_QUERY = 15001
+ERROR_EVT_PUBLISHER_METADATA_NOT_FOUND = 15002
+ERROR_EVT_EVENT_TEMPLATE_NOT_FOUND = 15003
+ERROR_EVT_INVALID_PUBLISHER_NAME = 15004
+ERROR_EVT_INVALID_EVENT_DATA = 15005
+ERROR_EVT_CHANNEL_NOT_FOUND = 15007
+ERROR_EVT_MALFORMED_XML_TEXT = 15008
+ERROR_EVT_SUBSCRIPTION_TO_DIRECT_CHANNEL = 15009
+ERROR_EVT_CONFIGURATION_ERROR = 15010
+ERROR_EVT_QUERY_RESULT_STALE = 15011
+ERROR_EVT_QUERY_RESULT_INVALID_POSITION = 15012
+ERROR_EVT_NON_VALIDATING_MSXML = 15013
+ERROR_EVT_FILTER_ALREADYSCOPED = 15014
+ERROR_EVT_FILTER_NOTELTSET = 15015
+ERROR_EVT_FILTER_INVARG = 15016
+ERROR_EVT_FILTER_INVTEST = 15017
+ERROR_EVT_FILTER_INVTYPE = 15018
+ERROR_EVT_FILTER_PARSEERR = 15019
+ERROR_EVT_FILTER_UNSUPPORTEDOP = 15020
+ERROR_EVT_FILTER_UNEXPECTEDTOKEN = 15021
+ERROR_EVT_INVALID_OPERATION_OVER_ENABLED_DIRECT_CHANNEL = 15022
+ERROR_EVT_INVALID_CHANNEL_PROPERTY_VALUE = 15023
+ERROR_EVT_INVALID_PUBLISHER_PROPERTY_VALUE = 15024
+ERROR_EVT_CHANNEL_CANNOT_ACTIVATE = 15025
+ERROR_EVT_FILTER_TOO_COMPLEX = 15026
+ERROR_EVT_MESSAGE_NOT_FOUND = 15027
+ERROR_EVT_MESSAGE_ID_NOT_FOUND = 15028
+ERROR_EVT_UNRESOLVED_VALUE_INSERT = 15029
+ERROR_EVT_UNRESOLVED_PARAMETER_INSERT = 15030
+ERROR_EVT_MAX_INSERTS_REACHED = 15031
+ERROR_EVT_EVENT_DEFINITION_NOT_FOUND = 15032
+ERROR_EVT_MESSAGE_LOCALE_NOT_FOUND = 15033
+ERROR_EVT_VERSION_TOO_OLD = 15034
+ERROR_EVT_VERSION_TOO_NEW = 15035
+ERROR_EVT_CANNOT_OPEN_CHANNEL_OF_QUERY = 15036
+ERROR_EVT_PUBLISHER_DISABLED = 15037
+ERROR_EVT_FILTER_OUT_OF_RANGE = 15038
+ERROR_EC_SUBSCRIPTION_CANNOT_ACTIVATE = 15080
+ERROR_EC_LOG_DISABLED = 15081
+ERROR_EC_CIRCULAR_FORWARDING = 15082
+ERROR_EC_CREDSTORE_FULL = 15083
+ERROR_EC_CRED_NOT_FOUND = 15084
+ERROR_EC_NO_ACTIVE_CHANNEL = 15085
+ERROR_MUI_FILE_NOT_FOUND = 15100
+ERROR_MUI_INVALID_FILE = 15101
+ERROR_MUI_INVALID_RC_CONFIG = 15102
+ERROR_MUI_INVALID_LOCALE_NAME = 15103
+ERROR_MUI_INVALID_ULTIMATEFALLBACK_NAME = 15104
+ERROR_MUI_FILE_NOT_LOADED = 15105
+ERROR_RESOURCE_ENUM_USER_STOP = 15106
+ERROR_MUI_INTLSETTINGS_UILANG_NOT_INSTALLED = 15107
+ERROR_MUI_INTLSETTINGS_INVALID_LOCALE_NAME = 15108
+ERROR_MRM_RUNTIME_NO_DEFAULT_OR_NEUTRAL_RESOURCE = 15110
+ERROR_MRM_INVALID_PRICONFIG = 15111
+ERROR_MRM_INVALID_FILE_TYPE = 15112
+ERROR_MRM_UNKNOWN_QUALIFIER = 15113
+ERROR_MRM_INVALID_QUALIFIER_VALUE = 15114
+ERROR_MRM_NO_CANDIDATE = 15115
+ERROR_MRM_NO_MATCH_OR_DEFAULT_CANDIDATE = 15116
+ERROR_MRM_RESOURCE_TYPE_MISMATCH = 15117
+ERROR_MRM_DUPLICATE_MAP_NAME = 15118
+ERROR_MRM_DUPLICATE_ENTRY = 15119
+ERROR_MRM_INVALID_RESOURCE_IDENTIFIER = 15120
+ERROR_MRM_FILEPATH_TOO_LONG = 15121
+ERROR_MRM_UNSUPPORTED_DIRECTORY_TYPE = 15122
+ERROR_MRM_INVALID_PRI_FILE = 15126
+ERROR_MRM_NAMED_RESOURCE_NOT_FOUND = 15127
+ERROR_MRM_MAP_NOT_FOUND = 15135
+ERROR_MRM_UNSUPPORTED_PROFILE_TYPE = 15136
+ERROR_MRM_INVALID_QUALIFIER_OPERATOR = 15137
+ERROR_MRM_INDETERMINATE_QUALIFIER_VALUE = 15138
+ERROR_MRM_AUTOMERGE_ENABLED = 15139
+ERROR_MRM_TOO_MANY_RESOURCES = 15140
+ERROR_MRM_UNSUPPORTED_FILE_TYPE_FOR_MERGE = 15141
+ERROR_MRM_UNSUPPORTED_FILE_TYPE_FOR_LOAD_UNLOAD_PRI_FILE = 15142
+ERROR_MRM_NO_CURRENT_VIEW_ON_THREAD = 15143
+ERROR_DIFFERENT_PROFILE_RESOURCE_MANAGER_EXIST = 15144
+ERROR_OPERATION_NOT_ALLOWED_FROM_SYSTEM_COMPONENT = 15145
+ERROR_MRM_DIRECT_REF_TO_NON_DEFAULT_RESOURCE = 15146
+ERROR_MRM_GENERATION_COUNT_MISMATCH = 15147
+ERROR_PRI_MERGE_VERSION_MISMATCH = 15148
+ERROR_PRI_MERGE_MISSING_SCHEMA = 15149
+ERROR_PRI_MERGE_LOAD_FILE_FAILED = 15150
+ERROR_PRI_MERGE_ADD_FILE_FAILED = 15151
+ERROR_PRI_MERGE_WRITE_FILE_FAILED = 15152
+ERROR_PRI_MERGE_MULTIPLE_PACKAGE_FAMILIES_NOT_ALLOWED = 15153
+ERROR_PRI_MERGE_MULTIPLE_MAIN_PACKAGES_NOT_ALLOWED = 15154
+ERROR_PRI_MERGE_BUNDLE_PACKAGES_NOT_ALLOWED = 15155
+ERROR_PRI_MERGE_MAIN_PACKAGE_REQUIRED = 15156
+ERROR_PRI_MERGE_RESOURCE_PACKAGE_REQUIRED = 15157
+ERROR_PRI_MERGE_INVALID_FILE_NAME = 15158
+ERROR_MRM_PACKAGE_NOT_FOUND = 15159
+ERROR_MRM_MISSING_DEFAULT_LANGUAGE = 15160
+ERROR_MRM_SCOPE_ITEM_CONFLICT = 15161
+ERROR_MCA_INVALID_CAPABILITIES_STRING = 15200
+ERROR_MCA_INVALID_VCP_VERSION = 15201
+ERROR_MCA_MONITOR_VIOLATES_MCCS_SPECIFICATION = 15202
+ERROR_MCA_MCCS_VERSION_MISMATCH = 15203
+ERROR_MCA_UNSUPPORTED_MCCS_VERSION = 15204
+ERROR_MCA_INTERNAL_ERROR = 15205
+ERROR_MCA_INVALID_TECHNOLOGY_TYPE_RETURNED = 15206
+ERROR_MCA_UNSUPPORTED_COLOR_TEMPERATURE = 15207
+ERROR_AMBIGUOUS_SYSTEM_DEVICE = 15250
+ERROR_SYSTEM_DEVICE_NOT_FOUND = 15299
+ERROR_HASH_NOT_SUPPORTED = 15300
+ERROR_HASH_NOT_PRESENT = 15301
+ERROR_SECONDARY_IC_PROVIDER_NOT_REGISTERED = 15321
+ERROR_GPIO_CLIENT_INFORMATION_INVALID = 15322
+ERROR_GPIO_VERSION_NOT_SUPPORTED = 15323
+ERROR_GPIO_INVALID_REGISTRATION_PACKET = 15324
+ERROR_GPIO_OPERATION_DENIED = 15325
+ERROR_GPIO_INCOMPATIBLE_CONNECT_MODE = 15326
+ERROR_GPIO_INTERRUPT_ALREADY_UNMASKED = 15327
+ERROR_CANNOT_SWITCH_RUNLEVEL = 15400
+ERROR_INVALID_RUNLEVEL_SETTING = 15401
+ERROR_RUNLEVEL_SWITCH_TIMEOUT = 15402
+ERROR_RUNLEVEL_SWITCH_AGENT_TIMEOUT = 15403
+ERROR_RUNLEVEL_SWITCH_IN_PROGRESS = 15404
+ERROR_SERVICES_FAILED_AUTOSTART = 15405
+ERROR_COM_TASK_STOP_PENDING = 15501
+ERROR_INSTALL_OPEN_PACKAGE_FAILED = 15600
+ERROR_INSTALL_PACKAGE_NOT_FOUND = 15601
+ERROR_INSTALL_INVALID_PACKAGE = 15602
+ERROR_INSTALL_RESOLVE_DEPENDENCY_FAILED = 15603
+ERROR_INSTALL_OUT_OF_DISK_SPACE = 15604
+ERROR_INSTALL_NETWORK_FAILURE = 15605
+ERROR_INSTALL_REGISTRATION_FAILURE = 15606
+ERROR_INSTALL_DEREGISTRATION_FAILURE = 15607
+ERROR_INSTALL_CANCEL = 15608
+ERROR_INSTALL_FAILED = 15609
+ERROR_REMOVE_FAILED = 15610
+ERROR_PACKAGE_ALREADY_EXISTS = 15611
+ERROR_NEEDS_REMEDIATION = 15612
+ERROR_INSTALL_PREREQUISITE_FAILED = 15613
+ERROR_PACKAGE_REPOSITORY_CORRUPTED = 15614
+ERROR_INSTALL_POLICY_FAILURE = 15615
+ERROR_PACKAGE_UPDATING = 15616
+ERROR_DEPLOYMENT_BLOCKED_BY_POLICY = 15617
+ERROR_PACKAGES_IN_USE = 15618
+ERROR_RECOVERY_FILE_CORRUPT = 15619
+ERROR_INVALID_STAGED_SIGNATURE = 15620
+ERROR_DELETING_EXISTING_APPLICATIONDATA_STORE_FAILED = 15621
+ERROR_INSTALL_PACKAGE_DOWNGRADE = 15622
+ERROR_SYSTEM_NEEDS_REMEDIATION = 15623
+ERROR_APPX_INTEGRITY_FAILURE_CLR_NGEN = 15624
+ERROR_RESILIENCY_FILE_CORRUPT = 15625
+ERROR_INSTALL_FIREWALL_SERVICE_NOT_RUNNING = 15626
+ERROR_PACKAGE_MOVE_FAILED = 15627
+ERROR_INSTALL_VOLUME_NOT_EMPTY = 15628
+ERROR_INSTALL_VOLUME_OFFLINE = 15629
+ERROR_INSTALL_VOLUME_CORRUPT = 15630
+ERROR_NEEDS_REGISTRATION = 15631
+ERROR_INSTALL_WRONG_PROCESSOR_ARCHITECTURE = 15632
+ERROR_DEV_SIDELOAD_LIMIT_EXCEEDED = 15633
+ERROR_INSTALL_OPTIONAL_PACKAGE_REQUIRES_MAIN_PACKAGE = 15634
+ERROR_PACKAGE_NOT_SUPPORTED_ON_FILESYSTEM = 15635
+ERROR_PACKAGE_MOVE_BLOCKED_BY_STREAMING = 15636
+ERROR_INSTALL_OPTIONAL_PACKAGE_APPLICATIONID_NOT_UNIQUE = 15637
+ERROR_PACKAGE_STAGING_ONHOLD = 15638
+ERROR_INSTALL_INVALID_RELATED_SET_UPDATE = 15639
+ERROR_INSTALL_OPTIONAL_PACKAGE_REQUIRES_MAIN_PACKAGE_FULLTRUST_CAPABILITY = 15640
+ERROR_DEPLOYMENT_BLOCKED_BY_USER_LOG_OFF = 15641
+ERROR_PROVISION_OPTIONAL_PACKAGE_REQUIRES_MAIN_PACKAGE_PROVISIONED = 15642
+ERROR_PACKAGES_REPUTATION_CHECK_FAILED = 15643
+ERROR_PACKAGES_REPUTATION_CHECK_TIMEDOUT = 15644
+ERROR_DEPLOYMENT_OPTION_NOT_SUPPORTED = 15645
+ERROR_APPINSTALLER_ACTIVATION_BLOCKED = 15646
+ERROR_REGISTRATION_FROM_REMOTE_DRIVE_NOT_SUPPORTED = 15647
+ERROR_APPX_RAW_DATA_WRITE_FAILED = 15648
+ERROR_DEPLOYMENT_BLOCKED_BY_VOLUME_POLICY_PACKAGE = 15649
+ERROR_DEPLOYMENT_BLOCKED_BY_VOLUME_POLICY_MACHINE = 15650
+ERROR_DEPLOYMENT_BLOCKED_BY_PROFILE_POLICY = 15651
+ERROR_DEPLOYMENT_FAILED_CONFLICTING_MUTABLE_PACKAGE_DIRECTORY = 15652
+ERROR_SINGLETON_RESOURCE_INSTALLED_IN_ACTIVE_USER = 15653
+ERROR_DIFFERENT_VERSION_OF_PACKAGED_SERVICE_INSTALLED = 15654
+ERROR_SERVICE_EXISTS_AS_NON_PACKAGED_SERVICE = 15655
+ERROR_PACKAGED_SERVICE_REQUIRES_ADMIN_PRIVILEGES = 15656
+ERROR_REDIRECTION_TO_DEFAULT_ACCOUNT_NOT_ALLOWED = 15657
+ERROR_PACKAGE_LACKS_CAPABILITY_TO_DEPLOY_ON_HOST = 15658
+ERROR_UNSIGNED_PACKAGE_INVALID_CONTENT = 15659
+ERROR_UNSIGNED_PACKAGE_INVALID_PUBLISHER_NAMESPACE = 15660
+ERROR_SIGNED_PACKAGE_INVALID_PUBLISHER_NAMESPACE = 15661
+ERROR_PACKAGE_EXTERNAL_LOCATION_NOT_ALLOWED = 15662
+ERROR_INSTALL_FULLTRUST_HOSTRUNTIME_REQUIRES_MAIN_PACKAGE_FULLTRUST_CAPABILITY = 15663
+ERROR_PACKAGE_LACKS_CAPABILITY_FOR_MANDATORY_STARTUPTASKS = 15664
+ERROR_INSTALL_RESOLVE_HOSTRUNTIME_DEPENDENCY_FAILED = 15665
+ERROR_MACHINE_SCOPE_NOT_ALLOWED = 15666
+ERROR_CLASSIC_COMPAT_MODE_NOT_ALLOWED = 15667
+ERROR_STAGEFROMUPDATEAGENT_PACKAGE_NOT_APPLICABLE = 15668
+ERROR_PACKAGE_NOT_REGISTERED_FOR_USER = 15669
+ERROR_PACKAGE_NAME_MISMATCH = 15670
+ERROR_APPINSTALLER_URI_IN_USE = 15671
+ERROR_APPINSTALLER_IS_MANAGED_BY_SYSTEM = 15672
+APPMODEL_ERROR_NO_PACKAGE = 15700
+APPMODEL_ERROR_PACKAGE_RUNTIME_CORRUPT = 15701
+APPMODEL_ERROR_PACKAGE_IDENTITY_CORRUPT = 15702
+APPMODEL_ERROR_NO_APPLICATION = 15703
+APPMODEL_ERROR_DYNAMIC_PROPERTY_READ_FAILED = 15704
+APPMODEL_ERROR_DYNAMIC_PROPERTY_INVALID = 15705
+APPMODEL_ERROR_PACKAGE_NOT_AVAILABLE = 15706
+APPMODEL_ERROR_NO_MUTABLE_DIRECTORY = 15707
+ERROR_STATE_LOAD_STORE_FAILED = 15800
+ERROR_STATE_GET_VERSION_FAILED = 15801
+ERROR_STATE_SET_VERSION_FAILED = 15802
+ERROR_STATE_STRUCTURED_RESET_FAILED = 15803
+ERROR_STATE_OPEN_CONTAINER_FAILED = 15804
+ERROR_STATE_CREATE_CONTAINER_FAILED = 15805
+ERROR_STATE_DELETE_CONTAINER_FAILED = 15806
+ERROR_STATE_READ_SETTING_FAILED = 15807
+ERROR_STATE_WRITE_SETTING_FAILED = 15808
+ERROR_STATE_DELETE_SETTING_FAILED = 15809
+ERROR_STATE_QUERY_SETTING_FAILED = 15810
+ERROR_STATE_READ_COMPOSITE_SETTING_FAILED = 15811
+ERROR_STATE_WRITE_COMPOSITE_SETTING_FAILED = 15812
+ERROR_STATE_ENUMERATE_CONTAINER_FAILED = 15813
+ERROR_STATE_ENUMERATE_SETTINGS_FAILED = 15814
+ERROR_STATE_COMPOSITE_SETTING_VALUE_SIZE_LIMIT_EXCEEDED = 15815
+ERROR_STATE_SETTING_VALUE_SIZE_LIMIT_EXCEEDED = 15816
+ERROR_STATE_SETTING_NAME_SIZE_LIMIT_EXCEEDED = 15817
+ERROR_STATE_CONTAINER_NAME_SIZE_LIMIT_EXCEEDED = 15818
+ERROR_API_UNAVAILABLE = 15841
+STORE_ERROR_UNLICENSED = 15861
+STORE_ERROR_UNLICENSED_USER = 15862
+STORE_ERROR_PENDING_COM_TRANSACTION = 15863
+STORE_ERROR_LICENSE_REVOKED = 15864
+SEVERITY_SUCCESS = 0
+SEVERITY_ERROR = 1
+
+
+def SUCCEEDED(hr):
+    return (hr) >= 0
+
+
+def FAILED(hr):
+    return (hr) < 0
+
+
+def HRESULT_CODE(hr):
+    return (hr) & 0xFFFF
+
+
+def SCODE_CODE(sc):
+    return (sc) & 0xFFFF
+
+
+def HRESULT_FACILITY(hr):
+    return ((hr) >> 16) & 0x1FFF
+
+
+def SCODE_FACILITY(sc):
+    return ((sc) >> 16) & 0x1FFF
+
+
+def HRESULT_SEVERITY(hr):
+    return ((hr) >> 31) & 0x1
+
+
+def SCODE_SEVERITY(sc):
+    return ((sc) >> 31) & 0x1
+
+
+FACILITY_NT_BIT = 0x10000000
+
+
+def HRESULT_FROM_WIN32(x):
+    return __HRESULT_FROM_WIN32(x)
+
+
+def HRESULT_FROM_NT(x):
+    return (x) | FACILITY_NT_BIT
+
+
+def GetScode(hr):
+    return hr
+
+
+def ResultFromScode(sc):
+    return sc
+
+
+NOERROR = 0
+E_UNEXPECTED = -2147418113
+E_NOTIMPL = -2147467263
+E_OUTOFMEMORY = -2147024882
+E_INVALIDARG = -2147024809
+E_NOINTERFACE = -2147467262
+E_POINTER = -2147467261
+E_HANDLE = -2147024890
+E_ABORT = -2147467260
+E_FAIL = -2147467259
+E_ACCESSDENIED = -2147024891
+E_PENDING = -2147483638
+E_BOUNDS = -2147483637
+E_CHANGED_STATE = -2147483636
+E_ILLEGAL_STATE_CHANGE = -2147483635
+E_ILLEGAL_METHOD_CALL = -2147483634
+RO_E_METADATA_NAME_NOT_FOUND = -2147483633
+RO_E_METADATA_NAME_IS_NAMESPACE = -2147483632
+RO_E_METADATA_INVALID_TYPE_FORMAT = -2147483631
+RO_E_INVALID_METADATA_FILE = -2147483630
+RO_E_CLOSED = -2147483629
+RO_E_EXCLUSIVE_WRITE = -2147483628
+RO_E_CHANGE_NOTIFICATION_IN_PROGRESS = -2147483627
+RO_E_ERROR_STRING_NOT_FOUND = -2147483626
+E_STRING_NOT_NULL_TERMINATED = -2147483625
+E_ILLEGAL_DELEGATE_ASSIGNMENT = -2147483624
+E_ASYNC_OPERATION_NOT_STARTED = -2147483623
+E_APPLICATION_EXITING = -2147483622
+E_APPLICATION_VIEW_EXITING = -2147483621
+RO_E_MUST_BE_AGILE = -2147483620
+RO_E_UNSUPPORTED_FROM_MTA = -2147483619
+RO_E_COMMITTED = -2147483618
+RO_E_BLOCKED_CROSS_ASTA_CALL = -2147483617
+RO_E_CANNOT_ACTIVATE_FULL_TRUST_SERVER = -2147483616
+RO_E_CANNOT_ACTIVATE_UNIVERSAL_APPLICATION_SERVER = -2147483615
+CO_E_INIT_TLS = -2147467258
+CO_E_INIT_SHARED_ALLOCATOR = -2147467257
+CO_E_INIT_MEMORY_ALLOCATOR = -2147467256
+CO_E_INIT_CLASS_CACHE = -2147467255
+CO_E_INIT_RPC_CHANNEL = -2147467254
+CO_E_INIT_TLS_SET_CHANNEL_CONTROL = -2147467253
+CO_E_INIT_TLS_CHANNEL_CONTROL = -2147467252
+CO_E_INIT_UNACCEPTED_USER_ALLOCATOR = -2147467251
+CO_E_INIT_SCM_MUTEX_EXISTS = -2147467250
+CO_E_INIT_SCM_FILE_MAPPING_EXISTS = -2147467249
+CO_E_INIT_SCM_MAP_VIEW_OF_FILE = -2147467248
+CO_E_INIT_SCM_EXEC_FAILURE = -2147467247
+CO_E_INIT_ONLY_SINGLE_THREADED = -2147467246
+CO_E_CANT_REMOTE = -2147467245
+CO_E_BAD_SERVER_NAME = -2147467244
+CO_E_WRONG_SERVER_IDENTITY = -2147467243
+CO_E_OLE1DDE_DISABLED = -2147467242
+CO_E_RUNAS_SYNTAX = -2147467241
+CO_E_CREATEPROCESS_FAILURE = -2147467240
+CO_E_RUNAS_CREATEPROCESS_FAILURE = -2147467239
+CO_E_RUNAS_LOGON_FAILURE = -2147467238
+CO_E_LAUNCH_PERMSSION_DENIED = -2147467237
+CO_E_START_SERVICE_FAILURE = -2147467236
+CO_E_REMOTE_COMMUNICATION_FAILURE = -2147467235
+CO_E_SERVER_START_TIMEOUT = -2147467234
+CO_E_CLSREG_INCONSISTENT = -2147467233
+CO_E_IIDREG_INCONSISTENT = -2147467232
+CO_E_NOT_SUPPORTED = -2147467231
+CO_E_RELOAD_DLL = -2147467230
+CO_E_MSI_ERROR = -2147467229
+CO_E_ATTEMPT_TO_CREATE_OUTSIDE_CLIENT_CONTEXT = -2147467228
+CO_E_SERVER_PAUSED = -2147467227
+CO_E_SERVER_NOT_PAUSED = -2147467226
+CO_E_CLASS_DISABLED = -2147467225
+CO_E_CLRNOTAVAILABLE = -2147467224
+CO_E_ASYNC_WORK_REJECTED = -2147467223
+CO_E_SERVER_INIT_TIMEOUT = -2147467222
+CO_E_NO_SECCTX_IN_ACTIVATE = -2147467221
+CO_E_TRACKER_CONFIG = -2147467216
+CO_E_THREADPOOL_CONFIG = -2147467215
+CO_E_SXS_CONFIG = -2147467214
+CO_E_MALFORMED_SPN = -2147467213
+CO_E_UNREVOKED_REGISTRATION_ON_APARTMENT_SHUTDOWN = -2147467212
+CO_E_PREMATURE_STUB_RUNDOWN = -2147467211
+S_OK = 0
+S_FALSE = 1
+OLE_E_FIRST = -2147221504
+OLE_E_LAST = -2147221249
+OLE_S_FIRST = 0x00040000
+OLE_S_LAST = 0x000400FF
+OLE_E_OLEVERB = -2147221504
+OLE_E_ADVF = -2147221503
+OLE_E_ENUM_NOMORE = -2147221502
+OLE_E_ADVISENOTSUPPORTED = -2147221501
+OLE_E_NOCONNECTION = -2147221500
+OLE_E_NOTRUNNING = -2147221499
+OLE_E_NOCACHE = -2147221498
+OLE_E_BLANK = -2147221497
+OLE_E_CLASSDIFF = -2147221496
+OLE_E_CANT_GETMONIKER = -2147221495
+OLE_E_CANT_BINDTOSOURCE = -2147221494
+OLE_E_STATIC = -2147221493
+OLE_E_PROMPTSAVECANCELLED = -2147221492
+OLE_E_INVALIDRECT = -2147221491
+OLE_E_WRONGCOMPOBJ = -2147221490
+OLE_E_INVALIDHWND = -2147221489
+OLE_E_NOT_INPLACEACTIVE = -2147221488
+OLE_E_CANTCONVERT = -2147221487
+OLE_E_NOSTORAGE = -2147221486
+DV_E_FORMATETC = -2147221404
+DV_E_DVTARGETDEVICE = -2147221403
+DV_E_STGMEDIUM = -2147221402
+DV_E_STATDATA = -2147221401
+DV_E_LINDEX = -2147221400
+DV_E_TYMED = -2147221399
+DV_E_CLIPFORMAT = -2147221398
+DV_E_DVASPECT = -2147221397
+DV_E_DVTARGETDEVICE_SIZE = -2147221396
+DV_E_NOIVIEWOBJECT = -2147221395
+DRAGDROP_E_FIRST = -2147221248
+DRAGDROP_E_LAST = -2147221233
+DRAGDROP_S_FIRST = 0x00040100
+DRAGDROP_S_LAST = 0x0004010F
+DRAGDROP_E_NOTREGISTERED = -2147221248
+DRAGDROP_E_ALREADYREGISTERED = -2147221247
+DRAGDROP_E_INVALIDHWND = -2147221246
+DRAGDROP_E_CONCURRENT_DRAG_ATTEMPTED = -2147221245
+CLASSFACTORY_E_FIRST = -2147221232
+CLASSFACTORY_E_LAST = -2147221217
+CLASSFACTORY_S_FIRST = 0x00040110
+CLASSFACTORY_S_LAST = 0x0004011F
+CLASS_E_NOAGGREGATION = -2147221232
+CLASS_E_CLASSNOTAVAILABLE = -2147221231
+CLASS_E_NOTLICENSED = -2147221230
+MARSHAL_E_FIRST = -2147221216
+MARSHAL_E_LAST = -2147221201
+MARSHAL_S_FIRST = 0x00040120
+MARSHAL_S_LAST = 0x0004012F
+DATA_E_FIRST = -2147221200
+DATA_E_LAST = -2147221185
+DATA_S_FIRST = 0x00040130
+DATA_S_LAST = 0x0004013F
+VIEW_E_FIRST = -2147221184
+VIEW_E_LAST = -2147221169
+VIEW_S_FIRST = 0x00040140
+VIEW_S_LAST = 0x0004014F
+VIEW_E_DRAW = -2147221184
+REGDB_E_FIRST = -2147221168
+REGDB_E_LAST = -2147221153
+REGDB_S_FIRST = 0x00040150
+REGDB_S_LAST = 0x0004015F
+REGDB_E_READREGDB = -2147221168
+REGDB_E_WRITEREGDB = -2147221167
+REGDB_E_KEYMISSING = -2147221166
+REGDB_E_INVALIDVALUE = -2147221165
+REGDB_E_CLASSNOTREG = -2147221164
+REGDB_E_IIDNOTREG = -2147221163
+REGDB_E_BADTHREADINGMODEL = -2147221162
+REGDB_E_PACKAGEPOLICYVIOLATION = -2147221161
+CAT_E_FIRST = -2147221152
+CAT_E_LAST = -2147221151
+CAT_E_CATIDNOEXIST = -2147221152
+CAT_E_NODESCRIPTION = -2147221151
+CS_E_FIRST = -2147221148
+CS_E_LAST = -2147221137
+CS_E_PACKAGE_NOTFOUND = -2147221148
+CS_E_NOT_DELETABLE = -2147221147
+CS_E_CLASS_NOTFOUND = -2147221146
+CS_E_INVALID_VERSION = -2147221145
+CS_E_NO_CLASSSTORE = -2147221144
+CS_E_OBJECT_NOTFOUND = -2147221143
+CS_E_OBJECT_ALREADY_EXISTS = -2147221142
+CS_E_INVALID_PATH = -2147221141
+CS_E_NETWORK_ERROR = -2147221140
+CS_E_ADMIN_LIMIT_EXCEEDED = -2147221139
+CS_E_SCHEMA_MISMATCH = -2147221138
+CS_E_INTERNAL_ERROR = -2147221137
+CACHE_E_FIRST = -2147221136
+CACHE_E_LAST = -2147221121
+CACHE_S_FIRST = 0x00040170
+CACHE_S_LAST = 0x0004017F
+CACHE_E_NOCACHE_UPDATED = -2147221136
+OLEOBJ_E_FIRST = -2147221120
+OLEOBJ_E_LAST = -2147221105
+OLEOBJ_S_FIRST = 0x00040180
+OLEOBJ_S_LAST = 0x0004018F
+OLEOBJ_E_NOVERBS = -2147221120
+OLEOBJ_E_INVALIDVERB = -2147221119
+CLIENTSITE_E_FIRST = -2147221104
+CLIENTSITE_E_LAST = -2147221089
+CLIENTSITE_S_FIRST = 0x00040190
+CLIENTSITE_S_LAST = 0x0004019F
+INPLACE_E_NOTUNDOABLE = -2147221088
+INPLACE_E_NOTOOLSPACE = -2147221087
+INPLACE_E_FIRST = -2147221088
+INPLACE_E_LAST = -2147221073
+INPLACE_S_FIRST = 0x000401A0
+INPLACE_S_LAST = 0x000401AF
+ENUM_E_FIRST = -2147221072
+ENUM_E_LAST = -2147221057
+ENUM_S_FIRST = 0x000401B0
+ENUM_S_LAST = 0x000401BF
+CONVERT10_E_FIRST = -2147221056
+CONVERT10_E_LAST = -2147221041
+CONVERT10_S_FIRST = 0x000401C0
+CONVERT10_S_LAST = 0x000401CF
+CONVERT10_E_OLESTREAM_GET = -2147221056
+CONVERT10_E_OLESTREAM_PUT = -2147221055
+CONVERT10_E_OLESTREAM_FMT = -2147221054
+CONVERT10_E_OLESTREAM_BITMAP_TO_DIB = -2147221053
+CONVERT10_E_STG_FMT = -2147221052
+CONVERT10_E_STG_NO_STD_STREAM = -2147221051
+CONVERT10_E_STG_DIB_TO_BITMAP = -2147221050
+CONVERT10_E_OLELINK_DISABLED = -2147221049
+CLIPBRD_E_FIRST = -2147221040
+CLIPBRD_E_LAST = -2147221025
+CLIPBRD_S_FIRST = 0x000401D0
+CLIPBRD_S_LAST = 0x000401DF
+CLIPBRD_E_CANT_OPEN = -2147221040
+CLIPBRD_E_CANT_EMPTY = -2147221039
+CLIPBRD_E_CANT_SET = -2147221038
+CLIPBRD_E_BAD_DATA = -2147221037
+CLIPBRD_E_CANT_CLOSE = -2147221036
+MK_E_FIRST = -2147221024
+MK_E_LAST = -2147221009
+MK_S_FIRST = 0x000401E0
+MK_S_LAST = 0x000401EF
+MK_E_CONNECTMANUALLY = -2147221024
+MK_E_EXCEEDEDDEADLINE = -2147221023
+MK_E_NEEDGENERIC = -2147221022
+MK_E_UNAVAILABLE = -2147221021
+MK_E_SYNTAX = -2147221020
+MK_E_NOOBJECT = -2147221019
+MK_E_INVALIDEXTENSION = -2147221018
+MK_E_INTERMEDIATEINTERFACENOTSUPPORTED = -2147221017
+MK_E_NOTBINDABLE = -2147221016
+MK_E_NOTBOUND = -2147221015
+MK_E_CANTOPENFILE = -2147221014
+MK_E_MUSTBOTHERUSER = -2147221013
+MK_E_NOINVERSE = -2147221012
+MK_E_NOSTORAGE = -2147221011
+MK_E_NOPREFIX = -2147221010
+MK_E_ENUMERATION_FAILED = -2147221009
+CO_E_FIRST = -2147221008
+CO_E_LAST = -2147220993
+CO_S_FIRST = 0x000401F0
+CO_S_LAST = 0x000401FF
+CO_E_NOTINITIALIZED = -2147221008
+CO_E_ALREADYINITIALIZED = -2147221007
+CO_E_CANTDETERMINECLASS = -2147221006
+CO_E_CLASSSTRING = -2147221005
+CO_E_IIDSTRING = -2147221004
+CO_E_APPNOTFOUND = -2147221003
+CO_E_APPSINGLEUSE = -2147221002
+CO_E_ERRORINAPP = -2147221001
+CO_E_DLLNOTFOUND = -2147221000
+CO_E_ERRORINDLL = -2147220999
+CO_E_WRONGOSFORAPP = -2147220998
+CO_E_OBJNOTREG = -2147220997
+CO_E_OBJISREG = -2147220996
+CO_E_OBJNOTCONNECTED = -2147220995
+CO_E_APPDIDNTREG = -2147220994
+CO_E_RELEASED = -2147220993
+EVENT_E_FIRST = -2147220992
+EVENT_E_LAST = -2147220961
+EVENT_S_FIRST = 0x00040200
+EVENT_S_LAST = 0x0004021F
+EVENT_S_SOME_SUBSCRIBERS_FAILED = 0x00040200
+EVENT_E_ALL_SUBSCRIBERS_FAILED = -2147220991
+EVENT_S_NOSUBSCRIBERS = 0x00040202
+EVENT_E_QUERYSYNTAX = -2147220989
+EVENT_E_QUERYFIELD = -2147220988
+EVENT_E_INTERNALEXCEPTION = -2147220987
+EVENT_E_INTERNALERROR = -2147220986
+EVENT_E_INVALID_PER_USER_SID = -2147220985
+EVENT_E_USER_EXCEPTION = -2147220984
+EVENT_E_TOO_MANY_METHODS = -2147220983
+EVENT_E_MISSING_EVENTCLASS = -2147220982
+EVENT_E_NOT_ALL_REMOVED = -2147220981
+EVENT_E_COMPLUS_NOT_INSTALLED = -2147220980
+EVENT_E_CANT_MODIFY_OR_DELETE_UNCONFIGURED_OBJECT = -2147220979
+EVENT_E_CANT_MODIFY_OR_DELETE_CONFIGURED_OBJECT = -2147220978
+EVENT_E_INVALID_EVENT_CLASS_PARTITION = -2147220977
+EVENT_E_PER_USER_SID_NOT_LOGGED_ON = -2147220976
+TPC_E_INVALID_PROPERTY = -2147220927
+TPC_E_NO_DEFAULT_TABLET = -2147220974
+TPC_E_UNKNOWN_PROPERTY = -2147220965
+TPC_E_INVALID_INPUT_RECT = -2147220967
+TPC_E_INVALID_STROKE = -2147220958
+TPC_E_INITIALIZE_FAIL = -2147220957
+TPC_E_NOT_RELEVANT = -2147220942
+TPC_E_INVALID_PACKET_DESCRIPTION = -2147220941
+TPC_E_RECOGNIZER_NOT_REGISTERED = -2147220939
+TPC_E_INVALID_RIGHTS = -2147220938
+TPC_E_OUT_OF_ORDER_CALL = -2147220937
+TPC_E_QUEUE_FULL = -2147220936
+TPC_E_INVALID_CONFIGURATION = -2147220935
+TPC_E_INVALID_DATA_FROM_RECOGNIZER = -2147220934
+TPC_S_TRUNCATED = 0x00040252
+TPC_S_INTERRUPTED = 0x00040253
+TPC_S_NO_DATA_TO_PROCESS = 0x00040254
+XACT_E_FIRST = -2147168256
+XACT_E_LAST = -2147168213
+XACT_S_FIRST = 0x0004D000
+XACT_S_LAST = 0x0004D010
+XACT_E_ALREADYOTHERSINGLEPHASE = -2147168256
+XACT_E_CANTRETAIN = -2147168255
+XACT_E_COMMITFAILED = -2147168254
+XACT_E_COMMITPREVENTED = -2147168253
+XACT_E_HEURISTICABORT = -2147168252
+XACT_E_HEURISTICCOMMIT = -2147168251
+XACT_E_HEURISTICDAMAGE = -2147168250
+XACT_E_HEURISTICDANGER = -2147168249
+XACT_E_ISOLATIONLEVEL = -2147168248
+XACT_E_NOASYNC = -2147168247
+XACT_E_NOENLIST = -2147168246
+XACT_E_NOISORETAIN = -2147168245
+XACT_E_NORESOURCE = -2147168244
+XACT_E_NOTCURRENT = -2147168243
+XACT_E_NOTRANSACTION = -2147168242
+XACT_E_NOTSUPPORTED = -2147168241
+XACT_E_UNKNOWNRMGRID = -2147168240
+XACT_E_WRONGSTATE = -2147168239
+XACT_E_WRONGUOW = -2147168238
+XACT_E_XTIONEXISTS = -2147168237
+XACT_E_NOIMPORTOBJECT = -2147168236
+XACT_E_INVALIDCOOKIE = -2147168235
+XACT_E_INDOUBT = -2147168234
+XACT_E_NOTIMEOUT = -2147168233
+XACT_E_ALREADYINPROGRESS = -2147168232
+XACT_E_ABORTED = -2147168231
+XACT_E_LOGFULL = -2147168230
+XACT_E_TMNOTAVAILABLE = -2147168229
+XACT_E_CONNECTION_DOWN = -2147168228
+XACT_E_CONNECTION_DENIED = -2147168227
+XACT_E_REENLISTTIMEOUT = -2147168226
+XACT_E_TIP_CONNECT_FAILED = -2147168225
+XACT_E_TIP_PROTOCOL_ERROR = -2147168224
+XACT_E_TIP_PULL_FAILED = -2147168223
+XACT_E_DEST_TMNOTAVAILABLE = -2147168222
+XACT_E_TIP_DISABLED = -2147168221
+XACT_E_NETWORK_TX_DISABLED = -2147168220
+XACT_E_PARTNER_NETWORK_TX_DISABLED = -2147168219
+XACT_E_XA_TX_DISABLED = -2147168218
+XACT_E_UNABLE_TO_READ_DTC_CONFIG = -2147168217
+XACT_E_UNABLE_TO_LOAD_DTC_PROXY = -2147168216
+XACT_E_ABORTING = -2147168215
+XACT_E_PUSH_COMM_FAILURE = -2147168214
+XACT_E_PULL_COMM_FAILURE = -2147168213
+XACT_E_LU_TX_DISABLED = -2147168212
+XACT_E_CLERKNOTFOUND = -2147168128
+XACT_E_CLERKEXISTS = -2147168127
+XACT_E_RECOVERYINPROGRESS = -2147168126
+XACT_E_TRANSACTIONCLOSED = -2147168125
+XACT_E_INVALIDLSN = -2147168124
+XACT_E_REPLAYREQUEST = -2147168123
+XACT_S_ASYNC = 0x0004D000
+XACT_S_DEFECT = 0x0004D001
+XACT_S_READONLY = 0x0004D002
+XACT_S_SOMENORETAIN = 0x0004D003
+XACT_S_OKINFORM = 0x0004D004
+XACT_S_MADECHANGESCONTENT = 0x0004D005
+XACT_S_MADECHANGESINFORM = 0x0004D006
+XACT_S_ALLNORETAIN = 0x0004D007
+XACT_S_ABORTING = 0x0004D008
+XACT_S_SINGLEPHASE = 0x0004D009
+XACT_S_LOCALLY_OK = 0x0004D00A
+XACT_S_LASTRESOURCEMANAGER = 0x0004D010
+CONTEXT_E_FIRST = -2147164160
+CONTEXT_E_LAST = -2147164113
+CONTEXT_S_FIRST = 0x0004E000
+CONTEXT_S_LAST = 0x0004E02F
+CONTEXT_E_ABORTED = -2147164158
+CONTEXT_E_ABORTING = -2147164157
+CONTEXT_E_NOCONTEXT = -2147164156
+CONTEXT_E_WOULD_DEADLOCK = -2147164155
+CONTEXT_E_SYNCH_TIMEOUT = -2147164154
+CONTEXT_E_OLDREF = -2147164153
+CONTEXT_E_ROLENOTFOUND = -2147164148
+CONTEXT_E_TMNOTAVAILABLE = -2147164145
+CO_E_ACTIVATIONFAILED = -2147164127
+CO_E_ACTIVATIONFAILED_EVENTLOGGED = -2147164126
+CO_E_ACTIVATIONFAILED_CATALOGERROR = -2147164125
+CO_E_ACTIVATIONFAILED_TIMEOUT = -2147164124
+CO_E_INITIALIZATIONFAILED = -2147164123
+CONTEXT_E_NOJIT = -2147164122
+CONTEXT_E_NOTRANSACTION = -2147164121
+CO_E_THREADINGMODEL_CHANGED = -2147164120
+CO_E_NOIISINTRINSICS = -2147164119
+CO_E_NOCOOKIES = -2147164118
+CO_E_DBERROR = -2147164117
+CO_E_NOTPOOLED = -2147164116
+CO_E_NOTCONSTRUCTED = -2147164115
+CO_E_NOSYNCHRONIZATION = -2147164114
+CO_E_ISOLEVELMISMATCH = -2147164113
+CO_E_CALL_OUT_OF_TX_SCOPE_NOT_ALLOWED = -2147164112
+CO_E_EXIT_TRANSACTION_SCOPE_NOT_CALLED = -2147164111
+OLE_S_USEREG = 0x00040000
+OLE_S_STATIC = 0x00040001
+OLE_S_MAC_CLIPFORMAT = 0x00040002
+DRAGDROP_S_DROP = 0x00040100
+DRAGDROP_S_CANCEL = 0x00040101
+DRAGDROP_S_USEDEFAULTCURSORS = 0x00040102
+DATA_S_SAMEFORMATETC = 0x00040130
+VIEW_S_ALREADY_FROZEN = 0x00040140
+CACHE_S_FORMATETC_NOTSUPPORTED = 0x00040170
+CACHE_S_SAMECACHE = 0x00040171
+CACHE_S_SOMECACHES_NOTUPDATED = 0x00040172
+OLEOBJ_S_INVALIDVERB = 0x00040180
+OLEOBJ_S_CANNOT_DOVERB_NOW = 0x00040181
+OLEOBJ_S_INVALIDHWND = 0x00040182
+INPLACE_S_TRUNCATED = 0x000401A0
+CONVERT10_S_NO_PRESENTATION = 0x000401C0
+MK_S_REDUCED_TO_SELF = 0x000401E2
+MK_S_ME = 0x000401E4
+MK_S_HIM = 0x000401E5
+MK_S_US = 0x000401E6
+MK_S_MONIKERALREADYREGISTERED = 0x000401E7
+SCHED_S_TASK_READY = 0x00041300
+SCHED_S_TASK_RUNNING = 0x00041301
+SCHED_S_TASK_DISABLED = 0x00041302
+SCHED_S_TASK_HAS_NOT_RUN = 0x00041303
+SCHED_S_TASK_NO_MORE_RUNS = 0x00041304
+SCHED_S_TASK_NOT_SCHEDULED = 0x00041305
+SCHED_S_TASK_TERMINATED = 0x00041306
+SCHED_S_TASK_NO_VALID_TRIGGERS = 0x00041307
+SCHED_S_EVENT_TRIGGER = 0x00041308
+SCHED_E_TRIGGER_NOT_FOUND = -2147216631
+SCHED_E_TASK_NOT_READY = -2147216630
+SCHED_E_TASK_NOT_RUNNING = -2147216629
+SCHED_E_SERVICE_NOT_INSTALLED = -2147216628
+SCHED_E_CANNOT_OPEN_TASK = -2147216627
+SCHED_E_INVALID_TASK = -2147216626
+SCHED_E_ACCOUNT_INFORMATION_NOT_SET = -2147216625
+SCHED_E_ACCOUNT_NAME_NOT_FOUND = -2147216624
+SCHED_E_ACCOUNT_DBASE_CORRUPT = -2147216623
+SCHED_E_NO_SECURITY_SERVICES = -2147216622
+SCHED_E_UNKNOWN_OBJECT_VERSION = -2147216621
+SCHED_E_UNSUPPORTED_ACCOUNT_OPTION = -2147216620
+SCHED_E_SERVICE_NOT_RUNNING = -2147216619
+SCHED_E_UNEXPECTEDNODE = -2147216618
+SCHED_E_NAMESPACE = -2147216617
+SCHED_E_INVALIDVALUE = -2147216616
+SCHED_E_MISSINGNODE = -2147216615
+SCHED_E_MALFORMEDXML = -2147216614
+SCHED_S_SOME_TRIGGERS_FAILED = 0x0004131B
+SCHED_S_BATCH_LOGON_PROBLEM = 0x0004131C
+SCHED_E_TOO_MANY_NODES = -2147216611
+SCHED_E_PAST_END_BOUNDARY = -2147216610
+SCHED_E_ALREADY_RUNNING = -2147216609
+SCHED_E_USER_NOT_LOGGED_ON = -2147216608
+SCHED_E_INVALID_TASK_HASH = -2147216607
+SCHED_E_SERVICE_NOT_AVAILABLE = -2147216606
+SCHED_E_SERVICE_TOO_BUSY = -2147216605
+SCHED_E_TASK_ATTEMPTED = -2147216604
+SCHED_S_TASK_QUEUED = 0x00041325
+SCHED_E_TASK_DISABLED = -2147216602
+SCHED_E_TASK_NOT_V1_COMPAT = -2147216601
+SCHED_E_START_ON_DEMAND = -2147216600
+SCHED_E_TASK_NOT_UBPM_COMPAT = -2147216599
+SCHED_E_DEPRECATED_FEATURE_USED = -2147216592
+CO_E_CLASS_CREATE_FAILED = -2146959359
+CO_E_SCM_ERROR = -2146959358
+CO_E_SCM_RPC_FAILURE = -2146959357
+CO_E_BAD_PATH = -2146959356
+CO_E_SERVER_EXEC_FAILURE = -2146959355
+CO_E_OBJSRV_RPC_FAILURE = -2146959354
+MK_E_NO_NORMALIZED = -2146959353
+CO_E_SERVER_STOPPING = -2146959352
+MEM_E_INVALID_ROOT = -2146959351
+MEM_E_INVALID_LINK = -2146959344
+MEM_E_INVALID_SIZE = -2146959343
+CO_S_NOTALLINTERFACES = 0x00080012
+CO_S_MACHINENAMENOTFOUND = 0x00080013
+CO_E_MISSING_DISPLAYNAME = -2146959339
+CO_E_RUNAS_VALUE_MUST_BE_AAA = -2146959338
+CO_E_ELEVATION_DISABLED = -2146959337
+APPX_E_PACKAGING_INTERNAL = -2146958848
+APPX_E_INTERLEAVING_NOT_ALLOWED = -2146958847
+APPX_E_RELATIONSHIPS_NOT_ALLOWED = -2146958846
+APPX_E_MISSING_REQUIRED_FILE = -2146958845
+APPX_E_INVALID_MANIFEST = -2146958844
+APPX_E_INVALID_BLOCKMAP = -2146958843
+APPX_E_CORRUPT_CONTENT = -2146958842
+APPX_E_BLOCK_HASH_INVALID = -2146958841
+APPX_E_REQUESTED_RANGE_TOO_LARGE = -2146958840
+APPX_E_INVALID_SIP_CLIENT_DATA = -2146958839
+APPX_E_INVALID_KEY_INFO = -2146958838
+APPX_E_INVALID_CONTENTGROUPMAP = -2146958837
+APPX_E_INVALID_APPINSTALLER = -2146958836
+APPX_E_DELTA_BASELINE_VERSION_MISMATCH = -2146958835
+APPX_E_DELTA_PACKAGE_MISSING_FILE = -2146958834
+APPX_E_INVALID_DELTA_PACKAGE = -2146958833
+APPX_E_DELTA_APPENDED_PACKAGE_NOT_ALLOWED = -2146958832
+APPX_E_INVALID_PACKAGING_LAYOUT = -2146958831
+APPX_E_INVALID_PACKAGESIGNCONFIG = -2146958830
+APPX_E_RESOURCESPRI_NOT_ALLOWED = -2146958829
+APPX_E_FILE_COMPRESSION_MISMATCH = -2146958828
+APPX_E_INVALID_PAYLOAD_PACKAGE_EXTENSION = -2146958827
+APPX_E_INVALID_ENCRYPTION_EXCLUSION_FILE_LIST = -2146958826
+APPX_E_INVALID_PACKAGE_FOLDER_ACLS = -2146958825
+APPX_E_INVALID_PUBLISHER_BRIDGING = -2146958824
+APPX_E_DIGEST_MISMATCH = -2146958823
+BT_E_SPURIOUS_ACTIVATION = -2146958592
+DISP_E_UNKNOWNINTERFACE = -2147352575
+DISP_E_MEMBERNOTFOUND = -2147352573
+DISP_E_PARAMNOTFOUND = -2147352572
+DISP_E_TYPEMISMATCH = -2147352571
+DISP_E_UNKNOWNNAME = -2147352570
+DISP_E_NONAMEDARGS = -2147352569
+DISP_E_BADVARTYPE = -2147352568
+DISP_E_EXCEPTION = -2147352567
+DISP_E_OVERFLOW = -2147352566
+DISP_E_BADINDEX = -2147352565
+DISP_E_UNKNOWNLCID = -2147352564
+DISP_E_ARRAYISLOCKED = -2147352563
+DISP_E_BADPARAMCOUNT = -2147352562
+DISP_E_PARAMNOTOPTIONAL = -2147352561
+DISP_E_BADCALLEE = -2147352560
+DISP_E_NOTACOLLECTION = -2147352559
+DISP_E_DIVBYZERO = -2147352558
+DISP_E_BUFFERTOOSMALL = -2147352557
+TYPE_E_BUFFERTOOSMALL = -2147319786
+TYPE_E_FIELDNOTFOUND = -2147319785
+TYPE_E_INVDATAREAD = -2147319784
+TYPE_E_UNSUPFORMAT = -2147319783
+TYPE_E_REGISTRYACCESS = -2147319780
+TYPE_E_LIBNOTREGISTERED = -2147319779
+TYPE_E_UNDEFINEDTYPE = -2147319769
+TYPE_E_QUALIFIEDNAMEDISALLOWED = -2147319768
+TYPE_E_INVALIDSTATE = -2147319767
+TYPE_E_WRONGTYPEKIND = -2147319766
+TYPE_E_ELEMENTNOTFOUND = -2147319765
+TYPE_E_AMBIGUOUSNAME = -2147319764
+TYPE_E_NAMECONFLICT = -2147319763
+TYPE_E_UNKNOWNLCID = -2147319762
+TYPE_E_DLLFUNCTIONNOTFOUND = -2147319761
+TYPE_E_BADMODULEKIND = -2147317571
+TYPE_E_SIZETOOBIG = -2147317563
+TYPE_E_DUPLICATEID = -2147317562
+TYPE_E_INVALIDID = -2147317553
+TYPE_E_TYPEMISMATCH = -2147316576
+TYPE_E_OUTOFBOUNDS = -2147316575
+TYPE_E_IOERROR = -2147316574
+TYPE_E_CANTCREATETMPFILE = -2147316573
+TYPE_E_CANTLOADLIBRARY = -2147312566
+TYPE_E_INCONSISTENTPROPFUNCS = -2147312509
+TYPE_E_CIRCULARTYPE = -2147312508
+STG_E_INVALIDFUNCTION = -2147287039
+STG_E_FILENOTFOUND = -2147287038
+STG_E_PATHNOTFOUND = -2147287037
+STG_E_TOOMANYOPENFILES = -2147287036
+STG_E_ACCESSDENIED = -2147287035
+STG_E_INVALIDHANDLE = -2147287034
+STG_E_INSUFFICIENTMEMORY = -2147287032
+STG_E_INVALIDPOINTER = -2147287031
+STG_E_NOMOREFILES = -2147287022
+STG_E_DISKISWRITEPROTECTED = -2147287021
+STG_E_SEEKERROR = -2147287015
+STG_E_WRITEFAULT = -2147287011
+STG_E_READFAULT = -2147287010
+STG_E_SHAREVIOLATION = -2147287008
+STG_E_LOCKVIOLATION = -2147287007
+STG_E_FILEALREADYEXISTS = -2147286960
+STG_E_INVALIDPARAMETER = -2147286953
+STG_E_MEDIUMFULL = -2147286928
+STG_E_PROPSETMISMATCHED = -2147286800
+STG_E_ABNORMALAPIEXIT = -2147286790
+STG_E_INVALIDHEADER = -2147286789
+STG_E_INVALIDNAME = -2147286788
+STG_E_UNKNOWN = -2147286787
+STG_E_UNIMPLEMENTEDFUNCTION = -2147286786
+STG_E_INVALIDFLAG = -2147286785
+STG_E_INUSE = -2147286784
+STG_E_NOTCURRENT = -2147286783
+STG_E_REVERTED = -2147286782
+STG_E_CANTSAVE = -2147286781
+STG_E_OLDFORMAT = -2147286780
+STG_E_OLDDLL = -2147286779
+STG_E_SHAREREQUIRED = -2147286778
+STG_E_NOTFILEBASEDSTORAGE = -2147286777
+STG_E_EXTANTMARSHALLINGS = -2147286776
+STG_E_DOCFILECORRUPT = -2147286775
+STG_E_BADBASEADDRESS = -2147286768
+STG_E_DOCFILETOOLARGE = -2147286767
+STG_E_NOTSIMPLEFORMAT = -2147286766
+STG_E_INCOMPLETE = -2147286527
+STG_E_TERMINATED = -2147286526
+STG_S_CONVERTED = 0x00030200
+STG_S_BLOCK = 0x00030201
+STG_S_RETRYNOW = 0x00030202
+STG_S_MONITORING = 0x00030203
+STG_S_MULTIPLEOPENS = 0x00030204
+STG_S_CONSOLIDATIONFAILED = 0x00030205
+STG_S_CANNOTCONSOLIDATE = 0x00030206
+STG_S_POWER_CYCLE_REQUIRED = 0x00030207
+STG_E_FIRMWARE_SLOT_INVALID = -2147286520
+STG_E_FIRMWARE_IMAGE_INVALID = -2147286519
+STG_E_DEVICE_UNRESPONSIVE = -2147286518
+STG_E_STATUS_COPY_PROTECTION_FAILURE = -2147286267
+STG_E_CSS_AUTHENTICATION_FAILURE = -2147286266
+STG_E_CSS_KEY_NOT_PRESENT = -2147286265
+STG_E_CSS_KEY_NOT_ESTABLISHED = -2147286264
+STG_E_CSS_SCRAMBLED_SECTOR = -2147286263
+STG_E_CSS_REGION_MISMATCH = -2147286262
+STG_E_RESETS_EXHAUSTED = -2147286261
+RPC_E_CALL_REJECTED = -2147418111
+RPC_E_CALL_CANCELED = -2147418110
+RPC_E_CANTPOST_INSENDCALL = -2147418109
+RPC_E_CANTCALLOUT_INASYNCCALL = -2147418108
+RPC_E_CANTCALLOUT_INEXTERNALCALL = -2147418107
+RPC_E_CONNECTION_TERMINATED = -2147418106
+RPC_E_SERVER_DIED = -2147418105
+RPC_E_CLIENT_DIED = -2147418104
+RPC_E_INVALID_DATAPACKET = -2147418103
+RPC_E_CANTTRANSMIT_CALL = -2147418102
+RPC_E_CLIENT_CANTMARSHAL_DATA = -2147418101
+RPC_E_CLIENT_CANTUNMARSHAL_DATA = -2147418100
+RPC_E_SERVER_CANTMARSHAL_DATA = -2147418099
+RPC_E_SERVER_CANTUNMARSHAL_DATA = -2147418098
+RPC_E_INVALID_DATA = -2147418097
+RPC_E_INVALID_PARAMETER = -2147418096
+RPC_E_CANTCALLOUT_AGAIN = -2147418095
+RPC_E_SERVER_DIED_DNE = -2147418094
+RPC_E_SYS_CALL_FAILED = -2147417856
+RPC_E_OUT_OF_RESOURCES = -2147417855
+RPC_E_ATTEMPTED_MULTITHREAD = -2147417854
+RPC_E_NOT_REGISTERED = -2147417853
+RPC_E_FAULT = -2147417852
+RPC_E_SERVERFAULT = -2147417851
+RPC_E_CHANGED_MODE = -2147417850
+RPC_E_INVALIDMETHOD = -2147417849
+RPC_E_DISCONNECTED = -2147417848
+RPC_E_RETRY = -2147417847
+RPC_E_SERVERCALL_RETRYLATER = -2147417846
+RPC_E_SERVERCALL_REJECTED = -2147417845
+RPC_E_INVALID_CALLDATA = -2147417844
+RPC_E_CANTCALLOUT_ININPUTSYNCCALL = -2147417843
+RPC_E_WRONG_THREAD = -2147417842
+RPC_E_THREAD_NOT_INIT = -2147417841
+RPC_E_VERSION_MISMATCH = -2147417840
+RPC_E_INVALID_HEADER = -2147417839
+RPC_E_INVALID_EXTENSION = -2147417838
+RPC_E_INVALID_IPID = -2147417837
+RPC_E_INVALID_OBJECT = -2147417836
+RPC_S_CALLPENDING = -2147417835
+RPC_S_WAITONTIMER = -2147417834
+RPC_E_CALL_COMPLETE = -2147417833
+RPC_E_UNSECURE_CALL = -2147417832
+RPC_E_TOO_LATE = -2147417831
+RPC_E_NO_GOOD_SECURITY_PACKAGES = -2147417830
+RPC_E_ACCESS_DENIED = -2147417829
+RPC_E_REMOTE_DISABLED = -2147417828
+RPC_E_INVALID_OBJREF = -2147417827
+RPC_E_NO_CONTEXT = -2147417826
+RPC_E_TIMEOUT = -2147417825
+RPC_E_NO_SYNC = -2147417824
+RPC_E_FULLSIC_REQUIRED = -2147417823
+RPC_E_INVALID_STD_NAME = -2147417822
+CO_E_FAILEDTOIMPERSONATE = -2147417821
+CO_E_FAILEDTOGETSECCTX = -2147417820
+CO_E_FAILEDTOOPENTHREADTOKEN = -2147417819
+CO_E_FAILEDTOGETTOKENINFO = -2147417818
+CO_E_TRUSTEEDOESNTMATCHCLIENT = -2147417817
+CO_E_FAILEDTOQUERYCLIENTBLANKET = -2147417816
+CO_E_FAILEDTOSETDACL = -2147417815
+CO_E_ACCESSCHECKFAILED = -2147417814
+CO_E_NETACCESSAPIFAILED = -2147417813
+CO_E_WRONGTRUSTEENAMESYNTAX = -2147417812
+CO_E_INVALIDSID = -2147417811
+CO_E_CONVERSIONFAILED = -2147417810
+CO_E_NOMATCHINGSIDFOUND = -2147417809
+CO_E_LOOKUPACCSIDFAILED = -2147417808
+CO_E_NOMATCHINGNAMEFOUND = -2147417807
+CO_E_LOOKUPACCNAMEFAILED = -2147417806
+CO_E_SETSERLHNDLFAILED = -2147417805
+CO_E_FAILEDTOGETWINDIR = -2147417804
+CO_E_PATHTOOLONG = -2147417803
+CO_E_FAILEDTOGENUUID = -2147417802
+CO_E_FAILEDTOCREATEFILE = -2147417801
+CO_E_FAILEDTOCLOSEHANDLE = -2147417800
+CO_E_EXCEEDSYSACLLIMIT = -2147417799
+CO_E_ACESINWRONGORDER = -2147417798
+CO_E_INCOMPATIBLESTREAMVERSION = -2147417797
+CO_E_FAILEDTOOPENPROCESSTOKEN = -2147417796
+CO_E_DECODEFAILED = -2147417795
+CO_E_ACNOTINITIALIZED = -2147417793
+CO_E_CANCEL_DISABLED = -2147417792
+RPC_E_UNEXPECTED = -2147352577
+ERROR_AUDITING_DISABLED = -1073151999
+ERROR_ALL_SIDS_FILTERED = -1073151998
+ERROR_BIZRULES_NOT_ENABLED = -1073151997
+NTE_BAD_UID = -2146893823
+NTE_BAD_HASH = -2146893822
+NTE_BAD_KEY = -2146893821
+NTE_BAD_LEN = -2146893820
+NTE_BAD_DATA = -2146893819
+NTE_BAD_SIGNATURE = -2146893818
+NTE_BAD_VER = -2146893817
+NTE_BAD_ALGID = -2146893816
+NTE_BAD_FLAGS = -2146893815
+NTE_BAD_TYPE = -2146893814
+NTE_BAD_KEY_STATE = -2146893813
+NTE_BAD_HASH_STATE = -2146893812
+NTE_NO_KEY = -2146893811
+NTE_NO_MEMORY = -2146893810
+NTE_EXISTS = -2146893809
+NTE_PERM = -2146893808
+NTE_NOT_FOUND = -2146893807
+NTE_DOUBLE_ENCRYPT = -2146893806
+NTE_BAD_PROVIDER = -2146893805
+NTE_BAD_PROV_TYPE = -2146893804
+NTE_BAD_PUBLIC_KEY = -2146893803
+NTE_BAD_KEYSET = -2146893802
+NTE_PROV_TYPE_NOT_DEF = -2146893801
+NTE_PROV_TYPE_ENTRY_BAD = -2146893800
+NTE_KEYSET_NOT_DEF = -2146893799
+NTE_KEYSET_ENTRY_BAD = -2146893798
+NTE_PROV_TYPE_NO_MATCH = -2146893797
+NTE_SIGNATURE_FILE_BAD = -2146893796
+NTE_PROVIDER_DLL_FAIL = -2146893795
+NTE_PROV_DLL_NOT_FOUND = -2146893794
+NTE_BAD_KEYSET_PARAM = -2146893793
+NTE_FAIL = -2146893792
+NTE_SYS_ERR = -2146893791
+NTE_SILENT_CONTEXT = -2146893790
+NTE_TOKEN_KEYSET_STORAGE_FULL = -2146893789
+NTE_TEMPORARY_PROFILE = -2146893788
+NTE_FIXEDPARAMETER = -2146893787
+NTE_INVALID_HANDLE = -2146893786
+NTE_INVALID_PARAMETER = -2146893785
+NTE_BUFFER_TOO_SMALL = -2146893784
+NTE_NOT_SUPPORTED = -2146893783
+NTE_NO_MORE_ITEMS = -2146893782
+NTE_BUFFERS_OVERLAP = -2146893781
+NTE_DECRYPTION_FAILURE = -2146893780
+NTE_INTERNAL_ERROR = -2146893779
+NTE_UI_REQUIRED = -2146893778
+NTE_HMAC_NOT_SUPPORTED = -2146893777
+NTE_DEVICE_NOT_READY = -2146893776
+NTE_AUTHENTICATION_IGNORED = -2146893775
+NTE_VALIDATION_FAILED = -2146893774
+NTE_INCORRECT_PASSWORD = -2146893773
+NTE_ENCRYPTION_FAILURE = -2146893772
+NTE_DEVICE_NOT_FOUND = -2146893771
+NTE_USER_CANCELLED = -2146893770
+NTE_PASSWORD_CHANGE_REQUIRED = -2146893769
+NTE_NOT_ACTIVE_CONSOLE = -2146893768
+SEC_E_INSUFFICIENT_MEMORY = -2146893056
+SEC_E_INVALID_HANDLE = -2146893055
+SEC_E_UNSUPPORTED_FUNCTION = -2146893054
+SEC_E_TARGET_UNKNOWN = -2146893053
+SEC_E_INTERNAL_ERROR = -2146893052
+SEC_E_SECPKG_NOT_FOUND = -2146893051
+SEC_E_NOT_OWNER = -2146893050
+SEC_E_CANNOT_INSTALL = -2146893049
+SEC_E_INVALID_TOKEN = -2146893048
+SEC_E_CANNOT_PACK = -2146893047
+SEC_E_QOP_NOT_SUPPORTED = -2146893046
+SEC_E_NO_IMPERSONATION = -2146893045
+SEC_E_LOGON_DENIED = -2146893044
+SEC_E_UNKNOWN_CREDENTIALS = -2146893043
+SEC_E_NO_CREDENTIALS = -2146893042
+SEC_E_MESSAGE_ALTERED = -2146893041
+SEC_E_OUT_OF_SEQUENCE = -2146893040
+SEC_E_NO_AUTHENTICATING_AUTHORITY = -2146893039
+SEC_I_CONTINUE_NEEDED = 0x00090312
+SEC_I_COMPLETE_NEEDED = 0x00090313
+SEC_I_COMPLETE_AND_CONTINUE = 0x00090314
+SEC_I_LOCAL_LOGON = 0x00090315
+SEC_I_GENERIC_EXTENSION_RECEIVED = 0x00090316
+SEC_E_BAD_PKGID = -2146893034
+SEC_E_CONTEXT_EXPIRED = -2146893033
+SEC_I_CONTEXT_EXPIRED = 0x00090317
+SEC_E_INCOMPLETE_MESSAGE = -2146893032
+SEC_E_INCOMPLETE_CREDENTIALS = -2146893024
+SEC_E_BUFFER_TOO_SMALL = -2146893023
+SEC_I_INCOMPLETE_CREDENTIALS = 0x00090320
+SEC_I_RENEGOTIATE = 0x00090321
+SEC_E_WRONG_PRINCIPAL = -2146893022
+SEC_I_NO_LSA_CONTEXT = 0x00090323
+SEC_E_TIME_SKEW = -2146893020
+SEC_E_UNTRUSTED_ROOT = -2146893019
+SEC_E_ILLEGAL_MESSAGE = -2146893018
+SEC_E_CERT_UNKNOWN = -2146893017
+SEC_E_CERT_EXPIRED = -2146893016
+SEC_E_ENCRYPT_FAILURE = -2146893015
+SEC_E_DECRYPT_FAILURE = -2146893008
+SEC_E_ALGORITHM_MISMATCH = -2146893007
+SEC_E_SECURITY_QOS_FAILED = -2146893006
+SEC_E_UNFINISHED_CONTEXT_DELETED = -2146893005
+SEC_E_NO_TGT_REPLY = -2146893004
+SEC_E_NO_IP_ADDRESSES = -2146893003
+SEC_E_WRONG_CREDENTIAL_HANDLE = -2146893002
+SEC_E_CRYPTO_SYSTEM_INVALID = -2146893001
+SEC_E_MAX_REFERRALS_EXCEEDED = -2146893000
+SEC_E_MUST_BE_KDC = -2146892999
+SEC_E_STRONG_CRYPTO_NOT_SUPPORTED = -2146892998
+SEC_E_TOO_MANY_PRINCIPALS = -2146892997
+SEC_E_NO_PA_DATA = -2146892996
+SEC_E_PKINIT_NAME_MISMATCH = -2146892995
+SEC_E_SMARTCARD_LOGON_REQUIRED = -2146892994
+SEC_E_SHUTDOWN_IN_PROGRESS = -2146892993
+SEC_E_KDC_INVALID_REQUEST = -2146892992
+SEC_E_KDC_UNABLE_TO_REFER = -2146892991
+SEC_E_KDC_UNKNOWN_ETYPE = -2146892990
+SEC_E_UNSUPPORTED_PREAUTH = -2146892989
+SEC_E_DELEGATION_REQUIRED = -2146892987
+SEC_E_BAD_BINDINGS = -2146892986
+SEC_E_MULTIPLE_ACCOUNTS = -2146892985
+SEC_E_NO_KERB_KEY = -2146892984
+SEC_E_CERT_WRONG_USAGE = -2146892983
+SEC_E_DOWNGRADE_DETECTED = -2146892976
+SEC_E_SMARTCARD_CERT_REVOKED = -2146892975
+SEC_E_ISSUING_CA_UNTRUSTED = -2146892974
+SEC_E_REVOCATION_OFFLINE_C = -2146892973
+SEC_E_PKINIT_CLIENT_FAILURE = -2146892972
+SEC_E_SMARTCARD_CERT_EXPIRED = -2146892971
+SEC_E_NO_S4U_PROT_SUPPORT = -2146892970
+SEC_E_CROSSREALM_DELEGATION_FAILURE = -2146892969
+SEC_E_REVOCATION_OFFLINE_KDC = -2146892968
+SEC_E_ISSUING_CA_UNTRUSTED_KDC = -2146892967
+SEC_E_KDC_CERT_EXPIRED = -2146892966
+SEC_E_KDC_CERT_REVOKED = -2146892965
+SEC_I_SIGNATURE_NEEDED = 0x0009035C
+SEC_E_INVALID_PARAMETER = -2146892963
+SEC_E_DELEGATION_POLICY = -2146892962
+SEC_E_POLICY_NLTM_ONLY = -2146892961
+SEC_I_NO_RENEGOTIATION = 0x00090360
+SEC_E_NO_CONTEXT = -2146892959
+SEC_E_PKU2U_CERT_FAILURE = -2146892958
+SEC_E_MUTUAL_AUTH_FAILED = -2146892957
+SEC_I_MESSAGE_FRAGMENT = 0x00090364
+SEC_E_ONLY_HTTPS_ALLOWED = -2146892955
+SEC_I_CONTINUE_NEEDED_MESSAGE_OK = 0x00090366
+SEC_E_APPLICATION_PROTOCOL_MISMATCH = -2146892953
+SEC_I_ASYNC_CALL_PENDING = 0x00090368
+SEC_E_INVALID_UPN_NAME = -2146892951
+SEC_E_EXT_BUFFER_TOO_SMALL = -2146892950
+SEC_E_INSUFFICIENT_BUFFERS = -2146892949
+SEC_E_NO_SPM = SEC_E_INTERNAL_ERROR
+SEC_E_NOT_SUPPORTED = SEC_E_UNSUPPORTED_FUNCTION
+CRYPT_E_MSG_ERROR = -2146889727
+CRYPT_E_UNKNOWN_ALGO = -2146889726
+CRYPT_E_OID_FORMAT = -2146889725
+CRYPT_E_INVALID_MSG_TYPE = -2146889724
+CRYPT_E_UNEXPECTED_ENCODING = -2146889723
+CRYPT_E_AUTH_ATTR_MISSING = -2146889722
+CRYPT_E_HASH_VALUE = -2146889721
+CRYPT_E_INVALID_INDEX = -2146889720
+CRYPT_E_ALREADY_DECRYPTED = -2146889719
+CRYPT_E_NOT_DECRYPTED = -2146889718
+CRYPT_E_RECIPIENT_NOT_FOUND = -2146889717
+CRYPT_E_CONTROL_TYPE = -2146889716
+CRYPT_E_ISSUER_SERIALNUMBER = -2146889715
+CRYPT_E_SIGNER_NOT_FOUND = -2146889714
+CRYPT_E_ATTRIBUTES_MISSING = -2146889713
+CRYPT_E_STREAM_MSG_NOT_READY = -2146889712
+CRYPT_E_STREAM_INSUFFICIENT_DATA = -2146889711
+CRYPT_I_NEW_PROTECTION_REQUIRED = 0x00091012
+CRYPT_E_BAD_LEN = -2146885631
+CRYPT_E_BAD_ENCODE = -2146885630
+CRYPT_E_FILE_ERROR = -2146885629
+CRYPT_E_NOT_FOUND = -2146885628
+CRYPT_E_EXISTS = -2146885627
+CRYPT_E_NO_PROVIDER = -2146885626
+CRYPT_E_SELF_SIGNED = -2146885625
+CRYPT_E_DELETED_PREV = -2146885624
+CRYPT_E_NO_MATCH = -2146885623
+CRYPT_E_UNEXPECTED_MSG_TYPE = -2146885622
+CRYPT_E_NO_KEY_PROPERTY = -2146885621
+CRYPT_E_NO_DECRYPT_CERT = -2146885620
+CRYPT_E_BAD_MSG = -2146885619
+CRYPT_E_NO_SIGNER = -2146885618
+CRYPT_E_PENDING_CLOSE = -2146885617
+CRYPT_E_REVOKED = -2146885616
+CRYPT_E_NO_REVOCATION_DLL = -2146885615
+CRYPT_E_NO_REVOCATION_CHECK = -2146885614
+CRYPT_E_REVOCATION_OFFLINE = -2146885613
+CRYPT_E_NOT_IN_REVOCATION_DATABASE = -2146885612
+CRYPT_E_INVALID_NUMERIC_STRING = -2146885600
+CRYPT_E_INVALID_PRINTABLE_STRING = -2146885599
+CRYPT_E_INVALID_IA5_STRING = -2146885598
+CRYPT_E_INVALID_X500_STRING = -2146885597
+CRYPT_E_NOT_CHAR_STRING = -2146885596
+CRYPT_E_FILERESIZED = -2146885595
+CRYPT_E_SECURITY_SETTINGS = -2146885594
+CRYPT_E_NO_VERIFY_USAGE_DLL = -2146885593
+CRYPT_E_NO_VERIFY_USAGE_CHECK = -2146885592
+CRYPT_E_VERIFY_USAGE_OFFLINE = -2146885591
+CRYPT_E_NOT_IN_CTL = -2146885590
+CRYPT_E_NO_TRUSTED_SIGNER = -2146885589
+CRYPT_E_MISSING_PUBKEY_PARA = -2146885588
+CRYPT_E_OBJECT_LOCATOR_OBJECT_NOT_FOUND = -2146885587
+CRYPT_E_OSS_ERROR = -2146881536
+OSS_MORE_BUF = -2146881535
+OSS_NEGATIVE_UINTEGER = -2146881534
+OSS_PDU_RANGE = -2146881533
+OSS_MORE_INPUT = -2146881532
+OSS_DATA_ERROR = -2146881531
+OSS_BAD_ARG = -2146881530
+OSS_BAD_VERSION = -2146881529
+OSS_OUT_MEMORY = -2146881528
+OSS_PDU_MISMATCH = -2146881527
+OSS_LIMITED = -2146881526
+OSS_BAD_PTR = -2146881525
+OSS_BAD_TIME = -2146881524
+OSS_INDEFINITE_NOT_SUPPORTED = -2146881523
+OSS_MEM_ERROR = -2146881522
+OSS_BAD_TABLE = -2146881521
+OSS_TOO_LONG = -2146881520
+OSS_CONSTRAINT_VIOLATED = -2146881519
+OSS_FATAL_ERROR = -2146881518
+OSS_ACCESS_SERIALIZATION_ERROR = -2146881517
+OSS_NULL_TBL = -2146881516
+OSS_NULL_FCN = -2146881515
+OSS_BAD_ENCRULES = -2146881514
+OSS_UNAVAIL_ENCRULES = -2146881513
+OSS_CANT_OPEN_TRACE_WINDOW = -2146881512
+OSS_UNIMPLEMENTED = -2146881511
+OSS_OID_DLL_NOT_LINKED = -2146881510
+OSS_CANT_OPEN_TRACE_FILE = -2146881509
+OSS_TRACE_FILE_ALREADY_OPEN = -2146881508
+OSS_TABLE_MISMATCH = -2146881507
+OSS_TYPE_NOT_SUPPORTED = -2146881506
+OSS_REAL_DLL_NOT_LINKED = -2146881505
+OSS_REAL_CODE_NOT_LINKED = -2146881504
+OSS_OUT_OF_RANGE = -2146881503
+OSS_COPIER_DLL_NOT_LINKED = -2146881502
+OSS_CONSTRAINT_DLL_NOT_LINKED = -2146881501
+OSS_COMPARATOR_DLL_NOT_LINKED = -2146881500
+OSS_COMPARATOR_CODE_NOT_LINKED = -2146881499
+OSS_MEM_MGR_DLL_NOT_LINKED = -2146881498
+OSS_PDV_DLL_NOT_LINKED = -2146881497
+OSS_PDV_CODE_NOT_LINKED = -2146881496
+OSS_API_DLL_NOT_LINKED = -2146881495
+OSS_BERDER_DLL_NOT_LINKED = -2146881494
+OSS_PER_DLL_NOT_LINKED = -2146881493
+OSS_OPEN_TYPE_ERROR = -2146881492
+OSS_MUTEX_NOT_CREATED = -2146881491
+OSS_CANT_CLOSE_TRACE_FILE = -2146881490
+CRYPT_E_ASN1_ERROR = -2146881280
+CRYPT_E_ASN1_INTERNAL = -2146881279
+CRYPT_E_ASN1_EOD = -2146881278
+CRYPT_E_ASN1_CORRUPT = -2146881277
+CRYPT_E_ASN1_LARGE = -2146881276
+CRYPT_E_ASN1_CONSTRAINT = -2146881275
+CRYPT_E_ASN1_MEMORY = -2146881274
+CRYPT_E_ASN1_OVERFLOW = -2146881273
+CRYPT_E_ASN1_BADPDU = -2146881272
+CRYPT_E_ASN1_BADARGS = -2146881271
+CRYPT_E_ASN1_BADREAL = -2146881270
+CRYPT_E_ASN1_BADTAG = -2146881269
+CRYPT_E_ASN1_CHOICE = -2146881268
+CRYPT_E_ASN1_RULE = -2146881267
+CRYPT_E_ASN1_UTF8 = -2146881266
+CRYPT_E_ASN1_PDU_TYPE = -2146881229
+CRYPT_E_ASN1_NYI = -2146881228
+CRYPT_E_ASN1_EXTENDED = -2146881023
+CRYPT_E_ASN1_NOEOD = -2146881022
+CERTSRV_E_BAD_REQUESTSUBJECT = -2146877439
+CERTSRV_E_NO_REQUEST = -2146877438
+CERTSRV_E_BAD_REQUESTSTATUS = -2146877437
+CERTSRV_E_PROPERTY_EMPTY = -2146877436
+CERTSRV_E_INVALID_CA_CERTIFICATE = -2146877435
+CERTSRV_E_SERVER_SUSPENDED = -2146877434
+CERTSRV_E_ENCODING_LENGTH = -2146877433
+CERTSRV_E_ROLECONFLICT = -2146877432
+CERTSRV_E_RESTRICTEDOFFICER = -2146877431
+CERTSRV_E_KEY_ARCHIVAL_NOT_CONFIGURED = -2146877430
+CERTSRV_E_NO_VALID_KRA = -2146877429
+CERTSRV_E_BAD_REQUEST_KEY_ARCHIVAL = -2146877428
+CERTSRV_E_NO_CAADMIN_DEFINED = -2146877427
+CERTSRV_E_BAD_RENEWAL_CERT_ATTRIBUTE = -2146877426
+CERTSRV_E_NO_DB_SESSIONS = -2146877425
+CERTSRV_E_ALIGNMENT_FAULT = -2146877424
+CERTSRV_E_ENROLL_DENIED = -2146877423
+CERTSRV_E_TEMPLATE_DENIED = -2146877422
+CERTSRV_E_DOWNLEVEL_DC_SSL_OR_UPGRADE = -2146877421
+CERTSRV_E_ADMIN_DENIED_REQUEST = -2146877420
+CERTSRV_E_NO_POLICY_SERVER = -2146877419
+CERTSRV_E_WEAK_SIGNATURE_OR_KEY = -2146877418
+CERTSRV_E_KEY_ATTESTATION_NOT_SUPPORTED = -2146877417
+CERTSRV_E_ENCRYPTION_CERT_REQUIRED = -2146877416
+CERTSRV_E_UNSUPPORTED_CERT_TYPE = -2146875392
+CERTSRV_E_NO_CERT_TYPE = -2146875391
+CERTSRV_E_TEMPLATE_CONFLICT = -2146875390
+CERTSRV_E_SUBJECT_ALT_NAME_REQUIRED = -2146875389
+CERTSRV_E_ARCHIVED_KEY_REQUIRED = -2146875388
+CERTSRV_E_SMIME_REQUIRED = -2146875387
+CERTSRV_E_BAD_RENEWAL_SUBJECT = -2146875386
+CERTSRV_E_BAD_TEMPLATE_VERSION = -2146875385
+CERTSRV_E_TEMPLATE_POLICY_REQUIRED = -2146875384
+CERTSRV_E_SIGNATURE_POLICY_REQUIRED = -2146875383
+CERTSRV_E_SIGNATURE_COUNT = -2146875382
+CERTSRV_E_SIGNATURE_REJECTED = -2146875381
+CERTSRV_E_ISSUANCE_POLICY_REQUIRED = -2146875380
+CERTSRV_E_SUBJECT_UPN_REQUIRED = -2146875379
+CERTSRV_E_SUBJECT_DIRECTORY_GUID_REQUIRED = -2146875378
+CERTSRV_E_SUBJECT_DNS_REQUIRED = -2146875377
+CERTSRV_E_ARCHIVED_KEY_UNEXPECTED = -2146875376
+CERTSRV_E_KEY_LENGTH = -2146875375
+CERTSRV_E_SUBJECT_EMAIL_REQUIRED = -2146875374
+CERTSRV_E_UNKNOWN_CERT_TYPE = -2146875373
+CERTSRV_E_CERT_TYPE_OVERLAP = -2146875372
+CERTSRV_E_TOO_MANY_SIGNATURES = -2146875371
+CERTSRV_E_RENEWAL_BAD_PUBLIC_KEY = -2146875370
+CERTSRV_E_INVALID_EK = -2146875369
+CERTSRV_E_INVALID_IDBINDING = -2146875368
+CERTSRV_E_INVALID_ATTESTATION = -2146875367
+CERTSRV_E_KEY_ATTESTATION = -2146875366
+CERTSRV_E_CORRUPT_KEY_ATTESTATION = -2146875365
+CERTSRV_E_EXPIRED_CHALLENGE = -2146875364
+CERTSRV_E_INVALID_RESPONSE = -2146875363
+CERTSRV_E_INVALID_REQUESTID = -2146875362
+CERTSRV_E_REQUEST_PRECERTIFICATE_MISMATCH = -2146875361
+CERTSRV_E_PENDING_CLIENT_RESPONSE = -2146875360
+CERTSRV_E_SEC_EXT_DIRECTORY_SID_REQUIRED = -2146875359
+XENROLL_E_KEY_NOT_EXPORTABLE = -2146873344
+XENROLL_E_CANNOT_ADD_ROOT_CERT = -2146873343
+XENROLL_E_RESPONSE_KA_HASH_NOT_FOUND = -2146873342
+XENROLL_E_RESPONSE_UNEXPECTED_KA_HASH = -2146873341
+XENROLL_E_RESPONSE_KA_HASH_MISMATCH = -2146873340
+XENROLL_E_KEYSPEC_SMIME_MISMATCH = -2146873339
+TRUST_E_SYSTEM_ERROR = -2146869247
+TRUST_E_NO_SIGNER_CERT = -2146869246
+TRUST_E_COUNTER_SIGNER = -2146869245
+TRUST_E_CERT_SIGNATURE = -2146869244
+TRUST_E_TIME_STAMP = -2146869243
+TRUST_E_BAD_DIGEST = -2146869232
+TRUST_E_MALFORMED_SIGNATURE = -2146869231
+TRUST_E_BASIC_CONSTRAINTS = -2146869223
+TRUST_E_FINANCIAL_CRITERIA = -2146869218
+MSSIPOTF_E_OUTOFMEMRANGE = -2146865151
+MSSIPOTF_E_CANTGETOBJECT = -2146865150
+MSSIPOTF_E_NOHEADTABLE = -2146865149
+MSSIPOTF_E_BAD_MAGICNUMBER = -2146865148
+MSSIPOTF_E_BAD_OFFSET_TABLE = -2146865147
+MSSIPOTF_E_TABLE_TAGORDER = -2146865146
+MSSIPOTF_E_TABLE_LONGWORD = -2146865145
+MSSIPOTF_E_BAD_FIRST_TABLE_PLACEMENT = -2146865144
+MSSIPOTF_E_TABLES_OVERLAP = -2146865143
+MSSIPOTF_E_TABLE_PADBYTES = -2146865142
+MSSIPOTF_E_FILETOOSMALL = -2146865141
+MSSIPOTF_E_TABLE_CHECKSUM = -2146865140
+MSSIPOTF_E_FILE_CHECKSUM = -2146865139
+MSSIPOTF_E_FAILED_POLICY = -2146865136
+MSSIPOTF_E_FAILED_HINTS_CHECK = -2146865135
+MSSIPOTF_E_NOT_OPENTYPE = -2146865134
+MSSIPOTF_E_FILE = -2146865133
+MSSIPOTF_E_CRYPT = -2146865132
+MSSIPOTF_E_BADVERSION = -2146865131
+MSSIPOTF_E_DSIG_STRUCTURE = -2146865130
+MSSIPOTF_E_PCONST_CHECK = -2146865129
+MSSIPOTF_E_STRUCTURE = -2146865128
+ERROR_CRED_REQUIRES_CONFIRMATION = -2146865127
+NTE_OP_OK = 0
+TRUST_E_PROVIDER_UNKNOWN = -2146762751
+TRUST_E_ACTION_UNKNOWN = -2146762750
+TRUST_E_SUBJECT_FORM_UNKNOWN = -2146762749
+TRUST_E_SUBJECT_NOT_TRUSTED = -2146762748
+DIGSIG_E_ENCODE = -2146762747
+DIGSIG_E_DECODE = -2146762746
+DIGSIG_E_EXTENSIBILITY = -2146762745
+DIGSIG_E_CRYPTO = -2146762744
+PERSIST_E_SIZEDEFINITE = -2146762743
+PERSIST_E_SIZEINDEFINITE = -2146762742
+PERSIST_E_NOTSELFSIZING = -2146762741
+TRUST_E_NOSIGNATURE = -2146762496
+CERT_E_EXPIRED = -2146762495
+CERT_E_VALIDITYPERIODNESTING = -2146762494
+CERT_E_ROLE = -2146762493
+CERT_E_PATHLENCONST = -2146762492
+CERT_E_CRITICAL = -2146762491
+CERT_E_PURPOSE = -2146762490
+CERT_E_ISSUERCHAINING = -2146762489
+CERT_E_MALFORMED = -2146762488
+CERT_E_UNTRUSTEDROOT = -2146762487
+CERT_E_CHAINING = -2146762486
+TRUST_E_FAIL = -2146762485
+CERT_E_REVOKED = -2146762484
+CERT_E_UNTRUSTEDTESTROOT = -2146762483
+CERT_E_REVOCATION_FAILURE = -2146762482
+CERT_E_CN_NO_MATCH = -2146762481
+CERT_E_WRONG_USAGE = -2146762480
+TRUST_E_EXPLICIT_DISTRUST = -2146762479
+CERT_E_UNTRUSTEDCA = -2146762478
+CERT_E_INVALID_POLICY = -2146762477
+CERT_E_INVALID_NAME = -2146762476
+
+
+def HRESULT_FROM_SETUPAPI(x):
+    return __HRESULT_FROM_SETUPAPI(x)
+
+
+SPAPI_E_EXPECTED_SECTION_NAME = -2146500608
+SPAPI_E_BAD_SECTION_NAME_LINE = -2146500607
+SPAPI_E_SECTION_NAME_TOO_LONG = -2146500606
+SPAPI_E_GENERAL_SYNTAX = -2146500605
+SPAPI_E_WRONG_INF_STYLE = -2146500352
+SPAPI_E_SECTION_NOT_FOUND = -2146500351
+SPAPI_E_LINE_NOT_FOUND = -2146500350
+SPAPI_E_NO_BACKUP = -2146500349
+SPAPI_E_NO_ASSOCIATED_CLASS = -2146500096
+SPAPI_E_CLASS_MISMATCH = -2146500095
+SPAPI_E_DUPLICATE_FOUND = -2146500094
+SPAPI_E_NO_DRIVER_SELECTED = -2146500093
+SPAPI_E_KEY_DOES_NOT_EXIST = -2146500092
+SPAPI_E_INVALID_DEVINST_NAME = -2146500091
+SPAPI_E_INVALID_CLASS = -2146500090
+SPAPI_E_DEVINST_ALREADY_EXISTS = -2146500089
+SPAPI_E_DEVINFO_NOT_REGISTERED = -2146500088
+SPAPI_E_INVALID_REG_PROPERTY = -2146500087
+SPAPI_E_NO_INF = -2146500086
+SPAPI_E_NO_SUCH_DEVINST = -2146500085
+SPAPI_E_CANT_LOAD_CLASS_ICON = -2146500084
+SPAPI_E_INVALID_CLASS_INSTALLER = -2146500083
+SPAPI_E_DI_DO_DEFAULT = -2146500082
+SPAPI_E_DI_NOFILECOPY = -2146500081
+SPAPI_E_INVALID_HWPROFILE = -2146500080
+SPAPI_E_NO_DEVICE_SELECTED = -2146500079
+SPAPI_E_DEVINFO_LIST_LOCKED = -2146500078
+SPAPI_E_DEVINFO_DATA_LOCKED = -2146500077
+SPAPI_E_DI_BAD_PATH = -2146500076
+SPAPI_E_NO_CLASSINSTALL_PARAMS = -2146500075
+SPAPI_E_FILEQUEUE_LOCKED = -2146500074
+SPAPI_E_BAD_SERVICE_INSTALLSECT = -2146500073
+SPAPI_E_NO_CLASS_DRIVER_LIST = -2146500072
+SPAPI_E_NO_ASSOCIATED_SERVICE = -2146500071
+SPAPI_E_NO_DEFAULT_DEVICE_INTERFACE = -2146500070
+SPAPI_E_DEVICE_INTERFACE_ACTIVE = -2146500069
+SPAPI_E_DEVICE_INTERFACE_REMOVED = -2146500068
+SPAPI_E_BAD_INTERFACE_INSTALLSECT = -2146500067
+SPAPI_E_NO_SUCH_INTERFACE_CLASS = -2146500066
+SPAPI_E_INVALID_REFERENCE_STRING = -2146500065
+SPAPI_E_INVALID_MACHINENAME = -2146500064
+SPAPI_E_REMOTE_COMM_FAILURE = -2146500063
+SPAPI_E_MACHINE_UNAVAILABLE = -2146500062
+SPAPI_E_NO_CONFIGMGR_SERVICES = -2146500061
+SPAPI_E_INVALID_PROPPAGE_PROVIDER = -2146500060
+SPAPI_E_NO_SUCH_DEVICE_INTERFACE = -2146500059
+SPAPI_E_DI_POSTPROCESSING_REQUIRED = -2146500058
+SPAPI_E_INVALID_COINSTALLER = -2146500057
+SPAPI_E_NO_COMPAT_DRIVERS = -2146500056
+SPAPI_E_NO_DEVICE_ICON = -2146500055
+SPAPI_E_INVALID_INF_LOGCONFIG = -2146500054
+SPAPI_E_DI_DONT_INSTALL = -2146500053
+SPAPI_E_INVALID_FILTER_DRIVER = -2146500052
+SPAPI_E_NON_WINDOWS_NT_DRIVER = -2146500051
+SPAPI_E_NON_WINDOWS_DRIVER = -2146500050
+SPAPI_E_NO_CATALOG_FOR_OEM_INF = -2146500049
+SPAPI_E_DEVINSTALL_QUEUE_NONNATIVE = -2146500048
+SPAPI_E_NOT_DISABLEABLE = -2146500047
+SPAPI_E_CANT_REMOVE_DEVINST = -2146500046
+SPAPI_E_INVALID_TARGET = -2146500045
+SPAPI_E_DRIVER_NONNATIVE = -2146500044
+SPAPI_E_IN_WOW64 = -2146500043
+SPAPI_E_SET_SYSTEM_RESTORE_POINT = -2146500042
+SPAPI_E_INCORRECTLY_COPIED_INF = -2146500041
+SPAPI_E_SCE_DISABLED = -2146500040
+SPAPI_E_UNKNOWN_EXCEPTION = -2146500039
+SPAPI_E_PNP_REGISTRY_ERROR = -2146500038
+SPAPI_E_REMOTE_REQUEST_UNSUPPORTED = -2146500037
+SPAPI_E_NOT_AN_INSTALLED_OEM_INF = -2146500036
+SPAPI_E_INF_IN_USE_BY_DEVICES = -2146500035
+SPAPI_E_DI_FUNCTION_OBSOLETE = -2146500034
+SPAPI_E_NO_AUTHENTICODE_CATALOG = -2146500033
+SPAPI_E_AUTHENTICODE_DISALLOWED = -2146500032
+SPAPI_E_AUTHENTICODE_TRUSTED_PUBLISHER = -2146500031
+SPAPI_E_AUTHENTICODE_TRUST_NOT_ESTABLISHED = -2146500030
+SPAPI_E_AUTHENTICODE_PUBLISHER_NOT_TRUSTED = -2146500029
+SPAPI_E_SIGNATURE_OSATTRIBUTE_MISMATCH = -2146500028
+SPAPI_E_ONLY_VALIDATE_VIA_AUTHENTICODE = -2146500027
+SPAPI_E_DEVICE_INSTALLER_NOT_READY = -2146500026
+SPAPI_E_DRIVER_STORE_ADD_FAILED = -2146500025
+SPAPI_E_DEVICE_INSTALL_BLOCKED = -2146500024
+SPAPI_E_DRIVER_INSTALL_BLOCKED = -2146500023
+SPAPI_E_WRONG_INF_TYPE = -2146500022
+SPAPI_E_FILE_HASH_NOT_IN_CATALOG = -2146500021
+SPAPI_E_DRIVER_STORE_DELETE_FAILED = -2146500020
+SPAPI_E_UNRECOVERABLE_STACK_OVERFLOW = -2146499840
+SPAPI_E_ERROR_NOT_INSTALLED = -2146496512
+SCARD_S_SUCCESS = NO_ERROR
+SCARD_F_INTERNAL_ERROR = -2146435071
+SCARD_E_CANCELLED = -2146435070
+SCARD_E_INVALID_HANDLE = -2146435069
+SCARD_E_INVALID_PARAMETER = -2146435068
+SCARD_E_INVALID_TARGET = -2146435067
+SCARD_E_NO_MEMORY = -2146435066
+SCARD_F_WAITED_TOO_LONG = -2146435065
+SCARD_E_INSUFFICIENT_BUFFER = -2146435064
+SCARD_E_UNKNOWN_READER = -2146435063
+SCARD_E_TIMEOUT = -2146435062
+SCARD_E_SHARING_VIOLATION = -2146435061
+SCARD_E_NO_SMARTCARD = -2146435060
+SCARD_E_UNKNOWN_CARD = -2146435059
+SCARD_E_CANT_DISPOSE = -2146435058
+SCARD_E_PROTO_MISMATCH = -2146435057
+SCARD_E_NOT_READY = -2146435056
+SCARD_E_INVALID_VALUE = -2146435055
+SCARD_E_SYSTEM_CANCELLED = -2146435054
+SCARD_F_COMM_ERROR = -2146435053
+SCARD_F_UNKNOWN_ERROR = -2146435052
+SCARD_E_INVALID_ATR = -2146435051
+SCARD_E_NOT_TRANSACTED = -2146435050
+SCARD_E_READER_UNAVAILABLE = -2146435049
+SCARD_P_SHUTDOWN = -2146435048
+SCARD_E_PCI_TOO_SMALL = -2146435047
+SCARD_E_READER_UNSUPPORTED = -2146435046
+SCARD_E_DUPLICATE_READER = -2146435045
+SCARD_E_CARD_UNSUPPORTED = -2146435044
+SCARD_E_NO_SERVICE = -2146435043
+SCARD_E_SERVICE_STOPPED = -2146435042
+SCARD_E_UNEXPECTED = -2146435041
+SCARD_E_ICC_INSTALLATION = -2146435040
+SCARD_E_ICC_CREATEORDER = -2146435039
+SCARD_E_UNSUPPORTED_FEATURE = -2146435038
+SCARD_E_DIR_NOT_FOUND = -2146435037
+SCARD_E_FILE_NOT_FOUND = -2146435036
+SCARD_E_NO_DIR = -2146435035
+SCARD_E_NO_FILE = -2146435034
+SCARD_E_NO_ACCESS = -2146435033
+SCARD_E_WRITE_TOO_MANY = -2146435032
+SCARD_E_BAD_SEEK = -2146435031
+SCARD_E_INVALID_CHV = -2146435030
+SCARD_E_UNKNOWN_RES_MNG = -2146435029
+SCARD_E_NO_SUCH_CERTIFICATE = -2146435028
+SCARD_E_CERTIFICATE_UNAVAILABLE = -2146435027
+SCARD_E_NO_READERS_AVAILABLE = -2146435026
+SCARD_E_COMM_DATA_LOST = -2146435025
+SCARD_E_NO_KEY_CONTAINER = -2146435024
+SCARD_E_SERVER_TOO_BUSY = -2146435023
+SCARD_E_PIN_CACHE_EXPIRED = -2146435022
+SCARD_E_NO_PIN_CACHE = -2146435021
+SCARD_E_READ_ONLY_CARD = -2146435020
+SCARD_W_UNSUPPORTED_CARD = -2146434971
+SCARD_W_UNRESPONSIVE_CARD = -2146434970
+SCARD_W_UNPOWERED_CARD = -2146434969
+SCARD_W_RESET_CARD = -2146434968
+SCARD_W_REMOVED_CARD = -2146434967
+SCARD_W_SECURITY_VIOLATION = -2146434966
+SCARD_W_WRONG_CHV = -2146434965
+SCARD_W_CHV_BLOCKED = -2146434964
+SCARD_W_EOF = -2146434963
+SCARD_W_CANCELLED_BY_USER = -2146434962
+SCARD_W_CARD_NOT_AUTHENTICATED = -2146434961
+SCARD_W_CACHE_ITEM_NOT_FOUND = -2146434960
+SCARD_W_CACHE_ITEM_STALE = -2146434959
+SCARD_W_CACHE_ITEM_TOO_BIG = -2146434958
+COMADMIN_E_OBJECTERRORS = -2146368511
+COMADMIN_E_OBJECTINVALID = -2146368510
+COMADMIN_E_KEYMISSING = -2146368509
+COMADMIN_E_ALREADYINSTALLED = -2146368508
+COMADMIN_E_APP_FILE_WRITEFAIL = -2146368505
+COMADMIN_E_APP_FILE_READFAIL = -2146368504
+COMADMIN_E_APP_FILE_VERSION = -2146368503
+COMADMIN_E_BADPATH = -2146368502
+COMADMIN_E_APPLICATIONEXISTS = -2146368501
+COMADMIN_E_ROLEEXISTS = -2146368500
+COMADMIN_E_CANTCOPYFILE = -2146368499
+COMADMIN_E_NOUSER = -2146368497
+COMADMIN_E_INVALIDUSERIDS = -2146368496
+COMADMIN_E_NOREGISTRYCLSID = -2146368495
+COMADMIN_E_BADREGISTRYPROGID = -2146368494
+COMADMIN_E_AUTHENTICATIONLEVEL = -2146368493
+COMADMIN_E_USERPASSWDNOTVALID = -2146368492
+COMADMIN_E_CLSIDORIIDMISMATCH = -2146368488
+COMADMIN_E_REMOTEINTERFACE = -2146368487
+COMADMIN_E_DLLREGISTERSERVER = -2146368486
+COMADMIN_E_NOSERVERSHARE = -2146368485
+COMADMIN_E_DLLLOADFAILED = -2146368483
+COMADMIN_E_BADREGISTRYLIBID = -2146368482
+COMADMIN_E_APPDIRNOTFOUND = -2146368481
+COMADMIN_E_REGISTRARFAILED = -2146368477
+COMADMIN_E_COMPFILE_DOESNOTEXIST = -2146368476
+COMADMIN_E_COMPFILE_LOADDLLFAIL = -2146368475
+COMADMIN_E_COMPFILE_GETCLASSOBJ = -2146368474
+COMADMIN_E_COMPFILE_CLASSNOTAVAIL = -2146368473
+COMADMIN_E_COMPFILE_BADTLB = -2146368472
+COMADMIN_E_COMPFILE_NOTINSTALLABLE = -2146368471
+COMADMIN_E_NOTCHANGEABLE = -2146368470
+COMADMIN_E_NOTDELETEABLE = -2146368469
+COMADMIN_E_SESSION = -2146368468
+COMADMIN_E_COMP_MOVE_LOCKED = -2146368467
+COMADMIN_E_COMP_MOVE_BAD_DEST = -2146368466
+COMADMIN_E_REGISTERTLB = -2146368464
+COMADMIN_E_SYSTEMAPP = -2146368461
+COMADMIN_E_COMPFILE_NOREGISTRAR = -2146368460
+COMADMIN_E_COREQCOMPINSTALLED = -2146368459
+COMADMIN_E_SERVICENOTINSTALLED = -2146368458
+COMADMIN_E_PROPERTYSAVEFAILED = -2146368457
+COMADMIN_E_OBJECTEXISTS = -2146368456
+COMADMIN_E_COMPONENTEXISTS = -2146368455
+COMADMIN_E_REGFILE_CORRUPT = -2146368453
+COMADMIN_E_PROPERTY_OVERFLOW = -2146368452
+COMADMIN_E_NOTINREGISTRY = -2146368450
+COMADMIN_E_OBJECTNOTPOOLABLE = -2146368449
+COMADMIN_E_APPLID_MATCHES_CLSID = -2146368442
+COMADMIN_E_ROLE_DOES_NOT_EXIST = -2146368441
+COMADMIN_E_START_APP_NEEDS_COMPONENTS = -2146368440
+COMADMIN_E_REQUIRES_DIFFERENT_PLATFORM = -2146368439
+COMADMIN_E_CAN_NOT_EXPORT_APP_PROXY = -2146368438
+COMADMIN_E_CAN_NOT_START_APP = -2146368437
+COMADMIN_E_CAN_NOT_EXPORT_SYS_APP = -2146368436
+COMADMIN_E_CANT_SUBSCRIBE_TO_COMPONENT = -2146368435
+COMADMIN_E_EVENTCLASS_CANT_BE_SUBSCRIBER = -2146368434
+COMADMIN_E_LIB_APP_PROXY_INCOMPATIBLE = -2146368433
+COMADMIN_E_BASE_PARTITION_ONLY = -2146368432
+COMADMIN_E_START_APP_DISABLED = -2146368431
+COMADMIN_E_CAT_DUPLICATE_PARTITION_NAME = -2146368425
+COMADMIN_E_CAT_INVALID_PARTITION_NAME = -2146368424
+COMADMIN_E_CAT_PARTITION_IN_USE = -2146368423
+COMADMIN_E_FILE_PARTITION_DUPLICATE_FILES = -2146368422
+COMADMIN_E_CAT_IMPORTED_COMPONENTS_NOT_ALLOWED = -2146368421
+COMADMIN_E_AMBIGUOUS_APPLICATION_NAME = -2146368420
+COMADMIN_E_AMBIGUOUS_PARTITION_NAME = -2146368419
+COMADMIN_E_REGDB_NOTINITIALIZED = -2146368398
+COMADMIN_E_REGDB_NOTOPEN = -2146368397
+COMADMIN_E_REGDB_SYSTEMERR = -2146368396
+COMADMIN_E_REGDB_ALREADYRUNNING = -2146368395
+COMADMIN_E_MIG_VERSIONNOTSUPPORTED = -2146368384
+COMADMIN_E_MIG_SCHEMANOTFOUND = -2146368383
+COMADMIN_E_CAT_BITNESSMISMATCH = -2146368382
+COMADMIN_E_CAT_UNACCEPTABLEBITNESS = -2146368381
+COMADMIN_E_CAT_WRONGAPPBITNESS = -2146368380
+COMADMIN_E_CAT_PAUSE_RESUME_NOT_SUPPORTED = -2146368379
+COMADMIN_E_CAT_SERVERFAULT = -2146368378
+COMQC_E_APPLICATION_NOT_QUEUED = -2146368000
+COMQC_E_NO_QUEUEABLE_INTERFACES = -2146367999
+COMQC_E_QUEUING_SERVICE_NOT_AVAILABLE = -2146367998
+COMQC_E_NO_IPERSISTSTREAM = -2146367997
+COMQC_E_BAD_MESSAGE = -2146367996
+COMQC_E_UNAUTHENTICATED = -2146367995
+COMQC_E_UNTRUSTED_ENQUEUER = -2146367994
+MSDTC_E_DUPLICATE_RESOURCE = -2146367743
+COMADMIN_E_OBJECT_PARENT_MISSING = -2146367480
+COMADMIN_E_OBJECT_DOES_NOT_EXIST = -2146367479
+COMADMIN_E_APP_NOT_RUNNING = -2146367478
+COMADMIN_E_INVALID_PARTITION = -2146367477
+COMADMIN_E_SVCAPP_NOT_POOLABLE_OR_RECYCLABLE = -2146367475
+COMADMIN_E_USER_IN_SET = -2146367474
+COMADMIN_E_CANTRECYCLELIBRARYAPPS = -2146367473
+COMADMIN_E_CANTRECYCLESERVICEAPPS = -2146367471
+COMADMIN_E_PROCESSALREADYRECYCLED = -2146367470
+COMADMIN_E_PAUSEDPROCESSMAYNOTBERECYCLED = -2146367469
+COMADMIN_E_CANTMAKEINPROCSERVICE = -2146367468
+COMADMIN_E_PROGIDINUSEBYCLSID = -2146367467
+COMADMIN_E_DEFAULT_PARTITION_NOT_IN_SET = -2146367466
+COMADMIN_E_RECYCLEDPROCESSMAYNOTBEPAUSED = -2146367465
+COMADMIN_E_PARTITION_ACCESSDENIED = -2146367464
+COMADMIN_E_PARTITION_MSI_ONLY = -2146367463
+COMADMIN_E_LEGACYCOMPS_NOT_ALLOWED_IN_1_0_FORMAT = -2146367462
+COMADMIN_E_LEGACYCOMPS_NOT_ALLOWED_IN_NONBASE_PARTITIONS = -2146367461
+COMADMIN_E_COMP_MOVE_SOURCE = -2146367460
+COMADMIN_E_COMP_MOVE_DEST = -2146367459
+COMADMIN_E_COMP_MOVE_PRIVATE = -2146367458
+COMADMIN_E_BASEPARTITION_REQUIRED_IN_SET = -2146367457
+COMADMIN_E_CANNOT_ALIAS_EVENTCLASS = -2146367456
+COMADMIN_E_PRIVATE_ACCESSDENIED = -2146367455
+COMADMIN_E_SAFERINVALID = -2146367454
+COMADMIN_E_REGISTRY_ACCESSDENIED = -2146367453
+COMADMIN_E_PARTITIONS_DISABLED = -2146367452
+MENROLL_E_DEVICE_MESSAGE_FORMAT_ERROR = -2145910783
+MENROLL_E_DEVICE_AUTHENTICATION_ERROR = -2145910782
+MENROLL_E_DEVICE_AUTHORIZATION_ERROR = -2145910781
+MENROLL_E_DEVICE_CERTIFICATEREQUEST_ERROR = -2145910780
+MENROLL_E_DEVICE_CONFIGMGRSERVER_ERROR = -2145910779
+MENROLL_E_DEVICE_INTERNALSERVICE_ERROR = -2145910778
+MENROLL_E_DEVICE_INVALIDSECURITY_ERROR = -2145910777
+MENROLL_E_DEVICE_UNKNOWN_ERROR = -2145910776
+MENROLL_E_ENROLLMENT_IN_PROGRESS = -2145910775
+MENROLL_E_DEVICE_ALREADY_ENROLLED = -2145910774
+MENROLL_E_DISCOVERY_SEC_CERT_DATE_INVALID = -2145910771
+MENROLL_E_PASSWORD_NEEDED = -2145910770
+MENROLL_E_WAB_ERROR = -2145910769
+MENROLL_E_CONNECTIVITY = -2145910768
+MENROLL_S_ENROLLMENT_SUSPENDED = 0x00180011
+MENROLL_E_INVALIDSSLCERT = -2145910766
+MENROLL_E_DEVICECAPREACHED = -2145910765
+MENROLL_E_DEVICENOTSUPPORTED = -2145910764
+MENROLL_E_NOT_SUPPORTED = -2145910763
+MENROLL_E_NOTELIGIBLETORENEW = -2145910762
+MENROLL_E_INMAINTENANCE = -2145910761
+MENROLL_E_USER_LICENSE = -2145910760
+MENROLL_E_ENROLLMENTDATAINVALID = -2145910759
+MENROLL_E_INSECUREREDIRECT = -2145910758
+MENROLL_E_PLATFORM_WRONG_STATE = -2145910757
+MENROLL_E_PLATFORM_LICENSE_ERROR = -2145910756
+MENROLL_E_PLATFORM_UNKNOWN_ERROR = -2145910755
+MENROLL_E_PROV_CSP_CERTSTORE = -2145910754
+MENROLL_E_PROV_CSP_W7 = -2145910753
+MENROLL_E_PROV_CSP_DMCLIENT = -2145910752
+MENROLL_E_PROV_CSP_PFW = -2145910751
+MENROLL_E_PROV_CSP_MISC = -2145910750
+MENROLL_E_PROV_UNKNOWN = -2145910749
+MENROLL_E_PROV_SSLCERTNOTFOUND = -2145910748
+MENROLL_E_PROV_CSP_APPMGMT = -2145910747
+MENROLL_E_DEVICE_MANAGEMENT_BLOCKED = -2145910746
+MENROLL_E_CERTPOLICY_PRIVATEKEYCREATION_FAILED = -2145910745
+MENROLL_E_CERTAUTH_FAILED_TO_FIND_CERT = -2145910744
+MENROLL_E_EMPTY_MESSAGE = -2145910743
+MENROLL_E_USER_CANCELLED = -2145910736
+MENROLL_E_MDM_NOT_CONFIGURED = -2145910735
+MENROLL_E_CUSTOMSERVERERROR = -2145910734
+WER_S_REPORT_DEBUG = 0x001B0000
+WER_S_REPORT_UPLOADED = 0x001B0001
+WER_S_REPORT_QUEUED = 0x001B0002
+WER_S_DISABLED = 0x001B0003
+WER_S_SUSPENDED_UPLOAD = 0x001B0004
+WER_S_DISABLED_QUEUE = 0x001B0005
+WER_S_DISABLED_ARCHIVE = 0x001B0006
+WER_S_REPORT_ASYNC = 0x001B0007
+WER_S_IGNORE_ASSERT_INSTANCE = 0x001B0008
+WER_S_IGNORE_ALL_ASSERTS = 0x001B0009
+WER_S_ASSERT_CONTINUE = 0x001B000A
+WER_S_THROTTLED = 0x001B000B
+WER_S_REPORT_UPLOADED_CAB = 0x001B000C
+WER_E_CRASH_FAILURE = -2145681408
+WER_E_CANCELED = -2145681407
+WER_E_NETWORK_FAILURE = -2145681406
+WER_E_NOT_INITIALIZED = -2145681405
+WER_E_ALREADY_REPORTING = -2145681404
+WER_E_DUMP_THROTTLED = -2145681403
+WER_E_INSUFFICIENT_CONSENT = -2145681402
+WER_E_TOO_HEAVY = -2145681401
+
+
+def FILTER_HRESULT_FROM_FLT_NTSTATUS(x):
+    assert (x & 0xFFF0000) == 0x001C0000
+    return ((x) & (-2147418113)) | (FACILITY_USERMODE_FILTER_MANAGER << 16)
+
+
+ERROR_FLT_IO_COMPLETE = 0x001F0001
+ERROR_FLT_NO_HANDLER_DEFINED = -2145452031
+ERROR_FLT_CONTEXT_ALREADY_DEFINED = -2145452030
+ERROR_FLT_INVALID_ASYNCHRONOUS_REQUEST = -2145452029
+ERROR_FLT_DISALLOW_FAST_IO = -2145452028
+ERROR_FLT_INVALID_NAME_REQUEST = -2145452027
+ERROR_FLT_NOT_SAFE_TO_POST_OPERATION = -2145452026
+ERROR_FLT_NOT_INITIALIZED = -2145452025
+ERROR_FLT_FILTER_NOT_READY = -2145452024
+ERROR_FLT_POST_OPERATION_CLEANUP = -2145452023
+ERROR_FLT_INTERNAL_ERROR = -2145452022
+ERROR_FLT_DELETING_OBJECT = -2145452021
+ERROR_FLT_MUST_BE_NONPAGED_POOL = -2145452020
+ERROR_FLT_DUPLICATE_ENTRY = -2145452019
+ERROR_FLT_CBDQ_DISABLED = -2145452018
+ERROR_FLT_DO_NOT_ATTACH = -2145452017
+ERROR_FLT_DO_NOT_DETACH = -2145452016
+ERROR_FLT_INSTANCE_ALTITUDE_COLLISION = -2145452015
+ERROR_FLT_INSTANCE_NAME_COLLISION = -2145452014
+ERROR_FLT_FILTER_NOT_FOUND = -2145452013
+ERROR_FLT_VOLUME_NOT_FOUND = -2145452012
+ERROR_FLT_INSTANCE_NOT_FOUND = -2145452011
+ERROR_FLT_CONTEXT_ALLOCATION_NOT_FOUND = -2145452010
+ERROR_FLT_INVALID_CONTEXT_REGISTRATION = -2145452009
+ERROR_FLT_NAME_CACHE_MISS = -2145452008
+ERROR_FLT_NO_DEVICE_OBJECT = -2145452007
+ERROR_FLT_VOLUME_ALREADY_MOUNTED = -2145452006
+ERROR_FLT_ALREADY_ENLISTED = -2145452005
+ERROR_FLT_CONTEXT_ALREADY_LINKED = -2145452004
+ERROR_FLT_NO_WAITER_FOR_REPLY = -2145452000
+ERROR_FLT_REGISTRATION_BUSY = -2145451997
+ERROR_FLT_WCOS_NOT_SUPPORTED = -2145451996
+ERROR_HUNG_DISPLAY_DRIVER_THREAD = -2144993279
+DWM_E_COMPOSITIONDISABLED = -2144980991
+DWM_E_REMOTING_NOT_SUPPORTED = -2144980990
+DWM_E_NO_REDIRECTION_SURFACE_AVAILABLE = -2144980989
+DWM_E_NOT_QUEUING_PRESENTS = -2144980988
+DWM_E_ADAPTER_NOT_FOUND = -2144980987
+DWM_S_GDI_REDIRECTION_SURFACE = 0x00263005
+DWM_E_TEXTURE_TOO_LARGE = -2144980985
+DWM_S_GDI_REDIRECTION_SURFACE_BLT_VIA_GDI = 0x00263008
+ERROR_MONITOR_NO_DESCRIPTOR = 0x00261001
+ERROR_MONITOR_UNKNOWN_DESCRIPTOR_FORMAT = 0x00261002
+ERROR_MONITOR_INVALID_DESCRIPTOR_CHECKSUM = -1071247357
+ERROR_MONITOR_INVALID_STANDARD_TIMING_BLOCK = -1071247356
+ERROR_MONITOR_WMI_DATABLOCK_REGISTRATION_FAILED = -1071247355
+ERROR_MONITOR_INVALID_SERIAL_NUMBER_MONDSC_BLOCK = -1071247354
+ERROR_MONITOR_INVALID_USER_FRIENDLY_MONDSC_BLOCK = -1071247353
+ERROR_MONITOR_NO_MORE_DESCRIPTOR_DATA = -1071247352
+ERROR_MONITOR_INVALID_DETAILED_TIMING_BLOCK = -1071247351
+ERROR_MONITOR_INVALID_MANUFACTURE_DATE = -1071247350
+ERROR_GRAPHICS_NOT_EXCLUSIVE_MODE_OWNER = -1071243264
+ERROR_GRAPHICS_INSUFFICIENT_DMA_BUFFER = -1071243263
+ERROR_GRAPHICS_INVALID_DISPLAY_ADAPTER = -1071243262
+ERROR_GRAPHICS_ADAPTER_WAS_RESET = -1071243261
+ERROR_GRAPHICS_INVALID_DRIVER_MODEL = -1071243260
+ERROR_GRAPHICS_PRESENT_MODE_CHANGED = -1071243259
+ERROR_GRAPHICS_PRESENT_OCCLUDED = -1071243258
+ERROR_GRAPHICS_PRESENT_DENIED = -1071243257
+ERROR_GRAPHICS_CANNOTCOLORCONVERT = -1071243256
+ERROR_GRAPHICS_DRIVER_MISMATCH = -1071243255
+ERROR_GRAPHICS_PARTIAL_DATA_POPULATED = 0x4026200A
+ERROR_GRAPHICS_PRESENT_REDIRECTION_DISABLED = -1071243253
+ERROR_GRAPHICS_PRESENT_UNOCCLUDED = -1071243252
+ERROR_GRAPHICS_WINDOWDC_NOT_AVAILABLE = -1071243251
+ERROR_GRAPHICS_WINDOWLESS_PRESENT_DISABLED = -1071243250
+ERROR_GRAPHICS_PRESENT_INVALID_WINDOW = -1071243249
+ERROR_GRAPHICS_PRESENT_BUFFER_NOT_BOUND = -1071243248
+ERROR_GRAPHICS_VAIL_STATE_CHANGED = -1071243247
+ERROR_GRAPHICS_INDIRECT_DISPLAY_ABANDON_SWAPCHAIN = -1071243246
+ERROR_GRAPHICS_INDIRECT_DISPLAY_DEVICE_STOPPED = -1071243245
+ERROR_GRAPHICS_VAIL_FAILED_TO_SEND_CREATE_SUPERWETINK_MESSAGE = -1071243244
+ERROR_GRAPHICS_VAIL_FAILED_TO_SEND_DESTROY_SUPERWETINK_MESSAGE = -1071243243
+ERROR_GRAPHICS_VAIL_FAILED_TO_SEND_COMPOSITION_WINDOW_DPI_MESSAGE = -1071243242
+ERROR_GRAPHICS_LINK_CONFIGURATION_IN_PROGRESS = -1071243241
+ERROR_GRAPHICS_MPO_ALLOCATION_UNPINNED = -1071243240
+ERROR_GRAPHICS_NO_VIDEO_MEMORY = -1071243008
+ERROR_GRAPHICS_CANT_LOCK_MEMORY = -1071243007
+ERROR_GRAPHICS_ALLOCATION_BUSY = -1071243006
+ERROR_GRAPHICS_TOO_MANY_REFERENCES = -1071243005
+ERROR_GRAPHICS_TRY_AGAIN_LATER = -1071243004
+ERROR_GRAPHICS_TRY_AGAIN_NOW = -1071243003
+ERROR_GRAPHICS_ALLOCATION_INVALID = -1071243002
+ERROR_GRAPHICS_UNSWIZZLING_APERTURE_UNAVAILABLE = -1071243001
+ERROR_GRAPHICS_UNSWIZZLING_APERTURE_UNSUPPORTED = -1071243000
+ERROR_GRAPHICS_CANT_EVICT_PINNED_ALLOCATION = -1071242999
+ERROR_GRAPHICS_INVALID_ALLOCATION_USAGE = -1071242992
+ERROR_GRAPHICS_CANT_RENDER_LOCKED_ALLOCATION = -1071242991
+ERROR_GRAPHICS_ALLOCATION_CLOSED = -1071242990
+ERROR_GRAPHICS_INVALID_ALLOCATION_INSTANCE = -1071242989
+ERROR_GRAPHICS_INVALID_ALLOCATION_HANDLE = -1071242988
+ERROR_GRAPHICS_WRONG_ALLOCATION_DEVICE = -1071242987
+ERROR_GRAPHICS_ALLOCATION_CONTENT_LOST = -1071242986
+ERROR_GRAPHICS_GPU_EXCEPTION_ON_DEVICE = -1071242752
+ERROR_GRAPHICS_SKIP_ALLOCATION_PREPARATION = 0x40262201
+ERROR_GRAPHICS_INVALID_VIDPN_TOPOLOGY = -1071242496
+ERROR_GRAPHICS_VIDPN_TOPOLOGY_NOT_SUPPORTED = -1071242495
+ERROR_GRAPHICS_VIDPN_TOPOLOGY_CURRENTLY_NOT_SUPPORTED = -1071242494
+ERROR_GRAPHICS_INVALID_VIDPN = -1071242493
+ERROR_GRAPHICS_INVALID_VIDEO_PRESENT_SOURCE = -1071242492
+ERROR_GRAPHICS_INVALID_VIDEO_PRESENT_TARGET = -1071242491
+ERROR_GRAPHICS_VIDPN_MODALITY_NOT_SUPPORTED = -1071242490
+ERROR_GRAPHICS_MODE_NOT_PINNED = 0x00262307
+ERROR_GRAPHICS_INVALID_VIDPN_SOURCEMODESET = -1071242488
+ERROR_GRAPHICS_INVALID_VIDPN_TARGETMODESET = -1071242487
+ERROR_GRAPHICS_INVALID_FREQUENCY = -1071242486
+ERROR_GRAPHICS_INVALID_ACTIVE_REGION = -1071242485
+ERROR_GRAPHICS_INVALID_TOTAL_REGION = -1071242484
+ERROR_GRAPHICS_INVALID_VIDEO_PRESENT_SOURCE_MODE = -1071242480
+ERROR_GRAPHICS_INVALID_VIDEO_PRESENT_TARGET_MODE = -1071242479
+ERROR_GRAPHICS_PINNED_MODE_MUST_REMAIN_IN_SET = -1071242478
+ERROR_GRAPHICS_PATH_ALREADY_IN_TOPOLOGY = -1071242477
+ERROR_GRAPHICS_MODE_ALREADY_IN_MODESET = -1071242476
+ERROR_GRAPHICS_INVALID_VIDEOPRESENTSOURCESET = -1071242475
+ERROR_GRAPHICS_INVALID_VIDEOPRESENTTARGETSET = -1071242474
+ERROR_GRAPHICS_SOURCE_ALREADY_IN_SET = -1071242473
+ERROR_GRAPHICS_TARGET_ALREADY_IN_SET = -1071242472
+ERROR_GRAPHICS_INVALID_VIDPN_PRESENT_PATH = -1071242471
+ERROR_GRAPHICS_NO_RECOMMENDED_VIDPN_TOPOLOGY = -1071242470
+ERROR_GRAPHICS_INVALID_MONITOR_FREQUENCYRANGESET = -1071242469
+ERROR_GRAPHICS_INVALID_MONITOR_FREQUENCYRANGE = -1071242468
+ERROR_GRAPHICS_FREQUENCYRANGE_NOT_IN_SET = -1071242467
+ERROR_GRAPHICS_NO_PREFERRED_MODE = 0x0026231E
+ERROR_GRAPHICS_FREQUENCYRANGE_ALREADY_IN_SET = -1071242465
+ERROR_GRAPHICS_STALE_MODESET = -1071242464
+ERROR_GRAPHICS_INVALID_MONITOR_SOURCEMODESET = -1071242463
+ERROR_GRAPHICS_INVALID_MONITOR_SOURCE_MODE = -1071242462
+ERROR_GRAPHICS_NO_RECOMMENDED_FUNCTIONAL_VIDPN = -1071242461
+ERROR_GRAPHICS_MODE_ID_MUST_BE_UNIQUE = -1071242460
+ERROR_GRAPHICS_EMPTY_ADAPTER_MONITOR_MODE_SUPPORT_INTERSECTION = -1071242459
+ERROR_GRAPHICS_VIDEO_PRESENT_TARGETS_LESS_THAN_SOURCES = -1071242458
+ERROR_GRAPHICS_PATH_NOT_IN_TOPOLOGY = -1071242457
+ERROR_GRAPHICS_ADAPTER_MUST_HAVE_AT_LEAST_ONE_SOURCE = -1071242456
+ERROR_GRAPHICS_ADAPTER_MUST_HAVE_AT_LEAST_ONE_TARGET = -1071242455
+ERROR_GRAPHICS_INVALID_MONITORDESCRIPTORSET = -1071242454
+ERROR_GRAPHICS_INVALID_MONITORDESCRIPTOR = -1071242453
+ERROR_GRAPHICS_MONITORDESCRIPTOR_NOT_IN_SET = -1071242452
+ERROR_GRAPHICS_MONITORDESCRIPTOR_ALREADY_IN_SET = -1071242451
+ERROR_GRAPHICS_MONITORDESCRIPTOR_ID_MUST_BE_UNIQUE = -1071242450
+ERROR_GRAPHICS_INVALID_VIDPN_TARGET_SUBSET_TYPE = -1071242449
+ERROR_GRAPHICS_RESOURCES_NOT_RELATED = -1071242448
+ERROR_GRAPHICS_SOURCE_ID_MUST_BE_UNIQUE = -1071242447
+ERROR_GRAPHICS_TARGET_ID_MUST_BE_UNIQUE = -1071242446
+ERROR_GRAPHICS_NO_AVAILABLE_VIDPN_TARGET = -1071242445
+ERROR_GRAPHICS_MONITOR_COULD_NOT_BE_ASSOCIATED_WITH_ADAPTER = -1071242444
+ERROR_GRAPHICS_NO_VIDPNMGR = -1071242443
+ERROR_GRAPHICS_NO_ACTIVE_VIDPN = -1071242442
+ERROR_GRAPHICS_STALE_VIDPN_TOPOLOGY = -1071242441
+ERROR_GRAPHICS_MONITOR_NOT_CONNECTED = -1071242440
+ERROR_GRAPHICS_SOURCE_NOT_IN_TOPOLOGY = -1071242439
+ERROR_GRAPHICS_INVALID_PRIMARYSURFACE_SIZE = -1071242438
+ERROR_GRAPHICS_INVALID_VISIBLEREGION_SIZE = -1071242437
+ERROR_GRAPHICS_INVALID_STRIDE = -1071242436
+ERROR_GRAPHICS_INVALID_PIXELFORMAT = -1071242435
+ERROR_GRAPHICS_INVALID_COLORBASIS = -1071242434
+ERROR_GRAPHICS_INVALID_PIXELVALUEACCESSMODE = -1071242433
+ERROR_GRAPHICS_TARGET_NOT_IN_TOPOLOGY = -1071242432
+ERROR_GRAPHICS_NO_DISPLAY_MODE_MANAGEMENT_SUPPORT = -1071242431
+ERROR_GRAPHICS_VIDPN_SOURCE_IN_USE = -1071242430
+ERROR_GRAPHICS_CANT_ACCESS_ACTIVE_VIDPN = -1071242429
+ERROR_GRAPHICS_INVALID_PATH_IMPORTANCE_ORDINAL = -1071242428
+ERROR_GRAPHICS_INVALID_PATH_CONTENT_GEOMETRY_TRANSFORMATION = -1071242427
+ERROR_GRAPHICS_PATH_CONTENT_GEOMETRY_TRANSFORMATION_NOT_SUPPORTED = -1071242426
+ERROR_GRAPHICS_INVALID_GAMMA_RAMP = -1071242425
+ERROR_GRAPHICS_GAMMA_RAMP_NOT_SUPPORTED = -1071242424
+ERROR_GRAPHICS_MULTISAMPLING_NOT_SUPPORTED = -1071242423
+ERROR_GRAPHICS_MODE_NOT_IN_MODESET = -1071242422
+ERROR_GRAPHICS_DATASET_IS_EMPTY = 0x0026234B
+ERROR_GRAPHICS_NO_MORE_ELEMENTS_IN_DATASET = 0x0026234C
+ERROR_GRAPHICS_INVALID_VIDPN_TOPOLOGY_RECOMMENDATION_REASON = -1071242419
+ERROR_GRAPHICS_INVALID_PATH_CONTENT_TYPE = -1071242418
+ERROR_GRAPHICS_INVALID_COPYPROTECTION_TYPE = -1071242417
+ERROR_GRAPHICS_UNASSIGNED_MODESET_ALREADY_EXISTS = -1071242416
+ERROR_GRAPHICS_PATH_CONTENT_GEOMETRY_TRANSFORMATION_NOT_PINNED = 0x00262351
+ERROR_GRAPHICS_INVALID_SCANLINE_ORDERING = -1071242414
+ERROR_GRAPHICS_TOPOLOGY_CHANGES_NOT_ALLOWED = -1071242413
+ERROR_GRAPHICS_NO_AVAILABLE_IMPORTANCE_ORDINALS = -1071242412
+ERROR_GRAPHICS_INCOMPATIBLE_PRIVATE_FORMAT = -1071242411
+ERROR_GRAPHICS_INVALID_MODE_PRUNING_ALGORITHM = -1071242410
+ERROR_GRAPHICS_INVALID_MONITOR_CAPABILITY_ORIGIN = -1071242409
+ERROR_GRAPHICS_INVALID_MONITOR_FREQUENCYRANGE_CONSTRAINT = -1071242408
+ERROR_GRAPHICS_MAX_NUM_PATHS_REACHED = -1071242407
+ERROR_GRAPHICS_CANCEL_VIDPN_TOPOLOGY_AUGMENTATION = -1071242406
+ERROR_GRAPHICS_INVALID_CLIENT_TYPE = -1071242405
+ERROR_GRAPHICS_CLIENTVIDPN_NOT_SET = -1071242404
+ERROR_GRAPHICS_SPECIFIED_CHILD_ALREADY_CONNECTED = -1071242240
+ERROR_GRAPHICS_CHILD_DESCRIPTOR_NOT_SUPPORTED = -1071242239
+ERROR_GRAPHICS_UNKNOWN_CHILD_STATUS = 0x4026242F
+ERROR_GRAPHICS_NOT_A_LINKED_ADAPTER = -1071242192
+ERROR_GRAPHICS_LEADLINK_NOT_ENUMERATED = -1071242191
+ERROR_GRAPHICS_CHAINLINKS_NOT_ENUMERATED = -1071242190
+ERROR_GRAPHICS_ADAPTER_CHAIN_NOT_READY = -1071242189
+ERROR_GRAPHICS_CHAINLINKS_NOT_STARTED = -1071242188
+ERROR_GRAPHICS_CHAINLINKS_NOT_POWERED_ON = -1071242187
+ERROR_GRAPHICS_INCONSISTENT_DEVICE_LINK_STATE = -1071242186
+ERROR_GRAPHICS_LEADLINK_START_DEFERRED = 0x40262437
+ERROR_GRAPHICS_NOT_POST_DEVICE_DRIVER = -1071242184
+ERROR_GRAPHICS_POLLING_TOO_FREQUENTLY = 0x40262439
+ERROR_GRAPHICS_START_DEFERRED = 0x4026243A
+ERROR_GRAPHICS_ADAPTER_ACCESS_NOT_EXCLUDED = -1071242181
+ERROR_GRAPHICS_DEPENDABLE_CHILD_STATUS = 0x4026243C
+ERROR_GRAPHICS_OPM_NOT_SUPPORTED = -1071241984
+ERROR_GRAPHICS_COPP_NOT_SUPPORTED = -1071241983
+ERROR_GRAPHICS_UAB_NOT_SUPPORTED = -1071241982
+ERROR_GRAPHICS_OPM_INVALID_ENCRYPTED_PARAMETERS = -1071241981
+ERROR_GRAPHICS_OPM_NO_VIDEO_OUTPUTS_EXIST = -1071241979
+ERROR_GRAPHICS_OPM_INTERNAL_ERROR = -1071241973
+ERROR_GRAPHICS_OPM_INVALID_HANDLE = -1071241972
+ERROR_GRAPHICS_PVP_INVALID_CERTIFICATE_LENGTH = -1071241970
+ERROR_GRAPHICS_OPM_SPANNING_MODE_ENABLED = -1071241969
+ERROR_GRAPHICS_OPM_THEATER_MODE_ENABLED = -1071241968
+ERROR_GRAPHICS_PVP_HFS_FAILED = -1071241967
+ERROR_GRAPHICS_OPM_INVALID_SRM = -1071241966
+ERROR_GRAPHICS_OPM_OUTPUT_DOES_NOT_SUPPORT_HDCP = -1071241965
+ERROR_GRAPHICS_OPM_OUTPUT_DOES_NOT_SUPPORT_ACP = -1071241964
+ERROR_GRAPHICS_OPM_OUTPUT_DOES_NOT_SUPPORT_CGMSA = -1071241963
+ERROR_GRAPHICS_OPM_HDCP_SRM_NEVER_SET = -1071241962
+ERROR_GRAPHICS_OPM_RESOLUTION_TOO_HIGH = -1071241961
+ERROR_GRAPHICS_OPM_ALL_HDCP_HARDWARE_ALREADY_IN_USE = -1071241960
+ERROR_GRAPHICS_OPM_VIDEO_OUTPUT_NO_LONGER_EXISTS = -1071241958
+ERROR_GRAPHICS_OPM_SESSION_TYPE_CHANGE_IN_PROGRESS = -1071241957
+ERROR_GRAPHICS_OPM_VIDEO_OUTPUT_DOES_NOT_HAVE_COPP_SEMANTICS = -1071241956
+ERROR_GRAPHICS_OPM_INVALID_INFORMATION_REQUEST = -1071241955
+ERROR_GRAPHICS_OPM_DRIVER_INTERNAL_ERROR = -1071241954
+ERROR_GRAPHICS_OPM_VIDEO_OUTPUT_DOES_NOT_HAVE_OPM_SEMANTICS = -1071241953
+ERROR_GRAPHICS_OPM_SIGNALING_NOT_SUPPORTED = -1071241952
+ERROR_GRAPHICS_OPM_INVALID_CONFIGURATION_REQUEST = -1071241951
+ERROR_GRAPHICS_I2C_NOT_SUPPORTED = -1071241856
+ERROR_GRAPHICS_I2C_DEVICE_DOES_NOT_EXIST = -1071241855
+ERROR_GRAPHICS_I2C_ERROR_TRANSMITTING_DATA = -1071241854
+ERROR_GRAPHICS_I2C_ERROR_RECEIVING_DATA = -1071241853
+ERROR_GRAPHICS_DDCCI_VCP_NOT_SUPPORTED = -1071241852
+ERROR_GRAPHICS_DDCCI_INVALID_DATA = -1071241851
+ERROR_GRAPHICS_DDCCI_MONITOR_RETURNED_INVALID_TIMING_STATUS_BYTE = -1071241850
+ERROR_GRAPHICS_MCA_INVALID_CAPABILITIES_STRING = -1071241849
+ERROR_GRAPHICS_MCA_INTERNAL_ERROR = -1071241848
+ERROR_GRAPHICS_DDCCI_INVALID_MESSAGE_COMMAND = -1071241847
+ERROR_GRAPHICS_DDCCI_INVALID_MESSAGE_LENGTH = -1071241846
+ERROR_GRAPHICS_DDCCI_INVALID_MESSAGE_CHECKSUM = -1071241845
+ERROR_GRAPHICS_INVALID_PHYSICAL_MONITOR_HANDLE = -1071241844
+ERROR_GRAPHICS_MONITOR_NO_LONGER_EXISTS = -1071241843
+ERROR_GRAPHICS_DDCCI_CURRENT_CURRENT_VALUE_GREATER_THAN_MAXIMUM_VALUE = -1071241768
+ERROR_GRAPHICS_MCA_INVALID_VCP_VERSION = -1071241767
+ERROR_GRAPHICS_MCA_MONITOR_VIOLATES_MCCS_SPECIFICATION = -1071241766
+ERROR_GRAPHICS_MCA_MCCS_VERSION_MISMATCH = -1071241765
+ERROR_GRAPHICS_MCA_UNSUPPORTED_MCCS_VERSION = -1071241764
+ERROR_GRAPHICS_MCA_INVALID_TECHNOLOGY_TYPE_RETURNED = -1071241762
+ERROR_GRAPHICS_MCA_UNSUPPORTED_COLOR_TEMPERATURE = -1071241761
+ERROR_GRAPHICS_ONLY_CONSOLE_SESSION_SUPPORTED = -1071241760
+ERROR_GRAPHICS_NO_DISPLAY_DEVICE_CORRESPONDS_TO_NAME = -1071241759
+ERROR_GRAPHICS_DISPLAY_DEVICE_NOT_ATTACHED_TO_DESKTOP = -1071241758
+ERROR_GRAPHICS_MIRRORING_DEVICES_NOT_SUPPORTED = -1071241757
+ERROR_GRAPHICS_INVALID_POINTER = -1071241756
+ERROR_GRAPHICS_NO_MONITORS_CORRESPOND_TO_DISPLAY_DEVICE = -1071241755
+ERROR_GRAPHICS_PARAMETER_ARRAY_TOO_SMALL = -1071241754
+ERROR_GRAPHICS_INTERNAL_ERROR = -1071241753
+ERROR_GRAPHICS_SESSION_TYPE_CHANGE_IN_PROGRESS = -1071249944
+NAP_E_INVALID_PACKET = -2144927743
+NAP_E_MISSING_SOH = -2144927742
+NAP_E_CONFLICTING_ID = -2144927741
+NAP_E_NO_CACHED_SOH = -2144927740
+NAP_E_STILL_BOUND = -2144927739
+NAP_E_NOT_REGISTERED = -2144927738
+NAP_E_NOT_INITIALIZED = -2144927737
+NAP_E_MISMATCHED_ID = -2144927736
+NAP_E_NOT_PENDING = -2144927735
+NAP_E_ID_NOT_FOUND = -2144927734
+NAP_E_MAXSIZE_TOO_SMALL = -2144927733
+NAP_E_SERVICE_NOT_RUNNING = -2144927732
+NAP_S_CERT_ALREADY_PRESENT = 0x0027000D
+NAP_E_ENTITY_DISABLED = -2144927730
+NAP_E_NETSH_GROUPPOLICY_ERROR = -2144927729
+NAP_E_TOO_MANY_CALLS = -2144927728
+NAP_E_SHV_CONFIG_EXISTED = -2144927727
+NAP_E_SHV_CONFIG_NOT_FOUND = -2144927726
+NAP_E_SHV_TIMEOUT = -2144927725
+TPM_E_ERROR_MASK = -2144862208
+TPM_E_AUTHFAIL = -2144862207
+TPM_E_BADINDEX = -2144862206
+TPM_E_BAD_PARAMETER = -2144862205
+TPM_E_AUDITFAILURE = -2144862204
+TPM_E_CLEAR_DISABLED = -2144862203
+TPM_E_DEACTIVATED = -2144862202
+TPM_E_DISABLED = -2144862201
+TPM_E_DISABLED_CMD = -2144862200
+TPM_E_FAIL = -2144862199
+TPM_E_BAD_ORDINAL = -2144862198
+TPM_E_INSTALL_DISABLED = -2144862197
+TPM_E_INVALID_KEYHANDLE = -2144862196
+TPM_E_KEYNOTFOUND = -2144862195
+TPM_E_INAPPROPRIATE_ENC = -2144862194
+TPM_E_MIGRATEFAIL = -2144862193
+TPM_E_INVALID_PCR_INFO = -2144862192
+TPM_E_NOSPACE = -2144862191
+TPM_E_NOSRK = -2144862190
+TPM_E_NOTSEALED_BLOB = -2144862189
+TPM_E_OWNER_SET = -2144862188
+TPM_E_RESOURCES = -2144862187
+TPM_E_SHORTRANDOM = -2144862186
+TPM_E_SIZE = -2144862185
+TPM_E_WRONGPCRVAL = -2144862184
+TPM_E_BAD_PARAM_SIZE = -2144862183
+TPM_E_SHA_THREAD = -2144862182
+TPM_E_SHA_ERROR = -2144862181
+TPM_E_FAILEDSELFTEST = -2144862180
+TPM_E_AUTH2FAIL = -2144862179
+TPM_E_BADTAG = -2144862178
+TPM_E_IOERROR = -2144862177
+TPM_E_ENCRYPT_ERROR = -2144862176
+TPM_E_DECRYPT_ERROR = -2144862175
+TPM_E_INVALID_AUTHHANDLE = -2144862174
+TPM_E_NO_ENDORSEMENT = -2144862173
+TPM_E_INVALID_KEYUSAGE = -2144862172
+TPM_E_WRONG_ENTITYTYPE = -2144862171
+TPM_E_INVALID_POSTINIT = -2144862170
+TPM_E_INAPPROPRIATE_SIG = -2144862169
+TPM_E_BAD_KEY_PROPERTY = -2144862168
+TPM_E_BAD_MIGRATION = -2144862167
+TPM_E_BAD_SCHEME = -2144862166
+TPM_E_BAD_DATASIZE = -2144862165
+TPM_E_BAD_MODE = -2144862164
+TPM_E_BAD_PRESENCE = -2144862163
+TPM_E_BAD_VERSION = -2144862162
+TPM_E_NO_WRAP_TRANSPORT = -2144862161
+TPM_E_AUDITFAIL_UNSUCCESSFUL = -2144862160
+TPM_E_AUDITFAIL_SUCCESSFUL = -2144862159
+TPM_E_NOTRESETABLE = -2144862158
+TPM_E_NOTLOCAL = -2144862157
+TPM_E_BAD_TYPE = -2144862156
+TPM_E_INVALID_RESOURCE = -2144862155
+TPM_E_NOTFIPS = -2144862154
+TPM_E_INVALID_FAMILY = -2144862153
+TPM_E_NO_NV_PERMISSION = -2144862152
+TPM_E_REQUIRES_SIGN = -2144862151
+TPM_E_KEY_NOTSUPPORTED = -2144862150
+TPM_E_AUTH_CONFLICT = -2144862149
+TPM_E_AREA_LOCKED = -2144862148
+TPM_E_BAD_LOCALITY = -2144862147
+TPM_E_READ_ONLY = -2144862146
+TPM_E_PER_NOWRITE = -2144862145
+TPM_E_FAMILYCOUNT = -2144862144
+TPM_E_WRITE_LOCKED = -2144862143
+TPM_E_BAD_ATTRIBUTES = -2144862142
+TPM_E_INVALID_STRUCTURE = -2144862141
+TPM_E_KEY_OWNER_CONTROL = -2144862140
+TPM_E_BAD_COUNTER = -2144862139
+TPM_E_NOT_FULLWRITE = -2144862138
+TPM_E_CONTEXT_GAP = -2144862137
+TPM_E_MAXNVWRITES = -2144862136
+TPM_E_NOOPERATOR = -2144862135
+TPM_E_RESOURCEMISSING = -2144862134
+TPM_E_DELEGATE_LOCK = -2144862133
+TPM_E_DELEGATE_FAMILY = -2144862132
+TPM_E_DELEGATE_ADMIN = -2144862131
+TPM_E_TRANSPORT_NOTEXCLUSIVE = -2144862130
+TPM_E_OWNER_CONTROL = -2144862129
+TPM_E_DAA_RESOURCES = -2144862128
+TPM_E_DAA_INPUT_DATA0 = -2144862127
+TPM_E_DAA_INPUT_DATA1 = -2144862126
+TPM_E_DAA_ISSUER_SETTINGS = -2144862125
+TPM_E_DAA_TPM_SETTINGS = -2144862124
+TPM_E_DAA_STAGE = -2144862123
+TPM_E_DAA_ISSUER_VALIDITY = -2144862122
+TPM_E_DAA_WRONG_W = -2144862121
+TPM_E_BAD_HANDLE = -2144862120
+TPM_E_BAD_DELEGATE = -2144862119
+TPM_E_BADCONTEXT = -2144862118
+TPM_E_TOOMANYCONTEXTS = -2144862117
+TPM_E_MA_TICKET_SIGNATURE = -2144862116
+TPM_E_MA_DESTINATION = -2144862115
+TPM_E_MA_SOURCE = -2144862114
+TPM_E_MA_AUTHORITY = -2144862113
+TPM_E_PERMANENTEK = -2144862111
+TPM_E_BAD_SIGNATURE = -2144862110
+TPM_E_NOCONTEXTSPACE = -2144862109
+TPM_20_E_ASYMMETRIC = -2144862079
+TPM_20_E_ATTRIBUTES = -2144862078
+TPM_20_E_HASH = -2144862077
+TPM_20_E_VALUE = -2144862076
+TPM_20_E_HIERARCHY = -2144862075
+TPM_20_E_KEY_SIZE = -2144862073
+TPM_20_E_MGF = -2144862072
+TPM_20_E_MODE = -2144862071
+TPM_20_E_TYPE = -2144862070
+TPM_20_E_HANDLE = -2144862069
+TPM_20_E_KDF = -2144862068
+TPM_20_E_RANGE = -2144862067
+TPM_20_E_AUTH_FAIL = -2144862066
+TPM_20_E_NONCE = -2144862065
+TPM_20_E_PP = -2144862064
+TPM_20_E_SCHEME = -2144862062
+TPM_20_E_SIZE = -2144862059
+TPM_20_E_SYMMETRIC = -2144862058
+TPM_20_E_TAG = -2144862057
+TPM_20_E_SELECTOR = -2144862056
+TPM_20_E_INSUFFICIENT = -2144862054
+TPM_20_E_SIGNATURE = -2144862053
+TPM_20_E_KEY = -2144862052
+TPM_20_E_POLICY_FAIL = -2144862051
+TPM_20_E_INTEGRITY = -2144862049
+TPM_20_E_TICKET = -2144862048
+TPM_20_E_RESERVED_BITS = -2144862047
+TPM_20_E_BAD_AUTH = -2144862046
+TPM_20_E_EXPIRED = -2144862045
+TPM_20_E_POLICY_CC = -2144862044
+TPM_20_E_BINDING = -2144862043
+TPM_20_E_CURVE = -2144862042
+TPM_20_E_ECC_POINT = -2144862041
+TPM_20_E_INITIALIZE = -2144861952
+TPM_20_E_FAILURE = -2144861951
+TPM_20_E_SEQUENCE = -2144861949
+TPM_20_E_PRIVATE = -2144861941
+TPM_20_E_HMAC = -2144861927
+TPM_20_E_DISABLED = -2144861920
+TPM_20_E_EXCLUSIVE = -2144861919
+TPM_20_E_ECC_CURVE = -2144861917
+TPM_20_E_AUTH_TYPE = -2144861916
+TPM_20_E_AUTH_MISSING = -2144861915
+TPM_20_E_POLICY = -2144861914
+TPM_20_E_PCR = -2144861913
+TPM_20_E_PCR_CHANGED = -2144861912
+TPM_20_E_UPGRADE = -2144861907
+TPM_20_E_TOO_MANY_CONTEXTS = -2144861906
+TPM_20_E_AUTH_UNAVAILABLE = -2144861905
+TPM_20_E_REBOOT = -2144861904
+TPM_20_E_UNBALANCED = -2144861903
+TPM_20_E_COMMAND_SIZE = -2144861886
+TPM_20_E_COMMAND_CODE = -2144861885
+TPM_20_E_AUTHSIZE = -2144861884
+TPM_20_E_AUTH_CONTEXT = -2144861883
+TPM_20_E_NV_RANGE = -2144861882
+TPM_20_E_NV_SIZE = -2144861881
+TPM_20_E_NV_LOCKED = -2144861880
+TPM_20_E_NV_AUTHORIZATION = -2144861879
+TPM_20_E_NV_UNINITIALIZED = -2144861878
+TPM_20_E_NV_SPACE = -2144861877
+TPM_20_E_NV_DEFINED = -2144861876
+TPM_20_E_BAD_CONTEXT = -2144861872
+TPM_20_E_CPHASH = -2144861871
+TPM_20_E_PARENT = -2144861870
+TPM_20_E_NEEDS_TEST = -2144861869
+TPM_20_E_NO_RESULT = -2144861868
+TPM_20_E_SENSITIVE = -2144861867
+TPM_E_COMMAND_BLOCKED = -2144861184
+TPM_E_INVALID_HANDLE = -2144861183
+TPM_E_DUPLICATE_VHANDLE = -2144861182
+TPM_E_EMBEDDED_COMMAND_BLOCKED = -2144861181
+TPM_E_EMBEDDED_COMMAND_UNSUPPORTED = -2144861180
+TPM_E_RETRY = -2144860160
+TPM_E_NEEDS_SELFTEST = -2144860159
+TPM_E_DOING_SELFTEST = -2144860158
+TPM_E_DEFEND_LOCK_RUNNING = -2144860157
+TPM_20_E_CONTEXT_GAP = -2144859903
+TPM_20_E_OBJECT_MEMORY = -2144859902
+TPM_20_E_SESSION_MEMORY = -2144859901
+TPM_20_E_MEMORY = -2144859900
+TPM_20_E_SESSION_HANDLES = -2144859899
+TPM_20_E_OBJECT_HANDLES = -2144859898
+TPM_20_E_LOCALITY = -2144859897
+TPM_20_E_YIELDED = -2144859896
+TPM_20_E_CANCELED = -2144859895
+TPM_20_E_TESTING = -2144859894
+TPM_20_E_NV_RATE = -2144859872
+TPM_20_E_LOCKOUT = -2144859871
+TPM_20_E_RETRY = -2144859870
+TPM_20_E_NV_UNAVAILABLE = -2144859869
+TBS_E_INTERNAL_ERROR = -2144845823
+TBS_E_BAD_PARAMETER = -2144845822
+TBS_E_INVALID_OUTPUT_POINTER = -2144845821
+TBS_E_INVALID_CONTEXT = -2144845820
+TBS_E_INSUFFICIENT_BUFFER = -2144845819
+TBS_E_IOERROR = -2144845818
+TBS_E_INVALID_CONTEXT_PARAM = -2144845817
+TBS_E_SERVICE_NOT_RUNNING = -2144845816
+TBS_E_TOO_MANY_TBS_CONTEXTS = -2144845815
+TBS_E_TOO_MANY_RESOURCES = -2144845814
+TBS_E_SERVICE_START_PENDING = -2144845813
+TBS_E_PPI_NOT_SUPPORTED = -2144845812
+TBS_E_COMMAND_CANCELED = -2144845811
+TBS_E_BUFFER_TOO_LARGE = -2144845810
+TBS_E_TPM_NOT_FOUND = -2144845809
+TBS_E_SERVICE_DISABLED = -2144845808
+TBS_E_NO_EVENT_LOG = -2144845807
+TBS_E_ACCESS_DENIED = -2144845806
+TBS_E_PROVISIONING_NOT_ALLOWED = -2144845805
+TBS_E_PPI_FUNCTION_UNSUPPORTED = -2144845804
+TBS_E_OWNERAUTH_NOT_FOUND = -2144845803
+TBS_E_PROVISIONING_INCOMPLETE = -2144845802
+TPMAPI_E_INVALID_STATE = -2144796416
+TPMAPI_E_NOT_ENOUGH_DATA = -2144796415
+TPMAPI_E_TOO_MUCH_DATA = -2144796414
+TPMAPI_E_INVALID_OUTPUT_POINTER = -2144796413
+TPMAPI_E_INVALID_PARAMETER = -2144796412
+TPMAPI_E_OUT_OF_MEMORY = -2144796411
+TPMAPI_E_BUFFER_TOO_SMALL = -2144796410
+TPMAPI_E_INTERNAL_ERROR = -2144796409
+TPMAPI_E_ACCESS_DENIED = -2144796408
+TPMAPI_E_AUTHORIZATION_FAILED = -2144796407
+TPMAPI_E_INVALID_CONTEXT_HANDLE = -2144796406
+TPMAPI_E_TBS_COMMUNICATION_ERROR = -2144796405
+TPMAPI_E_TPM_COMMAND_ERROR = -2144796404
+TPMAPI_E_MESSAGE_TOO_LARGE = -2144796403
+TPMAPI_E_INVALID_ENCODING = -2144796402
+TPMAPI_E_INVALID_KEY_SIZE = -2144796401
+TPMAPI_E_ENCRYPTION_FAILED = -2144796400
+TPMAPI_E_INVALID_KEY_PARAMS = -2144796399
+TPMAPI_E_INVALID_MIGRATION_AUTHORIZATION_BLOB = -2144796398
+TPMAPI_E_INVALID_PCR_INDEX = -2144796397
+TPMAPI_E_INVALID_DELEGATE_BLOB = -2144796396
+TPMAPI_E_INVALID_CONTEXT_PARAMS = -2144796395
+TPMAPI_E_INVALID_KEY_BLOB = -2144796394
+TPMAPI_E_INVALID_PCR_DATA = -2144796393
+TPMAPI_E_INVALID_OWNER_AUTH = -2144796392
+TPMAPI_E_FIPS_RNG_CHECK_FAILED = -2144796391
+TPMAPI_E_EMPTY_TCG_LOG = -2144796390
+TPMAPI_E_INVALID_TCG_LOG_ENTRY = -2144796389
+TPMAPI_E_TCG_SEPARATOR_ABSENT = -2144796388
+TPMAPI_E_TCG_INVALID_DIGEST_ENTRY = -2144796387
+TPMAPI_E_POLICY_DENIES_OPERATION = -2144796386
+TPMAPI_E_NV_BITS_NOT_DEFINED = -2144796385
+TPMAPI_E_NV_BITS_NOT_READY = -2144796384
+TPMAPI_E_SEALING_KEY_NOT_AVAILABLE = -2144796383
+TPMAPI_E_NO_AUTHORIZATION_CHAIN_FOUND = -2144796382
+TPMAPI_E_SVN_COUNTER_NOT_AVAILABLE = -2144796381
+TPMAPI_E_OWNER_AUTH_NOT_NULL = -2144796380
+TPMAPI_E_ENDORSEMENT_AUTH_NOT_NULL = -2144796379
+TPMAPI_E_AUTHORIZATION_REVOKED = -2144796378
+TPMAPI_E_MALFORMED_AUTHORIZATION_KEY = -2144796377
+TPMAPI_E_AUTHORIZING_KEY_NOT_SUPPORTED = -2144796376
+TPMAPI_E_INVALID_AUTHORIZATION_SIGNATURE = -2144796375
+TPMAPI_E_MALFORMED_AUTHORIZATION_POLICY = -2144796374
+TPMAPI_E_MALFORMED_AUTHORIZATION_OTHER = -2144796373
+TPMAPI_E_SEALING_KEY_CHANGED = -2144796372
+TPMAPI_E_INVALID_TPM_VERSION = -2144796371
+TPMAPI_E_INVALID_POLICYAUTH_BLOB_TYPE = -2144796370
+TBSIMP_E_BUFFER_TOO_SMALL = -2144796160
+TBSIMP_E_CLEANUP_FAILED = -2144796159
+TBSIMP_E_INVALID_CONTEXT_HANDLE = -2144796158
+TBSIMP_E_INVALID_CONTEXT_PARAM = -2144796157
+TBSIMP_E_TPM_ERROR = -2144796156
+TBSIMP_E_HASH_BAD_KEY = -2144796155
+TBSIMP_E_DUPLICATE_VHANDLE = -2144796154
+TBSIMP_E_INVALID_OUTPUT_POINTER = -2144796153
+TBSIMP_E_INVALID_PARAMETER = -2144796152
+TBSIMP_E_RPC_INIT_FAILED = -2144796151
+TBSIMP_E_SCHEDULER_NOT_RUNNING = -2144796150
+TBSIMP_E_COMMAND_CANCELED = -2144796149
+TBSIMP_E_OUT_OF_MEMORY = -2144796148
+TBSIMP_E_LIST_NO_MORE_ITEMS = -2144796147
+TBSIMP_E_LIST_NOT_FOUND = -2144796146
+TBSIMP_E_NOT_ENOUGH_SPACE = -2144796145
+TBSIMP_E_NOT_ENOUGH_TPM_CONTEXTS = -2144796144
+TBSIMP_E_COMMAND_FAILED = -2144796143
+TBSIMP_E_UNKNOWN_ORDINAL = -2144796142
+TBSIMP_E_RESOURCE_EXPIRED = -2144796141
+TBSIMP_E_INVALID_RESOURCE = -2144796140
+TBSIMP_E_NOTHING_TO_UNLOAD = -2144796139
+TBSIMP_E_HASH_TABLE_FULL = -2144796138
+TBSIMP_E_TOO_MANY_TBS_CONTEXTS = -2144796137
+TBSIMP_E_TOO_MANY_RESOURCES = -2144796136
+TBSIMP_E_PPI_NOT_SUPPORTED = -2144796135
+TBSIMP_E_TPM_INCOMPATIBLE = -2144796134
+TBSIMP_E_NO_EVENT_LOG = -2144796133
+TPM_E_PPI_ACPI_FAILURE = -2144795904
+TPM_E_PPI_USER_ABORT = -2144795903
+TPM_E_PPI_BIOS_FAILURE = -2144795902
+TPM_E_PPI_NOT_SUPPORTED = -2144795901
+TPM_E_PPI_BLOCKED_IN_BIOS = -2144795900
+TPM_E_PCP_ERROR_MASK = -2144795648
+TPM_E_PCP_DEVICE_NOT_READY = -2144795647
+TPM_E_PCP_INVALID_HANDLE = -2144795646
+TPM_E_PCP_INVALID_PARAMETER = -2144795645
+TPM_E_PCP_FLAG_NOT_SUPPORTED = -2144795644
+TPM_E_PCP_NOT_SUPPORTED = -2144795643
+TPM_E_PCP_BUFFER_TOO_SMALL = -2144795642
+TPM_E_PCP_INTERNAL_ERROR = -2144795641
+TPM_E_PCP_AUTHENTICATION_FAILED = -2144795640
+TPM_E_PCP_AUTHENTICATION_IGNORED = -2144795639
+TPM_E_PCP_POLICY_NOT_FOUND = -2144795638
+TPM_E_PCP_PROFILE_NOT_FOUND = -2144795637
+TPM_E_PCP_VALIDATION_FAILED = -2144795636
+TPM_E_PCP_WRONG_PARENT = -2144795634
+TPM_E_KEY_NOT_LOADED = -2144795633
+TPM_E_NO_KEY_CERTIFICATION = -2144795632
+TPM_E_KEY_NOT_FINALIZED = -2144795631
+TPM_E_ATTESTATION_CHALLENGE_NOT_SET = -2144795630
+TPM_E_NOT_PCR_BOUND = -2144795629
+TPM_E_KEY_ALREADY_FINALIZED = -2144795628
+TPM_E_KEY_USAGE_POLICY_NOT_SUPPORTED = -2144795627
+TPM_E_KEY_USAGE_POLICY_INVALID = -2144795626
+TPM_E_SOFT_KEY_ERROR = -2144795625
+TPM_E_KEY_NOT_AUTHENTICATED = -2144795624
+TPM_E_PCP_KEY_NOT_AIK = -2144795623
+TPM_E_KEY_NOT_SIGNING_KEY = -2144795622
+TPM_E_LOCKED_OUT = -2144795621
+TPM_E_CLAIM_TYPE_NOT_SUPPORTED = -2144795620
+TPM_E_VERSION_NOT_SUPPORTED = -2144795619
+TPM_E_BUFFER_LENGTH_MISMATCH = -2144795618
+TPM_E_PCP_IFX_RSA_KEY_CREATION_BLOCKED = -2144795617
+TPM_E_PCP_TICKET_MISSING = -2144795616
+TPM_E_PCP_RAW_POLICY_NOT_SUPPORTED = -2144795615
+TPM_E_PCP_KEY_HANDLE_INVALIDATED = -2144795614
+TPM_E_PCP_UNSUPPORTED_PSS_SALT = 0x40290423
+TPM_E_PCP_PLATFORM_CLAIM_MAY_BE_OUTDATED = 0x40290424
+TPM_E_PCP_PLATFORM_CLAIM_OUTDATED = 0x40290425
+TPM_E_PCP_PLATFORM_CLAIM_REBOOT = 0x40290426
+TPM_E_ZERO_EXHAUST_ENABLED = -2144795392
+TPM_E_PROVISIONING_INCOMPLETE = -2144795136
+TPM_E_INVALID_OWNER_AUTH = -2144795135
+TPM_E_TOO_MUCH_DATA = -2144795134
+TPM_E_TPM_GENERATED_EPS = -2144795133
+PLA_E_DCS_NOT_FOUND = -2144337918
+PLA_E_DCS_IN_USE = -2144337750
+PLA_E_TOO_MANY_FOLDERS = -2144337851
+PLA_E_NO_MIN_DISK = -2144337808
+PLA_E_DCS_ALREADY_EXISTS = -2144337737
+PLA_S_PROPERTY_IGNORED = 0x00300100
+PLA_E_PROPERTY_CONFLICT = -2144337663
+PLA_E_DCS_SINGLETON_REQUIRED = -2144337662
+PLA_E_CREDENTIALS_REQUIRED = -2144337661
+PLA_E_DCS_NOT_RUNNING = -2144337660
+PLA_E_CONFLICT_INCL_EXCL_API = -2144337659
+PLA_E_NETWORK_EXE_NOT_VALID = -2144337658
+PLA_E_EXE_ALREADY_CONFIGURED = -2144337657
+PLA_E_EXE_PATH_NOT_VALID = -2144337656
+PLA_E_DC_ALREADY_EXISTS = -2144337655
+PLA_E_DCS_START_WAIT_TIMEOUT = -2144337654
+PLA_E_DC_START_WAIT_TIMEOUT = -2144337653
+PLA_E_REPORT_WAIT_TIMEOUT = -2144337652
+PLA_E_NO_DUPLICATES = -2144337651
+PLA_E_EXE_FULL_PATH_REQUIRED = -2144337650
+PLA_E_INVALID_SESSION_NAME = -2144337649
+PLA_E_PLA_CHANNEL_NOT_ENABLED = -2144337648
+PLA_E_TASKSCHED_CHANNEL_NOT_ENABLED = -2144337647
+PLA_E_RULES_MANAGER_FAILED = -2144337646
+PLA_E_CABAPI_FAILURE = -2144337645
+FVE_E_LOCKED_VOLUME = -2144272384
+FVE_E_NOT_ENCRYPTED = -2144272383
+FVE_E_NO_TPM_BIOS = -2144272382
+FVE_E_NO_MBR_METRIC = -2144272381
+FVE_E_NO_BOOTSECTOR_METRIC = -2144272380
+FVE_E_NO_BOOTMGR_METRIC = -2144272379
+FVE_E_WRONG_BOOTMGR = -2144272378
+FVE_E_SECURE_KEY_REQUIRED = -2144272377
+FVE_E_NOT_ACTIVATED = -2144272376
+FVE_E_ACTION_NOT_ALLOWED = -2144272375
+FVE_E_AD_SCHEMA_NOT_INSTALLED = -2144272374
+FVE_E_AD_INVALID_DATATYPE = -2144272373
+FVE_E_AD_INVALID_DATASIZE = -2144272372
+FVE_E_AD_NO_VALUES = -2144272371
+FVE_E_AD_ATTR_NOT_SET = -2144272370
+FVE_E_AD_GUID_NOT_FOUND = -2144272369
+FVE_E_BAD_INFORMATION = -2144272368
+FVE_E_TOO_SMALL = -2144272367
+FVE_E_SYSTEM_VOLUME = -2144272366
+FVE_E_FAILED_WRONG_FS = -2144272365
+FVE_E_BAD_PARTITION_SIZE = -2144272364
+FVE_E_NOT_SUPPORTED = -2144272363
+FVE_E_BAD_DATA = -2144272362
+FVE_E_VOLUME_NOT_BOUND = -2144272361
+FVE_E_TPM_NOT_OWNED = -2144272360
+FVE_E_NOT_DATA_VOLUME = -2144272359
+FVE_E_AD_INSUFFICIENT_BUFFER = -2144272358
+FVE_E_CONV_READ = -2144272357
+FVE_E_CONV_WRITE = -2144272356
+FVE_E_KEY_REQUIRED = -2144272355
+FVE_E_CLUSTERING_NOT_SUPPORTED = -2144272354
+FVE_E_VOLUME_BOUND_ALREADY = -2144272353
+FVE_E_OS_NOT_PROTECTED = -2144272352
+FVE_E_PROTECTION_DISABLED = -2144272351
+FVE_E_RECOVERY_KEY_REQUIRED = -2144272350
+FVE_E_FOREIGN_VOLUME = -2144272349
+FVE_E_OVERLAPPED_UPDATE = -2144272348
+FVE_E_TPM_SRK_AUTH_NOT_ZERO = -2144272347
+FVE_E_FAILED_SECTOR_SIZE = -2144272346
+FVE_E_FAILED_AUTHENTICATION = -2144272345
+FVE_E_NOT_OS_VOLUME = -2144272344
+FVE_E_AUTOUNLOCK_ENABLED = -2144272343
+FVE_E_WRONG_BOOTSECTOR = -2144272342
+FVE_E_WRONG_SYSTEM_FS = -2144272341
+FVE_E_POLICY_PASSWORD_REQUIRED = -2144272340
+FVE_E_CANNOT_SET_FVEK_ENCRYPTED = -2144272339
+FVE_E_CANNOT_ENCRYPT_NO_KEY = -2144272338
+FVE_E_BOOTABLE_CDDVD = -2144272336
+FVE_E_PROTECTOR_EXISTS = -2144272335
+FVE_E_RELATIVE_PATH = -2144272334
+FVE_E_PROTECTOR_NOT_FOUND = -2144272333
+FVE_E_INVALID_KEY_FORMAT = -2144272332
+FVE_E_INVALID_PASSWORD_FORMAT = -2144272331
+FVE_E_FIPS_RNG_CHECK_FAILED = -2144272330
+FVE_E_FIPS_PREVENTS_RECOVERY_PASSWORD = -2144272329
+FVE_E_FIPS_PREVENTS_EXTERNAL_KEY_EXPORT = -2144272328
+FVE_E_NOT_DECRYPTED = -2144272327
+FVE_E_INVALID_PROTECTOR_TYPE = -2144272326
+FVE_E_NO_PROTECTORS_TO_TEST = -2144272325
+FVE_E_KEYFILE_NOT_FOUND = -2144272324
+FVE_E_KEYFILE_INVALID = -2144272323
+FVE_E_KEYFILE_NO_VMK = -2144272322
+FVE_E_TPM_DISABLED = -2144272321
+FVE_E_NOT_ALLOWED_IN_SAFE_MODE = -2144272320
+FVE_E_TPM_INVALID_PCR = -2144272319
+FVE_E_TPM_NO_VMK = -2144272318
+FVE_E_PIN_INVALID = -2144272317
+FVE_E_AUTH_INVALID_APPLICATION = -2144272316
+FVE_E_AUTH_INVALID_CONFIG = -2144272315
+FVE_E_FIPS_DISABLE_PROTECTION_NOT_ALLOWED = -2144272314
+FVE_E_FS_NOT_EXTENDED = -2144272313
+FVE_E_FIRMWARE_TYPE_NOT_SUPPORTED = -2144272312
+FVE_E_NO_LICENSE = -2144272311
+FVE_E_NOT_ON_STACK = -2144272310
+FVE_E_FS_MOUNTED = -2144272309
+FVE_E_TOKEN_NOT_IMPERSONATED = -2144272308
+FVE_E_DRY_RUN_FAILED = -2144272307
+FVE_E_REBOOT_REQUIRED = -2144272306
+FVE_E_DEBUGGER_ENABLED = -2144272305
+FVE_E_RAW_ACCESS = -2144272304
+FVE_E_RAW_BLOCKED = -2144272303
+FVE_E_BCD_APPLICATIONS_PATH_INCORRECT = -2144272302
+FVE_E_NOT_ALLOWED_IN_VERSION = -2144272301
+FVE_E_NO_AUTOUNLOCK_MASTER_KEY = -2144272300
+FVE_E_MOR_FAILED = -2144272299
+FVE_E_HIDDEN_VOLUME = -2144272298
+FVE_E_TRANSIENT_STATE = -2144272297
+FVE_E_PUBKEY_NOT_ALLOWED = -2144272296
+FVE_E_VOLUME_HANDLE_OPEN = -2144272295
+FVE_E_NO_FEATURE_LICENSE = -2144272294
+FVE_E_INVALID_STARTUP_OPTIONS = -2144272293
+FVE_E_POLICY_RECOVERY_PASSWORD_NOT_ALLOWED = -2144272292
+FVE_E_POLICY_RECOVERY_PASSWORD_REQUIRED = -2144272291
+FVE_E_POLICY_RECOVERY_KEY_NOT_ALLOWED = -2144272290
+FVE_E_POLICY_RECOVERY_KEY_REQUIRED = -2144272289
+FVE_E_POLICY_STARTUP_PIN_NOT_ALLOWED = -2144272288
+FVE_E_POLICY_STARTUP_PIN_REQUIRED = -2144272287
+FVE_E_POLICY_STARTUP_KEY_NOT_ALLOWED = -2144272286
+FVE_E_POLICY_STARTUP_KEY_REQUIRED = -2144272285
+FVE_E_POLICY_STARTUP_PIN_KEY_NOT_ALLOWED = -2144272284
+FVE_E_POLICY_STARTUP_PIN_KEY_REQUIRED = -2144272283
+FVE_E_POLICY_STARTUP_TPM_NOT_ALLOWED = -2144272282
+FVE_E_POLICY_STARTUP_TPM_REQUIRED = -2144272281
+FVE_E_POLICY_INVALID_PIN_LENGTH = -2144272280
+FVE_E_KEY_PROTECTOR_NOT_SUPPORTED = -2144272279
+FVE_E_POLICY_PASSPHRASE_NOT_ALLOWED = -2144272278
+FVE_E_POLICY_PASSPHRASE_REQUIRED = -2144272277
+FVE_E_FIPS_PREVENTS_PASSPHRASE = -2144272276
+FVE_E_OS_VOLUME_PASSPHRASE_NOT_ALLOWED = -2144272275
+FVE_E_INVALID_BITLOCKER_OID = -2144272274
+FVE_E_VOLUME_TOO_SMALL = -2144272273
+FVE_E_DV_NOT_SUPPORTED_ON_FS = -2144272272
+FVE_E_DV_NOT_ALLOWED_BY_GP = -2144272271
+FVE_E_POLICY_USER_CERTIFICATE_NOT_ALLOWED = -2144272270
+FVE_E_POLICY_USER_CERTIFICATE_REQUIRED = -2144272269
+FVE_E_POLICY_USER_CERT_MUST_BE_HW = -2144272268
+FVE_E_POLICY_USER_CONFIGURE_FDV_AUTOUNLOCK_NOT_ALLOWED = -2144272267
+FVE_E_POLICY_USER_CONFIGURE_RDV_AUTOUNLOCK_NOT_ALLOWED = -2144272266
+FVE_E_POLICY_USER_CONFIGURE_RDV_NOT_ALLOWED = -2144272265
+FVE_E_POLICY_USER_ENABLE_RDV_NOT_ALLOWED = -2144272264
+FVE_E_POLICY_USER_DISABLE_RDV_NOT_ALLOWED = -2144272263
+FVE_E_POLICY_INVALID_PASSPHRASE_LENGTH = -2144272256
+FVE_E_POLICY_PASSPHRASE_TOO_SIMPLE = -2144272255
+FVE_E_RECOVERY_PARTITION = -2144272254
+FVE_E_POLICY_CONFLICT_FDV_RK_OFF_AUK_ON = -2144272253
+FVE_E_POLICY_CONFLICT_RDV_RK_OFF_AUK_ON = -2144272252
+FVE_E_NON_BITLOCKER_OID = -2144272251
+FVE_E_POLICY_PROHIBITS_SELFSIGNED = -2144272250
+FVE_E_POLICY_CONFLICT_RO_AND_STARTUP_KEY_REQUIRED = -2144272249
+FVE_E_CONV_RECOVERY_FAILED = -2144272248
+FVE_E_VIRTUALIZED_SPACE_TOO_BIG = -2144272247
+FVE_E_POLICY_CONFLICT_OSV_RP_OFF_ADB_ON = -2144272240
+FVE_E_POLICY_CONFLICT_FDV_RP_OFF_ADB_ON = -2144272239
+FVE_E_POLICY_CONFLICT_RDV_RP_OFF_ADB_ON = -2144272238
+FVE_E_NON_BITLOCKER_KU = -2144272237
+FVE_E_PRIVATEKEY_AUTH_FAILED = -2144272236
+FVE_E_REMOVAL_OF_DRA_FAILED = -2144272235
+FVE_E_OPERATION_NOT_SUPPORTED_ON_VISTA_VOLUME = -2144272234
+FVE_E_CANT_LOCK_AUTOUNLOCK_ENABLED_VOLUME = -2144272233
+FVE_E_FIPS_HASH_KDF_NOT_ALLOWED = -2144272232
+FVE_E_ENH_PIN_INVALID = -2144272231
+FVE_E_INVALID_PIN_CHARS = -2144272230
+FVE_E_INVALID_DATUM_TYPE = -2144272229
+FVE_E_EFI_ONLY = -2144272228
+FVE_E_MULTIPLE_NKP_CERTS = -2144272227
+FVE_E_REMOVAL_OF_NKP_FAILED = -2144272226
+FVE_E_INVALID_NKP_CERT = -2144272225
+FVE_E_NO_EXISTING_PIN = -2144272224
+FVE_E_PROTECTOR_CHANGE_PIN_MISMATCH = -2144272223
+FVE_E_PIN_PROTECTOR_CHANGE_BY_STD_USER_DISALLOWED = -2144272222
+FVE_E_PROTECTOR_CHANGE_MAX_PIN_CHANGE_ATTEMPTS_REACHED = -2144272221
+FVE_E_POLICY_PASSPHRASE_REQUIRES_ASCII = -2144272220
+FVE_E_FULL_ENCRYPTION_NOT_ALLOWED_ON_TP_STORAGE = -2144272219
+FVE_E_WIPE_NOT_ALLOWED_ON_TP_STORAGE = -2144272218
+FVE_E_KEY_LENGTH_NOT_SUPPORTED_BY_EDRIVE = -2144272217
+FVE_E_NO_EXISTING_PASSPHRASE = -2144272216
+FVE_E_PROTECTOR_CHANGE_PASSPHRASE_MISMATCH = -2144272215
+FVE_E_PASSPHRASE_TOO_LONG = -2144272214
+FVE_E_NO_PASSPHRASE_WITH_TPM = -2144272213
+FVE_E_NO_TPM_WITH_PASSPHRASE = -2144272212
+FVE_E_NOT_ALLOWED_ON_CSV_STACK = -2144272211
+FVE_E_NOT_ALLOWED_ON_CLUSTER = -2144272210
+FVE_E_EDRIVE_NO_FAILOVER_TO_SW = -2144272209
+FVE_E_EDRIVE_BAND_IN_USE = -2144272208
+FVE_E_EDRIVE_DISALLOWED_BY_GP = -2144272207
+FVE_E_EDRIVE_INCOMPATIBLE_VOLUME = -2144272206
+FVE_E_NOT_ALLOWED_TO_UPGRADE_WHILE_CONVERTING = -2144272205
+FVE_E_EDRIVE_DV_NOT_SUPPORTED = -2144272204
+FVE_E_NO_PREBOOT_KEYBOARD_DETECTED = -2144272203
+FVE_E_NO_PREBOOT_KEYBOARD_OR_WINRE_DETECTED = -2144272202
+FVE_E_POLICY_REQUIRES_STARTUP_PIN_ON_TOUCH_DEVICE = -2144272201
+FVE_E_POLICY_REQUIRES_RECOVERY_PASSWORD_ON_TOUCH_DEVICE = -2144272200
+FVE_E_WIPE_CANCEL_NOT_APPLICABLE = -2144272199
+FVE_E_SECUREBOOT_DISABLED = -2144272198
+FVE_E_SECUREBOOT_CONFIGURATION_INVALID = -2144272197
+FVE_E_EDRIVE_DRY_RUN_FAILED = -2144272196
+FVE_E_SHADOW_COPY_PRESENT = -2144272195
+FVE_E_POLICY_INVALID_ENHANCED_BCD_SETTINGS = -2144272194
+FVE_E_EDRIVE_INCOMPATIBLE_FIRMWARE = -2144272193
+FVE_E_PROTECTOR_CHANGE_MAX_PASSPHRASE_CHANGE_ATTEMPTS_REACHED = -2144272192
+FVE_E_PASSPHRASE_PROTECTOR_CHANGE_BY_STD_USER_DISALLOWED = -2144272191
+FVE_E_LIVEID_ACCOUNT_SUSPENDED = -2144272190
+FVE_E_LIVEID_ACCOUNT_BLOCKED = -2144272189
+FVE_E_NOT_PROVISIONED_ON_ALL_VOLUMES = -2144272188
+FVE_E_DE_FIXED_DATA_NOT_SUPPORTED = -2144272187
+FVE_E_DE_HARDWARE_NOT_COMPLIANT = -2144272186
+FVE_E_DE_WINRE_NOT_CONFIGURED = -2144272185
+FVE_E_DE_PROTECTION_SUSPENDED = -2144272184
+FVE_E_DE_OS_VOLUME_NOT_PROTECTED = -2144272183
+FVE_E_DE_DEVICE_LOCKEDOUT = -2144272182
+FVE_E_DE_PROTECTION_NOT_YET_ENABLED = -2144272181
+FVE_E_INVALID_PIN_CHARS_DETAILED = -2144272180
+FVE_E_DEVICE_LOCKOUT_COUNTER_UNAVAILABLE = -2144272179
+FVE_E_DEVICELOCKOUT_COUNTER_MISMATCH = -2144272178
+FVE_E_BUFFER_TOO_LARGE = -2144272177
+FVE_E_NO_SUCH_CAPABILITY_ON_TARGET = -2144272176
+FVE_E_DE_PREVENTED_FOR_OS = -2144272175
+FVE_E_DE_VOLUME_OPTED_OUT = -2144272174
+FVE_E_DE_VOLUME_NOT_SUPPORTED = -2144272173
+FVE_E_EOW_NOT_SUPPORTED_IN_VERSION = -2144272172
+FVE_E_ADBACKUP_NOT_ENABLED = -2144272171
+FVE_E_VOLUME_EXTEND_PREVENTS_EOW_DECRYPT = -2144272170
+FVE_E_NOT_DE_VOLUME = -2144272169
+FVE_E_PROTECTION_CANNOT_BE_DISABLED = -2144272168
+FVE_E_OSV_KSR_NOT_ALLOWED = -2144272167
+FVE_E_AD_BACKUP_REQUIRED_POLICY_NOT_SET_OS_DRIVE = -2144272166
+FVE_E_AD_BACKUP_REQUIRED_POLICY_NOT_SET_FIXED_DRIVE = -2144272165
+FVE_E_AD_BACKUP_REQUIRED_POLICY_NOT_SET_REMOVABLE_DRIVE = -2144272164
+FVE_E_KEY_ROTATION_NOT_SUPPORTED = -2144272163
+FVE_E_EXECUTE_REQUEST_SENT_TOO_SOON = -2144272162
+FVE_E_KEY_ROTATION_NOT_ENABLED = -2144272161
+FVE_E_DEVICE_NOT_JOINED = -2144272160
+FVE_E_AAD_ENDPOINT_BUSY = -2144272159
+FVE_E_INVALID_NBP_CERT = -2144272158
+FVE_E_EDRIVE_BAND_ENUMERATION_FAILED = -2144272157
+FVE_E_POLICY_ON_RDV_EXCLUSION_LIST = -2144272156
+FVE_E_PREDICTED_TPM_PROTECTOR_NOT_SUPPORTED = -2144272155
+FVE_E_SETUP_TPM_CALLBACK_NOT_SUPPORTED = -2144272154
+FVE_E_TPM_CONTEXT_SETUP_NOT_SUPPORTED = -2144272153
+FVE_E_UPDATE_INVALID_CONFIG = -2144272152
+FVE_E_AAD_SERVER_FAIL_RETRY_AFTER = -2144272151
+FVE_E_AAD_SERVER_FAIL_BACKOFF = -2144272150
+FVE_E_DATASET_FULL = -2144272149
+FVE_E_METADATA_FULL = -2144272148
+FWP_E_CALLOUT_NOT_FOUND = -2144206847
+FWP_E_CONDITION_NOT_FOUND = -2144206846
+FWP_E_FILTER_NOT_FOUND = -2144206845
+FWP_E_LAYER_NOT_FOUND = -2144206844
+FWP_E_PROVIDER_NOT_FOUND = -2144206843
+FWP_E_PROVIDER_CONTEXT_NOT_FOUND = -2144206842
+FWP_E_SUBLAYER_NOT_FOUND = -2144206841
+FWP_E_NOT_FOUND = -2144206840
+FWP_E_ALREADY_EXISTS = -2144206839
+FWP_E_IN_USE = -2144206838
+FWP_E_DYNAMIC_SESSION_IN_PROGRESS = -2144206837
+FWP_E_WRONG_SESSION = -2144206836
+FWP_E_NO_TXN_IN_PROGRESS = -2144206835
+FWP_E_TXN_IN_PROGRESS = -2144206834
+FWP_E_TXN_ABORTED = -2144206833
+FWP_E_SESSION_ABORTED = -2144206832
+FWP_E_INCOMPATIBLE_TXN = -2144206831
+FWP_E_TIMEOUT = -2144206830
+FWP_E_NET_EVENTS_DISABLED = -2144206829
+FWP_E_INCOMPATIBLE_LAYER = -2144206828
+FWP_E_KM_CLIENTS_ONLY = -2144206827
+FWP_E_LIFETIME_MISMATCH = -2144206826
+FWP_E_BUILTIN_OBJECT = -2144206825
+FWP_E_TOO_MANY_CALLOUTS = -2144206824
+FWP_E_NOTIFICATION_DROPPED = -2144206823
+FWP_E_TRAFFIC_MISMATCH = -2144206822
+FWP_E_INCOMPATIBLE_SA_STATE = -2144206821
+FWP_E_NULL_POINTER = -2144206820
+FWP_E_INVALID_ENUMERATOR = -2144206819
+FWP_E_INVALID_FLAGS = -2144206818
+FWP_E_INVALID_NET_MASK = -2144206817
+FWP_E_INVALID_RANGE = -2144206816
+FWP_E_INVALID_INTERVAL = -2144206815
+FWP_E_ZERO_LENGTH_ARRAY = -2144206814
+FWP_E_NULL_DISPLAY_NAME = -2144206813
+FWP_E_INVALID_ACTION_TYPE = -2144206812
+FWP_E_INVALID_WEIGHT = -2144206811
+FWP_E_MATCH_TYPE_MISMATCH = -2144206810
+FWP_E_TYPE_MISMATCH = -2144206809
+FWP_E_OUT_OF_BOUNDS = -2144206808
+FWP_E_RESERVED = -2144206807
+FWP_E_DUPLICATE_CONDITION = -2144206806
+FWP_E_DUPLICATE_KEYMOD = -2144206805
+FWP_E_ACTION_INCOMPATIBLE_WITH_LAYER = -2144206804
+FWP_E_ACTION_INCOMPATIBLE_WITH_SUBLAYER = -2144206803
+FWP_E_CONTEXT_INCOMPATIBLE_WITH_LAYER = -2144206802
+FWP_E_CONTEXT_INCOMPATIBLE_WITH_CALLOUT = -2144206801
+FWP_E_INCOMPATIBLE_AUTH_METHOD = -2144206800
+FWP_E_INCOMPATIBLE_DH_GROUP = -2144206799
+FWP_E_EM_NOT_SUPPORTED = -2144206798
+FWP_E_NEVER_MATCH = -2144206797
+FWP_E_PROVIDER_CONTEXT_MISMATCH = -2144206796
+FWP_E_INVALID_PARAMETER = -2144206795
+FWP_E_TOO_MANY_SUBLAYERS = -2144206794
+FWP_E_CALLOUT_NOTIFICATION_FAILED = -2144206793
+FWP_E_INVALID_AUTH_TRANSFORM = -2144206792
+FWP_E_INVALID_CIPHER_TRANSFORM = -2144206791
+FWP_E_INCOMPATIBLE_CIPHER_TRANSFORM = -2144206790
+FWP_E_INVALID_TRANSFORM_COMBINATION = -2144206789
+FWP_E_DUPLICATE_AUTH_METHOD = -2144206788
+FWP_E_INVALID_TUNNEL_ENDPOINT = -2144206787
+FWP_E_L2_DRIVER_NOT_READY = -2144206786
+FWP_E_KEY_DICTATOR_ALREADY_REGISTERED = -2144206785
+FWP_E_KEY_DICTATION_INVALID_KEYING_MATERIAL = -2144206784
+FWP_E_CONNECTIONS_DISABLED = -2144206783
+FWP_E_INVALID_DNS_NAME = -2144206782
+FWP_E_STILL_ON = -2144206781
+FWP_E_IKEEXT_NOT_RUNNING = -2144206780
+FWP_E_DROP_NOICMP = -2144206588
+WS_S_ASYNC = 0x003D0000
+WS_S_END = 0x003D0001
+WS_E_INVALID_FORMAT = -2143485952
+WS_E_OBJECT_FAULTED = -2143485951
+WS_E_NUMERIC_OVERFLOW = -2143485950
+WS_E_INVALID_OPERATION = -2143485949
+WS_E_OPERATION_ABORTED = -2143485948
+WS_E_ENDPOINT_ACCESS_DENIED = -2143485947
+WS_E_OPERATION_TIMED_OUT = -2143485946
+WS_E_OPERATION_ABANDONED = -2143485945
+WS_E_QUOTA_EXCEEDED = -2143485944
+WS_E_NO_TRANSLATION_AVAILABLE = -2143485943
+WS_E_SECURITY_VERIFICATION_FAILURE = -2143485942
+WS_E_ADDRESS_IN_USE = -2143485941
+WS_E_ADDRESS_NOT_AVAILABLE = -2143485940
+WS_E_ENDPOINT_NOT_FOUND = -2143485939
+WS_E_ENDPOINT_NOT_AVAILABLE = -2143485938
+WS_E_ENDPOINT_FAILURE = -2143485937
+WS_E_ENDPOINT_UNREACHABLE = -2143485936
+WS_E_ENDPOINT_ACTION_NOT_SUPPORTED = -2143485935
+WS_E_ENDPOINT_TOO_BUSY = -2143485934
+WS_E_ENDPOINT_FAULT_RECEIVED = -2143485933
+WS_E_ENDPOINT_DISCONNECTED = -2143485932
+WS_E_PROXY_FAILURE = -2143485931
+WS_E_PROXY_ACCESS_DENIED = -2143485930
+WS_E_NOT_SUPPORTED = -2143485929
+WS_E_PROXY_REQUIRES_BASIC_AUTH = -2143485928
+WS_E_PROXY_REQUIRES_DIGEST_AUTH = -2143485927
+WS_E_PROXY_REQUIRES_NTLM_AUTH = -2143485926
+WS_E_PROXY_REQUIRES_NEGOTIATE_AUTH = -2143485925
+WS_E_SERVER_REQUIRES_BASIC_AUTH = -2143485924
+WS_E_SERVER_REQUIRES_DIGEST_AUTH = -2143485923
+WS_E_SERVER_REQUIRES_NTLM_AUTH = -2143485922
+WS_E_SERVER_REQUIRES_NEGOTIATE_AUTH = -2143485921
+WS_E_INVALID_ENDPOINT_URL = -2143485920
+WS_E_OTHER = -2143485919
+WS_E_SECURITY_TOKEN_EXPIRED = -2143485918
+WS_E_SECURITY_SYSTEM_FAILURE = -2143485917
+
+
+ERROR_NDIS_INTERFACE_CLOSING = -2144075774
+ERROR_NDIS_BAD_VERSION = -2144075772
+ERROR_NDIS_BAD_CHARACTERISTICS = -2144075771
+ERROR_NDIS_ADAPTER_NOT_FOUND = -2144075770
+ERROR_NDIS_OPEN_FAILED = -2144075769
+ERROR_NDIS_DEVICE_FAILED = -2144075768
+ERROR_NDIS_MULTICAST_FULL = -2144075767
+ERROR_NDIS_MULTICAST_EXISTS = -2144075766
+ERROR_NDIS_MULTICAST_NOT_FOUND = -2144075765
+ERROR_NDIS_REQUEST_ABORTED = -2144075764
+ERROR_NDIS_RESET_IN_PROGRESS = -2144075763
+ERROR_NDIS_NOT_SUPPORTED = -2144075589
+ERROR_NDIS_INVALID_PACKET = -2144075761
+ERROR_NDIS_ADAPTER_NOT_READY = -2144075759
+ERROR_NDIS_INVALID_LENGTH = -2144075756
+ERROR_NDIS_INVALID_DATA = -2144075755
+ERROR_NDIS_BUFFER_TOO_SHORT = -2144075754
+ERROR_NDIS_INVALID_OID = -2144075753
+ERROR_NDIS_ADAPTER_REMOVED = -2144075752
+ERROR_NDIS_UNSUPPORTED_MEDIA = -2144075751
+ERROR_NDIS_GROUP_ADDRESS_IN_USE = -2144075750
+ERROR_NDIS_FILE_NOT_FOUND = -2144075749
+ERROR_NDIS_ERROR_READING_FILE = -2144075748
+ERROR_NDIS_ALREADY_MAPPED = -2144075747
+ERROR_NDIS_RESOURCE_CONFLICT = -2144075746
+ERROR_NDIS_MEDIA_DISCONNECTED = -2144075745
+ERROR_NDIS_INVALID_ADDRESS = -2144075742
+ERROR_NDIS_INVALID_DEVICE_REQUEST = -2144075760
+ERROR_NDIS_PAUSED = -2144075734
+ERROR_NDIS_INTERFACE_NOT_FOUND = -2144075733
+ERROR_NDIS_UNSUPPORTED_REVISION = -2144075732
+ERROR_NDIS_INVALID_PORT = -2144075731
+ERROR_NDIS_INVALID_PORT_STATE = -2144075730
+ERROR_NDIS_LOW_POWER_STATE = -2144075729
+ERROR_NDIS_REINIT_REQUIRED = -2144075728
+ERROR_NDIS_NO_QUEUES = -2144075727
+ERROR_NDIS_DOT11_AUTO_CONFIG_ENABLED = -2144067584
+ERROR_NDIS_DOT11_MEDIA_IN_USE = -2144067583
+ERROR_NDIS_DOT11_POWER_STATE_INVALID = -2144067582
+ERROR_NDIS_PM_WOL_PATTERN_LIST_FULL = -2144067581
+ERROR_NDIS_PM_PROTOCOL_OFFLOAD_LIST_FULL = -2144067580
+ERROR_NDIS_DOT11_AP_CHANNEL_CURRENTLY_NOT_AVAILABLE = -2144067579
+ERROR_NDIS_DOT11_AP_BAND_CURRENTLY_NOT_AVAILABLE = -2144067578
+ERROR_NDIS_DOT11_AP_CHANNEL_NOT_ALLOWED = -2144067577
+ERROR_NDIS_DOT11_AP_BAND_NOT_ALLOWED = -2144067576
+ERROR_NDIS_INDICATION_REQUIRED = 0x00340001
+ERROR_NDIS_OFFLOAD_POLICY = -1070329841
+ERROR_NDIS_OFFLOAD_CONNECTION_REJECTED = -1070329838
+ERROR_NDIS_OFFLOAD_PATH_REJECTED = -1070329837
+ERROR_HV_INVALID_HYPERCALL_CODE = -1070268414
+ERROR_HV_INVALID_HYPERCALL_INPUT = -1070268413
+ERROR_HV_INVALID_ALIGNMENT = -1070268412
+ERROR_HV_INVALID_PARAMETER = -1070268411
+ERROR_HV_ACCESS_DENIED = -1070268410
+ERROR_HV_INVALID_PARTITION_STATE = -1070268409
+ERROR_HV_OPERATION_DENIED = -1070268408
+ERROR_HV_UNKNOWN_PROPERTY = -1070268407
+ERROR_HV_PROPERTY_VALUE_OUT_OF_RANGE = -1070268406
+ERROR_HV_INSUFFICIENT_MEMORY = -1070268405
+ERROR_HV_PARTITION_TOO_DEEP = -1070268404
+ERROR_HV_INVALID_PARTITION_ID = -1070268403
+ERROR_HV_INVALID_VP_INDEX = -1070268402
+ERROR_HV_INVALID_PORT_ID = -1070268399
+ERROR_HV_INVALID_CONNECTION_ID = -1070268398
+ERROR_HV_INSUFFICIENT_BUFFERS = -1070268397
+ERROR_HV_NOT_ACKNOWLEDGED = -1070268396
+ERROR_HV_INVALID_VP_STATE = -1070268395
+ERROR_HV_ACKNOWLEDGED = -1070268394
+ERROR_HV_INVALID_SAVE_RESTORE_STATE = -1070268393
+ERROR_HV_INVALID_SYNIC_STATE = -1070268392
+ERROR_HV_OBJECT_IN_USE = -1070268391
+ERROR_HV_INVALID_PROXIMITY_DOMAIN_INFO = -1070268390
+ERROR_HV_NO_DATA = -1070268389
+ERROR_HV_INACTIVE = -1070268388
+ERROR_HV_NO_RESOURCES = -1070268387
+ERROR_HV_FEATURE_UNAVAILABLE = -1070268386
+ERROR_HV_INSUFFICIENT_BUFFER = -1070268365
+ERROR_HV_INSUFFICIENT_DEVICE_DOMAINS = -1070268360
+ERROR_HV_CPUID_FEATURE_VALIDATION = -1070268356
+ERROR_HV_CPUID_XSAVE_FEATURE_VALIDATION = -1070268355
+ERROR_HV_PROCESSOR_STARTUP_TIMEOUT = -1070268354
+ERROR_HV_SMX_ENABLED = -1070268353
+ERROR_HV_INVALID_LP_INDEX = -1070268351
+ERROR_HV_INVALID_REGISTER_VALUE = -1070268336
+ERROR_HV_INVALID_VTL_STATE = -1070268335
+ERROR_HV_NX_NOT_DETECTED = -1070268331
+ERROR_HV_INVALID_DEVICE_ID = -1070268329
+ERROR_HV_INVALID_DEVICE_STATE = -1070268328
+ERROR_HV_PENDING_PAGE_REQUESTS = 0x00350059
+ERROR_HV_PAGE_REQUEST_INVALID = -1070268320
+ERROR_HV_INVALID_CPU_GROUP_ID = -1070268305
+ERROR_HV_INVALID_CPU_GROUP_STATE = -1070268304
+ERROR_HV_OPERATION_FAILED = -1070268303
+ERROR_HV_NOT_ALLOWED_WITH_NESTED_VIRT_ACTIVE = -1070268302
+ERROR_HV_INSUFFICIENT_ROOT_MEMORY = -1070268301
+ERROR_HV_EVENT_BUFFER_ALREADY_FREED = -1070268300
+ERROR_HV_INSUFFICIENT_CONTIGUOUS_MEMORY = -1070268299
+ERROR_HV_DEVICE_NOT_IN_DOMAIN = -1070268298
+ERROR_HV_NESTED_VM_EXIT = -1070268297
+ERROR_HV_MSR_ACCESS_FAILED = -1070268288
+ERROR_HV_INSUFFICIENT_MEMORY_MIRRORING = -1070268287
+ERROR_HV_INSUFFICIENT_CONTIGUOUS_MEMORY_MIRRORING = -1070268286
+ERROR_HV_INSUFFICIENT_CONTIGUOUS_ROOT_MEMORY = -1070268285
+ERROR_HV_INSUFFICIENT_ROOT_MEMORY_MIRRORING = -1070268284
+ERROR_HV_INSUFFICIENT_CONTIGUOUS_ROOT_MEMORY_MIRRORING = -1070268283
+ERROR_HV_NOT_PRESENT = -1070264320
+ERROR_VID_DUPLICATE_HANDLER = -1070137343
+ERROR_VID_TOO_MANY_HANDLERS = -1070137342
+ERROR_VID_QUEUE_FULL = -1070137341
+ERROR_VID_HANDLER_NOT_PRESENT = -1070137340
+ERROR_VID_INVALID_OBJECT_NAME = -1070137339
+ERROR_VID_PARTITION_NAME_TOO_LONG = -1070137338
+ERROR_VID_MESSAGE_QUEUE_NAME_TOO_LONG = -1070137337
+ERROR_VID_PARTITION_ALREADY_EXISTS = -1070137336
+ERROR_VID_PARTITION_DOES_NOT_EXIST = -1070137335
+ERROR_VID_PARTITION_NAME_NOT_FOUND = -1070137334
+ERROR_VID_MESSAGE_QUEUE_ALREADY_EXISTS = -1070137333
+ERROR_VID_EXCEEDED_MBP_ENTRY_MAP_LIMIT = -1070137332
+ERROR_VID_MB_STILL_REFERENCED = -1070137331
+ERROR_VID_CHILD_GPA_PAGE_SET_CORRUPTED = -1070137330
+ERROR_VID_INVALID_NUMA_SETTINGS = -1070137329
+ERROR_VID_INVALID_NUMA_NODE_INDEX = -1070137328
+ERROR_VID_NOTIFICATION_QUEUE_ALREADY_ASSOCIATED = -1070137327
+ERROR_VID_INVALID_MEMORY_BLOCK_HANDLE = -1070137326
+ERROR_VID_PAGE_RANGE_OVERFLOW = -1070137325
+ERROR_VID_INVALID_MESSAGE_QUEUE_HANDLE = -1070137324
+ERROR_VID_INVALID_GPA_RANGE_HANDLE = -1070137323
+ERROR_VID_NO_MEMORY_BLOCK_NOTIFICATION_QUEUE = -1070137322
+ERROR_VID_MEMORY_BLOCK_LOCK_COUNT_EXCEEDED = -1070137321
+ERROR_VID_INVALID_PPM_HANDLE = -1070137320
+ERROR_VID_MBPS_ARE_LOCKED = -1070137319
+ERROR_VID_MESSAGE_QUEUE_CLOSED = -1070137318
+ERROR_VID_VIRTUAL_PROCESSOR_LIMIT_EXCEEDED = -1070137317
+ERROR_VID_STOP_PENDING = -1070137316
+ERROR_VID_INVALID_PROCESSOR_STATE = -1070137315
+ERROR_VID_EXCEEDED_KM_CONTEXT_COUNT_LIMIT = -1070137314
+ERROR_VID_KM_INTERFACE_ALREADY_INITIALIZED = -1070137313
+ERROR_VID_MB_PROPERTY_ALREADY_SET_RESET = -1070137312
+ERROR_VID_MMIO_RANGE_DESTROYED = -1070137311
+ERROR_VID_INVALID_CHILD_GPA_PAGE_SET = -1070137310
+ERROR_VID_RESERVE_PAGE_SET_IS_BEING_USED = -1070137309
+ERROR_VID_RESERVE_PAGE_SET_TOO_SMALL = -1070137308
+ERROR_VID_MBP_ALREADY_LOCKED_USING_RESERVED_PAGE = -1070137307
+ERROR_VID_MBP_COUNT_EXCEEDED_LIMIT = -1070137306
+ERROR_VID_SAVED_STATE_CORRUPT = -1070137305
+ERROR_VID_SAVED_STATE_UNRECOGNIZED_ITEM = -1070137304
+ERROR_VID_SAVED_STATE_INCOMPATIBLE = -1070137303
+ERROR_VID_VTL_ACCESS_DENIED = -1070137302
+ERROR_VID_INSUFFICIENT_RESOURCES_RESERVE = -1070137301
+ERROR_VID_INSUFFICIENT_RESOURCES_PHYSICAL_BUFFER = -1070137300
+ERROR_VID_INSUFFICIENT_RESOURCES_HV_DEPOSIT = -1070137299
+ERROR_VID_MEMORY_TYPE_NOT_SUPPORTED = -1070137298
+ERROR_VID_INSUFFICIENT_RESOURCES_WITHDRAW = -1070137297
+ERROR_VID_PROCESS_ALREADY_SET = -1070137296
+ERROR_VMCOMPUTE_TERMINATED_DURING_START = -1070137088
+ERROR_VMCOMPUTE_IMAGE_MISMATCH = -1070137087
+ERROR_VMCOMPUTE_HYPERV_NOT_INSTALLED = -1070137086
+ERROR_VMCOMPUTE_OPERATION_PENDING = -1070137085
+ERROR_VMCOMPUTE_TOO_MANY_NOTIFICATIONS = -1070137084
+ERROR_VMCOMPUTE_INVALID_STATE = -1070137083
+ERROR_VMCOMPUTE_UNEXPECTED_EXIT = -1070137082
+ERROR_VMCOMPUTE_TERMINATED = -1070137081
+ERROR_VMCOMPUTE_CONNECT_FAILED = -1070137080
+ERROR_VMCOMPUTE_TIMEOUT = -1070137079
+ERROR_VMCOMPUTE_CONNECTION_CLOSED = -1070137078
+ERROR_VMCOMPUTE_UNKNOWN_MESSAGE = -1070137077
+ERROR_VMCOMPUTE_UNSUPPORTED_PROTOCOL_VERSION = -1070137076
+ERROR_VMCOMPUTE_INVALID_JSON = -1070137075
+ERROR_VMCOMPUTE_SYSTEM_NOT_FOUND = -1070137074
+ERROR_VMCOMPUTE_SYSTEM_ALREADY_EXISTS = -1070137073
+ERROR_VMCOMPUTE_SYSTEM_ALREADY_STOPPED = -1070137072
+ERROR_VMCOMPUTE_PROTOCOL_ERROR = -1070137071
+ERROR_VMCOMPUTE_INVALID_LAYER = -1070137070
+ERROR_VMCOMPUTE_WINDOWS_INSIDER_REQUIRED = -1070137069
+HCS_E_TERMINATED_DURING_START = -2143878912
+HCS_E_IMAGE_MISMATCH = -2143878911
+HCS_E_HYPERV_NOT_INSTALLED = -2143878910
+HCS_E_INVALID_STATE = -2143878907
+HCS_E_UNEXPECTED_EXIT = -2143878906
+HCS_E_TERMINATED = -2143878905
+HCS_E_CONNECT_FAILED = -2143878904
+HCS_E_CONNECTION_TIMEOUT = -2143878903
+HCS_E_CONNECTION_CLOSED = -2143878902
+HCS_E_UNKNOWN_MESSAGE = -2143878901
+HCS_E_UNSUPPORTED_PROTOCOL_VERSION = -2143878900
+HCS_E_INVALID_JSON = -2143878899
+HCS_E_SYSTEM_NOT_FOUND = -2143878898
+HCS_E_SYSTEM_ALREADY_EXISTS = -2143878897
+HCS_E_SYSTEM_ALREADY_STOPPED = -2143878896
+HCS_E_PROTOCOL_ERROR = -2143878895
+HCS_E_INVALID_LAYER = -2143878894
+HCS_E_WINDOWS_INSIDER_REQUIRED = -2143878893
+HCS_E_SERVICE_NOT_AVAILABLE = -2143878892
+HCS_E_OPERATION_NOT_STARTED = -2143878891
+HCS_E_OPERATION_ALREADY_STARTED = -2143878890
+HCS_E_OPERATION_PENDING = -2143878889
+HCS_E_OPERATION_TIMEOUT = -2143878888
+HCS_E_OPERATION_SYSTEM_CALLBACK_ALREADY_SET = -2143878887
+HCS_E_OPERATION_RESULT_ALLOCATION_FAILED = -2143878886
+HCS_E_ACCESS_DENIED = -2143878885
+HCS_E_GUEST_CRITICAL_ERROR = -2143878884
+HCS_E_PROCESS_INFO_NOT_AVAILABLE = -2143878883
+HCS_E_SERVICE_DISCONNECT = -2143878882
+HCS_E_PROCESS_ALREADY_STOPPED = -2143878881
+HCS_E_SYSTEM_NOT_CONFIGURED_FOR_OPERATION = -2143878880
+HCS_E_OPERATION_ALREADY_CANCELLED = -2143878879
+ERROR_VNET_VIRTUAL_SWITCH_NAME_NOT_FOUND = -1070136832
+ERROR_VID_REMOTE_NODE_PARENT_GPA_PAGES_USED = -2143879167
+WHV_E_UNKNOWN_CAPABILITY = -2143878400
+WHV_E_INSUFFICIENT_BUFFER = -2143878399
+WHV_E_UNKNOWN_PROPERTY = -2143878398
+WHV_E_UNSUPPORTED_HYPERVISOR_CONFIG = -2143878397
+WHV_E_INVALID_PARTITION_CONFIG = -2143878396
+WHV_E_GPA_RANGE_NOT_FOUND = -2143878395
+WHV_E_VP_ALREADY_EXISTS = -2143878394
+WHV_E_VP_DOES_NOT_EXIST = -2143878393
+WHV_E_INVALID_VP_STATE = -2143878392
+WHV_E_INVALID_VP_REGISTER_NAME = -2143878391
+WHV_E_UNSUPPORTED_PROCESSOR_CONFIG = -2143878384
+ERROR_VSMB_SAVED_STATE_FILE_NOT_FOUND = -1070136320
+ERROR_VSMB_SAVED_STATE_CORRUPT = -1070136319
+VM_SAVED_STATE_DUMP_E_PARTITION_STATE_NOT_FOUND = -1070136064
+VM_SAVED_STATE_DUMP_E_GUEST_MEMORY_NOT_FOUND = -1070136063
+VM_SAVED_STATE_DUMP_E_NO_VP_FOUND_IN_PARTITION_STATE = -1070136062
+VM_SAVED_STATE_DUMP_E_NESTED_VIRTUALIZATION_NOT_SUPPORTED = -1070136061
+VM_SAVED_STATE_DUMP_E_WINDOWS_KERNEL_IMAGE_NOT_FOUND = -1070136060
+VM_SAVED_STATE_DUMP_E_VA_NOT_MAPPED = -1070136059
+VM_SAVED_STATE_DUMP_E_INVALID_VP_STATE = -1070136058
+VM_SAVED_STATE_DUMP_E_VP_VTL_NOT_ENABLED = -1070136055
+ERROR_DM_OPERATION_LIMIT_EXCEEDED = -1070135808
+ERROR_VOLMGR_INCOMPLETE_REGENERATION = -2143813631
+ERROR_VOLMGR_INCOMPLETE_DISK_MIGRATION = -2143813630
+ERROR_VOLMGR_DATABASE_FULL = -1070071807
+ERROR_VOLMGR_DISK_CONFIGURATION_CORRUPTED = -1070071806
+ERROR_VOLMGR_DISK_CONFIGURATION_NOT_IN_SYNC = -1070071805
+ERROR_VOLMGR_PACK_CONFIG_UPDATE_FAILED = -1070071804
+ERROR_VOLMGR_DISK_CONTAINS_NON_SIMPLE_VOLUME = -1070071803
+ERROR_VOLMGR_DISK_DUPLICATE = -1070071802
+ERROR_VOLMGR_DISK_DYNAMIC = -1070071801
+ERROR_VOLMGR_DISK_ID_INVALID = -1070071800
+ERROR_VOLMGR_DISK_INVALID = -1070071799
+ERROR_VOLMGR_DISK_LAST_VOTER = -1070071798
+ERROR_VOLMGR_DISK_LAYOUT_INVALID = -1070071797
+ERROR_VOLMGR_DISK_LAYOUT_NON_BASIC_BETWEEN_BASIC_PARTITIONS = -1070071796
+ERROR_VOLMGR_DISK_LAYOUT_NOT_CYLINDER_ALIGNED = -1070071795
+ERROR_VOLMGR_DISK_LAYOUT_PARTITIONS_TOO_SMALL = -1070071794
+ERROR_VOLMGR_DISK_LAYOUT_PRIMARY_BETWEEN_LOGICAL_PARTITIONS = -1070071793
+ERROR_VOLMGR_DISK_LAYOUT_TOO_MANY_PARTITIONS = -1070071792
+ERROR_VOLMGR_DISK_MISSING = -1070071791
+ERROR_VOLMGR_DISK_NOT_EMPTY = -1070071790
+ERROR_VOLMGR_DISK_NOT_ENOUGH_SPACE = -1070071789
+ERROR_VOLMGR_DISK_REVECTORING_FAILED = -1070071788
+ERROR_VOLMGR_DISK_SECTOR_SIZE_INVALID = -1070071787
+ERROR_VOLMGR_DISK_SET_NOT_CONTAINED = -1070071786
+ERROR_VOLMGR_DISK_USED_BY_MULTIPLE_MEMBERS = -1070071785
+ERROR_VOLMGR_DISK_USED_BY_MULTIPLE_PLEXES = -1070071784
+ERROR_VOLMGR_DYNAMIC_DISK_NOT_SUPPORTED = -1070071783
+ERROR_VOLMGR_EXTENT_ALREADY_USED = -1070071782
+ERROR_VOLMGR_EXTENT_NOT_CONTIGUOUS = -1070071781
+ERROR_VOLMGR_EXTENT_NOT_IN_PUBLIC_REGION = -1070071780
+ERROR_VOLMGR_EXTENT_NOT_SECTOR_ALIGNED = -1070071779
+ERROR_VOLMGR_EXTENT_OVERLAPS_EBR_PARTITION = -1070071778
+ERROR_VOLMGR_EXTENT_VOLUME_LENGTHS_DO_NOT_MATCH = -1070071777
+ERROR_VOLMGR_FAULT_TOLERANT_NOT_SUPPORTED = -1070071776
+ERROR_VOLMGR_INTERLEAVE_LENGTH_INVALID = -1070071775
+ERROR_VOLMGR_MAXIMUM_REGISTERED_USERS = -1070071774
+ERROR_VOLMGR_MEMBER_IN_SYNC = -1070071773
+ERROR_VOLMGR_MEMBER_INDEX_DUPLICATE = -1070071772
+ERROR_VOLMGR_MEMBER_INDEX_INVALID = -1070071771
+ERROR_VOLMGR_MEMBER_MISSING = -1070071770
+ERROR_VOLMGR_MEMBER_NOT_DETACHED = -1070071769
+ERROR_VOLMGR_MEMBER_REGENERATING = -1070071768
+ERROR_VOLMGR_ALL_DISKS_FAILED = -1070071767
+ERROR_VOLMGR_NO_REGISTERED_USERS = -1070071766
+ERROR_VOLMGR_NO_SUCH_USER = -1070071765
+ERROR_VOLMGR_NOTIFICATION_RESET = -1070071764
+ERROR_VOLMGR_NUMBER_OF_MEMBERS_INVALID = -1070071763
+ERROR_VOLMGR_NUMBER_OF_PLEXES_INVALID = -1070071762
+ERROR_VOLMGR_PACK_DUPLICATE = -1070071761
+ERROR_VOLMGR_PACK_ID_INVALID = -1070071760
+ERROR_VOLMGR_PACK_INVALID = -1070071759
+ERROR_VOLMGR_PACK_NAME_INVALID = -1070071758
+ERROR_VOLMGR_PACK_OFFLINE = -1070071757
+ERROR_VOLMGR_PACK_HAS_QUORUM = -1070071756
+ERROR_VOLMGR_PACK_WITHOUT_QUORUM = -1070071755
+ERROR_VOLMGR_PARTITION_STYLE_INVALID = -1070071754
+ERROR_VOLMGR_PARTITION_UPDATE_FAILED = -1070071753
+ERROR_VOLMGR_PLEX_IN_SYNC = -1070071752
+ERROR_VOLMGR_PLEX_INDEX_DUPLICATE = -1070071751
+ERROR_VOLMGR_PLEX_INDEX_INVALID = -1070071750
+ERROR_VOLMGR_PLEX_LAST_ACTIVE = -1070071749
+ERROR_VOLMGR_PLEX_MISSING = -1070071748
+ERROR_VOLMGR_PLEX_REGENERATING = -1070071747
+ERROR_VOLMGR_PLEX_TYPE_INVALID = -1070071746
+ERROR_VOLMGR_PLEX_NOT_RAID5 = -1070071745
+ERROR_VOLMGR_PLEX_NOT_SIMPLE = -1070071744
+ERROR_VOLMGR_STRUCTURE_SIZE_INVALID = -1070071743
+ERROR_VOLMGR_TOO_MANY_NOTIFICATION_REQUESTS = -1070071742
+ERROR_VOLMGR_TRANSACTION_IN_PROGRESS = -1070071741
+ERROR_VOLMGR_UNEXPECTED_DISK_LAYOUT_CHANGE = -1070071740
+ERROR_VOLMGR_VOLUME_CONTAINS_MISSING_DISK = -1070071739
+ERROR_VOLMGR_VOLUME_ID_INVALID = -1070071738
+ERROR_VOLMGR_VOLUME_LENGTH_INVALID = -1070071737
+ERROR_VOLMGR_VOLUME_LENGTH_NOT_SECTOR_SIZE_MULTIPLE = -1070071736
+ERROR_VOLMGR_VOLUME_NOT_MIRRORED = -1070071735
+ERROR_VOLMGR_VOLUME_NOT_RETAINED = -1070071734
+ERROR_VOLMGR_VOLUME_OFFLINE = -1070071733
+ERROR_VOLMGR_VOLUME_RETAINED = -1070071732
+ERROR_VOLMGR_NUMBER_OF_EXTENTS_INVALID = -1070071731
+ERROR_VOLMGR_DIFFERENT_SECTOR_SIZE = -1070071730
+ERROR_VOLMGR_BAD_BOOT_DISK = -1070071729
+ERROR_VOLMGR_PACK_CONFIG_OFFLINE = -1070071728
+ERROR_VOLMGR_PACK_CONFIG_ONLINE = -1070071727
+ERROR_VOLMGR_NOT_PRIMARY_PACK = -1070071726
+ERROR_VOLMGR_PACK_LOG_UPDATE_FAILED = -1070071725
+ERROR_VOLMGR_NUMBER_OF_DISKS_IN_PLEX_INVALID = -1070071724
+ERROR_VOLMGR_NUMBER_OF_DISKS_IN_MEMBER_INVALID = -1070071723
+ERROR_VOLMGR_VOLUME_MIRRORED = -1070071722
+ERROR_VOLMGR_PLEX_NOT_SIMPLE_SPANNED = -1070071721
+ERROR_VOLMGR_NO_VALID_LOG_COPIES = -1070071720
+ERROR_VOLMGR_PRIMARY_PACK_PRESENT = -1070071719
+ERROR_VOLMGR_NUMBER_OF_DISKS_INVALID = -1070071718
+ERROR_VOLMGR_MIRROR_NOT_SUPPORTED = -1070071717
+ERROR_VOLMGR_RAID5_NOT_SUPPORTED = -1070071716
+ERROR_BCD_NOT_ALL_ENTRIES_IMPORTED = -2143748095
+ERROR_BCD_TOO_MANY_ELEMENTS = -1070006270
+ERROR_BCD_NOT_ALL_ENTRIES_SYNCHRONIZED = -2143748093
+ERROR_VHD_DRIVE_FOOTER_MISSING = -1069940735
+ERROR_VHD_DRIVE_FOOTER_CHECKSUM_MISMATCH = -1069940734
+ERROR_VHD_DRIVE_FOOTER_CORRUPT = -1069940733
+ERROR_VHD_FORMAT_UNKNOWN = -1069940732
+ERROR_VHD_FORMAT_UNSUPPORTED_VERSION = -1069940731
+ERROR_VHD_SPARSE_HEADER_CHECKSUM_MISMATCH = -1069940730
+ERROR_VHD_SPARSE_HEADER_UNSUPPORTED_VERSION = -1069940729
+ERROR_VHD_SPARSE_HEADER_CORRUPT = -1069940728
+ERROR_VHD_BLOCK_ALLOCATION_FAILURE = -1069940727
+ERROR_VHD_BLOCK_ALLOCATION_TABLE_CORRUPT = -1069940726
+ERROR_VHD_INVALID_BLOCK_SIZE = -1069940725
+ERROR_VHD_BITMAP_MISMATCH = -1069940724
+ERROR_VHD_PARENT_VHD_NOT_FOUND = -1069940723
+ERROR_VHD_CHILD_PARENT_ID_MISMATCH = -1069940722
+ERROR_VHD_CHILD_PARENT_TIMESTAMP_MISMATCH = -1069940721
+ERROR_VHD_METADATA_READ_FAILURE = -1069940720
+ERROR_VHD_METADATA_WRITE_FAILURE = -1069940719
+ERROR_VHD_INVALID_SIZE = -1069940718
+ERROR_VHD_INVALID_FILE_SIZE = -1069940717
+ERROR_VIRTDISK_PROVIDER_NOT_FOUND = -1069940716
+ERROR_VIRTDISK_NOT_VIRTUAL_DISK = -1069940715
+ERROR_VHD_PARENT_VHD_ACCESS_DENIED = -1069940714
+ERROR_VHD_CHILD_PARENT_SIZE_MISMATCH = -1069940713
+ERROR_VHD_DIFFERENCING_CHAIN_CYCLE_DETECTED = -1069940712
+ERROR_VHD_DIFFERENCING_CHAIN_ERROR_IN_PARENT = -1069940711
+ERROR_VIRTUAL_DISK_LIMITATION = -1069940710
+ERROR_VHD_INVALID_TYPE = -1069940709
+ERROR_VHD_INVALID_STATE = -1069940708
+ERROR_VIRTDISK_UNSUPPORTED_DISK_SECTOR_SIZE = -1069940707
+ERROR_VIRTDISK_DISK_ALREADY_OWNED = -1069940706
+ERROR_VIRTDISK_DISK_ONLINE_AND_WRITABLE = -1069940705
+ERROR_CTLOG_TRACKING_NOT_INITIALIZED = -1069940704
+ERROR_CTLOG_LOGFILE_SIZE_EXCEEDED_MAXSIZE = -1069940703
+ERROR_CTLOG_VHD_CHANGED_OFFLINE = -1069940702
+ERROR_CTLOG_INVALID_TRACKING_STATE = -1069940701
+ERROR_CTLOG_INCONSISTENT_TRACKING_FILE = -1069940700
+ERROR_VHD_RESIZE_WOULD_TRUNCATE_DATA = -1069940699
+ERROR_VHD_COULD_NOT_COMPUTE_MINIMUM_VIRTUAL_SIZE = -1069940698
+ERROR_VHD_ALREADY_AT_OR_BELOW_MINIMUM_VIRTUAL_SIZE = -1069940697
+ERROR_VHD_METADATA_FULL = -1069940696
+ERROR_VHD_INVALID_CHANGE_TRACKING_ID = -1069940695
+ERROR_VHD_CHANGE_TRACKING_DISABLED = -1069940694
+ERROR_VHD_MISSING_CHANGE_TRACKING_INFORMATION = -1069940688
+ERROR_VHD_UNEXPECTED_ID = -1069940684
+ERROR_QUERY_STORAGE_ERROR = -2143682559
+HCN_E_NETWORK_NOT_FOUND = -2143617023
+HCN_E_ENDPOINT_NOT_FOUND = -2143617022
+HCN_E_LAYER_NOT_FOUND = -2143617021
+HCN_E_SWITCH_NOT_FOUND = -2143617020
+HCN_E_SUBNET_NOT_FOUND = -2143617019
+HCN_E_ADAPTER_NOT_FOUND = -2143617018
+HCN_E_PORT_NOT_FOUND = -2143617017
+HCN_E_POLICY_NOT_FOUND = -2143617016
+HCN_E_VFP_PORTSETTING_NOT_FOUND = -2143617015
+HCN_E_INVALID_NETWORK = -2143617014
+HCN_E_INVALID_NETWORK_TYPE = -2143617013
+HCN_E_INVALID_ENDPOINT = -2143617012
+HCN_E_INVALID_POLICY = -2143617011
+HCN_E_INVALID_POLICY_TYPE = -2143617010
+HCN_E_INVALID_REMOTE_ENDPOINT_OPERATION = -2143617009
+HCN_E_NETWORK_ALREADY_EXISTS = -2143617008
+HCN_E_LAYER_ALREADY_EXISTS = -2143617007
+HCN_E_POLICY_ALREADY_EXISTS = -2143617006
+HCN_E_PORT_ALREADY_EXISTS = -2143617005
+HCN_E_ENDPOINT_ALREADY_ATTACHED = -2143617004
+HCN_E_REQUEST_UNSUPPORTED = -2143617003
+HCN_E_MAPPING_NOT_SUPPORTED = -2143617002
+HCN_E_DEGRADED_OPERATION = -2143617001
+HCN_E_SHARED_SWITCH_MODIFICATION = -2143617000
+HCN_E_GUID_CONVERSION_FAILURE = -2143616999
+HCN_E_REGKEY_FAILURE = -2143616998
+HCN_E_INVALID_JSON = -2143616997
+HCN_E_INVALID_JSON_REFERENCE = -2143616996
+HCN_E_ENDPOINT_SHARING_DISABLED = -2143616995
+HCN_E_INVALID_IP = -2143616994
+HCN_E_SWITCH_EXTENSION_NOT_FOUND = -2143616993
+HCN_E_MANAGER_STOPPED = -2143616992
+GCN_E_MODULE_NOT_FOUND = -2143616991
+GCN_E_NO_REQUEST_HANDLERS = -2143616990
+GCN_E_REQUEST_UNSUPPORTED = -2143616989
+GCN_E_RUNTIMEKEYS_FAILED = -2143616988
+GCN_E_NETADAPTER_TIMEOUT = -2143616987
+GCN_E_NETADAPTER_NOT_FOUND = -2143616986
+GCN_E_NETCOMPARTMENT_NOT_FOUND = -2143616985
+GCN_E_NETINTERFACE_NOT_FOUND = -2143616984
+GCN_E_DEFAULTNAMESPACE_EXISTS = -2143616983
+HCN_E_ICS_DISABLED = -2143616982
+HCN_E_ENDPOINT_NAMESPACE_ALREADY_EXISTS = -2143616981
+HCN_E_ENTITY_HAS_REFERENCES = -2143616980
+HCN_E_INVALID_INTERNAL_PORT = -2143616979
+HCN_E_NAMESPACE_ATTACH_FAILED = -2143616978
+HCN_E_ADDR_INVALID_OR_RESERVED = -2143616977
+HCN_E_INVALID_PREFIX = -2143616976
+HCN_E_OBJECT_USED_AFTER_UNLOAD = -2143616975
+HCN_E_INVALID_SUBNET = -2143616974
+HCN_E_INVALID_IP_SUBNET = -2143616973
+HCN_E_ENDPOINT_NOT_ATTACHED = -2143616972
+HCN_E_ENDPOINT_NOT_LOCAL = -2143616971
+HCN_INTERFACEPARAMETERS_ALREADY_APPLIED = -2143616970
+HCN_E_VFP_NOT_ALLOWED = -2143616969
+SDIAG_E_CANCELLED = -2143551232
+SDIAG_E_SCRIPT = -2143551231
+SDIAG_E_POWERSHELL = -2143551230
+SDIAG_E_MANAGEDHOST = -2143551229
+SDIAG_E_NOVERIFIER = -2143551228
+SDIAG_S_CANNOTRUN = 0x003C0105
+SDIAG_E_DISABLED = -2143551226
+SDIAG_E_TRUST = -2143551225
+SDIAG_E_CANNOTRUN = -2143551224
+SDIAG_E_VERSION = -2143551223
+SDIAG_E_RESOURCE = -2143551222
+SDIAG_E_ROOTCAUSE = -2143551221
+WPN_E_CHANNEL_CLOSED = -2143420160
+WPN_E_CHANNEL_REQUEST_NOT_COMPLETE = -2143420159
+WPN_E_INVALID_APP = -2143420158
+WPN_E_OUTSTANDING_CHANNEL_REQUEST = -2143420157
+WPN_E_DUPLICATE_CHANNEL = -2143420156
+WPN_E_PLATFORM_UNAVAILABLE = -2143420155
+WPN_E_NOTIFICATION_POSTED = -2143420154
+WPN_E_NOTIFICATION_HIDDEN = -2143420153
+WPN_E_NOTIFICATION_NOT_POSTED = -2143420152
+WPN_E_CLOUD_DISABLED = -2143420151
+WPN_E_CLOUD_INCAPABLE = -2143420144
+WPN_E_CLOUD_AUTH_UNAVAILABLE = -2143420134
+WPN_E_CLOUD_SERVICE_UNAVAILABLE = -2143420133
+WPN_E_FAILED_LOCK_SCREEN_UPDATE_INTIALIZATION = -2143420132
+WPN_E_NOTIFICATION_DISABLED = -2143420143
+WPN_E_NOTIFICATION_INCAPABLE = -2143420142
+WPN_E_INTERNET_INCAPABLE = -2143420141
+WPN_E_NOTIFICATION_TYPE_DISABLED = -2143420140
+WPN_E_NOTIFICATION_SIZE = -2143420139
+WPN_E_TAG_SIZE = -2143420138
+WPN_E_ACCESS_DENIED = -2143420137
+WPN_E_DUPLICATE_REGISTRATION = -2143420136
+WPN_E_PUSH_NOTIFICATION_INCAPABLE = -2143420135
+WPN_E_DEV_ID_SIZE = -2143420128
+WPN_E_TAG_ALPHANUMERIC = -2143420118
+WPN_E_INVALID_HTTP_STATUS_CODE = -2143420117
+WPN_E_OUT_OF_SESSION = -2143419904
+WPN_E_POWER_SAVE = -2143419903
+WPN_E_IMAGE_NOT_FOUND_IN_CACHE = -2143419902
+WPN_E_ALL_URL_NOT_COMPLETED = -2143419901
+WPN_E_INVALID_CLOUD_IMAGE = -2143419900
+WPN_E_NOTIFICATION_ID_MATCHED = -2143419899
+WPN_E_CALLBACK_ALREADY_REGISTERED = -2143419898
+WPN_E_TOAST_NOTIFICATION_DROPPED = -2143419897
+WPN_E_STORAGE_LOCKED = -2143419896
+WPN_E_GROUP_SIZE = -2143419895
+WPN_E_GROUP_ALPHANUMERIC = -2143419894
+WPN_E_CLOUD_DISABLED_FOR_APP = -2143419893
+E_MBN_CONTEXT_NOT_ACTIVATED = -2141945343
+E_MBN_BAD_SIM = -2141945342
+E_MBN_DATA_CLASS_NOT_AVAILABLE = -2141945341
+E_MBN_INVALID_ACCESS_STRING = -2141945340
+E_MBN_MAX_ACTIVATED_CONTEXTS = -2141945339
+E_MBN_PACKET_SVC_DETACHED = -2141945338
+E_MBN_PROVIDER_NOT_VISIBLE = -2141945337
+E_MBN_RADIO_POWER_OFF = -2141945336
+E_MBN_SERVICE_NOT_ACTIVATED = -2141945335
+E_MBN_SIM_NOT_INSERTED = -2141945334
+E_MBN_VOICE_CALL_IN_PROGRESS = -2141945333
+E_MBN_INVALID_CACHE = -2141945332
+E_MBN_NOT_REGISTERED = -2141945331
+E_MBN_PROVIDERS_NOT_FOUND = -2141945330
+E_MBN_PIN_NOT_SUPPORTED = -2141945329
+E_MBN_PIN_REQUIRED = -2141945328
+E_MBN_PIN_DISABLED = -2141945327
+E_MBN_FAILURE = -2141945326
+E_MBN_INVALID_PROFILE = -2141945320
+E_MBN_DEFAULT_PROFILE_EXIST = -2141945319
+E_MBN_SMS_ENCODING_NOT_SUPPORTED = -2141945312
+E_MBN_SMS_FILTER_NOT_SUPPORTED = -2141945311
+E_MBN_SMS_INVALID_MEMORY_INDEX = -2141945310
+E_MBN_SMS_LANG_NOT_SUPPORTED = -2141945309
+E_MBN_SMS_MEMORY_FAILURE = -2141945308
+E_MBN_SMS_NETWORK_TIMEOUT = -2141945307
+E_MBN_SMS_UNKNOWN_SMSC_ADDRESS = -2141945306
+E_MBN_SMS_FORMAT_NOT_SUPPORTED = -2141945305
+E_MBN_SMS_OPERATION_NOT_ALLOWED = -2141945304
+E_MBN_SMS_MEMORY_FULL = -2141945303
+PEER_E_IPV6_NOT_INSTALLED = -2140995583
+PEER_E_NOT_INITIALIZED = -2140995582
+PEER_E_CANNOT_START_SERVICE = -2140995581
+PEER_E_NOT_LICENSED = -2140995580
+PEER_E_INVALID_GRAPH = -2140995568
+PEER_E_DBNAME_CHANGED = -2140995567
+PEER_E_DUPLICATE_GRAPH = -2140995566
+PEER_E_GRAPH_NOT_READY = -2140995565
+PEER_E_GRAPH_SHUTTING_DOWN = -2140995564
+PEER_E_GRAPH_IN_USE = -2140995563
+PEER_E_INVALID_DATABASE = -2140995562
+PEER_E_TOO_MANY_ATTRIBUTES = -2140995561
+PEER_E_CONNECTION_NOT_FOUND = -2140995325
+PEER_E_CONNECT_SELF = -2140995322
+PEER_E_ALREADY_LISTENING = -2140995321
+PEER_E_NODE_NOT_FOUND = -2140995320
+PEER_E_CONNECTION_FAILED = -2140995319
+PEER_E_CONNECTION_NOT_AUTHENTICATED = -2140995318
+PEER_E_CONNECTION_REFUSED = -2140995317
+PEER_E_CLASSIFIER_TOO_LONG = -2140995071
+PEER_E_TOO_MANY_IDENTITIES = -2140995070
+PEER_E_NO_KEY_ACCESS = -2140995069
+PEER_E_GROUPS_EXIST = -2140995068
+PEER_E_RECORD_NOT_FOUND = -2140994815
+PEER_E_DATABASE_ACCESSDENIED = -2140994814
+PEER_E_DBINITIALIZATION_FAILED = -2140994813
+PEER_E_MAX_RECORD_SIZE_EXCEEDED = -2140994812
+PEER_E_DATABASE_ALREADY_PRESENT = -2140994811
+PEER_E_DATABASE_NOT_PRESENT = -2140994810
+PEER_E_IDENTITY_NOT_FOUND = -2140994559
+PEER_E_EVENT_HANDLE_NOT_FOUND = -2140994303
+PEER_E_INVALID_SEARCH = -2140994047
+PEER_E_INVALID_ATTRIBUTES = -2140994046
+PEER_E_INVITATION_NOT_TRUSTED = -2140993791
+PEER_E_CHAIN_TOO_LONG = -2140993789
+PEER_E_INVALID_TIME_PERIOD = -2140993787
+PEER_E_CIRCULAR_CHAIN_DETECTED = -2140993786
+PEER_E_CERT_STORE_CORRUPTED = -2140993535
+PEER_E_NO_CLOUD = -2140991487
+PEER_E_CLOUD_NAME_AMBIGUOUS = -2140991483
+PEER_E_INVALID_RECORD = -2140987376
+PEER_E_NOT_AUTHORIZED = -2140987360
+PEER_E_PASSWORD_DOES_NOT_MEET_POLICY = -2140987359
+PEER_E_DEFERRED_VALIDATION = -2140987344
+PEER_E_INVALID_GROUP_PROPERTIES = -2140987328
+PEER_E_INVALID_PEER_NAME = -2140987312
+PEER_E_INVALID_CLASSIFIER = -2140987296
+PEER_E_INVALID_FRIENDLY_NAME = -2140987280
+PEER_E_INVALID_ROLE_PROPERTY = -2140987279
+PEER_E_INVALID_CLASSIFIER_PROPERTY = -2140987278
+PEER_E_INVALID_RECORD_EXPIRATION = -2140987264
+PEER_E_INVALID_CREDENTIAL_INFO = -2140987263
+PEER_E_INVALID_CREDENTIAL = -2140987262
+PEER_E_INVALID_RECORD_SIZE = -2140987261
+PEER_E_UNSUPPORTED_VERSION = -2140987248
+PEER_E_GROUP_NOT_READY = -2140987247
+PEER_E_GROUP_IN_USE = -2140987246
+PEER_E_INVALID_GROUP = -2140987245
+PEER_E_NO_MEMBERS_FOUND = -2140987244
+PEER_E_NO_MEMBER_CONNECTIONS = -2140987243
+PEER_E_UNABLE_TO_LISTEN = -2140987242
+PEER_E_IDENTITY_DELETED = -2140987232
+PEER_E_SERVICE_NOT_AVAILABLE = -2140987231
+PEER_E_CONTACT_NOT_FOUND = -2140971007
+PEER_S_GRAPH_DATA_CREATED = 0x00630001
+PEER_S_NO_EVENT_DATA = 0x00630002
+PEER_S_ALREADY_CONNECTED = 0x00632000
+PEER_S_SUBSCRIPTION_EXISTS = 0x00636000
+PEER_S_NO_CONNECTIVITY = 0x00630005
+PEER_S_ALREADY_A_MEMBER = 0x00630006
+PEER_E_CANNOT_CONVERT_PEER_NAME = -2140979199
+PEER_E_INVALID_PEER_HOST_NAME = -2140979198
+PEER_E_NO_MORE = -2140979197
+PEER_E_PNRP_DUPLICATE_PEER_NAME = -2140979195
+PEER_E_INVITE_CANCELLED = -2140966912
+PEER_E_INVITE_RESPONSE_NOT_AVAILABLE = -2140966911
+PEER_E_NOT_SIGNED_IN = -2140966909
+PEER_E_PRIVACY_DECLINED = -2140966908
+PEER_E_TIMEOUT = -2140966907
+PEER_E_INVALID_ADDRESS = -2140966905
+PEER_E_FW_EXCEPTION_DISABLED = -2140966904
+PEER_E_FW_BLOCKED_BY_POLICY = -2140966903
+PEER_E_FW_BLOCKED_BY_SHIELDS_UP = -2140966902
+PEER_E_FW_DECLINED = -2140966901
+UI_E_CREATE_FAILED = -2144731135
+UI_E_SHUTDOWN_CALLED = -2144731134
+UI_E_ILLEGAL_REENTRANCY = -2144731133
+UI_E_OBJECT_SEALED = -2144731132
+UI_E_VALUE_NOT_SET = -2144731131
+UI_E_VALUE_NOT_DETERMINED = -2144731130
+UI_E_INVALID_OUTPUT = -2144731129
+UI_E_BOOLEAN_EXPECTED = -2144731128
+UI_E_DIFFERENT_OWNER = -2144731127
+UI_E_AMBIGUOUS_MATCH = -2144731126
+UI_E_FP_OVERFLOW = -2144731125
+UI_E_WRONG_THREAD = -2144731124
+UI_E_STORYBOARD_ACTIVE = -2144730879
+UI_E_STORYBOARD_NOT_PLAYING = -2144730878
+UI_E_START_KEYFRAME_AFTER_END = -2144730877
+UI_E_END_KEYFRAME_NOT_DETERMINED = -2144730876
+UI_E_LOOPS_OVERLAP = -2144730875
+UI_E_TRANSITION_ALREADY_USED = -2144730874
+UI_E_TRANSITION_NOT_IN_STORYBOARD = -2144730873
+UI_E_TRANSITION_ECLIPSED = -2144730872
+UI_E_TIME_BEFORE_LAST_UPDATE = -2144730871
+UI_E_TIMER_CLIENT_ALREADY_CONNECTED = -2144730870
+UI_E_INVALID_DIMENSION = -2144730869
+UI_E_PRIMITIVE_OUT_OF_BOUNDS = -2144730868
+UI_E_WINDOW_CLOSED = -2144730623
+E_BLUETOOTH_ATT_INVALID_HANDLE = -2140864511
+E_BLUETOOTH_ATT_READ_NOT_PERMITTED = -2140864510
+E_BLUETOOTH_ATT_WRITE_NOT_PERMITTED = -2140864509
+E_BLUETOOTH_ATT_INVALID_PDU = -2140864508
+E_BLUETOOTH_ATT_INSUFFICIENT_AUTHENTICATION = -2140864507
+E_BLUETOOTH_ATT_REQUEST_NOT_SUPPORTED = -2140864506
+E_BLUETOOTH_ATT_INVALID_OFFSET = -2140864505
+E_BLUETOOTH_ATT_INSUFFICIENT_AUTHORIZATION = -2140864504
+E_BLUETOOTH_ATT_PREPARE_QUEUE_FULL = -2140864503
+E_BLUETOOTH_ATT_ATTRIBUTE_NOT_FOUND = -2140864502
+E_BLUETOOTH_ATT_ATTRIBUTE_NOT_LONG = -2140864501
+E_BLUETOOTH_ATT_INSUFFICIENT_ENCRYPTION_KEY_SIZE = -2140864500
+E_BLUETOOTH_ATT_INVALID_ATTRIBUTE_VALUE_LENGTH = -2140864499
+E_BLUETOOTH_ATT_UNLIKELY = -2140864498
+E_BLUETOOTH_ATT_INSUFFICIENT_ENCRYPTION = -2140864497
+E_BLUETOOTH_ATT_UNSUPPORTED_GROUP_TYPE = -2140864496
+E_BLUETOOTH_ATT_INSUFFICIENT_RESOURCES = -2140864495
+E_BLUETOOTH_ATT_UNKNOWN_ERROR = -2140860416
+E_AUDIO_ENGINE_NODE_NOT_FOUND = -2140798975
+E_HDAUDIO_EMPTY_CONNECTION_LIST = -2140798974
+E_HDAUDIO_CONNECTION_LIST_NOT_SUPPORTED = -2140798973
+E_HDAUDIO_NO_LOGICAL_DEVICES_CREATED = -2140798972
+E_HDAUDIO_NULL_LINKED_LIST_ENTRY = -2140798971
+STATEREPOSITORY_E_CONCURRENCY_LOCKING_FAILURE = -2140733439
+STATEREPOSITORY_E_STATEMENT_INPROGRESS = -2140733438
+STATEREPOSITORY_E_CONFIGURATION_INVALID = -2140733437
+STATEREPOSITORY_E_UNKNOWN_SCHEMA_VERSION = -2140733436
+STATEREPOSITORY_ERROR_DICTIONARY_CORRUPTED = -2140733435
+STATEREPOSITORY_E_BLOCKED = -2140733434
+STATEREPOSITORY_E_BUSY_RETRY = -2140733433
+STATEREPOSITORY_E_BUSY_RECOVERY_RETRY = -2140733432
+STATEREPOSITORY_E_LOCKED_RETRY = -2140733431
+STATEREPOSITORY_E_LOCKED_SHAREDCACHE_RETRY = -2140733430
+STATEREPOSITORY_E_TRANSACTION_REQUIRED = -2140733429
+STATEREPOSITORY_E_BUSY_TIMEOUT_EXCEEDED = -2140733428
+STATEREPOSITORY_E_BUSY_RECOVERY_TIMEOUT_EXCEEDED = -2140733427
+STATEREPOSITORY_E_LOCKED_TIMEOUT_EXCEEDED = -2140733426
+STATEREPOSITORY_E_LOCKED_SHAREDCACHE_TIMEOUT_EXCEEDED = -2140733425
+STATEREPOSITORY_E_SERVICE_STOP_IN_PROGRESS = -2140733424
+STATEREPOSTORY_E_NESTED_TRANSACTION_NOT_SUPPORTED = -2140733423
+STATEREPOSITORY_ERROR_CACHE_CORRUPTED = -2140733422
+STATEREPOSITORY_TRANSACTION_CALLER_ID_CHANGED = 0x00670013
+STATEREPOSITORY_TRANSACTION_IN_PROGRESS = -2140733420
+STATEREPOSITORY_E_CACHE_NOT_INIITALIZED = -2140733419
+STATEREPOSITORY_E_DEPENDENCY_NOT_RESOLVED = -2140733418
+ERROR_SPACES_POOL_WAS_DELETED = 0x00E70001
+ERROR_SPACES_FAULT_DOMAIN_TYPE_INVALID = -2132344831
+ERROR_SPACES_INTERNAL_ERROR = -2132344830
+ERROR_SPACES_RESILIENCY_TYPE_INVALID = -2132344829
+ERROR_SPACES_DRIVE_SECTOR_SIZE_INVALID = -2132344828
+ERROR_SPACES_DRIVE_REDUNDANCY_INVALID = -2132344826
+ERROR_SPACES_NUMBER_OF_DATA_COPIES_INVALID = -2132344825
+ERROR_SPACES_PARITY_LAYOUT_INVALID = -2132344824
+ERROR_SPACES_INTERLEAVE_LENGTH_INVALID = -2132344823
+ERROR_SPACES_NUMBER_OF_COLUMNS_INVALID = -2132344822
+ERROR_SPACES_NOT_ENOUGH_DRIVES = -2132344821
+ERROR_SPACES_EXTENDED_ERROR = -2132344820
+ERROR_SPACES_PROVISIONING_TYPE_INVALID = -2132344819
+ERROR_SPACES_ALLOCATION_SIZE_INVALID = -2132344818
+ERROR_SPACES_ENCLOSURE_AWARE_INVALID = -2132344817
+ERROR_SPACES_WRITE_CACHE_SIZE_INVALID = -2132344816
+ERROR_SPACES_NUMBER_OF_GROUPS_INVALID = -2132344815
+ERROR_SPACES_DRIVE_OPERATIONAL_STATE_INVALID = -2132344814
+ERROR_SPACES_ENTRY_INCOMPLETE = -2132344813
+ERROR_SPACES_ENTRY_INVALID = -2132344812
+ERROR_SPACES_UPDATE_COLUMN_STATE = -2132344811
+ERROR_SPACES_MAP_REQUIRED = -2132344810
+ERROR_SPACES_UNSUPPORTED_VERSION = -2132344809
+ERROR_SPACES_CORRUPT_METADATA = -2132344808
+ERROR_SPACES_DRT_FULL = -2132344807
+ERROR_SPACES_INCONSISTENCY = -2132344806
+ERROR_SPACES_LOG_NOT_READY = -2132344805
+ERROR_SPACES_NO_REDUNDANCY = -2132344804
+ERROR_SPACES_DRIVE_NOT_READY = -2132344803
+ERROR_SPACES_DRIVE_SPLIT = -2132344802
+ERROR_SPACES_DRIVE_LOST_DATA = -2132344801
+ERROR_SPACES_MARK_DIRTY = -2132344800
+ERROR_SPACES_FLUSH_METADATA = -2132344795
+ERROR_SPACES_CACHE_FULL = -2132344794
+ERROR_SPACES_REPAIR_IN_PROGRESS = -2132344793
+ERROR_VOLSNAP_BOOTFILE_NOT_VALID = -2138963967
+ERROR_VOLSNAP_ACTIVATION_TIMEOUT = -2138963966
+ERROR_VOLSNAP_NO_BYPASSIO_WITH_SNAPSHOT = -2138963965
+ERROR_TIERING_NOT_SUPPORTED_ON_VOLUME = -2138898431
+ERROR_TIERING_VOLUME_DISMOUNT_IN_PROGRESS = -2138898430
+ERROR_TIERING_STORAGE_TIER_NOT_FOUND = -2138898429
+ERROR_TIERING_INVALID_FILE_ID = -2138898428
+ERROR_TIERING_WRONG_CLUSTER_NODE = -2138898427
+ERROR_TIERING_ALREADY_PROCESSING = -2138898426
+ERROR_TIERING_CANNOT_PIN_OBJECT = -2138898425
+ERROR_TIERING_FILE_IS_NOT_PINNED = -2138898424
+ERROR_NOT_A_TIERED_VOLUME = -2138898423
+ERROR_ATTRIBUTE_NOT_PRESENT = -2138898422
+ERROR_SECCORE_INVALID_COMMAND = -1058537472
+ERROR_NO_APPLICABLE_APP_LICENSES_FOUND = -1058406399
+ERROR_CLIP_LICENSE_NOT_FOUND = -1058406398
+ERROR_CLIP_DEVICE_LICENSE_MISSING = -1058406397
+ERROR_CLIP_LICENSE_INVALID_SIGNATURE = -1058406396
+ERROR_CLIP_KEYHOLDER_LICENSE_MISSING_OR_INVALID = -1058406395
+ERROR_CLIP_LICENSE_EXPIRED = -1058406394
+ERROR_CLIP_LICENSE_SIGNED_BY_UNKNOWN_SOURCE = -1058406393
+ERROR_CLIP_LICENSE_NOT_SIGNED = -1058406392
+ERROR_CLIP_LICENSE_HARDWARE_ID_OUT_OF_TOLERANCE = -1058406391
+ERROR_CLIP_LICENSE_DEVICE_ID_MISMATCH = -1058406390
+DXGI_STATUS_OCCLUDED = 0x087A0001
+DXGI_STATUS_CLIPPED = 0x087A0002
+DXGI_STATUS_NO_REDIRECTION = 0x087A0004
+DXGI_STATUS_NO_DESKTOP_ACCESS = 0x087A0005
+DXGI_STATUS_GRAPHICS_VIDPN_SOURCE_IN_USE = 0x087A0006
+DXGI_STATUS_MODE_CHANGED = 0x087A0007
+DXGI_STATUS_MODE_CHANGE_IN_PROGRESS = 0x087A0008
+DXGI_ERROR_INVALID_CALL = -2005270527
+DXGI_ERROR_NOT_FOUND = -2005270526
+DXGI_ERROR_MORE_DATA = -2005270525
+DXGI_ERROR_UNSUPPORTED = -2005270524
+DXGI_ERROR_DEVICE_REMOVED = -2005270523
+DXGI_ERROR_DEVICE_HUNG = -2005270522
+DXGI_ERROR_DEVICE_RESET = -2005270521
+DXGI_ERROR_WAS_STILL_DRAWING = -2005270518
+DXGI_ERROR_FRAME_STATISTICS_DISJOINT = -2005270517
+DXGI_ERROR_GRAPHICS_VIDPN_SOURCE_IN_USE = -2005270516
+DXGI_ERROR_DRIVER_INTERNAL_ERROR = -2005270496
+DXGI_ERROR_NONEXCLUSIVE = -2005270495
+DXGI_ERROR_NOT_CURRENTLY_AVAILABLE = -2005270494
+DXGI_ERROR_REMOTE_CLIENT_DISCONNECTED = -2005270493
+DXGI_ERROR_REMOTE_OUTOFMEMORY = -2005270492
+DXGI_ERROR_ACCESS_LOST = -2005270490
+DXGI_ERROR_WAIT_TIMEOUT = -2005270489
+DXGI_ERROR_SESSION_DISCONNECTED = -2005270488
+DXGI_ERROR_RESTRICT_TO_OUTPUT_STALE = -2005270487
+DXGI_ERROR_CANNOT_PROTECT_CONTENT = -2005270486
+DXGI_ERROR_ACCESS_DENIED = -2005270485
+DXGI_ERROR_NAME_ALREADY_EXISTS = -2005270484
+DXGI_ERROR_SDK_COMPONENT_MISSING = -2005270483
+DXGI_ERROR_NOT_CURRENT = -2005270482
+DXGI_ERROR_HW_PROTECTION_OUTOFMEMORY = -2005270480
+DXGI_ERROR_DYNAMIC_CODE_POLICY_VIOLATION = -2005270479
+DXGI_ERROR_NON_COMPOSITED_UI = -2005270478
+DXCORE_ERROR_EVENT_NOT_UNREGISTERED = -2004877311
+PRESENTATION_ERROR_LOST = -2004811775
+DXGI_STATUS_UNOCCLUDED = 0x087A0009
+DXGI_STATUS_DDA_WAS_STILL_DRAWING = 0x087A000A
+DXGI_ERROR_MODE_CHANGE_IN_PROGRESS = -2005270491
+DXGI_STATUS_PRESENT_REQUIRED = 0x087A002F
+DXGI_ERROR_CACHE_CORRUPT = -2005270477
+DXGI_ERROR_CACHE_FULL = -2005270476
+DXGI_ERROR_CACHE_HASH_COLLISION = -2005270475
+DXGI_ERROR_ALREADY_EXISTS = -2005270474
+DXGI_ERROR_MPO_UNPINNED = -2005270428
+DXGI_DDI_ERR_WASSTILLDRAWING = -2005204991
+DXGI_DDI_ERR_UNSUPPORTED = -2005204990
+DXGI_DDI_ERR_NONEXCLUSIVE = -2005204989
+D3D10_ERROR_TOO_MANY_UNIQUE_STATE_OBJECTS = -2005336063
+D3D10_ERROR_FILE_NOT_FOUND = -2005336062
+D3D11_ERROR_TOO_MANY_UNIQUE_STATE_OBJECTS = -2005139455
+D3D11_ERROR_FILE_NOT_FOUND = -2005139454
+D3D11_ERROR_TOO_MANY_UNIQUE_VIEW_OBJECTS = -2005139453
+D3D11_ERROR_DEFERRED_CONTEXT_MAP_WITHOUT_INITIAL_DISCARD = -2005139452
+D3D12_ERROR_ADAPTER_NOT_FOUND = -2005008383
+D3D12_ERROR_DRIVER_VERSION_MISMATCH = -2005008382
+D3D12_ERROR_INVALID_REDIST = -2005008381
+D2DERR_WRONG_STATE = -2003238911
+D2DERR_NOT_INITIALIZED = -2003238910
+D2DERR_UNSUPPORTED_OPERATION = -2003238909
+D2DERR_SCANNER_FAILED = -2003238908
+D2DERR_SCREEN_ACCESS_DENIED = -2003238907
+D2DERR_DISPLAY_STATE_INVALID = -2003238906
+D2DERR_ZERO_VECTOR = -2003238905
+D2DERR_INTERNAL_ERROR = -2003238904
+D2DERR_DISPLAY_FORMAT_NOT_SUPPORTED = -2003238903
+D2DERR_INVALID_CALL = -2003238902
+D2DERR_NO_HARDWARE_DEVICE = -2003238901
+D2DERR_RECREATE_TARGET = -2003238900
+D2DERR_TOO_MANY_SHADER_ELEMENTS = -2003238899
+D2DERR_SHADER_COMPILE_FAILED = -2003238898
+D2DERR_MAX_TEXTURE_SIZE_EXCEEDED = -2003238897
+D2DERR_UNSUPPORTED_VERSION = -2003238896
+D2DERR_BAD_NUMBER = -2003238895
+D2DERR_WRONG_FACTORY = -2003238894
+D2DERR_LAYER_ALREADY_IN_USE = -2003238893
+D2DERR_POP_CALL_DID_NOT_MATCH_PUSH = -2003238892
+D2DERR_WRONG_RESOURCE_DOMAIN = -2003238891
+D2DERR_PUSH_POP_UNBALANCED = -2003238890
+D2DERR_RENDER_TARGET_HAS_LAYER_OR_CLIPRECT = -2003238889
+D2DERR_INCOMPATIBLE_BRUSH_TYPES = -2003238888
+D2DERR_WIN32_ERROR = -2003238887
+D2DERR_TARGET_NOT_GDI_COMPATIBLE = -2003238886
+D2DERR_TEXT_EFFECT_IS_WRONG_TYPE = -2003238885
+D2DERR_TEXT_RENDERER_NOT_RELEASED = -2003238884
+D2DERR_EXCEEDS_MAX_BITMAP_SIZE = -2003238883
+D2DERR_INVALID_GRAPH_CONFIGURATION = -2003238882
+D2DERR_INVALID_INTERNAL_GRAPH_CONFIGURATION = -2003238881
+D2DERR_CYCLIC_GRAPH = -2003238880
+D2DERR_BITMAP_CANNOT_DRAW = -2003238879
+D2DERR_OUTSTANDING_BITMAP_REFERENCES = -2003238878
+D2DERR_ORIGINAL_TARGET_NOT_BOUND = -2003238877
+D2DERR_INVALID_TARGET = -2003238876
+D2DERR_BITMAP_BOUND_AS_TARGET = -2003238875
+D2DERR_INSUFFICIENT_DEVICE_CAPABILITIES = -2003238874
+D2DERR_INTERMEDIATE_TOO_LARGE = -2003238873
+D2DERR_EFFECT_IS_NOT_REGISTERED = -2003238872
+D2DERR_INVALID_PROPERTY = -2003238871
+D2DERR_NO_SUBPROPERTIES = -2003238870
+D2DERR_PRINT_JOB_CLOSED = -2003238869
+D2DERR_PRINT_FORMAT_NOT_SUPPORTED = -2003238868
+D2DERR_TOO_MANY_TRANSFORM_INPUTS = -2003238867
+D2DERR_INVALID_GLYPH_IMAGE = -2003238866
+DWRITE_E_FILEFORMAT = -2003283968
+DWRITE_E_UNEXPECTED = -2003283967
+DWRITE_E_NOFONT = -2003283966
+DWRITE_E_FILENOTFOUND = -2003283965
+DWRITE_E_FILEACCESS = -2003283964
+DWRITE_E_FONTCOLLECTIONOBSOLETE = -2003283963
+DWRITE_E_ALREADYREGISTERED = -2003283962
+DWRITE_E_CACHEFORMAT = -2003283961
+DWRITE_E_CACHEVERSION = -2003283960
+DWRITE_E_UNSUPPORTEDOPERATION = -2003283959
+DWRITE_E_TEXTRENDERERINCOMPATIBLE = -2003283958
+DWRITE_E_FLOWDIRECTIONCONFLICTS = -2003283957
+DWRITE_E_NOCOLOR = -2003283956
+DWRITE_E_REMOTEFONT = -2003283955
+DWRITE_E_DOWNLOADCANCELLED = -2003283954
+DWRITE_E_DOWNLOADFAILED = -2003283953
+DWRITE_E_TOOMANYDOWNLOADS = -2003283952
+WINCODEC_ERR_WRONGSTATE = -2003292412
+WINCODEC_ERR_VALUEOUTOFRANGE = -2003292411
+WINCODEC_ERR_UNKNOWNIMAGEFORMAT = -2003292409
+WINCODEC_ERR_UNSUPPORTEDVERSION = -2003292405
+WINCODEC_ERR_NOTINITIALIZED = -2003292404
+WINCODEC_ERR_ALREADYLOCKED = -2003292403
+WINCODEC_ERR_PROPERTYNOTFOUND = -2003292352
+WINCODEC_ERR_PROPERTYNOTSUPPORTED = -2003292351
+WINCODEC_ERR_PROPERTYSIZE = -2003292350
+WINCODEC_ERR_CODECPRESENT = -2003292349
+WINCODEC_ERR_CODECNOTHUMBNAIL = -2003292348
+WINCODEC_ERR_PALETTEUNAVAILABLE = -2003292347
+WINCODEC_ERR_CODECTOOMANYSCANLINES = -2003292346
+WINCODEC_ERR_INTERNALERROR = -2003292344
+WINCODEC_ERR_SOURCERECTDOESNOTMATCHDIMENSIONS = -2003292343
+WINCODEC_ERR_COMPONENTNOTFOUND = -2003292336
+WINCODEC_ERR_IMAGESIZEOUTOFRANGE = -2003292335
+WINCODEC_ERR_TOOMUCHMETADATA = -2003292334
+WINCODEC_ERR_BADIMAGE = -2003292320
+WINCODEC_ERR_BADHEADER = -2003292319
+WINCODEC_ERR_FRAMEMISSING = -2003292318
+WINCODEC_ERR_BADMETADATAHEADER = -2003292317
+WINCODEC_ERR_BADSTREAMDATA = -2003292304
+WINCODEC_ERR_STREAMWRITE = -2003292303
+WINCODEC_ERR_STREAMREAD = -2003292302
+WINCODEC_ERR_STREAMNOTAVAILABLE = -2003292301
+WINCODEC_ERR_UNSUPPORTEDPIXELFORMAT = -2003292288
+WINCODEC_ERR_UNSUPPORTEDOPERATION = -2003292287
+WINCODEC_ERR_INVALIDREGISTRATION = -2003292278
+WINCODEC_ERR_COMPONENTINITIALIZEFAILURE = -2003292277
+WINCODEC_ERR_INSUFFICIENTBUFFER = -2003292276
+WINCODEC_ERR_DUPLICATEMETADATAPRESENT = -2003292275
+WINCODEC_ERR_PROPERTYUNEXPECTEDTYPE = -2003292274
+WINCODEC_ERR_UNEXPECTEDSIZE = -2003292273
+WINCODEC_ERR_INVALIDQUERYREQUEST = -2003292272
+WINCODEC_ERR_UNEXPECTEDMETADATATYPE = -2003292271
+WINCODEC_ERR_REQUESTONLYVALIDATMETADATAROOT = -2003292270
+WINCODEC_ERR_INVALIDQUERYCHARACTER = -2003292269
+WINCODEC_ERR_WIN32ERROR = -2003292268
+WINCODEC_ERR_INVALIDPROGRESSIVELEVEL = -2003292267
+WINCODEC_ERR_INVALIDJPEGSCANINDEX = -2003292266
+MILERR_OBJECTBUSY = -2003304447
+MILERR_INSUFFICIENTBUFFER = -2003304446
+MILERR_WIN32ERROR = -2003304445
+MILERR_SCANNER_FAILED = -2003304444
+MILERR_SCREENACCESSDENIED = -2003304443
+MILERR_DISPLAYSTATEINVALID = -2003304442
+MILERR_NONINVERTIBLEMATRIX = -2003304441
+MILERR_ZEROVECTOR = -2003304440
+MILERR_TERMINATED = -2003304439
+MILERR_BADNUMBER = -2003304438
+MILERR_INTERNALERROR = -2003304320
+MILERR_DISPLAYFORMATNOTSUPPORTED = -2003304316
+MILERR_INVALIDCALL = -2003304315
+MILERR_ALREADYLOCKED = -2003304314
+MILERR_NOTLOCKED = -2003304313
+MILERR_DEVICECANNOTRENDERTEXT = -2003304312
+MILERR_GLYPHBITMAPMISSED = -2003304311
+MILERR_MALFORMEDGLYPHCACHE = -2003304310
+MILERR_GENERIC_IGNORE = -2003304309
+MILERR_MALFORMED_GUIDELINE_DATA = -2003304308
+MILERR_NO_HARDWARE_DEVICE = -2003304307
+MILERR_NEED_RECREATE_AND_PRESENT = -2003304306
+MILERR_ALREADY_INITIALIZED = -2003304305
+MILERR_MISMATCHED_SIZE = -2003304304
+MILERR_NO_REDIRECTION_SURFACE_AVAILABLE = -2003304303
+MILERR_REMOTING_NOT_SUPPORTED = -2003304302
+MILERR_QUEUED_PRESENT_NOT_SUPPORTED = -2003304301
+MILERR_NOT_QUEUING_PRESENTS = -2003304300
+MILERR_NO_REDIRECTION_SURFACE_RETRY_LATER = -2003304299
+MILERR_TOOMANYSHADERELEMNTS = -2003304298
+MILERR_MROW_READLOCK_FAILED = -2003304297
+MILERR_MROW_UPDATE_FAILED = -2003304296
+MILERR_SHADER_COMPILE_FAILED = -2003304295
+MILERR_MAX_TEXTURE_SIZE_EXCEEDED = -2003304294
+MILERR_QPC_TIME_WENT_BACKWARD = -2003304293
+MILERR_DXGI_ENUMERATION_OUT_OF_SYNC = -2003304291
+MILERR_ADAPTER_NOT_FOUND = -2003304290
+MILERR_COLORSPACE_NOT_SUPPORTED = -2003304289
+MILERR_PREFILTER_NOT_SUPPORTED = -2003304288
+MILERR_DISPLAYID_ACCESS_DENIED = -2003304287
+UCEERR_INVALIDPACKETHEADER = -2003303424
+UCEERR_UNKNOWNPACKET = -2003303423
+UCEERR_ILLEGALPACKET = -2003303422
+UCEERR_MALFORMEDPACKET = -2003303421
+UCEERR_ILLEGALHANDLE = -2003303420
+UCEERR_HANDLELOOKUPFAILED = -2003303419
+UCEERR_RENDERTHREADFAILURE = -2003303418
+UCEERR_CTXSTACKFRSTTARGETNULL = -2003303417
+UCEERR_CONNECTIONIDLOOKUPFAILED = -2003303416
+UCEERR_BLOCKSFULL = -2003303415
+UCEERR_MEMORYFAILURE = -2003303414
+UCEERR_PACKETRECORDOUTOFRANGE = -2003303413
+UCEERR_ILLEGALRECORDTYPE = -2003303412
+UCEERR_OUTOFHANDLES = -2003303411
+UCEERR_UNCHANGABLE_UPDATE_ATTEMPTED = -2003303410
+UCEERR_NO_MULTIPLE_WORKER_THREADS = -2003303409
+UCEERR_REMOTINGNOTSUPPORTED = -2003303408
+UCEERR_MISSINGENDCOMMAND = -2003303407
+UCEERR_MISSINGBEGINCOMMAND = -2003303406
+UCEERR_CHANNELSYNCTIMEDOUT = -2003303405
+UCEERR_CHANNELSYNCABANDONED = -2003303404
+UCEERR_UNSUPPORTEDTRANSPORTVERSION = -2003303403
+UCEERR_TRANSPORTUNAVAILABLE = -2003303402
+UCEERR_FEEDBACK_UNSUPPORTED = -2003303401
+UCEERR_COMMANDTRANSPORTDENIED = -2003303400
+UCEERR_GRAPHICSSTREAMUNAVAILABLE = -2003303399
+UCEERR_GRAPHICSSTREAMALREADYOPEN = -2003303392
+UCEERR_TRANSPORTDISCONNECTED = -2003303391
+UCEERR_TRANSPORTOVERLOADED = -2003303390
+UCEERR_PARTITION_ZOMBIED = -2003303389
+MILAVERR_NOCLOCK = -2003303168
+MILAVERR_NOMEDIATYPE = -2003303167
+MILAVERR_NOVIDEOMIXER = -2003303166
+MILAVERR_NOVIDEOPRESENTER = -2003303165
+MILAVERR_NOREADYFRAMES = -2003303164
+MILAVERR_MODULENOTLOADED = -2003303163
+MILAVERR_WMPFACTORYNOTREGISTERED = -2003303162
+MILAVERR_INVALIDWMPVERSION = -2003303161
+MILAVERR_INSUFFICIENTVIDEORESOURCES = -2003303160
+MILAVERR_VIDEOACCELERATIONNOTAVAILABLE = -2003303159
+MILAVERR_REQUESTEDTEXTURETOOBIG = -2003303158
+MILAVERR_SEEKFAILED = -2003303157
+MILAVERR_UNEXPECTEDWMPFAILURE = -2003303156
+MILAVERR_MEDIAPLAYERCLOSED = -2003303155
+MILAVERR_UNKNOWNHARDWAREERROR = -2003303154
+MILEFFECTSERR_UNKNOWNPROPERTY = -2003302898
+MILEFFECTSERR_EFFECTNOTPARTOFGROUP = -2003302897
+MILEFFECTSERR_NOINPUTSOURCEATTACHED = -2003302896
+MILEFFECTSERR_CONNECTORNOTCONNECTED = -2003302895
+MILEFFECTSERR_CONNECTORNOTASSOCIATEDWITHEFFECT = -2003302894
+MILEFFECTSERR_RESERVED = -2003302893
+MILEFFECTSERR_CYCLEDETECTED = -2003302892
+MILEFFECTSERR_EFFECTINMORETHANONEGRAPH = -2003302891
+MILEFFECTSERR_EFFECTALREADYINAGRAPH = -2003302890
+MILEFFECTSERR_EFFECTHASNOCHILDREN = -2003302889
+MILEFFECTSERR_ALREADYATTACHEDTOLISTENER = -2003302888
+MILEFFECTSERR_NOTAFFINETRANSFORM = -2003302887
+MILEFFECTSERR_EMPTYBOUNDS = -2003302886
+MILEFFECTSERR_OUTPUTSIZETOOLARGE = -2003302885
+DWMERR_STATE_TRANSITION_FAILED = -2003302656
+DWMERR_THEME_FAILED = -2003302655
+DWMERR_CATASTROPHIC_FAILURE = -2003302654
+DCOMPOSITION_ERROR_WINDOW_ALREADY_COMPOSED = -2003302400
+DCOMPOSITION_ERROR_SURFACE_BEING_RENDERED = -2003302399
+DCOMPOSITION_ERROR_SURFACE_NOT_BEING_RENDERED = -2003302398
+ONL_E_INVALID_AUTHENTICATION_TARGET = -2138701823
+ONL_E_ACCESS_DENIED_BY_TOU = -2138701822
+ONL_E_INVALID_APPLICATION = -2138701821
+ONL_E_PASSWORD_UPDATE_REQUIRED = -2138701820
+ONL_E_ACCOUNT_UPDATE_REQUIRED = -2138701819
+ONL_E_FORCESIGNIN = -2138701818
+ONL_E_ACCOUNT_LOCKED = -2138701817
+ONL_E_PARENTAL_CONSENT_REQUIRED = -2138701816
+ONL_E_EMAIL_VERIFICATION_REQUIRED = -2138701815
+ONL_E_ACCOUNT_SUSPENDED_COMPROIMISE = -2138701814
+ONL_E_ACCOUNT_SUSPENDED_ABUSE = -2138701813
+ONL_E_ACTION_REQUIRED = -2138701812
+ONL_CONNECTION_COUNT_LIMIT = -2138701811
+ONL_E_CONNECTED_ACCOUNT_CAN_NOT_SIGNOUT = -2138701810
+ONL_E_USER_AUTHENTICATION_REQUIRED = -2138701809
+ONL_E_REQUEST_THROTTLED = -2138701808
+FA_E_MAX_PERSISTED_ITEMS_REACHED = -2144927200
+FA_E_HOMEGROUP_NOT_AVAILABLE = -2144927198
+E_MONITOR_RESOLUTION_TOO_LOW = -2144927152
+E_ELEVATED_ACTIVATION_NOT_SUPPORTED = -2144927151
+E_UAC_DISABLED = -2144927150
+E_FULL_ADMIN_NOT_SUPPORTED = -2144927149
+E_APPLICATION_NOT_REGISTERED = -2144927148
+E_MULTIPLE_EXTENSIONS_FOR_APPLICATION = -2144927147
+E_MULTIPLE_PACKAGES_FOR_FAMILY = -2144927146
+E_APPLICATION_MANAGER_NOT_RUNNING = -2144927145
+S_STORE_LAUNCHED_FOR_REMEDIATION = 0x00270258
+S_APPLICATION_ACTIVATION_ERROR_HANDLED_BY_DIALOG = 0x00270259
+E_APPLICATION_ACTIVATION_TIMED_OUT = -2144927142
+E_APPLICATION_ACTIVATION_EXEC_FAILURE = -2144927141
+E_APPLICATION_TEMPORARY_LICENSE_ERROR = -2144927140
+E_APPLICATION_TRIAL_LICENSE_EXPIRED = -2144927139
+E_SKYDRIVE_ROOT_TARGET_FILE_SYSTEM_NOT_SUPPORTED = -2144927136
+E_SKYDRIVE_ROOT_TARGET_OVERLAP = -2144927135
+E_SKYDRIVE_ROOT_TARGET_CANNOT_INDEX = -2144927134
+E_SKYDRIVE_FILE_NOT_UPLOADED = -2144927133
+E_SKYDRIVE_UPDATE_AVAILABILITY_FAIL = -2144927132
+E_SKYDRIVE_ROOT_TARGET_VOLUME_ROOT_NOT_SUPPORTED = -2144927131
+E_SYNCENGINE_FILE_SIZE_OVER_LIMIT = -2013089791
+E_SYNCENGINE_FILE_SIZE_EXCEEDS_REMAINING_QUOTA = -2013089790
+E_SYNCENGINE_UNSUPPORTED_FILE_NAME = -2013089789
+E_SYNCENGINE_FOLDER_ITEM_COUNT_LIMIT_EXCEEDED = -2013089788
+E_SYNCENGINE_FILE_SYNC_PARTNER_ERROR = -2013089787
+E_SYNCENGINE_SYNC_PAUSED_BY_SERVICE = -2013089786
+E_SYNCENGINE_FILE_IDENTIFIER_UNKNOWN = -2013085694
+E_SYNCENGINE_SERVICE_AUTHENTICATION_FAILED = -2013085693
+E_SYNCENGINE_UNKNOWN_SERVICE_ERROR = -2013085692
+E_SYNCENGINE_SERVICE_RETURNED_UNEXPECTED_SIZE = -2013085691
+E_SYNCENGINE_REQUEST_BLOCKED_BY_SERVICE = -2013085690
+E_SYNCENGINE_REQUEST_BLOCKED_DUE_TO_CLIENT_ERROR = -2013085689
+E_SYNCENGINE_FOLDER_INACCESSIBLE = -2013081599
+E_SYNCENGINE_UNSUPPORTED_FOLDER_NAME = -2013081598
+E_SYNCENGINE_UNSUPPORTED_MARKET = -2013081597
+E_SYNCENGINE_PATH_LENGTH_LIMIT_EXCEEDED = -2013081596
+E_SYNCENGINE_REMOTE_PATH_LENGTH_LIMIT_EXCEEDED = -2013081595
+E_SYNCENGINE_CLIENT_UPDATE_NEEDED = -2013081594
+E_SYNCENGINE_PROXY_AUTHENTICATION_REQUIRED = -2013081593
+E_SYNCENGINE_STORAGE_SERVICE_PROVISIONING_FAILED = -2013081592
+E_SYNCENGINE_UNSUPPORTED_REPARSE_POINT = -2013081591
+E_SYNCENGINE_STORAGE_SERVICE_BLOCKED = -2013081590
+E_SYNCENGINE_FOLDER_IN_REDIRECTION = -2013081589
+EAS_E_POLICY_NOT_MANAGED_BY_OS = -2141913087
+EAS_E_POLICY_COMPLIANT_WITH_ACTIONS = -2141913086
+EAS_E_REQUESTED_POLICY_NOT_ENFORCEABLE = -2141913085
+EAS_E_CURRENT_USER_HAS_BLANK_PASSWORD = -2141913084
+EAS_E_REQUESTED_POLICY_PASSWORD_EXPIRATION_INCOMPATIBLE = -2141913083
+EAS_E_USER_CANNOT_CHANGE_PASSWORD = -2141913082
+EAS_E_ADMINS_HAVE_BLANK_PASSWORD = -2141913081
+EAS_E_ADMINS_CANNOT_CHANGE_PASSWORD = -2141913080
+EAS_E_LOCAL_CONTROLLED_USERS_CANNOT_CHANGE_PASSWORD = -2141913079
+EAS_E_PASSWORD_POLICY_NOT_ENFORCEABLE_FOR_CONNECTED_ADMINS = -2141913078
+EAS_E_CONNECTED_ADMINS_NEED_TO_CHANGE_PASSWORD = -2141913077
+EAS_E_PASSWORD_POLICY_NOT_ENFORCEABLE_FOR_CURRENT_CONNECTED_USER = -2141913076
+EAS_E_CURRENT_CONNECTED_USER_NEED_TO_CHANGE_PASSWORD = -2141913075
+WEB_E_UNSUPPORTED_FORMAT = -2089484287
+WEB_E_INVALID_XML = -2089484286
+WEB_E_MISSING_REQUIRED_ELEMENT = -2089484285
+WEB_E_MISSING_REQUIRED_ATTRIBUTE = -2089484284
+WEB_E_UNEXPECTED_CONTENT = -2089484283
+WEB_E_RESOURCE_TOO_LARGE = -2089484282
+WEB_E_INVALID_JSON_STRING = -2089484281
+WEB_E_INVALID_JSON_NUMBER = -2089484280
+WEB_E_JSON_VALUE_NOT_FOUND = -2089484279
+HTTP_E_STATUS_UNEXPECTED = -2145845247
+HTTP_E_STATUS_UNEXPECTED_REDIRECTION = -2145845245
+HTTP_E_STATUS_UNEXPECTED_CLIENT_ERROR = -2145845244
+HTTP_E_STATUS_UNEXPECTED_SERVER_ERROR = -2145845243
+HTTP_E_STATUS_AMBIGUOUS = -2145844948
+HTTP_E_STATUS_MOVED = -2145844947
+HTTP_E_STATUS_REDIRECT = -2145844946
+HTTP_E_STATUS_REDIRECT_METHOD = -2145844945
+HTTP_E_STATUS_NOT_MODIFIED = -2145844944
+HTTP_E_STATUS_USE_PROXY = -2145844943
+HTTP_E_STATUS_REDIRECT_KEEP_VERB = -2145844941
+HTTP_E_STATUS_BAD_REQUEST = -2145844848
+HTTP_E_STATUS_DENIED = -2145844847
+HTTP_E_STATUS_PAYMENT_REQ = -2145844846
+HTTP_E_STATUS_FORBIDDEN = -2145844845
+HTTP_E_STATUS_NOT_FOUND = -2145844844
+HTTP_E_STATUS_BAD_METHOD = -2145844843
+HTTP_E_STATUS_NONE_ACCEPTABLE = -2145844842
+HTTP_E_STATUS_PROXY_AUTH_REQ = -2145844841
+HTTP_E_STATUS_REQUEST_TIMEOUT = -2145844840
+HTTP_E_STATUS_CONFLICT = -2145844839
+HTTP_E_STATUS_GONE = -2145844838
+HTTP_E_STATUS_LENGTH_REQUIRED = -2145844837
+HTTP_E_STATUS_PRECOND_FAILED = -2145844836
+HTTP_E_STATUS_REQUEST_TOO_LARGE = -2145844835
+HTTP_E_STATUS_URI_TOO_LONG = -2145844834
+HTTP_E_STATUS_UNSUPPORTED_MEDIA = -2145844833
+HTTP_E_STATUS_RANGE_NOT_SATISFIABLE = -2145844832
+HTTP_E_STATUS_EXPECTATION_FAILED = -2145844831
+HTTP_E_STATUS_SERVER_ERROR = -2145844748
+HTTP_E_STATUS_NOT_SUPPORTED = -2145844747
+HTTP_E_STATUS_BAD_GATEWAY = -2145844746
+HTTP_E_STATUS_SERVICE_UNAVAIL = -2145844745
+HTTP_E_STATUS_GATEWAY_TIMEOUT = -2145844744
+HTTP_E_STATUS_VERSION_NOT_SUP = -2145844743
+E_INVALID_PROTOCOL_OPERATION = -2089418751
+E_INVALID_PROTOCOL_FORMAT = -2089418750
+E_PROTOCOL_EXTENSIONS_NOT_SUPPORTED = -2089418749
+E_SUBPROTOCOL_NOT_SUPPORTED = -2089418748
+E_PROTOCOL_VERSION_NOT_SUPPORTED = -2089418747
+INPUT_E_OUT_OF_ORDER = -2143289344
+INPUT_E_REENTRANCY = -2143289343
+INPUT_E_MULTIMODAL = -2143289342
+INPUT_E_PACKET = -2143289341
+INPUT_E_FRAME = -2143289340
+INPUT_E_HISTORY = -2143289339
+INPUT_E_DEVICE_INFO = -2143289338
+INPUT_E_TRANSFORM = -2143289337
+INPUT_E_DEVICE_PROPERTY = -2143289336
+INET_E_INVALID_URL = -2146697214
+INET_E_NO_SESSION = -2146697213
+INET_E_CANNOT_CONNECT = -2146697212
+INET_E_RESOURCE_NOT_FOUND = -2146697211
+INET_E_OBJECT_NOT_FOUND = -2146697210
+INET_E_DATA_NOT_AVAILABLE = -2146697209
+INET_E_DOWNLOAD_FAILURE = -2146697208
+INET_E_AUTHENTICATION_REQUIRED = -2146697207
+INET_E_NO_VALID_MEDIA = -2146697206
+INET_E_CONNECTION_TIMEOUT = -2146697205
+INET_E_INVALID_REQUEST = -2146697204
+INET_E_UNKNOWN_PROTOCOL = -2146697203
+INET_E_SECURITY_PROBLEM = -2146697202
+INET_E_CANNOT_LOAD_DATA = -2146697201
+INET_E_CANNOT_INSTANTIATE_OBJECT = -2146697200
+INET_E_INVALID_CERTIFICATE = -2146697191
+INET_E_REDIRECT_FAILED = -2146697196
+INET_E_REDIRECT_TO_DIR = -2146697195
+ERROR_DBG_CREATE_PROCESS_FAILURE_LOCKDOWN = -2135949311
+ERROR_DBG_ATTACH_PROCESS_FAILURE_LOCKDOWN = -2135949310
+ERROR_DBG_CONNECT_SERVER_FAILURE_LOCKDOWN = -2135949309
+ERROR_DBG_START_SERVER_FAILURE_LOCKDOWN = -2135949308
+HSP_E_ERROR_MASK = -2128084992
+HSP_E_INTERNAL_ERROR = -2128080897
+HSP_BS_ERROR_MASK = -2128080896
+HSP_BS_INTERNAL_ERROR = -2128080641
+HSP_DRV_ERROR_MASK = -2128019456
+HSP_DRV_INTERNAL_ERROR = -2128019201
+HSP_BASE_ERROR_MASK = -2128019200
+HSP_BASE_INTERNAL_ERROR = -2128018945
+HSP_KSP_ERROR_MASK = -2128018944
+HSP_KSP_DEVICE_NOT_READY = -2128018943
+HSP_KSP_INVALID_PROVIDER_HANDLE = -2128018942
+HSP_KSP_INVALID_KEY_HANDLE = -2128018941
+HSP_KSP_INVALID_PARAMETER = -2128018940
+HSP_KSP_BUFFER_TOO_SMALL = -2128018939
+HSP_KSP_NOT_SUPPORTED = -2128018938
+HSP_KSP_INVALID_DATA = -2128018937
+HSP_KSP_INVALID_FLAGS = -2128018936
+HSP_KSP_ALGORITHM_NOT_SUPPORTED = -2128018935
+HSP_KSP_KEY_ALREADY_FINALIZED = -2128018934
+HSP_KSP_KEY_NOT_FINALIZED = -2128018933
+HSP_KSP_INVALID_KEY_TYPE = -2128018932
+HSP_KSP_NO_MEMORY = -2128018928
+HSP_KSP_PARAMETER_NOT_SET = -2128018927
+HSP_KSP_KEY_EXISTS = -2128018923
+HSP_KSP_KEY_MISSING = -2128018922
+HSP_KSP_KEY_LOAD_FAIL = -2128018921
+HSP_KSP_NO_MORE_ITEMS = -2128018920
+HSP_KSP_INTERNAL_ERROR = -2128018689
+ERROR_IO_PREEMPTED = -1996423167
+JSCRIPT_E_CANTEXECUTE = -1996357631
+WEP_E_NOT_PROVISIONED_ON_ALL_VOLUMES = -2013200383
+WEP_E_FIXED_DATA_NOT_SUPPORTED = -2013200382
+WEP_E_HARDWARE_NOT_COMPLIANT = -2013200381
+WEP_E_LOCK_NOT_CONFIGURED = -2013200380
+WEP_E_PROTECTION_SUSPENDED = -2013200379
+WEP_E_NO_LICENSE = -2013200378
+WEP_E_OS_NOT_PROTECTED = -2013200377
+WEP_E_UNEXPECTED_FAIL = -2013200376
+WEP_E_BUFFER_TOO_LARGE = -2013200375
+ERROR_SVHDX_ERROR_STORED = -1067712512
+ERROR_SVHDX_ERROR_NOT_AVAILABLE = -1067647232
+ERROR_SVHDX_UNIT_ATTENTION_AVAILABLE = -1067647231
+ERROR_SVHDX_UNIT_ATTENTION_CAPACITY_DATA_CHANGED = -1067647230
+ERROR_SVHDX_UNIT_ATTENTION_RESERVATIONS_PREEMPTED = -1067647229
+ERROR_SVHDX_UNIT_ATTENTION_RESERVATIONS_RELEASED = -1067647228
+ERROR_SVHDX_UNIT_ATTENTION_REGISTRATIONS_PREEMPTED = -1067647227
+ERROR_SVHDX_UNIT_ATTENTION_OPERATING_DEFINITION_CHANGED = -1067647226
+ERROR_SVHDX_RESERVATION_CONFLICT = -1067647225
+ERROR_SVHDX_WRONG_FILE_TYPE = -1067647224
+ERROR_SVHDX_VERSION_MISMATCH = -1067647223
+ERROR_VHD_SHARED = -1067647222
+ERROR_SVHDX_NO_INITIATOR = -1067647221
+ERROR_VHDSET_BACKING_STORAGE_NOT_FOUND = -1067647220
+ERROR_SMB_NO_PREAUTH_INTEGRITY_HASH_OVERLAP = -1067646976
+ERROR_SMB_BAD_CLUSTER_DIALECT = -1067646975
+ERROR_SMB_NO_SIGNING_ALGORITHM_OVERLAP = -1067646974
+WININET_E_OUT_OF_HANDLES = -2147012895
+WININET_E_TIMEOUT = -2147012894
+WININET_E_EXTENDED_ERROR = -2147012893
+WININET_E_INTERNAL_ERROR = -2147012892
+WININET_E_INVALID_URL = -2147012891
+WININET_E_UNRECOGNIZED_SCHEME = -2147012890
+WININET_E_NAME_NOT_RESOLVED = -2147012889
+WININET_E_PROTOCOL_NOT_FOUND = -2147012888
+WININET_E_INVALID_OPTION = -2147012887
+WININET_E_BAD_OPTION_LENGTH = -2147012886
+WININET_E_OPTION_NOT_SETTABLE = -2147012885
+WININET_E_SHUTDOWN = -2147012884
+WININET_E_INCORRECT_USER_NAME = -2147012883
+WININET_E_INCORRECT_PASSWORD = -2147012882
+WININET_E_LOGIN_FAILURE = -2147012881
+WININET_E_INVALID_OPERATION = -2147012880
+WININET_E_OPERATION_CANCELLED = -2147012879
+WININET_E_INCORRECT_HANDLE_TYPE = -2147012878
+WININET_E_INCORRECT_HANDLE_STATE = -2147012877
+WININET_E_NOT_PROXY_REQUEST = -2147012876
+WININET_E_REGISTRY_VALUE_NOT_FOUND = -2147012875
+WININET_E_BAD_REGISTRY_PARAMETER = -2147012874
+WININET_E_NO_DIRECT_ACCESS = -2147012873
+WININET_E_NO_CONTEXT = -2147012872
+WININET_E_NO_CALLBACK = -2147012871
+WININET_E_REQUEST_PENDING = -2147012870
+WININET_E_INCORRECT_FORMAT = -2147012869
+WININET_E_ITEM_NOT_FOUND = -2147012868
+WININET_E_CANNOT_CONNECT = -2147012867
+WININET_E_CONNECTION_ABORTED = -2147012866
+WININET_E_CONNECTION_RESET = -2147012865
+WININET_E_FORCE_RETRY = -2147012864
+WININET_E_INVALID_PROXY_REQUEST = -2147012863
+WININET_E_NEED_UI = -2147012862
+WININET_E_HANDLE_EXISTS = -2147012860
+WININET_E_SEC_CERT_DATE_INVALID = -2147012859
+WININET_E_SEC_CERT_CN_INVALID = -2147012858
+WININET_E_HTTP_TO_HTTPS_ON_REDIR = -2147012857
+WININET_E_HTTPS_TO_HTTP_ON_REDIR = -2147012856
+WININET_E_MIXED_SECURITY = -2147012855
+WININET_E_CHG_POST_IS_NON_SECURE = -2147012854
+WININET_E_POST_IS_NON_SECURE = -2147012853
+WININET_E_CLIENT_AUTH_CERT_NEEDED = -2147012852
+WININET_E_INVALID_CA = -2147012851
+WININET_E_CLIENT_AUTH_NOT_SETUP = -2147012850
+WININET_E_ASYNC_THREAD_FAILED = -2147012849
+WININET_E_REDIRECT_SCHEME_CHANGE = -2147012848
+WININET_E_DIALOG_PENDING = -2147012847
+WININET_E_RETRY_DIALOG = -2147012846
+WININET_E_NO_NEW_CONTAINERS = -2147012845
+WININET_E_HTTPS_HTTP_SUBMIT_REDIR = -2147012844
+WININET_E_SEC_CERT_ERRORS = -2147012841
+WININET_E_SEC_CERT_REV_FAILED = -2147012839
+WININET_E_HEADER_NOT_FOUND = -2147012746
+WININET_E_DOWNLEVEL_SERVER = -2147012745
+WININET_E_INVALID_SERVER_RESPONSE = -2147012744
+WININET_E_INVALID_HEADER = -2147012743
+WININET_E_INVALID_QUERY_REQUEST = -2147012742
+WININET_E_HEADER_ALREADY_EXISTS = -2147012741
+WININET_E_REDIRECT_FAILED = -2147012740
+WININET_E_SECURITY_CHANNEL_ERROR = -2147012739
+WININET_E_UNABLE_TO_CACHE_FILE = -2147012738
+WININET_E_TCPIP_NOT_INSTALLED = -2147012737
+WININET_E_DISCONNECTED = -2147012733
+WININET_E_SERVER_UNREACHABLE = -2147012732
+WININET_E_PROXY_SERVER_UNREACHABLE = -2147012731
+WININET_E_BAD_AUTO_PROXY_SCRIPT = -2147012730
+WININET_E_UNABLE_TO_DOWNLOAD_SCRIPT = -2147012729
+WININET_E_SEC_INVALID_CERT = -2147012727
+WININET_E_SEC_CERT_REVOKED = -2147012726
+WININET_E_FAILED_DUETOSECURITYCHECK = -2147012725
+WININET_E_NOT_INITIALIZED = -2147012724
+WININET_E_LOGIN_FAILURE_DISPLAY_ENTITY_BODY = -2147012722
+WININET_E_DECODING_FAILED = -2147012721
+WININET_E_NOT_REDIRECTED = -2147012736
+WININET_E_COOKIE_NEEDS_CONFIRMATION = -2147012735
+WININET_E_COOKIE_DECLINED = -2147012734
+WININET_E_REDIRECT_NEEDS_CONFIRMATION = -2147012728
+SQLITE_E_ERROR = -2018574335
+SQLITE_E_INTERNAL = -2018574334
+SQLITE_E_PERM = -2018574333
+SQLITE_E_ABORT = -2018574332
+SQLITE_E_BUSY = -2018574331
+SQLITE_E_LOCKED = -2018574330
+SQLITE_E_NOMEM = -2018574329
+SQLITE_E_READONLY = -2018574328
+SQLITE_E_INTERRUPT = -2018574327
+SQLITE_E_IOERR = -2018574326
+SQLITE_E_CORRUPT = -2018574325
+SQLITE_E_NOTFOUND = -2018574324
+SQLITE_E_FULL = -2018574323
+SQLITE_E_CANTOPEN = -2018574322
+SQLITE_E_PROTOCOL = -2018574321
+SQLITE_E_EMPTY = -2018574320
+SQLITE_E_SCHEMA = -2018574319
+SQLITE_E_TOOBIG = -2018574318
+SQLITE_E_CONSTRAINT = -2018574317
+SQLITE_E_MISMATCH = -2018574316
+SQLITE_E_MISUSE = -2018574315
+SQLITE_E_NOLFS = -2018574314
+SQLITE_E_AUTH = -2018574313
+SQLITE_E_FORMAT = -2018574312
+SQLITE_E_RANGE = -2018574311
+SQLITE_E_NOTADB = -2018574310
+SQLITE_E_NOTICE = -2018574309
+SQLITE_E_WARNING = -2018574308
+SQLITE_E_ROW = -2018574236
+SQLITE_E_DONE = -2018574235
+SQLITE_E_IOERR_READ = -2018574070
+SQLITE_E_IOERR_SHORT_READ = -2018573814
+SQLITE_E_IOERR_WRITE = -2018573558
+SQLITE_E_IOERR_FSYNC = -2018573302
+SQLITE_E_IOERR_DIR_FSYNC = -2018573046
+SQLITE_E_IOERR_TRUNCATE = -2018572790
+SQLITE_E_IOERR_FSTAT = -2018572534
+SQLITE_E_IOERR_UNLOCK = -2018572278
+SQLITE_E_IOERR_RDLOCK = -2018572022
+SQLITE_E_IOERR_DELETE = -2018571766
+SQLITE_E_IOERR_BLOCKED = -2018571510
+SQLITE_E_IOERR_NOMEM = -2018571254
+SQLITE_E_IOERR_ACCESS = -2018570998
+SQLITE_E_IOERR_CHECKRESERVEDLOCK = -2018570742
+SQLITE_E_IOERR_LOCK = -2018570486
+SQLITE_E_IOERR_CLOSE = -2018570230
+SQLITE_E_IOERR_DIR_CLOSE = -2018569974
+SQLITE_E_IOERR_SHMOPEN = -2018569718
+SQLITE_E_IOERR_SHMSIZE = -2018569462
+SQLITE_E_IOERR_SHMLOCK = -2018569206
+SQLITE_E_IOERR_SHMMAP = -2018568950
+SQLITE_E_IOERR_SEEK = -2018568694
+SQLITE_E_IOERR_DELETE_NOENT = -2018568438
+SQLITE_E_IOERR_MMAP = -2018568182
+SQLITE_E_IOERR_GETTEMPPATH = -2018567926
+SQLITE_E_IOERR_CONVPATH = -2018567670
+SQLITE_E_IOERR_VNODE = -2018567678
+SQLITE_E_IOERR_AUTH = -2018567677
+SQLITE_E_LOCKED_SHAREDCACHE = -2018574074
+SQLITE_E_BUSY_RECOVERY = -2018574075
+SQLITE_E_BUSY_SNAPSHOT = -2018573819
+SQLITE_E_CANTOPEN_NOTEMPDIR = -2018574066
+SQLITE_E_CANTOPEN_ISDIR = -2018573810
+SQLITE_E_CANTOPEN_FULLPATH = -2018573554
+SQLITE_E_CANTOPEN_CONVPATH = -2018573298
+SQLITE_E_CORRUPT_VTAB = -2018574069
+SQLITE_E_READONLY_RECOVERY = -2018574072
+SQLITE_E_READONLY_CANTLOCK = -2018573816
+SQLITE_E_READONLY_ROLLBACK = -2018573560
+SQLITE_E_READONLY_DBMOVED = -2018573304
+SQLITE_E_ABORT_ROLLBACK = -2018573820
+SQLITE_E_CONSTRAINT_CHECK = -2018574061
+SQLITE_E_CONSTRAINT_COMMITHOOK = -2018573805
+SQLITE_E_CONSTRAINT_FOREIGNKEY = -2018573549
+SQLITE_E_CONSTRAINT_FUNCTION = -2018573293
+SQLITE_E_CONSTRAINT_NOTNULL = -2018573037
+SQLITE_E_CONSTRAINT_PRIMARYKEY = -2018572781
+SQLITE_E_CONSTRAINT_TRIGGER = -2018572525
+SQLITE_E_CONSTRAINT_UNIQUE = -2018572269
+SQLITE_E_CONSTRAINT_VTAB = -2018572013
+SQLITE_E_CONSTRAINT_ROWID = -2018571757
+SQLITE_E_NOTICE_RECOVER_WAL = -2018574053
+SQLITE_E_NOTICE_RECOVER_ROLLBACK = -2018573797
+SQLITE_E_WARNING_AUTOINDEX = -2018574052
+UTC_E_TOGGLE_TRACE_STARTED = -2017128447
+UTC_E_ALTERNATIVE_TRACE_CANNOT_PREEMPT = -2017128446
+UTC_E_AOT_NOT_RUNNING = -2017128445
+UTC_E_SCRIPT_TYPE_INVALID = -2017128444
+UTC_E_SCENARIODEF_NOT_FOUND = -2017128443
+UTC_E_TRACEPROFILE_NOT_FOUND = -2017128442
+UTC_E_FORWARDER_ALREADY_ENABLED = -2017128441
+UTC_E_FORWARDER_ALREADY_DISABLED = -2017128440
+UTC_E_EVENTLOG_ENTRY_MALFORMED = -2017128439
+UTC_E_DIAGRULES_SCHEMAVERSION_MISMATCH = -2017128438
+UTC_E_SCRIPT_TERMINATED = -2017128437
+UTC_E_INVALID_CUSTOM_FILTER = -2017128436
+UTC_E_TRACE_NOT_RUNNING = -2017128435
+UTC_E_REESCALATED_TOO_QUICKLY = -2017128434
+UTC_E_ESCALATION_ALREADY_RUNNING = -2017128433
+UTC_E_PERFTRACK_ALREADY_TRACING = -2017128432
+UTC_E_REACHED_MAX_ESCALATIONS = -2017128431
+UTC_E_FORWARDER_PRODUCER_MISMATCH = -2017128430
+UTC_E_INTENTIONAL_SCRIPT_FAILURE = -2017128429
+UTC_E_SQM_INIT_FAILED = -2017128428
+UTC_E_NO_WER_LOGGER_SUPPORTED = -2017128427
+UTC_E_TRACERS_DONT_EXIST = -2017128426
+UTC_E_WINRT_INIT_FAILED = -2017128425
+UTC_E_SCENARIODEF_SCHEMAVERSION_MISMATCH = -2017128424
+UTC_E_INVALID_FILTER = -2017128423
+UTC_E_EXE_TERMINATED = -2017128422
+UTC_E_ESCALATION_NOT_AUTHORIZED = -2017128421
+UTC_E_SETUP_NOT_AUTHORIZED = -2017128420
+UTC_E_CHILD_PROCESS_FAILED = -2017128419
+UTC_E_COMMAND_LINE_NOT_AUTHORIZED = -2017128418
+UTC_E_CANNOT_LOAD_SCENARIO_EDITOR_XML = -2017128417
+UTC_E_ESCALATION_TIMED_OUT = -2017128416
+UTC_E_SETUP_TIMED_OUT = -2017128415
+UTC_E_TRIGGER_MISMATCH = -2017128414
+UTC_E_TRIGGER_NOT_FOUND = -2017128413
+UTC_E_SIF_NOT_SUPPORTED = -2017128412
+UTC_E_DELAY_TERMINATED = -2017128411
+UTC_E_DEVICE_TICKET_ERROR = -2017128410
+UTC_E_TRACE_BUFFER_LIMIT_EXCEEDED = -2017128409
+UTC_E_API_RESULT_UNAVAILABLE = -2017128408
+UTC_E_RPC_TIMEOUT = -2017128407
+UTC_E_RPC_WAIT_FAILED = -2017128406
+UTC_E_API_BUSY = -2017128405
+UTC_E_TRACE_MIN_DURATION_REQUIREMENT_NOT_MET = -2017128404
+UTC_E_EXCLUSIVITY_NOT_AVAILABLE = -2017128403
+UTC_E_GETFILE_FILE_PATH_NOT_APPROVED = -2017128402
+UTC_E_ESCALATION_DIRECTORY_ALREADY_EXISTS = -2017128401
+UTC_E_TIME_TRIGGER_ON_START_INVALID = -2017128400
+UTC_E_TIME_TRIGGER_ONLY_VALID_ON_SINGLE_TRANSITION = -2017128399
+UTC_E_TIME_TRIGGER_INVALID_TIME_RANGE = -2017128398
+UTC_E_MULTIPLE_TIME_TRIGGER_ON_SINGLE_STATE = -2017128397
+UTC_E_BINARY_MISSING = -2017128396
+UTC_E_FAILED_TO_RESOLVE_CONTAINER_ID = -2017128394
+UTC_E_UNABLE_TO_RESOLVE_SESSION = -2017128393
+UTC_E_THROTTLED = -2017128392
+UTC_E_UNAPPROVED_SCRIPT = -2017128391
+UTC_E_SCRIPT_MISSING = -2017128390
+UTC_E_SCENARIO_THROTTLED = -2017128389
+UTC_E_API_NOT_SUPPORTED = -2017128388
+UTC_E_GETFILE_EXTERNAL_PATH_NOT_APPROVED = -2017128387
+UTC_E_TRY_GET_SCENARIO_TIMEOUT_EXCEEDED = -2017128386
+UTC_E_CERT_REV_FAILED = -2017128385
+UTC_E_FAILED_TO_START_NDISCAP = -2017128384
+UTC_E_KERNELDUMP_LIMIT_REACHED = -2017128383
+UTC_E_MISSING_AGGREGATE_EVENT_TAG = -2017128382
+UTC_E_INVALID_AGGREGATION_STRUCT = -2017128381
+UTC_E_ACTION_NOT_SUPPORTED_IN_DESTINATION = -2017128380
+UTC_E_FILTER_MISSING_ATTRIBUTE = -2017128379
+UTC_E_FILTER_INVALID_TYPE = -2017128378
+UTC_E_FILTER_VARIABLE_NOT_FOUND = -2017128377
+UTC_E_FILTER_FUNCTION_RESTRICTED = -2017128376
+UTC_E_FILTER_VERSION_MISMATCH = -2017128375
+UTC_E_FILTER_INVALID_FUNCTION = -2017128368
+UTC_E_FILTER_INVALID_FUNCTION_PARAMS = -2017128367
+UTC_E_FILTER_INVALID_COMMAND = -2017128366
+UTC_E_FILTER_ILLEGAL_EVAL = -2017128365
+UTC_E_TTTRACER_RETURNED_ERROR = -2017128364
+UTC_E_AGENT_DIAGNOSTICS_TOO_LARGE = -2017128363
+UTC_E_FAILED_TO_RECEIVE_AGENT_DIAGNOSTICS = -2017128362
+UTC_E_SCENARIO_HAS_NO_ACTIONS = -2017128361
+UTC_E_TTTRACER_STORAGE_FULL = -2017128360
+UTC_E_INSUFFICIENT_SPACE_TO_START_TRACE = -2017128359
+UTC_E_ESCALATION_CANCELLED_AT_SHUTDOWN = -2017128358
+UTC_E_GETFILEINFOACTION_FILE_NOT_APPROVED = -2017128357
+UTC_E_SETREGKEYACTION_TYPE_NOT_APPROVED = -2017128356
+UTC_E_TRACE_THROTTLED = -2017128355
+WINML_ERR_INVALID_DEVICE = -2003828735
+WINML_ERR_INVALID_BINDING = -2003828734
+WINML_ERR_VALUE_NOTFOUND = -2003828733
+WINML_ERR_SIZE_MISMATCH = -2003828732
+ERROR_QUIC_HANDSHAKE_FAILURE = -2143223808
+ERROR_QUIC_VER_NEG_FAILURE = -2143223807
+ERROR_QUIC_USER_CANCELED = -2143223806
+ERROR_QUIC_INTERNAL_ERROR = -2143223805
+ERROR_QUIC_PROTOCOL_VIOLATION = -2143223804
+ERROR_QUIC_CONNECTION_IDLE = -2143223803
+ERROR_QUIC_CONNECTION_TIMEOUT = -2143223802
+ERROR_QUIC_ALPN_NEG_FAILURE = -2143223801
+IORING_E_REQUIRED_FLAG_NOT_SUPPORTED = -2142896127
+IORING_E_SUBMISSION_QUEUE_FULL = -2142896126
+IORING_E_VERSION_NOT_SUPPORTED = -2142896125
+IORING_E_SUBMISSION_QUEUE_TOO_BIG = -2142896124
+IORING_E_COMPLETION_QUEUE_TOO_BIG = -2142896123
+IORING_E_SUBMIT_IN_PROGRESS = -2142896122
+IORING_E_CORRUPT = -2142896121
+IORING_E_COMPLETION_QUEUE_TOO_FULL = -2142896120
+
+
+# Generated by h2py from C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\shared\cderr.h
+CDERR_DIALOGFAILURE = 0xFFFF
+CDERR_GENERALCODES = 0x0000
+CDERR_STRUCTSIZE = 0x0001
+CDERR_INITIALIZATION = 0x0002
+CDERR_NOTEMPLATE = 0x0003
+CDERR_NOHINSTANCE = 0x0004
+CDERR_LOADSTRFAILURE = 0x0005
+CDERR_FINDRESFAILURE = 0x0006
+CDERR_LOADRESFAILURE = 0x0007
+CDERR_LOCKRESFAILURE = 0x0008
+CDERR_MEMALLOCFAILURE = 0x0009
+CDERR_MEMLOCKFAILURE = 0x000A
+CDERR_NOHOOK = 0x000B
+CDERR_REGISTERMSGFAIL = 0x000C
+PDERR_PRINTERCODES = 0x1000
+PDERR_SETUPFAILURE = 0x1001
+PDERR_PARSEFAILURE = 0x1002
+PDERR_RETDEFFAILURE = 0x1003
+PDERR_LOADDRVFAILURE = 0x1004
+PDERR_GETDEVMODEFAIL = 0x1005
+PDERR_INITFAILURE = 0x1006
+PDERR_NODEVICES = 0x1007
+PDERR_NODEFAULTPRN = 0x1008
+PDERR_DNDMMISMATCH = 0x1009
+PDERR_CREATEICFAILURE = 0x100A
+PDERR_PRINTERNOTFOUND = 0x100B
+PDERR_DEFAULTDIFFERENT = 0x100C
+CFERR_CHOOSEFONTCODES = 0x2000
+CFERR_NOFONTS = 0x2001
+CFERR_MAXLESSTHANMIN = 0x2002
+FNERR_FILENAMECODES = 0x3000
+FNERR_SUBCLASSFAILURE = 0x3001
+FNERR_INVALIDFILENAME = 0x3002
+FNERR_BUFFERTOOSMALL = 0x3003
+FRERR_FINDREPLACECODES = 0x4000
+FRERR_BUFFERLENGTHZERO = 0x4001
+CCERR_CHOOSECOLORCODES = 0x5000
+
+# === NexusCore/data_collection\Local-Code-Interpreter\src\tools.py ===
+import openai
+import base64
+import os
+import io
+import time
+from PIL import Image
+from abc import ABCMeta, abstractmethod
+
+
+def create_vision_chat_completion(vision_model, base64_image, prompt):
+    try:
+        response = openai.ChatCompletion.create(
+            model=vision_model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}",
+                            },
+                        },
+                    ],
+                }
+            ],
+            max_tokens=1000,
+        )
+        return response.choices[0].message.content
+    except:
+        return None
+
+
+def create_image(prompt):
+    try:
+        response = openai.Image.create(
+            model="dall-e-3",
+            prompt=prompt,
+            response_format="b64_json"
+        )
+        return response.data[0]['b64_json']
+    except:
+        return None
+
+
+def image_to_base64(path):
+    try:
+        _, suffix = os.path.splitext(path)
+        if suffix not in {'.jpg', '.jpeg', '.png', '.webp'}:
+            img = Image.open(path)
+            img_png = img.convert('RGB')
+            img_png.tobytes()
+            byte_buffer = io.BytesIO()
+            img_png.save(byte_buffer, 'PNG')
+            encoded_string = base64.b64encode(byte_buffer.getvalue()).decode('utf-8')
+        else:
+            with open(path, "rb") as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+        return encoded_string
+    except:
+        return None
+
+
+def base64_to_image_bytes(image_base64):
+    try:
+        return base64.b64decode(image_base64)
+    except:
+        return None
+
+
+def inquire_image(work_dir, vision_model, path, prompt):
+    image_base64 = image_to_base64(f'{work_dir}/{path}')
+    hypertext_to_display = None
+    if image_base64 is None:
+        return "Error: Image transform error", None
+    else:
+        response = create_vision_chat_completion(vision_model, image_base64, prompt)
+        if response is None:
+            return "Model response error", None
+        else:
+            return response, hypertext_to_display
+
+
+def dalle(unique_id, prompt):
+    img_base64 = create_image(prompt)
+    text_to_gpt = "Image has been successfully generated and displayed to user."
+
+    if img_base64 is None:
+        return "Error: Model response error", None
+
+    img_bytes = base64_to_image_bytes(img_base64)
+    if img_bytes is None:
+        return "Error: Image transform error", None
+
+    temp_path = f'cache/temp_{unique_id}'
+    if not os.path.exists(temp_path):
+        os.mkdir(temp_path)
+    path = f'{temp_path}/{hash(time.time())}.png'
+
+    with open(path, 'wb') as f:
+        f.write(img_bytes)
+
+    hypertext_to_display = f'<img src=\"file={path}\" width="50%" style=\'max-width:none; max-height:none\'>'
+    return text_to_gpt, hypertext_to_display
+
+
+class Tool(metaclass=ABCMeta):
+    def __init__(self, config):
+        self.config = config
+
+    @abstractmethod
+    def support(self):
+        pass
+
+    @abstractmethod
+    def get_tool_data(self):
+        pass
+
+
+class ImageInquireTool(Tool):
+    def support(self):
+        return self.config['model']['GPT-4V']['available']
+
+    def get_tool_data(self):
+        return {
+            "tool_name": "inquire_image",
+            "tool": inquire_image,
+            "system_prompt": "If necessary, utilize the 'inquire_image' tool to query an AI model regarding the "
+                             "content of images uploaded by users. Avoid phrases like\"based on the analysis\"; "
+                             "instead, respond as if you viewed the image by yourself. Keep in mind that not every"
+                             "tasks related to images require knowledge of the image content, such as converting "
+                             "an image format or extracting image file attributes, which should use `execute_code` "
+                             "tool instead. Use the tool only when understanding the image content is necessary.",
+            "tool_description": {
+                "name": "inquire_image",
+                "description": "This function enables you to inquire with an AI model about the contents of an image "
+                               "and receive the model's response.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "File path of the image"
+                        },
+                        "prompt": {
+                            "type": "string",
+                            "description": "The question you want to pose to the AI model about the image"
+                        }
+                    },
+                    "required": ["path", "prompt"]
+                }
+            },
+            "additional_parameters": {
+                "work_dir": lambda bot_backend: bot_backend.jupyter_work_dir,
+                "vision_model": self.config['model']['GPT-4V']['model_name']
+            }
+        }
+
+
+class DALLETool(Tool):
+    def support(self):
+        return True
+
+    def get_tool_data(self):
+        return {
+            "tool_name": "dalle",
+            "tool": dalle,
+            "system_prompt": "If user ask you to generate an art image, you can translate user's requirements into a "
+                             "prompt and sending it to the `dalle` tool. Please note that this tool is specifically "
+                             "designed for creating art images. For scientific figures, such as plots, please use the "
+                             "Python code execution tool `execute_code` instead.",
+            "tool_description": {
+                "name": "dalle",
+                "description": "This function allows you to access OpenAI's DALL·E-3 model for image generation.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "prompt": {
+                            "type": "string",
+                            "description": "A detailed description of the image you want to generate, should be in "
+                                           "English only. "
+                        }
+                    },
+                    "required": ["prompt"]
+                }
+            },
+            "additional_parameters": {
+                "unique_id": lambda bot_backend: bot_backend.unique_id,
+            }
+        }
+
+
+def get_available_tools(config):
+    tools = [ImageInquireTool]
+
+    available_tools = []
+    for tool in tools:
+        tool_instance = tool(config)
+        if tool_instance.support():
+            available_tools.append(tool_instance.get_tool_data())
+    return available_tools
+
+# === NexusCore/data_collection\Local-Code-Interpreter\src\functional.py ===
+from bot_backend import *
+import base64
+import time
+import tiktoken
+from notebook_serializer import add_code_cell_error_to_notebook, add_image_to_notebook, add_code_cell_output_to_notebook
+
+SLICED_CONV_MESSAGE = "[Rest of the conversation has been omitted to fit in the context window]"
+
+
+def get_conversation_slice(conversation, model, encoding_for_which_model, min_output_tokens_count=500):
+    """
+    Function to get a slice of the conversation that fits in the model's context window. returns: The conversation
+    with the first message(explaining the role of the assistant) + the last x messages that can fit in the context
+    window.
+    """
+    encoder = tiktoken.encoding_for_model(encoding_for_which_model)
+    count_tokens = lambda txt: len(encoder.encode(txt))
+    nb_tokens = count_tokens(conversation[0]['content'])
+    sliced_conv = [conversation[0]]
+    context_window_limit = int(config['model_context_window'][model])
+    max_tokens = context_window_limit - count_tokens(SLICED_CONV_MESSAGE) - min_output_tokens_count
+    sliced = False
+    for message in conversation[-1:0:-1]:
+        nb_tokens += count_tokens(message['content'])
+        if nb_tokens > max_tokens:
+            sliced_conv.insert(1, {'role': 'system', 'content': SLICED_CONV_MESSAGE})
+            sliced = True
+            break
+        sliced_conv.insert(1, message)
+    return sliced_conv, nb_tokens, sliced
+
+
+def chat_completion(bot_backend: BotBackend):
+    model_choice = bot_backend.gpt_model_choice
+    model_name = bot_backend.config['model'][model_choice]['model_name']
+    kwargs_for_chat_completion = copy.deepcopy(bot_backend.kwargs_for_chat_completion)
+    if bot_backend.config['API_TYPE'] == "azure":
+        kwargs_for_chat_completion['messages'], nb_tokens, sliced = \
+            get_conversation_slice(
+                conversation=kwargs_for_chat_completion['messages'],
+                model=model_name,
+                encoding_for_which_model='gpt-3.5-turbo' if model_choice == 'GPT-3.5' else 'gpt-4'
+            )
+    else:
+        kwargs_for_chat_completion['messages'], nb_tokens, sliced = \
+            get_conversation_slice(
+                conversation=kwargs_for_chat_completion['messages'],
+                model=model_name,
+                encoding_for_which_model=model_name
+            )
+
+    bot_backend.update_token_count(num_tokens=nb_tokens)
+    bot_backend.update_sliced_state(sliced=sliced)
+
+    assert config['model'][model_choice]['available'], f"{model_choice} is not available for your API key"
+
+    assert model_name in config['model_context_window'], \
+        f"{model_name} lacks context window information. Please check the config.json file."
+
+    response = openai.ChatCompletion.create(**kwargs_for_chat_completion)
+    return response
+
+
+def add_code_execution_result_to_bot_history(content_to_display, history, unique_id):
+    images, text = [], []
+
+    # terminal output
+    error_occurred = False
+
+    for mark, out_str in content_to_display:
+        if mark in ('stdout', 'execute_result_text', 'display_text'):
+            text.append(out_str)
+            add_code_cell_output_to_notebook(out_str)
+        elif mark in ('execute_result_png', 'execute_result_jpeg', 'display_png', 'display_jpeg'):
+            if 'png' in mark:
+                images.append(('png', out_str))
+                add_image_to_notebook(out_str, 'image/png')
+            else:
+                add_image_to_notebook(out_str, 'image/jpeg')
+                images.append(('jpg', out_str))
+        elif mark == 'error':
+            # Set output type to error
+            text.append(delete_color_control_char(out_str))
+            error_occurred = True
+            add_code_cell_error_to_notebook(out_str)
+    text = '\n'.join(text).strip('\n')
+    if error_occurred:
+        history.append([None, f'❌Terminal output:\n```shell\n\n{text}\n```'])
+    else:
+        history.append([None, f'✔️Terminal output:\n```shell\n{text}\n```'])
+
+    # image output
+    for filetype, img in images:
+        image_bytes = base64.b64decode(img)
+        temp_path = f'cache/temp_{unique_id}'
+        if not os.path.exists(temp_path):
+            os.mkdir(temp_path)
+        path = f'{temp_path}/{hash(time.time())}.{filetype}'
+        with open(path, 'wb') as f:
+            f.write(image_bytes)
+        width, height = get_image_size(path)
+        history.append(
+            [
+                None,
+                f'<img src=\"file={path}\" style=\'{"" if width < 800 else "width: 800px;"} max-width:none; '
+                f'max-height:none\'> '
+            ]
+        )
+
+
+def add_function_response_to_bot_history(hypertext_to_display, history):
+    if hypertext_to_display is not None:
+        if history[-1][1]:
+            history.append([None, hypertext_to_display])
+        else:
+            history[-1][1] = hypertext_to_display
+
+
+def parse_json(function_args: str, finished: bool):
+    """
+    GPT may generate non-standard JSON format string, which contains '\n' in string value, leading to error when using
+    `json.loads()`.
+    Here we implement a parser to extract code directly from non-standard JSON string.
+    :return: code string if successfully parsed otherwise None
+    """
+    parser_log = {
+        'met_begin_{': False,
+        'begin_"code"': False,
+        'end_"code"': False,
+        'met_:': False,
+        'met_end_}': False,
+        'met_end_code_"': False,
+        "code_begin_index": 0,
+        "code_end_index": 0
+    }
+    try:
+        for index, char in enumerate(function_args):
+            if char == '{':
+                parser_log['met_begin_{'] = True
+            elif parser_log['met_begin_{'] and char == '"':
+                if parser_log['met_:']:
+                    if finished:
+                        parser_log['code_begin_index'] = index + 1
+                        break
+                    else:
+                        if index + 1 == len(function_args):
+                            return None
+                        else:
+                            temp_code_str = function_args[index + 1:]
+                            if '\n' in temp_code_str:
+                                try:
+                                    return json.loads(function_args + '"}')['code']
+                                except json.JSONDecodeError:
+                                    try:
+                                        return json.loads(function_args + '}')['code']
+                                    except json.JSONDecodeError:
+                                        try:
+                                            return json.loads(function_args)['code']
+                                        except json.JSONDecodeError:
+                                            if temp_code_str[-1] in ('"', '\n'):
+                                                return None
+                                            else:
+                                                return temp_code_str.strip('\n')
+                            else:
+                                return json.loads(function_args + '"}')['code']
+                elif parser_log['begin_"code"']:
+                    parser_log['end_"code"'] = True
+                else:
+                    parser_log['begin_"code"'] = True
+            elif parser_log['end_"code"'] and char == ':':
+                parser_log['met_:'] = True
+            else:
+                continue
+        if finished:
+            for index, char in enumerate(function_args[::-1]):
+                back_index = -1 - index
+                if char == '}':
+                    parser_log['met_end_}'] = True
+                elif parser_log['met_end_}'] and char == '"':
+                    parser_log['code_end_index'] = back_index - 1
+                    break
+                else:
+                    continue
+            code_str = function_args[parser_log['code_begin_index']: parser_log['code_end_index'] + 1]
+            if '\n' in code_str:
+                return code_str.strip('\n')
+            else:
+                return json.loads(function_args)['code']
+
+    except Exception as e:
+        return None
+
+
+def get_image_size(image_path):
+    with Image.open(image_path) as img:
+        width, height = img.size
+    return width, height
+
+# === NexusCore/healing_sandbox\src\agents\orchestrator.py ===
+# ==============================================================================
+# フォルダ: src/agents
+# ファイル名: orchestrator.py
+# メモ: 構造化ロギング(Markdown/JSONL)の能力をMixinとして追加した、
+#      最終形態のOrchestratorアーキテクチャ。
+# ==============================================================================
+import subprocess
+import logging
+import os
+import sys
+import json
+from datetime import datetime
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, ClassVar
+
+if TYPE_CHECKING:
+    from .debugger_agent import DebuggerAgent
+    from .patch_applier import PatchApplier
+
+# --- Mixin 1: 構造化ロギングの「能力」 ---
+class StructuredLoggingMixin:
+    """
+    AIの思考と行動を人間と機械の両方が読める形式で記録するMixin。
+    - .md: 人間向けの監査ログ（業務日報）
+    - .jsonl: 機械学習向けの学習データ
+    """
+    log_dir: str
+    logger: logging.Logger
+    
+    def _log_to_files(self, md_content: str, json_data: dict):
+        """MarkdownとJSONLファイルに追記する内部ヘルパー"""
+        try:
+            # Markdown Log
+            with open(os.path.join(self.log_dir, "run_log.md"), "a", encoding="utf-8") as f:
+                f.write(md_content + "\n")
+            
+            # JSONL Log
+            with open(os.path.join(self.log_dir, "run_data.jsonl"), "a", encoding="utf-8") as f:
+                # すべてのJSONログにタイムスタンプとイベントタイプを追加
+                log_entry = {
+                    "timestamp": datetime.now().isoformat(),
+                    **json_data
+                }
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+        except Exception as e:
+            self.logger.error(f"Failed to write to structured log files: {e}")
+
+    def log_cycle_start(self, test_file: str, source_file: str):
+        md = f"# Self-Healing Cycle Start: {os.path.basename(test_file)}\n\n"
+        md += f"- **Timestamp**: {datetime.now().isoformat()}\n"
+        md += f"- **Test File**: `{test_file}`\n"
+        md += f"- **Source File**: `{source_file}`\n"
+        js = {"event": "cycle_start", "test_file": test_file, "source_file": source_file}
+        self._log_to_files(md, js)
+
+    def log_test_failure(self, attempt: int, test_output: str):
+        md = f"\n---\n\n## 🔴 Attempt {attempt}: Test Failed\n\n"
+        md += "```text\n" + test_output + "\n```"
+        js = {"event": "test_failure", "attempt": attempt, "test_output": test_output}
+        self._log_to_files(md, js)
+
+    def log_patch_generation(self, patch: str, target: str, fkb_entry: dict):
+        md = f"\n### 🧠 Diagnosis & Patch Generation\n\n"
+        md += f"- **Cause Found**: {fkb_entry.get('cause', 'N/A')}\n"
+        md += f"- **Target File**: `{target}`\n"
+        md += "```diff\n" + patch + "\n```"
+        js = {"event": "patch_generated", "patch": patch, "target": target, "fkb_entry": fkb_entry}
+        self._log_to_files(md, js)
+
+    def log_patch_application(self, success: bool, file_path: str):
+        if success:
+            md = f"\n- **Result**: ✅ Patch successfully applied to `{os.path.basename(file_path)}`."
+            js = {"event": "patch_applied", "status": "success", "file_path": file_path}
+        else:
+            md = f"\n- **Result**: ❌ Patch application FAILED for `{os.path.basename(file_path)}`."
+            js = {"event": "patch_applied", "status": "failed", "file_path": file_path}
+        self._log_to_files(md, js)
+    
+    def log_cycle_end(self, success: bool, attempts: int):
+        if success:
+            md = f"\n---\n\n## ✅ Self-Healing Cycle Succeeded\n\n- **Total Attempts**: {attempts}"
+            js = {"event": "cycle_end", "status": "success", "attempts": attempts}
+        else:
+            md = f"\n---\n\n## ❌ Self-Healing Cycle Failed\n\n- **Total Attempts**: {attempts}"
+            js = {"event": "cycle_end", "status": "failed", "attempts": attempts}
+        self._log_to_files(md, js)
+
+# --- Mixin 2: 自己修復のロジック ---
+class SelfHealingMixin:
+    """自己修復サイクルという「能力」を提供するMixin"""
+    logger: logging.Logger
+    debugger_agent: 'DebuggerAgent'
+    patch_applier: 'PatchApplier'
+    max_retries: int
+    # 構造化ロギングMixinのメソッドを呼び出すことを型ヒントで示す
+    log_cycle_start: callable
+    log_test_failure: callable
+    log_patch_generation: callable
+    log_patch_application: callable
+    log_cycle_end: callable
+
+    def run_tests(self, test_path: str) -> tuple[bool, str]:
+        # (実装は変更なし)
+        # ...
+        self.logger.info(f"Running tests for: {test_path}")
+        if not os.path.exists(test_path):
+            self.logger.error(f"Test path does not exist: {test_path}")
+            return False, f"Test path does not exist: {test_path}"
+        try:
+            process = subprocess.run(
+                [sys.executable, '-m', 'pytest', test_path, '--tb=short'],
+                capture_output=True, text=True, encoding='utf-8', errors='replace'
+            )
+            output = process.stdout + process.stderr
+            if process.returncode != 0:
+                self.logger.warning(f"Tests failed (Exit Code: {process.returncode}).")
+                self.logger.debug(f"Full test output:\n{output}")
+            else:
+                self.logger.info("All tests passed.")
+            return process.returncode == 0, output
+        except Exception as e:
+            self.logger.error(f"An exception occurred while running tests: {e}", exc_info=True)
+            return False, str(e)
+
+
+    def self_healing_cycle(self, test_file_path: str, source_file_path: str):
+        self.logger.info(f"Starting self-healing cycle for test: '{os.path.basename(test_file_path)}'")
+        self.log_cycle_start(test_file_path, source_file_path)
+        
+        for attempt in range(1, self.max_retries + 1):
+            self.logger.info(f"--- Attempt {attempt}/{self.max_retries} ---")
+            
+            tests_passed, test_output = self.run_tests(test_file_path)
+
+            if tests_passed:
+                self.logger.info("Self-healing successful!")
+                self.log_cycle_end(success=True, attempts=attempt)
+                print("\n[SUCCESS] The code was successfully repaired! All tests passed.")
+                return
+
+            self.logger.warning("Tests failed. Initiating debugging process.")
+            self.log_test_failure(attempt, test_output)
+            
+            files_context = {"source_file": source_file_path, "test_file": test_file_path}
+            debug_result = self.debugger_agent.debug(error_log=test_output, files_context=files_context)
+
+            if debug_result and debug_result.get("patch"):
+                patch, target_hint, entry = debug_result["patch"], debug_result["target"], debug_result["entry"]
+                self.log_patch_generation(patch, target_hint, entry)
+                
+                file_to_patch = files_context.get(target_hint)
+                
+                if not file_to_patch:
+                    self.logger.error(f"Invalid target hint from DebuggerAgent: '{target_hint}'. Aborting.")
+                    break
+
+                self.logger.info(f"Applying patch for '{target_hint}' to '{os.path.basename(file_to_patch)}'...")
+                was_applied = self.patch_applier.apply(patch, file_to_patch)
+                self.log_patch_application(was_applied, file_to_patch)
+
+                if not was_applied:
+                    self.logger.error("PatchApplier failed. Aborting cycle.")
+                    break
+            else:
+                self.logger.warning("DebuggerAgent did not return a patch. Aborting cycle.")
+                break
+        else: # forループがbreakされずに完了した場合
+            attempt += 1 # 最後の試行回数を反映
+        
+        self.logger.error(f"Self-healing cycle failed after {attempt -1} attempts.")
+        self.log_cycle_end(success=False, attempts=attempt - 1)
+        print("\n[FAILED] The code could not be repaired.")
+
+# --- 本体: 複数の能力(Mixin)を統合したOrchestrator ---
+@dataclass
+class Orchestrator(SelfHealingMixin, StructuredLoggingMixin):
+    """
+    NexusCoreの司令塔。
+    @dataclassで構成部品を定義し、Mixinで能力を獲得する。
+    """
+    # 構成部品
+    debugger_agent: 'DebuggerAgent'
+    patch_applier: 'PatchApplier'
+    log_dir: str # ログの保存先ディレクトリ
+    max_retries: int = 3
+    
+    # 初期化後に設定される属性
+    logger: logging.Logger = field(init=False)
+
+    def __post_init__(self):
+        """@dataclassの初期化後に呼ばれるメソッド"""
+        self.logger = logging.getLogger(self.__class__.__name__)
+        # ログディレクトリが存在しない場合は作成
+        os.makedirs(self.log_dir, exist_ok=True)
+        self.logger.info(f"Orchestrator initialized. Logging to '{self.log_dir}'.")
+        self.logger.debug(f"  - Debugger: {self.debugger_agent.__class__.__name__}")
+        self.logger.debug(f"  - Patcher: {self.patch_applier.__class__.__name__}")
+
+# === NexusCore/openenv\Lib\site-packages\pythonwin\pywin\Demos\app\customprint.py ===
+# A demo of an Application object that has some custom print functionality.
+
+# If you desire, you can also run this from inside Pythonwin, in which
+# case it will do the demo inside the Pythonwin environment.
+
+# This sample was contributed by Roger Burnham.
+
+import win32con
+import win32ui
+from pywin.framework import app
+from pywin.mfc import afxres, dialog, docview
+
+PRINTDLGORD = 1538
+IDC_PRINT_MAG_EDIT = 1010
+
+
+class PrintDemoTemplate(docview.DocTemplate):
+    def _SetupSharedMenu_(self):
+        pass
+
+
+class PrintDemoView(docview.ScrollView):
+    def OnInitialUpdate(self):
+        ret = self._obj_.OnInitialUpdate()
+        self.colors = {
+            "Black": (0x00 << 0) + (0x00 << 8) + (0x00 << 16),
+            "Red": (0xFF << 0) + (0x00 << 8) + (0x00 << 16),
+            "Green": (0x00 << 0) + (0xFF << 8) + (0x00 << 16),
+            "Blue": (0x00 << 0) + (0x00 << 8) + (0xFF << 16),
+            "Cyan": (0x00 << 0) + (0xFF << 8) + (0xFF << 16),
+            "Magenta": (0xFF << 0) + (0x00 << 8) + (0xFF << 16),
+            "Yellow": (0xFF << 0) + (0xFF << 8) + (0x00 << 16),
+        }
+        self.pens = {}
+        for name, color in self.colors.items():
+            self.pens[name] = win32ui.CreatePen(win32con.PS_SOLID, 5, color)
+        self.pen = None
+        self.size = (128, 128)
+        self.SetScaleToFitSize(self.size)
+        self.HookCommand(self.OnFilePrint, afxres.ID_FILE_PRINT)
+        self.HookCommand(self.OnFilePrintPreview, win32ui.ID_FILE_PRINT_PREVIEW)
+        return ret
+
+    def OnDraw(self, dc):
+        oldPen = None
+        x, y = self.size
+        delta = 2
+        colors = sorted(self.colors) * 2
+        for color in colors:
+            if oldPen is None:
+                oldPen = dc.SelectObject(self.pens[color])
+            else:
+                dc.SelectObject(self.pens[color])
+            dc.MoveTo((delta, delta))
+            dc.LineTo((x - delta, delta))
+            dc.LineTo((x - delta, y - delta))
+            dc.LineTo((delta, y - delta))
+            dc.LineTo((delta, delta))
+            delta += 4
+            if x - delta <= 0 or y - delta <= 0:
+                break
+        dc.SelectObject(oldPen)
+
+    def OnPrepareDC(self, dc, pInfo):
+        if dc.IsPrinting():
+            mag = self.prtDlg["mag"]
+            dc.SetMapMode(win32con.MM_ANISOTROPIC)
+            dc.SetWindowOrg((0, 0))
+            dc.SetWindowExt((1, 1))
+            dc.SetViewportOrg((0, 0))
+            dc.SetViewportExt((mag, mag))
+
+    def OnPreparePrinting(self, pInfo):
+        flags = (
+            win32ui.PD_USEDEVMODECOPIES
+            | win32ui.PD_PAGENUMS
+            | win32ui.PD_NOPAGENUMS
+            | win32ui.PD_NOSELECTION
+        )
+        self.prtDlg = ImagePrintDialog(pInfo, PRINTDLGORD, flags)
+        pInfo.SetPrintDialog(self.prtDlg)
+        pInfo.SetMinPage(1)
+        pInfo.SetMaxPage(1)
+        pInfo.SetFromPage(1)
+        pInfo.SetToPage(1)
+        ret = self.DoPreparePrinting(pInfo)
+        return ret
+
+    def OnBeginPrinting(self, dc, pInfo):
+        return self._obj_.OnBeginPrinting(dc, pInfo)
+
+    def OnEndPrinting(self, dc, pInfo):
+        del self.prtDlg
+        return self._obj_.OnEndPrinting(dc, pInfo)
+
+    def OnFilePrintPreview(self, *arg):
+        self._obj_.OnFilePrintPreview()
+
+    def OnFilePrint(self, *arg):
+        self._obj_.OnFilePrint()
+
+    def OnPrint(self, dc, pInfo):
+        doc = self.GetDocument()
+        metrics = dc.GetTextMetrics()
+        cxChar = metrics["tmAveCharWidth"]
+        cyChar = metrics["tmHeight"]
+        left, top, right, bottom = pInfo.GetDraw()
+        dc.TextOut(0, 2 * cyChar, doc.GetTitle())
+        top += 7 * cyChar / 2
+        dc.MoveTo(left, top)
+        dc.LineTo(right, top)
+        top += cyChar
+        # this seems to have not effect...
+        # get what I want with the dc.SetWindowOrg calls
+        pInfo.SetDraw((left, top, right, bottom))
+        dc.SetWindowOrg((0, -top))
+
+        self.OnDraw(dc)
+        dc.SetTextAlign(win32con.TA_LEFT | win32con.TA_BOTTOM)
+
+        rect = self.GetWindowRect()
+        rect = self.ScreenToClient(rect)
+        height = rect[3] - rect[1]
+        dc.SetWindowOrg((0, -(top + height + cyChar)))
+        dc.MoveTo(left, 0)
+        dc.LineTo(right, 0)
+
+        x = 0
+        y = (3 * cyChar) / 2
+
+        dc.TextOut(x, y, doc.GetTitle())
+        y += cyChar
+
+
+class PrintDemoApp(app.CApp):
+    def __init__(self):
+        app.CApp.__init__(self)
+
+    def InitInstance(self):
+        template = PrintDemoTemplate(None, None, None, PrintDemoView)
+        self.AddDocTemplate(template)
+        self._obj_.InitMDIInstance()
+        self.LoadMainFrame()
+        doc = template.OpenDocumentFile(None)
+        doc.SetTitle("Custom Print Document")
+
+
+class ImagePrintDialog(dialog.PrintDialog):
+    sectionPos = "Image Print Demo"
+
+    def __init__(self, pInfo, dlgID, flags=win32ui.PD_USEDEVMODECOPIES):
+        dialog.PrintDialog.__init__(self, pInfo, dlgID, flags=flags)
+        mag = win32ui.GetProfileVal(self.sectionPos, "Document Magnification", 0)
+        if mag <= 0:
+            mag = 2
+            win32ui.WriteProfileVal(self.sectionPos, "Document Magnification", mag)
+
+        self["mag"] = mag
+
+    def OnInitDialog(self):
+        self.magCtl = self.GetDlgItem(IDC_PRINT_MAG_EDIT)
+        self.magCtl.SetWindowText(repr(self["mag"]))
+        return dialog.PrintDialog.OnInitDialog(self)
+
+    def OnOK(self):
+        dialog.PrintDialog.OnOK(self)
+        strMag = self.magCtl.GetWindowText()
+        try:
+            self["mag"] = int(strMag)
+        except:
+            pass
+        win32ui.WriteProfileVal(self.sectionPos, "Document Magnification", self["mag"])
+
+
+if __name__ == "__main__":
+    # Running under Pythonwin
+    def test():
+        template = PrintDemoTemplate(None, None, None, PrintDemoView)
+        template.OpenDocumentFile(None)
+
+    test()
+else:
+    app = PrintDemoApp()
+
+# === NexusCore/openenv\Lib\site-packages\numpy\lib\_function_base_impl.py ===
+import builtins
+import collections.abc
+import functools
+import re
+import sys
+import warnings
+
+import numpy as np
+import numpy._core.numeric as _nx
+from numpy._core import overrides, transpose
+from numpy._core._multiarray_umath import _array_converter
+from numpy._core.fromnumeric import any, mean, nonzero, partition, ravel, sum
+from numpy._core.multiarray import _monotonicity, _place, bincount, normalize_axis_index
+from numpy._core.multiarray import interp as compiled_interp
+from numpy._core.multiarray import interp_complex as compiled_interp_complex
+from numpy._core.numeric import (
+    absolute,
+    arange,
+    array,
+    asanyarray,
+    asarray,
+    concatenate,
+    dot,
+    empty,
+    integer,
+    intp,
+    isscalar,
+    ndarray,
+    ones,
+    take,
+    where,
+    zeros_like,
+)
+from numpy._core.numerictypes import typecodes
+from numpy._core.umath import (
+    add,
+    arctan2,
+    cos,
+    exp,
+    frompyfunc,
+    less_equal,
+    minimum,
+    mod,
+    not_equal,
+    pi,
+    sin,
+    sqrt,
+    subtract,
+)
+from numpy._utils import set_module
+
+# needed in this module for compatibility
+from numpy.lib._histograms_impl import histogram, histogramdd  # noqa: F401
+from numpy.lib._twodim_base_impl import diag
+
+array_function_dispatch = functools.partial(
+    overrides.array_function_dispatch, module='numpy')
+
+
+__all__ = [
+    'select', 'piecewise', 'trim_zeros', 'copy', 'iterable', 'percentile',
+    'diff', 'gradient', 'angle', 'unwrap', 'sort_complex', 'flip',
+    'rot90', 'extract', 'place', 'vectorize', 'asarray_chkfinite', 'average',
+    'bincount', 'digitize', 'cov', 'corrcoef',
+    'median', 'sinc', 'hamming', 'hanning', 'bartlett',
+    'blackman', 'kaiser', 'trapezoid', 'trapz', 'i0',
+    'meshgrid', 'delete', 'insert', 'append', 'interp',
+    'quantile'
+    ]
+
+# _QuantileMethods is a dictionary listing all the supported methods to
+# compute quantile/percentile.
+#
+# Below virtual_index refers to the index of the element where the percentile
+# would be found in the sorted sample.
+# When the sample contains exactly the percentile wanted, the virtual_index is
+# an integer to the index of this element.
+# When the percentile wanted is in between two elements, the virtual_index
+# is made of a integer part (a.k.a 'i' or 'left') and a fractional part
+# (a.k.a 'g' or 'gamma')
+#
+# Each method in _QuantileMethods has two properties
+# get_virtual_index : Callable
+#   The function used to compute the virtual_index.
+# fix_gamma : Callable
+#   A function used for discrete methods to force the index to a specific value.
+_QuantileMethods = {
+    # --- HYNDMAN and FAN METHODS
+    # Discrete methods
+    'inverted_cdf': {
+        'get_virtual_index': lambda n, quantiles: _inverted_cdf(n, quantiles),  # noqa: PLW0108
+        'fix_gamma': None,  # should never be called
+    },
+    'averaged_inverted_cdf': {
+        'get_virtual_index': lambda n, quantiles: (n * quantiles) - 1,
+        'fix_gamma': lambda gamma, _: _get_gamma_mask(
+            shape=gamma.shape,
+            default_value=1.,
+            conditioned_value=0.5,
+            where=gamma == 0),
+    },
+    'closest_observation': {
+        'get_virtual_index': lambda n, quantiles: _closest_observation(n, quantiles),  # noqa: PLW0108
+        'fix_gamma': None,  # should never be called
+    },
+    # Continuous methods
+    'interpolated_inverted_cdf': {
+        'get_virtual_index': lambda n, quantiles:
+        _compute_virtual_index(n, quantiles, 0, 1),
+        'fix_gamma': lambda gamma, _: gamma,
+    },
+    'hazen': {
+        'get_virtual_index': lambda n, quantiles:
+        _compute_virtual_index(n, quantiles, 0.5, 0.5),
+        'fix_gamma': lambda gamma, _: gamma,
+    },
+    'weibull': {
+        'get_virtual_index': lambda n, quantiles:
+        _compute_virtual_index(n, quantiles, 0, 0),
+        'fix_gamma': lambda gamma, _: gamma,
+    },
+    # Default method.
+    # To avoid some rounding issues, `(n-1) * quantiles` is preferred to
+    # `_compute_virtual_index(n, quantiles, 1, 1)`.
+    # They are mathematically equivalent.
+    'linear': {
+        'get_virtual_index': lambda n, quantiles: (n - 1) * quantiles,
+        'fix_gamma': lambda gamma, _: gamma,
+    },
+    'median_unbiased': {
+        'get_virtual_index': lambda n, quantiles:
+        _compute_virtual_index(n, quantiles, 1 / 3.0, 1 / 3.0),
+        'fix_gamma': lambda gamma, _: gamma,
+    },
+    'normal_unbiased': {
+        'get_virtual_index': lambda n, quantiles:
+        _compute_virtual_index(n, quantiles, 3 / 8.0, 3 / 8.0),
+        'fix_gamma': lambda gamma, _: gamma,
+    },
+    # --- OTHER METHODS
+    'lower': {
+        'get_virtual_index': lambda n, quantiles: np.floor(
+            (n - 1) * quantiles).astype(np.intp),
+        'fix_gamma': None,  # should never be called, index dtype is int
+    },
+    'higher': {
+        'get_virtual_index': lambda n, quantiles: np.ceil(
+            (n - 1) * quantiles).astype(np.intp),
+        'fix_gamma': None,  # should never be called, index dtype is int
+    },
+    'midpoint': {
+        'get_virtual_index': lambda n, quantiles: 0.5 * (
+                np.floor((n - 1) * quantiles)
+                + np.ceil((n - 1) * quantiles)),
+        'fix_gamma': lambda gamma, index: _get_gamma_mask(
+            shape=gamma.shape,
+            default_value=0.5,
+            conditioned_value=0.,
+            where=index % 1 == 0),
+    },
+    'nearest': {
+        'get_virtual_index': lambda n, quantiles: np.around(
+            (n - 1) * quantiles).astype(np.intp),
+        'fix_gamma': None,
+        # should never be called, index dtype is int
+    }}
+
+
+def _rot90_dispatcher(m, k=None, axes=None):
+    return (m,)
+
+
+@array_function_dispatch(_rot90_dispatcher)
+def rot90(m, k=1, axes=(0, 1)):
+    """
+    Rotate an array by 90 degrees in the plane specified by axes.
+
+    Rotation direction is from the first towards the second axis.
+    This means for a 2D array with the default `k` and `axes`, the
+    rotation will be counterclockwise.
+
+    Parameters
+    ----------
+    m : array_like
+        Array of two or more dimensions.
+    k : integer
+        Number of times the array is rotated by 90 degrees.
+    axes : (2,) array_like
+        The array is rotated in the plane defined by the axes.
+        Axes must be different.
+
+    Returns
+    -------
+    y : ndarray
+        A rotated view of `m`.
+
+    See Also
+    --------
+    flip : Reverse the order of elements in an array along the given axis.
+    fliplr : Flip an array horizontally.
+    flipud : Flip an array vertically.
+
+    Notes
+    -----
+    ``rot90(m, k=1, axes=(1,0))``  is the reverse of
+    ``rot90(m, k=1, axes=(0,1))``
+
+    ``rot90(m, k=1, axes=(1,0))`` is equivalent to
+    ``rot90(m, k=-1, axes=(0,1))``
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> m = np.array([[1,2],[3,4]], int)
+    >>> m
+    array([[1, 2],
+           [3, 4]])
+    >>> np.rot90(m)
+    array([[2, 4],
+           [1, 3]])
+    >>> np.rot90(m, 2)
+    array([[4, 3],
+           [2, 1]])
+    >>> m = np.arange(8).reshape((2,2,2))
+    >>> np.rot90(m, 1, (1,2))
+    array([[[1, 3],
+            [0, 2]],
+           [[5, 7],
+            [4, 6]]])
+
+    """
+    axes = tuple(axes)
+    if len(axes) != 2:
+        raise ValueError("len(axes) must be 2.")
+
+    m = asanyarray(m)
+
+    if axes[0] == axes[1] or absolute(axes[0] - axes[1]) == m.ndim:
+        raise ValueError("Axes must be different.")
+
+    if (axes[0] >= m.ndim or axes[0] < -m.ndim
+        or axes[1] >= m.ndim or axes[1] < -m.ndim):
+        raise ValueError(f"Axes={axes} out of range for array of ndim={m.ndim}.")
+
+    k %= 4
+
+    if k == 0:
+        return m[:]
+    if k == 2:
+        return flip(flip(m, axes[0]), axes[1])
+
+    axes_list = arange(0, m.ndim)
+    (axes_list[axes[0]], axes_list[axes[1]]) = (axes_list[axes[1]],
+                                                axes_list[axes[0]])
+
+    if k == 1:
+        return transpose(flip(m, axes[1]), axes_list)
+    else:
+        # k == 3
+        return flip(transpose(m, axes_list), axes[1])
+
+
+def _flip_dispatcher(m, axis=None):
+    return (m,)
+
+
+@array_function_dispatch(_flip_dispatcher)
+def flip(m, axis=None):
+    """
+    Reverse the order of elements in an array along the given axis.
+
+    The shape of the array is preserved, but the elements are reordered.
+
+    Parameters
+    ----------
+    m : array_like
+        Input array.
+    axis : None or int or tuple of ints, optional
+         Axis or axes along which to flip over. The default,
+         axis=None, will flip over all of the axes of the input array.
+         If axis is negative it counts from the last to the first axis.
+
+         If axis is a tuple of ints, flipping is performed on all of the axes
+         specified in the tuple.
+
+    Returns
+    -------
+    out : array_like
+        A view of `m` with the entries of axis reversed.  Since a view is
+        returned, this operation is done in constant time.
+
+    See Also
+    --------
+    flipud : Flip an array vertically (axis=0).
+    fliplr : Flip an array horizontally (axis=1).
+
+    Notes
+    -----
+    flip(m, 0) is equivalent to flipud(m).
+
+    flip(m, 1) is equivalent to fliplr(m).
+
+    flip(m, n) corresponds to ``m[...,::-1,...]`` with ``::-1`` at position n.
+
+    flip(m) corresponds to ``m[::-1,::-1,...,::-1]`` with ``::-1`` at all
+    positions.
+
+    flip(m, (0, 1)) corresponds to ``m[::-1,::-1,...]`` with ``::-1`` at
+    position 0 and position 1.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> A = np.arange(8).reshape((2,2,2))
+    >>> A
+    array([[[0, 1],
+            [2, 3]],
+           [[4, 5],
+            [6, 7]]])
+    >>> np.flip(A, 0)
+    array([[[4, 5],
+            [6, 7]],
+           [[0, 1],
+            [2, 3]]])
+    >>> np.flip(A, 1)
+    array([[[2, 3],
+            [0, 1]],
+           [[6, 7],
+            [4, 5]]])
+    >>> np.flip(A)
+    array([[[7, 6],
+            [5, 4]],
+           [[3, 2],
+            [1, 0]]])
+    >>> np.flip(A, (0, 2))
+    array([[[5, 4],
+            [7, 6]],
+           [[1, 0],
+            [3, 2]]])
+    >>> rng = np.random.default_rng()
+    >>> A = rng.normal(size=(3,4,5))
+    >>> np.all(np.flip(A,2) == A[:,:,::-1,...])
+    True
+    """
+    if not hasattr(m, 'ndim'):
+        m = asarray(m)
+    if axis is None:
+        indexer = (np.s_[::-1],) * m.ndim
+    else:
+        axis = _nx.normalize_axis_tuple(axis, m.ndim)
+        indexer = [np.s_[:]] * m.ndim
+        for ax in axis:
+            indexer[ax] = np.s_[::-1]
+        indexer = tuple(indexer)
+    return m[indexer]
+
+
+@set_module('numpy')
+def iterable(y):
+    """
+    Check whether or not an object can be iterated over.
+
+    Parameters
+    ----------
+    y : object
+      Input object.
+
+    Returns
+    -------
+    b : bool
+      Return ``True`` if the object has an iterator method or is a
+      sequence and ``False`` otherwise.
+
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> np.iterable([1, 2, 3])
+    True
+    >>> np.iterable(2)
+    False
+
+    Notes
+    -----
+    In most cases, the results of ``np.iterable(obj)`` are consistent with
+    ``isinstance(obj, collections.abc.Iterable)``. One notable exception is
+    the treatment of 0-dimensional arrays::
+
+        >>> from collections.abc import Iterable
+        >>> a = np.array(1.0)  # 0-dimensional numpy array
+        >>> isinstance(a, Iterable)
+        True
+        >>> np.iterable(a)
+        False
+
+    """
+    try:
+        iter(y)
+    except TypeError:
+        return False
+    return True
+
+
+def _weights_are_valid(weights, a, axis):
+    """Validate weights array.
+
+    We assume, weights is not None.
+    """
+    wgt = np.asanyarray(weights)
+
+    # Sanity checks
+    if a.shape != wgt.shape:
+        if axis is None:
+            raise TypeError(
+                "Axis must be specified when shapes of a and weights "
+                "differ.")
+        if wgt.shape != tuple(a.shape[ax] for ax in axis):
+            raise ValueError(
+                "Shape of weights must be consistent with "
+                "shape of a along specified axis.")
+
+        # setup wgt to broadcast along axis
+        wgt = wgt.transpose(np.argsort(axis))
+        wgt = wgt.reshape(tuple((s if ax in axis else 1)
+                                for ax, s in enumerate(a.shape)))
+    return wgt
+
+
+def _average_dispatcher(a, axis=None, weights=None, returned=None, *,
+                        keepdims=None):
+    return (a, weights)
+
+
+@array_function_dispatch(_average_dispatcher)
+def average(a, axis=None, weights=None, returned=False, *,
+            keepdims=np._NoValue):
+    """
+    Compute the weighted average along the specified axis.
+
+    Parameters
+    ----------
+    a : array_like
+        Array containing data to be averaged. If `a` is not an array, a
+        conversion is attempted.
+    axis : None or int or tuple of ints, optional
+        Axis or axes along which to average `a`.  The default,
+        `axis=None`, will average over all of the elements of the input array.
+        If axis is negative it counts from the last to the first axis.
+        If axis is a tuple of ints, averaging is performed on all of the axes
+        specified in the tuple instead of a single axis or all the axes as
+        before.
+    weights : array_like, optional
+        An array of weights associated with the values in `a`. Each value in
+        `a` contributes to the average according to its associated weight.
+        The array of weights must be the same shape as `a` if no axis is
+        specified, otherwise the weights must have dimensions and shape
+        consistent with `a` along the specified axis.
+        If `weights=None`, then all data in `a` are assumed to have a
+        weight equal to one.
+        The calculation is::
+
+            avg = sum(a * weights) / sum(weights)
+
+        where the sum is over all included elements.
+        The only constraint on the values of `weights` is that `sum(weights)`
+        must not be 0.
+    returned : bool, optional
+        Default is `False`. If `True`, the tuple (`average`, `sum_of_weights`)
+        is returned, otherwise only the average is returned.
+        If `weights=None`, `sum_of_weights` is equivalent to the number of
+        elements over which the average is taken.
+    keepdims : bool, optional
+        If this is set to True, the axes which are reduced are left
+        in the result as dimensions with size one. With this option,
+        the result will broadcast correctly against the original `a`.
+        *Note:* `keepdims` will not work with instances of `numpy.matrix`
+        or other classes whose methods do not support `keepdims`.
+
+        .. versionadded:: 1.23.0
+
+    Returns
+    -------
+    retval, [sum_of_weights] : array_type or double
+        Return the average along the specified axis. When `returned` is `True`,
+        return a tuple with the average as the first element and the sum
+        of the weights as the second element. `sum_of_weights` is of the
+        same type as `retval`. The result dtype follows a general pattern.
+        If `weights` is None, the result dtype will be that of `a` , or ``float64``
+        if `a` is integral. Otherwise, if `weights` is not None and `a` is non-
+        integral, the result type will be the type of lowest precision capable of
+        representing values of both `a` and `weights`. If `a` happens to be
+        integral, the previous rules still applies but the result dtype will
+        at least be ``float64``.
+
+    Raises
+    ------
+    ZeroDivisionError
+        When all weights along axis are zero. See `numpy.ma.average` for a
+        version robust to this type of error.
+    TypeError
+        When `weights` does not have the same shape as `a`, and `axis=None`.
+    ValueError
+        When `weights` does not have dimensions and shape consistent with `a`
+        along specified `axis`.
+
+    See Also
+    --------
+    mean
+
+    ma.average : average for masked arrays -- useful if your data contains
+                 "missing" values
+    numpy.result_type : Returns the type that results from applying the
+                        numpy type promotion rules to the arguments.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> data = np.arange(1, 5)
+    >>> data
+    array([1, 2, 3, 4])
+    >>> np.average(data)
+    2.5
+    >>> np.average(np.arange(1, 11), weights=np.arange(10, 0, -1))
+    4.0
+
+    >>> data = np.arange(6).reshape((3, 2))
+    >>> data
+    array([[0, 1],
+           [2, 3],
+           [4, 5]])
+    >>> np.average(data, axis=1, weights=[1./4, 3./4])
+    array([0.75, 2.75, 4.75])
+    >>> np.average(data, weights=[1./4, 3./4])
+    Traceback (most recent call last):
+        ...
+    TypeError: Axis must be specified when shapes of a and weights differ.
+
+    With ``keepdims=True``, the following result has shape (3, 1).
+
+    >>> np.average(data, axis=1, keepdims=True)
+    array([[0.5],
+           [2.5],
+           [4.5]])
+
+    >>> data = np.arange(8).reshape((2, 2, 2))
+    >>> data
+    array([[[0, 1],
+            [2, 3]],
+           [[4, 5],
+            [6, 7]]])
+    >>> np.average(data, axis=(0, 1), weights=[[1./4, 3./4], [1., 1./2]])
+    array([3.4, 4.4])
+    >>> np.average(data, axis=0, weights=[[1./4, 3./4], [1., 1./2]])
+    Traceback (most recent call last):
+        ...
+    ValueError: Shape of weights must be consistent
+    with shape of a along specified axis.
+    """
+    a = np.asanyarray(a)
+
+    if axis is not None:
+        axis = _nx.normalize_axis_tuple(axis, a.ndim, argname="axis")
+
+    if keepdims is np._NoValue:
+        # Don't pass on the keepdims argument if one wasn't given.
+        keepdims_kw = {}
+    else:
+        keepdims_kw = {'keepdims': keepdims}
+
+    if weights is None:
+        avg = a.mean(axis, **keepdims_kw)
+        avg_as_array = np.asanyarray(avg)
+        scl = avg_as_array.dtype.type(a.size / avg_as_array.size)
+    else:
+        wgt = _weights_are_valid(weights=weights, a=a, axis=axis)
+
+        if issubclass(a.dtype.type, (np.integer, np.bool)):
+            result_dtype = np.result_type(a.dtype, wgt.dtype, 'f8')
+        else:
+            result_dtype = np.result_type(a.dtype, wgt.dtype)
+
+        scl = wgt.sum(axis=axis, dtype=result_dtype, **keepdims_kw)
+        if np.any(scl == 0.0):
+            raise ZeroDivisionError(
+                "Weights sum to zero, can't be normalized")
+
+        avg = avg_as_array = np.multiply(a, wgt,
+                          dtype=result_dtype).sum(axis, **keepdims_kw) / scl
+
+    if returned:
+        if scl.shape != avg_as_array.shape:
+            scl = np.broadcast_to(scl, avg_as_array.shape).copy()
+        return avg, scl
+    else:
+        return avg
+
+
+@set_module('numpy')
+def asarray_chkfinite(a, dtype=None, order=None):
+    """Convert the input to an array, checking for NaNs or Infs.
+
+    Parameters
+    ----------
+    a : array_like
+        Input data, in any form that can be converted to an array.  This
+        includes lists, lists of tuples, tuples, tuples of tuples, tuples
+        of lists and ndarrays.  Success requires no NaNs or Infs.
+    dtype : data-type, optional
+        By default, the data-type is inferred from the input data.
+    order : {'C', 'F', 'A', 'K'}, optional
+        Memory layout.  'A' and 'K' depend on the order of input array a.
+        'C' row-major (C-style),
+        'F' column-major (Fortran-style) memory representation.
+        'A' (any) means 'F' if `a` is Fortran contiguous, 'C' otherwise
+        'K' (keep) preserve input order
+        Defaults to 'C'.
+
+    Returns
+    -------
+    out : ndarray
+        Array interpretation of `a`.  No copy is performed if the input
+        is already an ndarray.  If `a` is a subclass of ndarray, a base
+        class ndarray is returned.
+
+    Raises
+    ------
+    ValueError
+        Raises ValueError if `a` contains NaN (Not a Number) or Inf (Infinity).
+
+    See Also
+    --------
+    asarray : Create and array.
+    asanyarray : Similar function which passes through subclasses.
+    ascontiguousarray : Convert input to a contiguous array.
+    asfortranarray : Convert input to an ndarray with column-major
+                     memory order.
+    fromiter : Create an array from an iterator.
+    fromfunction : Construct an array by executing a function on grid
+                   positions.
+
+    Examples
+    --------
+    >>> import numpy as np
+
+    Convert a list into an array. If all elements are finite, then
+    ``asarray_chkfinite`` is identical to ``asarray``.
+
+    >>> a = [1, 2]
+    >>> np.asarray_chkfinite(a, dtype=float)
+    array([1., 2.])
+
+    Raises ValueError if array_like contains Nans or Infs.
+
+    >>> a = [1, 2, np.inf]
+    >>> try:
+    ...     np.asarray_chkfinite(a)
+    ... except ValueError:
+    ...     print('ValueError')
+    ...
+    ValueError
+
+    """
+    a = asarray(a, dtype=dtype, order=order)
+    if a.dtype.char in typecodes['AllFloat'] and not np.isfinite(a).all():
+        raise ValueError(
+            "array must not contain infs or NaNs")
+    return a
+
+
+def _piecewise_dispatcher(x, condlist, funclist, *args, **kw):
+    yield x
+    # support the undocumented behavior of allowing scalars
+    if np.iterable(condlist):
+        yield from condlist
+
+
+@array_function_dispatch(_piecewise_dispatcher)
+def piecewise(x, condlist, funclist, *args, **kw):
+    """
+    Evaluate a piecewise-defined function.
+
+    Given a set of conditions and corresponding functions, evaluate each
+    function on the input data wherever its condition is true.
+
+    Parameters
+    ----------
+    x : ndarray or scalar
+        The input domain.
+    condlist : list of bool arrays or bool scalars
+        Each boolean array corresponds to a function in `funclist`.  Wherever
+        `condlist[i]` is True, `funclist[i](x)` is used as the output value.
+
+        Each boolean array in `condlist` selects a piece of `x`,
+        and should therefore be of the same shape as `x`.
+
+        The length of `condlist` must correspond to that of `funclist`.
+        If one extra function is given, i.e. if
+        ``len(funclist) == len(condlist) + 1``, then that extra function
+        is the default value, used wherever all conditions are false.
+    funclist : list of callables, f(x,*args,**kw), or scalars
+        Each function is evaluated over `x` wherever its corresponding
+        condition is True.  It should take a 1d array as input and give an 1d
+        array or a scalar value as output.  If, instead of a callable,
+        a scalar is provided then a constant function (``lambda x: scalar``) is
+        assumed.
+    args : tuple, optional
+        Any further arguments given to `piecewise` are passed to the functions
+        upon execution, i.e., if called ``piecewise(..., ..., 1, 'a')``, then
+        each function is called as ``f(x, 1, 'a')``.
+    kw : dict, optional
+        Keyword arguments used in calling `piecewise` are passed to the
+        functions upon execution, i.e., if called
+        ``piecewise(..., ..., alpha=1)``, then each function is called as
+        ``f(x, alpha=1)``.
+
+    Returns
+    -------
+    out : ndarray
+        The output is the same shape and type as x and is found by
+        calling the functions in `funclist` on the appropriate portions of `x`,
+        as defined by the boolean arrays in `condlist`.  Portions not covered
+        by any condition have a default value of 0.
+
+
+    See Also
+    --------
+    choose, select, where
+
+    Notes
+    -----
+    This is similar to choose or select, except that functions are
+    evaluated on elements of `x` that satisfy the corresponding condition from
+    `condlist`.
+
+    The result is::
+
+            |--
+            |funclist[0](x[condlist[0]])
+      out = |funclist[1](x[condlist[1]])
+            |...
+            |funclist[n2](x[condlist[n2]])
+            |--
+
+    Examples
+    --------
+    >>> import numpy as np
+
+    Define the signum function, which is -1 for ``x < 0`` and +1 for ``x >= 0``.
+
+    >>> x = np.linspace(-2.5, 2.5, 6)
+    >>> np.piecewise(x, [x < 0, x >= 0], [-1, 1])
+    array([-1., -1., -1.,  1.,  1.,  1.])
+
+    Define the absolute value, which is ``-x`` for ``x <0`` and ``x`` for
+    ``x >= 0``.
+
+    >>> np.piecewise(x, [x < 0, x >= 0], [lambda x: -x, lambda x: x])
+    array([2.5,  1.5,  0.5,  0.5,  1.5,  2.5])
+
+    Apply the same function to a scalar value.
+
+    >>> y = -2
+    >>> np.piecewise(y, [y < 0, y >= 0], [lambda x: -x, lambda x: x])
+    array(2)
+
+    """
+    x = asanyarray(x)
+    n2 = len(funclist)
+
+    # undocumented: single condition is promoted to a list of one condition
+    if isscalar(condlist) or (
+            not isinstance(condlist[0], (list, ndarray)) and x.ndim != 0):
+        condlist = [condlist]
+
+    condlist = asarray(condlist, dtype=bool)
+    n = len(condlist)
+
+    if n == n2 - 1:  # compute the "otherwise" condition.
+        condelse = ~np.any(condlist, axis=0, keepdims=True)
+        condlist = np.concatenate([condlist, condelse], axis=0)
+        n += 1
+    elif n != n2:
+        raise ValueError(
+            f"with {n} condition(s), either {n} or {n + 1} functions are expected"
+        )
+
+    y = zeros_like(x)
+    for cond, func in zip(condlist, funclist):
+        if not isinstance(func, collections.abc.Callable):
+            y[cond] = func
+        else:
+            vals = x[cond]
+            if vals.size > 0:
+                y[cond] = func(vals, *args, **kw)
+
+    return y
+
+
+def _select_dispatcher(condlist, choicelist, default=None):
+    yield from condlist
+    yield from choicelist
+
+
+@array_function_dispatch(_select_dispatcher)
+def select(condlist, choicelist, default=0):
+    """
+    Return an array drawn from elements in choicelist, depending on conditions.
+
+    Parameters
+    ----------
+    condlist : list of bool ndarrays
+        The list of conditions which determine from which array in `choicelist`
+        the output elements are taken. When multiple conditions are satisfied,
+        the first one encountered in `condlist` is used.
+    choicelist : list of ndarrays
+        The list of arrays from which the output elements are taken. It has
+        to be of the same length as `condlist`.
+    default : scalar, optional
+        The element inserted in `output` when all conditions evaluate to False.
+
+    Returns
+    -------
+    output : ndarray
+        The output at position m is the m-th element of the array in
+        `choicelist` where the m-th element of the corresponding array in
+        `condlist` is True.
+
+    See Also
+    --------
+    where : Return elements from one of two arrays depending on condition.
+    take, choose, compress, diag, diagonal
+
+    Examples
+    --------
+    >>> import numpy as np
+
+    Beginning with an array of integers from 0 to 5 (inclusive),
+    elements less than ``3`` are negated, elements greater than ``3``
+    are squared, and elements not meeting either of these conditions
+    (exactly ``3``) are replaced with a `default` value of ``42``.
+
+    >>> x = np.arange(6)
+    >>> condlist = [x<3, x>3]
+    >>> choicelist = [-x, x**2]
+    >>> np.select(condlist, choicelist, 42)
+    array([ 0,  -1,  -2, 42, 16, 25])
+
+    When multiple conditions are satisfied, the first one encountered in
+    `condlist` is used.
+
+    >>> condlist = [x<=4, x>3]
+    >>> choicelist = [x, x**2]
+    >>> np.select(condlist, choicelist, 55)
+    array([ 0,  1,  2,  3,  4, 25])
+
+    """
+    # Check the size of condlist and choicelist are the same, or abort.
+    if len(condlist) != len(choicelist):
+        raise ValueError(
+            'list of cases must be same length as list of conditions')
+
+    # Now that the dtype is known, handle the deprecated select([], []) case
+    if len(condlist) == 0:
+        raise ValueError("select with an empty condition list is not possible")
+
+    # TODO: This preserves the Python int, float, complex manually to get the
+    #       right `result_type` with NEP 50.  Most likely we will grow a better
+    #       way to spell this (and this can be replaced).
+    choicelist = [
+        choice if type(choice) in (int, float, complex) else np.asarray(choice)
+        for choice in choicelist]
+    choicelist.append(default if type(default) in (int, float, complex)
+                      else np.asarray(default))
+
+    try:
+        dtype = np.result_type(*choicelist)
+    except TypeError as e:
+        msg = f'Choicelist and default value do not have a common dtype: {e}'
+        raise TypeError(msg) from None
+
+    # Convert conditions to arrays and broadcast conditions and choices
+    # as the shape is needed for the result. Doing it separately optimizes
+    # for example when all choices are scalars.
+    condlist = np.broadcast_arrays(*condlist)
+    choicelist = np.broadcast_arrays(*choicelist)
+
+    # If cond array is not an ndarray in boolean format or scalar bool, abort.
+    for i, cond in enumerate(condlist):
+        if cond.dtype.type is not np.bool:
+            raise TypeError(
+                f'invalid entry {i} in condlist: should be boolean ndarray')
+
+    if choicelist[0].ndim == 0:
+        # This may be common, so avoid the call.
+        result_shape = condlist[0].shape
+    else:
+        result_shape = np.broadcast_arrays(condlist[0], choicelist[0])[0].shape
+
+    result = np.full(result_shape, choicelist[-1], dtype)
+
+    # Use np.copyto to burn each choicelist array onto result, using the
+    # corresponding condlist as a boolean mask. This is done in reverse
+    # order since the first choice should take precedence.
+    choicelist = choicelist[-2::-1]
+    condlist = condlist[::-1]
+    for choice, cond in zip(choicelist, condlist):
+        np.copyto(result, choice, where=cond)
+
+    return result
+
+
+def _copy_dispatcher(a, order=None, subok=None):
+    return (a,)
+
+
+@array_function_dispatch(_copy_dispatcher)
+def copy(a, order='K', subok=False):
+    """
+    Return an array copy of the given object.
+
+    Parameters
+    ----------
+    a : array_like
+        Input data.
+    order : {'C', 'F', 'A', 'K'}, optional
+        Controls the memory layout of the copy. 'C' means C-order,
+        'F' means F-order, 'A' means 'F' if `a` is Fortran contiguous,
+        'C' otherwise. 'K' means match the layout of `a` as closely
+        as possible. (Note that this function and :meth:`ndarray.copy` are very
+        similar, but have different default values for their order=
+        arguments.)
+    subok : bool, optional
+        If True, then sub-classes will be passed-through, otherwise the
+        returned array will be forced to be a base-class array (defaults to False).
+
+    Returns
+    -------
+    arr : ndarray
+        Array interpretation of `a`.
+
+    See Also
+    --------
+    ndarray.copy : Preferred method for creating an array copy
+
+    Notes
+    -----
+    This is equivalent to:
+
+    >>> np.array(a, copy=True)  #doctest: +SKIP
+
+    The copy made of the data is shallow, i.e., for arrays with object dtype,
+    the new array will point to the same objects.
+    See Examples from `ndarray.copy`.
+
+    Examples
+    --------
+    >>> import numpy as np
+
+    Create an array x, with a reference y and a copy z:
+
+    >>> x = np.array([1, 2, 3])
+    >>> y = x
+    >>> z = np.copy(x)
+
+    Note that, when we modify x, y changes, but not z:
+
+    >>> x[0] = 10
+    >>> x[0] == y[0]
+    True
+    >>> x[0] == z[0]
+    False
+
+    Note that, np.copy clears previously set WRITEABLE=False flag.
+
+    >>> a = np.array([1, 2, 3])
+    >>> a.flags["WRITEABLE"] = False
+    >>> b = np.copy(a)
+    >>> b.flags["WRITEABLE"]
+    True
+    >>> b[0] = 3
+    >>> b
+    array([3, 2, 3])
+    """
+    return array(a, order=order, subok=subok, copy=True)
+
+# Basic operations
+
+
+def _gradient_dispatcher(f, *varargs, axis=None, edge_order=None):
+    yield f
+    yield from varargs
+
+
+@array_function_dispatch(_gradient_dispatcher)
+def gradient(f, *varargs, axis=None, edge_order=1):
+    """
+    Return the gradient of an N-dimensional array.
+
+    The gradient is computed using second order accurate central differences
+    in the interior points and either first or second order accurate one-sides
+    (forward or backwards) differences at the boundaries.
+    The returned gradient hence has the same shape as the input array.
+
+    Parameters
+    ----------
+    f : array_like
+        An N-dimensional array containing samples of a scalar function.
+    varargs : list of scalar or array, optional
+        Spacing between f values. Default unitary spacing for all dimensions.
+        Spacing can be specified using:
+
+        1. single scalar to specify a sample distance for all dimensions.
+        2. N scalars to specify a constant sample distance for each dimension.
+           i.e. `dx`, `dy`, `dz`, ...
+        3. N arrays to specify the coordinates of the values along each
+           dimension of F. The length of the array must match the size of
+           the corresponding dimension
+        4. Any combination of N scalars/arrays with the meaning of 2. and 3.
+
+        If `axis` is given, the number of varargs must equal the number of axes
+        specified in the axis parameter.
+        Default: 1. (see Examples below).
+
+    edge_order : {1, 2}, optional
+        Gradient is calculated using N-th order accurate differences
+        at the boundaries. Default: 1.
+    axis : None or int or tuple of ints, optional
+        Gradient is calculated only along the given axis or axes
+        The default (axis = None) is to calculate the gradient for all the axes
+        of the input array. axis may be negative, in which case it counts from
+        the last to the first axis.
+
+    Returns
+    -------
+    gradient : ndarray or tuple of ndarray
+        A tuple of ndarrays (or a single ndarray if there is only one
+        dimension) corresponding to the derivatives of f with respect
+        to each dimension. Each derivative has the same shape as f.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> f = np.array([1, 2, 4, 7, 11, 16])
+    >>> np.gradient(f)
+    array([1. , 1.5, 2.5, 3.5, 4.5, 5. ])
+    >>> np.gradient(f, 2)
+    array([0.5 ,  0.75,  1.25,  1.75,  2.25,  2.5 ])
+
+    Spacing can be also specified with an array that represents the coordinates
+    of the values F along the dimensions.
+    For instance a uniform spacing:
+
+    >>> x = np.arange(f.size)
+    >>> np.gradient(f, x)
+    array([1. ,  1.5,  2.5,  3.5,  4.5,  5. ])
+
+    Or a non uniform one:
+
+    >>> x = np.array([0., 1., 1.5, 3.5, 4., 6.])
+    >>> np.gradient(f, x)
+    array([1. ,  3. ,  3.5,  6.7,  6.9,  2.5])
+
+    For two dimensional arrays, the return will be two arrays ordered by
+    axis. In this example the first array stands for the gradient in
+    rows and the second one in columns direction:
+
+    >>> np.gradient(np.array([[1, 2, 6], [3, 4, 5]]))
+    (array([[ 2.,  2., -1.],
+            [ 2.,  2., -1.]]),
+     array([[1. , 2.5, 4. ],
+            [1. , 1. , 1. ]]))
+
+    In this example the spacing is also specified:
+    uniform for axis=0 and non uniform for axis=1
+
+    >>> dx = 2.
+    >>> y = [1., 1.5, 3.5]
+    >>> np.gradient(np.array([[1, 2, 6], [3, 4, 5]]), dx, y)
+    (array([[ 1. ,  1. , -0.5],
+            [ 1. ,  1. , -0.5]]),
+     array([[2. , 2. , 2. ],
+            [2. , 1.7, 0.5]]))
+
+    It is possible to specify how boundaries are treated using `edge_order`
+
+    >>> x = np.array([0, 1, 2, 3, 4])
+    >>> f = x**2
+    >>> np.gradient(f, edge_order=1)
+    array([1.,  2.,  4.,  6.,  7.])
+    >>> np.gradient(f, edge_order=2)
+    array([0., 2., 4., 6., 8.])
+
+    The `axis` keyword can be used to specify a subset of axes of which the
+    gradient is calculated
+
+    >>> np.gradient(np.array([[1, 2, 6], [3, 4, 5]]), axis=0)
+    array([[ 2.,  2., -1.],
+           [ 2.,  2., -1.]])
+
+    The `varargs` argument defines the spacing between sample points in the
+    input array. It can take two forms:
+
+    1. An array, specifying coordinates, which may be unevenly spaced:
+
+    >>> x = np.array([0., 2., 3., 6., 8.])
+    >>> y = x ** 2
+    >>> np.gradient(y, x, edge_order=2)
+    array([ 0.,  4.,  6., 12., 16.])
+
+    2. A scalar, representing the fixed sample distance:
+
+    >>> dx = 2
+    >>> x = np.array([0., 2., 4., 6., 8.])
+    >>> y = x ** 2
+    >>> np.gradient(y, dx, edge_order=2)
+    array([ 0.,  4.,  8., 12., 16.])
+
+    It's possible to provide different data for spacing along each dimension.
+    The number of arguments must match the number of dimensions in the input
+    data.
+
+    >>> dx = 2
+    >>> dy = 3
+    >>> x = np.arange(0, 6, dx)
+    >>> y = np.arange(0, 9, dy)
+    >>> xs, ys = np.meshgrid(x, y)
+    >>> zs = xs + 2 * ys
+    >>> np.gradient(zs, dy, dx)  # Passing two scalars
+    (array([[2., 2., 2.],
+            [2., 2., 2.],
+            [2., 2., 2.]]),
+     array([[1., 1., 1.],
+            [1., 1., 1.],
+            [1., 1., 1.]]))
+
+    Mixing scalars and arrays is also allowed:
+
+    >>> np.gradient(zs, y, dx)  # Passing one array and one scalar
+    (array([[2., 2., 2.],
+            [2., 2., 2.],
+            [2., 2., 2.]]),
+     array([[1., 1., 1.],
+            [1., 1., 1.],
+            [1., 1., 1.]]))
+
+    Notes
+    -----
+    Assuming that :math:`f\\in C^{3}` (i.e., :math:`f` has at least 3 continuous
+    derivatives) and let :math:`h_{*}` be a non-homogeneous stepsize, we
+    minimize the "consistency error" :math:`\\eta_{i}` between the true gradient
+    and its estimate from a linear combination of the neighboring grid-points:
+
+    .. math::
+
+        \\eta_{i} = f_{i}^{\\left(1\\right)} -
+                    \\left[ \\alpha f\\left(x_{i}\\right) +
+                            \\beta f\\left(x_{i} + h_{d}\\right) +
+                            \\gamma f\\left(x_{i}-h_{s}\\right)
+                    \\right]
+
+    By substituting :math:`f(x_{i} + h_{d})` and :math:`f(x_{i} - h_{s})`
+    with their Taylor series expansion, this translates into solving
+    the following the linear system:
+
+    .. math::
+
+        \\left\\{
+            \\begin{array}{r}
+                \\alpha+\\beta+\\gamma=0 \\\\
+                \\beta h_{d}-\\gamma h_{s}=1 \\\\
+                \\beta h_{d}^{2}+\\gamma h_{s}^{2}=0
+            \\end{array}
+        \\right.
+
+    The resulting approximation of :math:`f_{i}^{(1)}` is the following:
+
+    .. math::
+
+        \\hat f_{i}^{(1)} =
+            \\frac{
+                h_{s}^{2}f\\left(x_{i} + h_{d}\\right)
+                + \\left(h_{d}^{2} - h_{s}^{2}\\right)f\\left(x_{i}\\right)
+                - h_{d}^{2}f\\left(x_{i}-h_{s}\\right)}
+                { h_{s}h_{d}\\left(h_{d} + h_{s}\\right)}
+            + \\mathcal{O}\\left(\\frac{h_{d}h_{s}^{2}
+                                + h_{s}h_{d}^{2}}{h_{d}
+                                + h_{s}}\\right)
+
+    It is worth noting that if :math:`h_{s}=h_{d}`
+    (i.e., data are evenly spaced)
+    we find the standard second order approximation:
+
+    .. math::
+
+        \\hat f_{i}^{(1)}=
+            \\frac{f\\left(x_{i+1}\\right) - f\\left(x_{i-1}\\right)}{2h}
+            + \\mathcal{O}\\left(h^{2}\\right)
+
+    With a similar procedure the forward/backward approximations used for
+    boundaries can be derived.
+
+    References
+    ----------
+    .. [1]  Quarteroni A., Sacco R., Saleri F. (2007) Numerical Mathematics
+            (Texts in Applied Mathematics). New York: Springer.
+    .. [2]  Durran D. R. (1999) Numerical Methods for Wave Equations
+            in Geophysical Fluid Dynamics. New York: Springer.
+    .. [3]  Fornberg B. (1988) Generation of Finite Difference Formulas on
+            Arbitrarily Spaced Grids,
+            Mathematics of Computation 51, no. 184 : 699-706.
+            `PDF <https://www.ams.org/journals/mcom/1988-51-184/
+            S0025-5718-1988-0935077-0/S0025-5718-1988-0935077-0.pdf>`_.
+    """
+    f = np.asanyarray(f)
+    N = f.ndim  # number of dimensions
+
+    if axis is None:
+        axes = tuple(range(N))
+    else:
+        axes = _nx.normalize_axis_tuple(axis, N)
+
+    len_axes = len(axes)
+    n = len(varargs)
+    if n == 0:
+        # no spacing argument - use 1 in all axes
+        dx = [1.0] * len_axes
+    elif n == 1 and np.ndim(varargs[0]) == 0:
+        # single scalar for all axes
+        dx = varargs * len_axes
+    elif n == len_axes:
+        # scalar or 1d array for each axis
+        dx = list(varargs)
+        for i, distances in enumerate(dx):
+            distances = np.asanyarray(distances)
+            if distances.ndim == 0:
+                continue
+            elif distances.ndim != 1:
+                raise ValueError("distances must be either scalars or 1d")
+            if len(distances) != f.shape[axes[i]]:
+                raise ValueError("when 1d, distances must match "
+                                 "the length of the corresponding dimension")
+            if np.issubdtype(distances.dtype, np.integer):
+                # Convert numpy integer types to float64 to avoid modular
+                # arithmetic in np.diff(distances).
+                distances = distances.astype(np.float64)
+            diffx = np.diff(distances)
+            # if distances are constant reduce to the scalar case
+            # since it brings a consistent speedup
+            if (diffx == diffx[0]).all():
+                diffx = diffx[0]
+            dx[i] = diffx
+    else:
+        raise TypeError("invalid number of arguments")
+
+    if edge_order > 2:
+        raise ValueError("'edge_order' greater than 2 not supported")
+
+    # use central differences on interior and one-sided differences on the
+    # endpoints. This preserves second order-accuracy over the full domain.
+
+    outvals = []
+
+    # create slice objects --- initially all are [:, :, ..., :]
+    slice1 = [slice(None)] * N
+    slice2 = [slice(None)] * N
+    slice3 = [slice(None)] * N
+    slice4 = [slice(None)] * N
+
+    otype = f.dtype
+    if otype.type is np.datetime64:
+        # the timedelta dtype with the same unit information
+        otype = np.dtype(otype.name.replace('datetime', 'timedelta'))
+        # view as timedelta to allow addition
+        f = f.view(otype)
+    elif otype.type is np.timedelta64:
+        pass
+    elif np.issubdtype(otype, np.inexact):
+        pass
+    else:
+        # All other types convert to floating point.
+        # First check if f is a numpy integer type; if so, convert f to float64
+        # to avoid modular arithmetic when computing the changes in f.
+        if np.issubdtype(otype, np.integer):
+            f = f.astype(np.float64)
+        otype = np.float64
+
+    for axis, ax_dx in zip(axes, dx):
+        if f.shape[axis] < edge_order + 1:
+            raise ValueError(
+                "Shape of array too small to calculate a numerical gradient, "
+                "at least (edge_order + 1) elements are required.")
+        # result allocation
+        out = np.empty_like(f, dtype=otype)
+
+        # spacing for the current axis
+        uniform_spacing = np.ndim(ax_dx) == 0
+
+        # Numerical differentiation: 2nd order interior
+        slice1[axis] = slice(1, -1)
+        slice2[axis] = slice(None, -2)
+        slice3[axis] = slice(1, -1)
+        slice4[axis] = slice(2, None)
+
+        if uniform_spacing:
+            out[tuple(slice1)] = (f[tuple(slice4)] - f[tuple(slice2)]) / (2. * ax_dx)
+        else:
+            dx1 = ax_dx[0:-1]
+            dx2 = ax_dx[1:]
+            a = -(dx2) / (dx1 * (dx1 + dx2))
+            b = (dx2 - dx1) / (dx1 * dx2)
+            c = dx1 / (dx2 * (dx1 + dx2))
+            # fix the shape for broadcasting
+            shape = np.ones(N, dtype=int)
+            shape[axis] = -1
+            a.shape = b.shape = c.shape = shape
+            # 1D equivalent -- out[1:-1] = a * f[:-2] + b * f[1:-1] + c * f[2:]
+            out[tuple(slice1)] = a * f[tuple(slice2)] + b * f[tuple(slice3)] \
+                                                + c * f[tuple(slice4)]
+
+        # Numerical differentiation: 1st order edges
+        if edge_order == 1:
+            slice1[axis] = 0
+            slice2[axis] = 1
+            slice3[axis] = 0
+            dx_0 = ax_dx if uniform_spacing else ax_dx[0]
+            # 1D equivalent -- out[0] = (f[1] - f[0]) / (x[1] - x[0])
+            out[tuple(slice1)] = (f[tuple(slice2)] - f[tuple(slice3)]) / dx_0
+
+            slice1[axis] = -1
+            slice2[axis] = -1
+            slice3[axis] = -2
+            dx_n = ax_dx if uniform_spacing else ax_dx[-1]
+            # 1D equivalent -- out[-1] = (f[-1] - f[-2]) / (x[-1] - x[-2])
+            out[tuple(slice1)] = (f[tuple(slice2)] - f[tuple(slice3)]) / dx_n
+
+        # Numerical differentiation: 2nd order edges
+        else:
+            slice1[axis] = 0
+            slice2[axis] = 0
+            slice3[axis] = 1
+            slice4[axis] = 2
+            if uniform_spacing:
+                a = -1.5 / ax_dx
+                b = 2. / ax_dx
+                c = -0.5 / ax_dx
+            else:
+                dx1 = ax_dx[0]
+                dx2 = ax_dx[1]
+                a = -(2. * dx1 + dx2) / (dx1 * (dx1 + dx2))
+                b = (dx1 + dx2) / (dx1 * dx2)
+                c = - dx1 / (dx2 * (dx1 + dx2))
+            # 1D equivalent -- out[0] = a * f[0] + b * f[1] + c * f[2]
+            out[tuple(slice1)] = a * f[tuple(slice2)] + b * f[tuple(slice3)] \
+                                                        + c * f[tuple(slice4)]
+
+            slice1[axis] = -1
+            slice2[axis] = -3
+            slice3[axis] = -2
+            slice4[axis] = -1
+            if uniform_spacing:
+                a = 0.5 / ax_dx
+                b = -2. / ax_dx
+                c = 1.5 / ax_dx
+            else:
+                dx1 = ax_dx[-2]
+                dx2 = ax_dx[-1]
+                a = (dx2) / (dx1 * (dx1 + dx2))
+                b = - (dx2 + dx1) / (dx1 * dx2)
+                c = (2. * dx2 + dx1) / (dx2 * (dx1 + dx2))
+            # 1D equivalent -- out[-1] = a * f[-3] + b * f[-2] + c * f[-1]
+            out[tuple(slice1)] = a * f[tuple(slice2)] + b * f[tuple(slice3)] \
+                                                        + c * f[tuple(slice4)]
+
+        outvals.append(out)
+
+        # reset the slice object in this dimension to ":"
+        slice1[axis] = slice(None)
+        slice2[axis] = slice(None)
+        slice3[axis] = slice(None)
+        slice4[axis] = slice(None)
+
+    if len_axes == 1:
+        return outvals[0]
+    return tuple(outvals)
+
+
+def _diff_dispatcher(a, n=None, axis=None, prepend=None, append=None):
+    return (a, prepend, append)
+
+
+@array_function_dispatch(_diff_dispatcher)
+def diff(a, n=1, axis=-1, prepend=np._NoValue, append=np._NoValue):
+    """
+    Calculate the n-th discrete difference along the given axis.
+
+    The first difference is given by ``out[i] = a[i+1] - a[i]`` along
+    the given axis, higher differences are calculated by using `diff`
+    recursively.
+
+    Parameters
+    ----------
+    a : array_like
+        Input array
+    n : int, optional
+        The number of times values are differenced. If zero, the input
+        is returned as-is.
+    axis : int, optional
+        The axis along which the difference is taken, default is the
+        last axis.
+    prepend, append : array_like, optional
+        Values to prepend or append to `a` along axis prior to
+        performing the difference.  Scalar values are expanded to
+        arrays with length 1 in the direction of axis and the shape
+        of the input array in along all other axes.  Otherwise the
+        dimension and shape must match `a` except along axis.
+
+    Returns
+    -------
+    diff : ndarray
+        The n-th differences. The shape of the output is the same as `a`
+        except along `axis` where the dimension is smaller by `n`. The
+        type of the output is the same as the type of the difference
+        between any two elements of `a`. This is the same as the type of
+        `a` in most cases. A notable exception is `datetime64`, which
+        results in a `timedelta64` output array.
+
+    See Also
+    --------
+    gradient, ediff1d, cumsum
+
+    Notes
+    -----
+    Type is preserved for boolean arrays, so the result will contain
+    `False` when consecutive elements are the same and `True` when they
+    differ.
+
+    For unsigned integer arrays, the results will also be unsigned. This
+    should not be surprising, as the result is consistent with
+    calculating the difference directly:
+
+    >>> u8_arr = np.array([1, 0], dtype=np.uint8)
+    >>> np.diff(u8_arr)
+    array([255], dtype=uint8)
+    >>> u8_arr[1,...] - u8_arr[0,...]
+    np.uint8(255)
+
+    If this is not desirable, then the array should be cast to a larger
+    integer type first:
+
+    >>> i16_arr = u8_arr.astype(np.int16)
+    >>> np.diff(i16_arr)
+    array([-1], dtype=int16)
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> x = np.array([1, 2, 4, 7, 0])
+    >>> np.diff(x)
+    array([ 1,  2,  3, -7])
+    >>> np.diff(x, n=2)
+    array([  1,   1, -10])
+
+    >>> x = np.array([[1, 3, 6, 10], [0, 5, 6, 8]])
+    >>> np.diff(x)
+    array([[2, 3, 4],
+           [5, 1, 2]])
+    >>> np.diff(x, axis=0)
+    array([[-1,  2,  0, -2]])
+
+    >>> x = np.arange('1066-10-13', '1066-10-16', dtype=np.datetime64)
+    >>> np.diff(x)
+    array([1, 1], dtype='timedelta64[D]')
+
+    """
+    if n == 0:
+        return a
+    if n < 0:
+        raise ValueError(
+            "order must be non-negative but got " + repr(n))
+
+    a = asanyarray(a)
+    nd = a.ndim
+    if nd == 0:
+        raise ValueError("diff requires input that is at least one dimensional")
+    axis = normalize_axis_index(axis, nd)
+
+    combined = []
+    if prepend is not np._NoValue:
+        prepend = np.asanyarray(prepend)
+        if prepend.ndim == 0:
+            shape = list(a.shape)
+            shape[axis] = 1
+            prepend = np.broadcast_to(prepend, tuple(shape))
+        combined.append(prepend)
+
+    combined.append(a)
+
+    if append is not np._NoValue:
+        append = np.asanyarray(append)
+        if append.ndim == 0:
+            shape = list(a.shape)
+            shape[axis] = 1
+            append = np.broadcast_to(append, tuple(shape))
+        combined.append(append)
+
+    if len(combined) > 1:
+        a = np.concatenate(combined, axis)
+
+    slice1 = [slice(None)] * nd
+    slice2 = [slice(None)] * nd
+    slice1[axis] = slice(1, None)
+    slice2[axis] = slice(None, -1)
+    slice1 = tuple(slice1)
+    slice2 = tuple(slice2)
+
+    op = not_equal if a.dtype == np.bool else subtract
+    for _ in range(n):
+        a = op(a[slice1], a[slice2])
+
+    return a
+
+
+def _interp_dispatcher(x, xp, fp, left=None, right=None, period=None):
+    return (x, xp, fp)
+
+
+@array_function_dispatch(_interp_dispatcher)
+def interp(x, xp, fp, left=None, right=None, period=None):
+    """
+    One-dimensional linear interpolation for monotonically increasing sample points.
+
+    Returns the one-dimensional piecewise linear interpolant to a function
+    with given discrete data points (`xp`, `fp`), evaluated at `x`.
+
+    Parameters
+    ----------
+    x : array_like
+        The x-coordinates at which to evaluate the interpolated values.
+
+    xp : 1-D sequence of floats
+        The x-coordinates of the data points, must be increasing if argument
+        `period` is not specified. Otherwise, `xp` is internally sorted after
+        normalizing the periodic boundaries with ``xp = xp % period``.
+
+    fp : 1-D sequence of float or complex
+        The y-coordinates of the data points, same length as `xp`.
+
+    left : optional float or complex corresponding to fp
+        Value to return for `x < xp[0]`, default is `fp[0]`.
+
+    right : optional float or complex corresponding to fp
+        Value to return for `x > xp[-1]`, default is `fp[-1]`.
+
+    period : None or float, optional
+        A period for the x-coordinates. This parameter allows the proper
+        interpolation of angular x-coordinates. Parameters `left` and `right`
+        are ignored if `period` is specified.
+
+    Returns
+    -------
+    y : float or complex (corresponding to fp) or ndarray
+        The interpolated values, same shape as `x`.
+
+    Raises
+    ------
+    ValueError
+        If `xp` and `fp` have different length
+        If `xp` or `fp` are not 1-D sequences
+        If `period == 0`
+
+    See Also
+    --------
+    scipy.interpolate
+
+    Warnings
+    --------
+    The x-coordinate sequence is expected to be increasing, but this is not
+    explicitly enforced.  However, if the sequence `xp` is non-increasing,
+    interpolation results are meaningless.
+
+    Note that, since NaN is unsortable, `xp` also cannot contain NaNs.
+
+    A simple check for `xp` being strictly increasing is::
+
+        np.all(np.diff(xp) > 0)
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> xp = [1, 2, 3]
+    >>> fp = [3, 2, 0]
+    >>> np.interp(2.5, xp, fp)
+    1.0
+    >>> np.interp([0, 1, 1.5, 2.72, 3.14], xp, fp)
+    array([3.  , 3.  , 2.5 , 0.56, 0.  ])
+    >>> UNDEF = -99.0
+    >>> np.interp(3.14, xp, fp, right=UNDEF)
+    -99.0
+
+    Plot an interpolant to the sine function:
+
+    >>> x = np.linspace(0, 2*np.pi, 10)
+    >>> y = np.sin(x)
+    >>> xvals = np.linspace(0, 2*np.pi, 50)
+    >>> yinterp = np.interp(xvals, x, y)
+    >>> import matplotlib.pyplot as plt
+    >>> plt.plot(x, y, 'o')
+    [<matplotlib.lines.Line2D object at 0x...>]
+    >>> plt.plot(xvals, yinterp, '-x')
+    [<matplotlib.lines.Line2D object at 0x...>]
+    >>> plt.show()
+
+    Interpolation with periodic x-coordinates:
+
+    >>> x = [-180, -170, -185, 185, -10, -5, 0, 365]
+    >>> xp = [190, -190, 350, -350]
+    >>> fp = [5, 10, 3, 4]
+    >>> np.interp(x, xp, fp, period=360)
+    array([7.5 , 5.  , 8.75, 6.25, 3.  , 3.25, 3.5 , 3.75])
+
+    Complex interpolation:
+
+    >>> x = [1.5, 4.0]
+    >>> xp = [2,3,5]
+    >>> fp = [1.0j, 0, 2+3j]
+    >>> np.interp(x, xp, fp)
+    array([0.+1.j , 1.+1.5j])
+
+    """
+
+    fp = np.asarray(fp)
+
+    if np.iscomplexobj(fp):
+        interp_func = compiled_interp_complex
+        input_dtype = np.complex128
+    else:
+        interp_func = compiled_interp
+        input_dtype = np.float64
+
+    if period is not None:
+        if period == 0:
+            raise ValueError("period must be a non-zero value")
+        period = abs(period)
+        left = None
+        right = None
+
+        x = np.asarray(x, dtype=np.float64)
+        xp = np.asarray(xp, dtype=np.float64)
+        fp = np.asarray(fp, dtype=input_dtype)
+
+        if xp.ndim != 1 or fp.ndim != 1:
+            raise ValueError("Data points must be 1-D sequences")
+        if xp.shape[0] != fp.shape[0]:
+            raise ValueError("fp and xp are not of the same length")
+        # normalizing periodic boundaries
+        x = x % period
+        xp = xp % period
+        asort_xp = np.argsort(xp)
+        xp = xp[asort_xp]
+        fp = fp[asort_xp]
+        xp = np.concatenate((xp[-1:] - period, xp, xp[0:1] + period))
+        fp = np.concatenate((fp[-1:], fp, fp[0:1]))
+
+    return interp_func(x, xp, fp, left, right)
+
+
+def _angle_dispatcher(z, deg=None):
+    return (z,)
+
+
+@array_function_dispatch(_angle_dispatcher)
+def angle(z, deg=False):
+    """
+    Return the angle of the complex argument.
+
+    Parameters
+    ----------
+    z : array_like
+        A complex number or sequence of complex numbers.
+    deg : bool, optional
+        Return angle in degrees if True, radians if False (default).
+
+    Returns
+    -------
+    angle : ndarray or scalar
+        The counterclockwise angle from the positive real axis on the complex
+        plane in the range ``(-pi, pi]``, with dtype as numpy.float64.
+
+    See Also
+    --------
+    arctan2
+    absolute
+
+    Notes
+    -----
+    This function passes the imaginary and real parts of the argument to
+    `arctan2` to compute the result; consequently, it follows the convention
+    of `arctan2` when the magnitude of the argument is zero. See example.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> np.angle([1.0, 1.0j, 1+1j])               # in radians
+    array([ 0.        ,  1.57079633,  0.78539816]) # may vary
+    >>> np.angle(1+1j, deg=True)                  # in degrees
+    45.0
+    >>> np.angle([0., -0., complex(0., -0.), complex(-0., -0.)])  # convention
+    array([ 0.        ,  3.14159265, -0.        , -3.14159265])
+
+    """
+    z = asanyarray(z)
+    if issubclass(z.dtype.type, _nx.complexfloating):
+        zimag = z.imag
+        zreal = z.real
+    else:
+        zimag = 0
+        zreal = z
+
+    a = arctan2(zimag, zreal)
+    if deg:
+        a *= 180 / pi
+    return a
+
+
+def _unwrap_dispatcher(p, discont=None, axis=None, *, period=None):
+    return (p,)
+
+
+@array_function_dispatch(_unwrap_dispatcher)
+def unwrap(p, discont=None, axis=-1, *, period=2 * pi):
+    r"""
+    Unwrap by taking the complement of large deltas with respect to the period.
+
+    This unwraps a signal `p` by changing elements which have an absolute
+    difference from their predecessor of more than ``max(discont, period/2)``
+    to their `period`-complementary values.
+
+    For the default case where `period` is :math:`2\pi` and `discont` is
+    :math:`\pi`, this unwraps a radian phase `p` such that adjacent differences
+    are never greater than :math:`\pi` by adding :math:`2k\pi` for some
+    integer :math:`k`.
+
+    Parameters
+    ----------
+    p : array_like
+        Input array.
+    discont : float, optional
+        Maximum discontinuity between values, default is ``period/2``.
+        Values below ``period/2`` are treated as if they were ``period/2``.
+        To have an effect different from the default, `discont` should be
+        larger than ``period/2``.
+    axis : int, optional
+        Axis along which unwrap will operate, default is the last axis.
+    period : float, optional
+        Size of the range over which the input wraps. By default, it is
+        ``2 pi``.
+
+        .. versionadded:: 1.21.0
+
+    Returns
+    -------
+    out : ndarray
+        Output array.
+
+    See Also
+    --------
+    rad2deg, deg2rad
+
+    Notes
+    -----
+    If the discontinuity in `p` is smaller than ``period/2``,
+    but larger than `discont`, no unwrapping is done because taking
+    the complement would only make the discontinuity larger.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> phase = np.linspace(0, np.pi, num=5)
+    >>> phase[3:] += np.pi
+    >>> phase
+    array([ 0.        ,  0.78539816,  1.57079633,  5.49778714,  6.28318531]) # may vary
+    >>> np.unwrap(phase)
+    array([ 0.        ,  0.78539816,  1.57079633, -0.78539816,  0.        ]) # may vary
+    >>> np.unwrap([0, 1, 2, -1, 0], period=4)
+    array([0, 1, 2, 3, 4])
+    >>> np.unwrap([ 1, 2, 3, 4, 5, 6, 1, 2, 3], period=6)
+    array([1, 2, 3, 4, 5, 6, 7, 8, 9])
+    >>> np.unwrap([2, 3, 4, 5, 2, 3, 4, 5], period=4)
+    array([2, 3, 4, 5, 6, 7, 8, 9])
+    >>> phase_deg = np.mod(np.linspace(0 ,720, 19), 360) - 180
+    >>> np.unwrap(phase_deg, period=360)
+    array([-180., -140., -100.,  -60.,  -20.,   20.,   60.,  100.,  140.,
+            180.,  220.,  260.,  300.,  340.,  380.,  420.,  460.,  500.,
+            540.])
+    """
+    p = asarray(p)
+    nd = p.ndim
+    dd = diff(p, axis=axis)
+    if discont is None:
+        discont = period / 2
+    slice1 = [slice(None, None)] * nd     # full slices
+    slice1[axis] = slice(1, None)
+    slice1 = tuple(slice1)
+    dtype = np.result_type(dd, period)
+    if _nx.issubdtype(dtype, _nx.integer):
+        interval_high, rem = divmod(period, 2)
+        boundary_ambiguous = rem == 0
+    else:
+        interval_high = period / 2
+        boundary_ambiguous = True
+    interval_low = -interval_high
+    ddmod = mod(dd - interval_low, period) + interval_low
+    if boundary_ambiguous:
+        # for `mask = (abs(dd) == period/2)`, the above line made
+        # `ddmod[mask] == -period/2`. correct these such that
+        # `ddmod[mask] == sign(dd[mask])*period/2`.
+        _nx.copyto(ddmod, interval_high,
+                   where=(ddmod == interval_low) & (dd > 0))
+    ph_correct = ddmod - dd
+    _nx.copyto(ph_correct, 0, where=abs(dd) < discont)
+    up = array(p, copy=True, dtype=dtype)
+    up[slice1] = p[slice1] + ph_correct.cumsum(axis)
+    return up
+
+
+def _sort_complex(a):
+    return (a,)
+
+
+@array_function_dispatch(_sort_complex)
+def sort_complex(a):
+    """
+    Sort a complex array using the real part first, then the imaginary part.
+
+    Parameters
+    ----------
+    a : array_like
+        Input array
+
+    Returns
+    -------
+    out : complex ndarray
+        Always returns a sorted complex array.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> np.sort_complex([5, 3, 6, 2, 1])
+    array([1.+0.j, 2.+0.j, 3.+0.j, 5.+0.j, 6.+0.j])
+
+    >>> np.sort_complex([1 + 2j, 2 - 1j, 3 - 2j, 3 - 3j, 3 + 5j])
+    array([1.+2.j,  2.-1.j,  3.-3.j,  3.-2.j,  3.+5.j])
+
+    """
+    b = array(a, copy=True)
+    b.sort()
+    if not issubclass(b.dtype.type, _nx.complexfloating):
+        if b.dtype.char in 'bhBH':
+            return b.astype('F')
+        elif b.dtype.char == 'g':
+            return b.astype('G')
+        else:
+            return b.astype('D')
+    else:
+        return b
+
+
+def _arg_trim_zeros(filt):
+    """Return indices of the first and last non-zero element.
+
+    Parameters
+    ----------
+    filt : array_like
+        Input array.
+
+    Returns
+    -------
+    start, stop : ndarray
+        Two arrays containing the indices of the first and last non-zero
+        element in each dimension.
+
+    See also
+    --------
+    trim_zeros
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> _arg_trim_zeros(np.array([0, 0, 1, 1, 0]))
+    (array([2]), array([3]))
+    """
+    nonzero = (
+        np.argwhere(filt)
+        if filt.dtype != np.object_
+        # Historically, `trim_zeros` treats `None` in an object array
+        # as non-zero while argwhere doesn't, account for that
+        else np.argwhere(filt != 0)
+    )
+    if nonzero.size == 0:
+        start = stop = np.array([], dtype=np.intp)
+    else:
+        start = nonzero.min(axis=0)
+        stop = nonzero.max(axis=0)
+    return start, stop
+
+
+def _trim_zeros(filt, trim=None, axis=None):
+    return (filt,)
+
+
+@array_function_dispatch(_trim_zeros)
+def trim_zeros(filt, trim='fb', axis=None):
+    """Remove values along a dimension which are zero along all other.
+
+    Parameters
+    ----------
+    filt : array_like
+        Input array.
+    trim : {"fb", "f", "b"}, optional
+        A string with 'f' representing trim from front and 'b' to trim from
+        back. By default, zeros are trimmed on both sides.
+        Front and back refer to the edges of a dimension, with "front" referring
+        to the side with the lowest index 0, and "back" referring to the highest
+        index (or index -1).
+    axis : int or sequence, optional
+        If None, `filt` is cropped such that the smallest bounding box is
+        returned that still contains all values which are not zero.
+        If an axis is specified, `filt` will be sliced in that dimension only
+        on the sides specified by `trim`. The remaining area will be the
+        smallest that still contains all values wich are not zero.
+
+        .. versionadded:: 2.2.0
+
+    Returns
+    -------
+    trimmed : ndarray or sequence
+        The result of trimming the input. The number of dimensions and the
+        input data type are preserved.
+
+    Notes
+    -----
+    For all-zero arrays, the first axis is trimmed first.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> a = np.array((0, 0, 0, 1, 2, 3, 0, 2, 1, 0))
+    >>> np.trim_zeros(a)
+    array([1, 2, 3, 0, 2, 1])
+
+    >>> np.trim_zeros(a, trim='b')
+    array([0, 0, 0, ..., 0, 2, 1])
+
+    Multiple dimensions are supported.
+
+    >>> b = np.array([[0, 0, 2, 3, 0, 0],
+    ...               [0, 1, 0, 3, 0, 0],
+    ...               [0, 0, 0, 0, 0, 0]])
+    >>> np.trim_zeros(b)
+    array([[0, 2, 3],
+           [1, 0, 3]])
+
+    >>> np.trim_zeros(b, axis=-1)
+    array([[0, 2, 3],
+           [1, 0, 3],
+           [0, 0, 0]])
+
+    The input data type is preserved, list/tuple in means list/tuple out.
+
+    >>> np.trim_zeros([0, 1, 2, 0])
+    [1, 2]
+
+    """
+    filt_ = np.asarray(filt)
+
+    trim = trim.lower()
+    if trim not in {"fb", "bf", "f", "b"}:
+        raise ValueError(f"unexpected character(s) in `trim`: {trim!r}")
+
+    start, stop = _arg_trim_zeros(filt_)
+    stop += 1  # Adjust for slicing
+
+    if start.size == 0:
+        # filt is all-zero -> assign same values to start and stop so that
+        # resulting slice will be empty
+        start = stop = np.zeros(filt_.ndim, dtype=np.intp)
+    else:
+        if 'f' not in trim:
+            start = (None,) * filt_.ndim
+        if 'b' not in trim:
+            stop = (None,) * filt_.ndim
+
+    if len(start) == 1:
+        # filt is 1D -> don't use multi-dimensional slicing to preserve
+        # non-array input types
+        sl = slice(start[0], stop[0])
+    elif axis is None:
+        # trim all axes
+        sl = tuple(slice(*x) for x in zip(start, stop))
+    else:
+        # only trim single axis
+        axis = normalize_axis_index(axis, filt_.ndim)
+        sl = (slice(None),) * axis + (slice(start[axis], stop[axis]),) + (...,)
+
+    trimmed = filt[sl]
+    return trimmed
+
+
+def _extract_dispatcher(condition, arr):
+    return (condition, arr)
+
+
+@array_function_dispatch(_extract_dispatcher)
+def extract(condition, arr):
+    """
+    Return the elements of an array that satisfy some condition.
+
+    This is equivalent to ``np.compress(ravel(condition), ravel(arr))``.  If
+    `condition` is boolean ``np.extract`` is equivalent to ``arr[condition]``.
+
+    Note that `place` does the exact opposite of `extract`.
+
+    Parameters
+    ----------
+    condition : array_like
+        An array whose nonzero or True entries indicate the elements of `arr`
+        to extract.
+    arr : array_like
+        Input array of the same size as `condition`.
+
+    Returns
+    -------
+    extract : ndarray
+        Rank 1 array of values from `arr` where `condition` is True.
+
+    See Also
+    --------
+    take, put, copyto, compress, place
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> arr = np.arange(12).reshape((3, 4))
+    >>> arr
+    array([[ 0,  1,  2,  3],
+           [ 4,  5,  6,  7],
+           [ 8,  9, 10, 11]])
+    >>> condition = np.mod(arr, 3)==0
+    >>> condition
+    array([[ True, False, False,  True],
+           [False, False,  True, False],
+           [False,  True, False, False]])
+    >>> np.extract(condition, arr)
+    array([0, 3, 6, 9])
+
+
+    If `condition` is boolean:
+
+    >>> arr[condition]
+    array([0, 3, 6, 9])
+
+    """
+    return _nx.take(ravel(arr), nonzero(ravel(condition))[0])
+
+
+def _place_dispatcher(arr, mask, vals):
+    return (arr, mask, vals)
+
+
+@array_function_dispatch(_place_dispatcher)
+def place(arr, mask, vals):
+    """
+    Change elements of an array based on conditional and input values.
+
+    Similar to ``np.copyto(arr, vals, where=mask)``, the difference is that
+    `place` uses the first N elements of `vals`, where N is the number of
+    True values in `mask`, while `copyto` uses the elements where `mask`
+    is True.
+
+    Note that `extract` does the exact opposite of `place`.
+
+    Parameters
+    ----------
+    arr : ndarray
+        Array to put data into.
+    mask : array_like
+        Boolean mask array. Must have the same size as `a`.
+    vals : 1-D sequence
+        Values to put into `a`. Only the first N elements are used, where
+        N is the number of True values in `mask`. If `vals` is smaller
+        than N, it will be repeated, and if elements of `a` are to be masked,
+        this sequence must be non-empty.
+
+    See Also
+    --------
+    copyto, put, take, extract
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> arr = np.arange(6).reshape(2, 3)
+    >>> np.place(arr, arr>2, [44, 55])
+    >>> arr
+    array([[ 0,  1,  2],
+           [44, 55, 44]])
+
+    """
+    return _place(arr, mask, vals)
+
+
+def disp(mesg, device=None, linefeed=True):
+    """
+    Display a message on a device.
+
+    .. deprecated:: 2.0
+        Use your own printing function instead.
+
+    Parameters
+    ----------
+    mesg : str
+        Message to display.
+    device : object
+        Device to write message. If None, defaults to ``sys.stdout`` which is
+        very similar to ``print``. `device` needs to have ``write()`` and
+        ``flush()`` methods.
+    linefeed : bool, optional
+        Option whether to print a line feed or not. Defaults to True.
+
+    Raises
+    ------
+    AttributeError
+        If `device` does not have a ``write()`` or ``flush()`` method.
+
+    Examples
+    --------
+    >>> import numpy as np
+
+    Besides ``sys.stdout``, a file-like object can also be used as it has
+    both required methods:
+
+    >>> from io import StringIO
+    >>> buf = StringIO()
+    >>> np.disp('"Display" in a file', device=buf)
+    >>> buf.getvalue()
+    '"Display" in a file\\n'
+
+    """
+
+    # Deprecated in NumPy 2.0, 2023-07-11
+    warnings.warn(
+        "`disp` is deprecated, "
+        "use your own printing function instead. "
+        "(deprecated in NumPy 2.0)",
+        DeprecationWarning,
+        stacklevel=2
+    )
+
+    if device is None:
+        device = sys.stdout
+    if linefeed:
+        device.write(f'{mesg}\n')
+    else:
+        device.write(f'{mesg}')
+    device.flush()
+
+
+# See https://docs.scipy.org/doc/numpy/reference/c-api.generalized-ufuncs.html
+_DIMENSION_NAME = r'\w+'
+_CORE_DIMENSION_LIST = f'(?:{_DIMENSION_NAME}(?:,{_DIMENSION_NAME})*)?'
+_ARGUMENT = fr'\({_CORE_DIMENSION_LIST}\)'
+_ARGUMENT_LIST = f'{_ARGUMENT}(?:,{_ARGUMENT})*'
+_SIGNATURE = f'^{_ARGUMENT_LIST}->{_ARGUMENT_LIST}$'
+
+
+def _parse_gufunc_signature(signature):
+    """
+    Parse string signatures for a generalized universal function.
+
+    Arguments
+    ---------
+    signature : string
+        Generalized universal function signature, e.g., ``(m,n),(n,p)->(m,p)``
+        for ``np.matmul``.
+
+    Returns
+    -------
+    Tuple of input and output core dimensions parsed from the signature, each
+    of the form List[Tuple[str, ...]].
+    """
+    signature = re.sub(r'\s+', '', signature)
+
+    if not re.match(_SIGNATURE, signature):
+        raise ValueError(
+            f'not a valid gufunc signature: {signature}')
+    return tuple([tuple(re.findall(_DIMENSION_NAME, arg))
+                  for arg in re.findall(_ARGUMENT, arg_list)]
+                 for arg_list in signature.split('->'))
+
+
+def _update_dim_sizes(dim_sizes, arg, core_dims):
+    """
+    Incrementally check and update core dimension sizes for a single argument.
+
+    Arguments
+    ---------
+    dim_sizes : Dict[str, int]
+        Sizes of existing core dimensions. Will be updated in-place.
+    arg : ndarray
+        Argument to examine.
+    core_dims : Tuple[str, ...]
+        Core dimensions for this argument.
+    """
+    if not core_dims:
+        return
+
+    num_core_dims = len(core_dims)
+    if arg.ndim < num_core_dims:
+        raise ValueError(
+            '%d-dimensional argument does not have enough '
+            'dimensions for all core dimensions %r'
+            % (arg.ndim, core_dims))
+
+    core_shape = arg.shape[-num_core_dims:]
+    for dim, size in zip(core_dims, core_shape):
+        if dim in dim_sizes:
+            if size != dim_sizes[dim]:
+                raise ValueError(
+                    'inconsistent size for core dimension %r: %r vs %r'
+                    % (dim, size, dim_sizes[dim]))
+        else:
+            dim_sizes[dim] = size
+
+
+def _parse_input_dimensions(args, input_core_dims):
+    """
+    Parse broadcast and core dimensions for vectorize with a signature.
+
+    Arguments
+    ---------
+    args : Tuple[ndarray, ...]
+        Tuple of input arguments to examine.
+    input_core_dims : List[Tuple[str, ...]]
+        List of core dimensions corresponding to each input.
+
+    Returns
+    -------
+    broadcast_shape : Tuple[int, ...]
+        Common shape to broadcast all non-core dimensions to.
+    dim_sizes : Dict[str, int]
+        Common sizes for named core dimensions.
+    """
+    broadcast_args = []
+    dim_sizes = {}
+    for arg, core_dims in zip(args, input_core_dims):
+        _update_dim_sizes(dim_sizes, arg, core_dims)
+        ndim = arg.ndim - len(core_dims)
+        dummy_array = np.lib.stride_tricks.as_strided(0, arg.shape[:ndim])
+        broadcast_args.append(dummy_array)
+    broadcast_shape = np.lib._stride_tricks_impl._broadcast_shape(
+        *broadcast_args
+    )
+    return broadcast_shape, dim_sizes
+
+
+def _calculate_shapes(broadcast_shape, dim_sizes, list_of_core_dims):
+    """Helper for calculating broadcast shapes with core dimensions."""
+    return [broadcast_shape + tuple(dim_sizes[dim] for dim in core_dims)
+            for core_dims in list_of_core_dims]
+
+
+def _create_arrays(broadcast_shape, dim_sizes, list_of_core_dims, dtypes,
+                   results=None):
+    """Helper for creating output arrays in vectorize."""
+    shapes = _calculate_shapes(broadcast_shape, dim_sizes, list_of_core_dims)
+    if dtypes is None:
+        dtypes = [None] * len(shapes)
+    if results is None:
+        arrays = tuple(np.empty(shape=shape, dtype=dtype)
+                       for shape, dtype in zip(shapes, dtypes))
+    else:
+        arrays = tuple(np.empty_like(result, shape=shape, dtype=dtype)
+                       for result, shape, dtype
+                       in zip(results, shapes, dtypes))
+    return arrays
+
+
+def _get_vectorize_dtype(dtype):
+    if dtype.char in "SU":
+        return dtype.char
+    return dtype
+
+
+@set_module('numpy')
+class vectorize:
+    """
+    vectorize(pyfunc=np._NoValue, otypes=None, doc=None, excluded=None,
+    cache=False, signature=None)
+
+    Returns an object that acts like pyfunc, but takes arrays as input.
+
+    Define a vectorized function which takes a nested sequence of objects or
+    numpy arrays as inputs and returns a single numpy array or a tuple of numpy
+    arrays. The vectorized function evaluates `pyfunc` over successive tuples
+    of the input arrays like the python map function, except it uses the
+    broadcasting rules of numpy.
+
+    The data type of the output of `vectorized` is determined by calling
+    the function with the first element of the input.  This can be avoided
+    by specifying the `otypes` argument.
+
+    Parameters
+    ----------
+    pyfunc : callable, optional
+        A python function or method.
+        Can be omitted to produce a decorator with keyword arguments.
+    otypes : str or list of dtypes, optional
+        The output data type. It must be specified as either a string of
+        typecode characters or a list of data type specifiers. There should
+        be one data type specifier for each output.
+    doc : str, optional
+        The docstring for the function. If None, the docstring will be the
+        ``pyfunc.__doc__``.
+    excluded : set, optional
+        Set of strings or integers representing the positional or keyword
+        arguments for which the function will not be vectorized. These will be
+        passed directly to `pyfunc` unmodified.
+
+    cache : bool, optional
+        If `True`, then cache the first function call that determines the number
+        of outputs if `otypes` is not provided.
+
+    signature : string, optional
+        Generalized universal function signature, e.g., ``(m,n),(n)->(m)`` for
+        vectorized matrix-vector multiplication. If provided, ``pyfunc`` will
+        be called with (and expected to return) arrays with shapes given by the
+        size of corresponding core dimensions. By default, ``pyfunc`` is
+        assumed to take scalars as input and output.
+
+    Returns
+    -------
+    out : callable
+        A vectorized function if ``pyfunc`` was provided,
+        a decorator otherwise.
+
+    See Also
+    --------
+    frompyfunc : Takes an arbitrary Python function and returns a ufunc
+
+    Notes
+    -----
+    The `vectorize` function is provided primarily for convenience, not for
+    performance. The implementation is essentially a for loop.
+
+    If `otypes` is not specified, then a call to the function with the
+    first argument will be used to determine the number of outputs.  The
+    results of this call will be cached if `cache` is `True` to prevent
+    calling the function twice.  However, to implement the cache, the
+    original function must be wrapped which will slow down subsequent
+    calls, so only do this if your function is expensive.
+
+    The new keyword argument interface and `excluded` argument support
+    further degrades performance.
+
+    References
+    ----------
+    .. [1] :doc:`/reference/c-api/generalized-ufuncs`
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> def myfunc(a, b):
+    ...     "Return a-b if a>b, otherwise return a+b"
+    ...     if a > b:
+    ...         return a - b
+    ...     else:
+    ...         return a + b
+
+    >>> vfunc = np.vectorize(myfunc)
+    >>> vfunc([1, 2, 3, 4], 2)
+    array([3, 4, 1, 2])
+
+    The docstring is taken from the input function to `vectorize` unless it
+    is specified:
+
+    >>> vfunc.__doc__
+    'Return a-b if a>b, otherwise return a+b'
+    >>> vfunc = np.vectorize(myfunc, doc='Vectorized `myfunc`')
+    >>> vfunc.__doc__
+    'Vectorized `myfunc`'
+
+    The output type is determined by evaluating the first element of the input,
+    unless it is specified:
+
+    >>> out = vfunc([1, 2, 3, 4], 2)
+    >>> type(out[0])
+    <class 'numpy.int64'>
+    >>> vfunc = np.vectorize(myfunc, otypes=[float])
+    >>> out = vfunc([1, 2, 3, 4], 2)
+    >>> type(out[0])
+    <class 'numpy.float64'>
+
+    The `excluded` argument can be used to prevent vectorizing over certain
+    arguments.  This can be useful for array-like arguments of a fixed length
+    such as the coefficients for a polynomial as in `polyval`:
+
+    >>> def mypolyval(p, x):
+    ...     _p = list(p)
+    ...     res = _p.pop(0)
+    ...     while _p:
+    ...         res = res*x + _p.pop(0)
+    ...     return res
+
+    Here, we exclude the zeroth argument from vectorization whether it is
+    passed by position or keyword.
+
+    >>> vpolyval = np.vectorize(mypolyval, excluded={0, 'p'})
+    >>> vpolyval([1, 2, 3], x=[0, 1])
+    array([3, 6])
+    >>> vpolyval(p=[1, 2, 3], x=[0, 1])
+    array([3, 6])
+
+    The `signature` argument allows for vectorizing functions that act on
+    non-scalar arrays of fixed length. For example, you can use it for a
+    vectorized calculation of Pearson correlation coefficient and its p-value:
+
+    >>> import scipy.stats
+    >>> pearsonr = np.vectorize(scipy.stats.pearsonr,
+    ...                 signature='(n),(n)->(),()')
+    >>> pearsonr([[0, 1, 2, 3]], [[1, 2, 3, 4], [4, 3, 2, 1]])
+    (array([ 1., -1.]), array([ 0.,  0.]))
+
+    Or for a vectorized convolution:
+
+    >>> convolve = np.vectorize(np.convolve, signature='(n),(m)->(k)')
+    >>> convolve(np.eye(4), [1, 2, 1])
+    array([[1., 2., 1., 0., 0., 0.],
+           [0., 1., 2., 1., 0., 0.],
+           [0., 0., 1., 2., 1., 0.],
+           [0., 0., 0., 1., 2., 1.]])
+
+    Decorator syntax is supported.  The decorator can be called as
+    a function to provide keyword arguments:
+
+    >>> @np.vectorize
+    ... def identity(x):
+    ...     return x
+    ...
+    >>> identity([0, 1, 2])
+    array([0, 1, 2])
+    >>> @np.vectorize(otypes=[float])
+    ... def as_float(x):
+    ...     return x
+    ...
+    >>> as_float([0, 1, 2])
+    array([0., 1., 2.])
+    """
+    def __init__(self, pyfunc=np._NoValue, otypes=None, doc=None,
+                 excluded=None, cache=False, signature=None):
+
+        if (pyfunc != np._NoValue) and (not callable(pyfunc)):
+            # Splitting the error message to keep
+            # the length below 79 characters.
+            part1 = "When used as a decorator, "
+            part2 = "only accepts keyword arguments."
+            raise TypeError(part1 + part2)
+
+        self.pyfunc = pyfunc
+        self.cache = cache
+        self.signature = signature
+        if pyfunc != np._NoValue and hasattr(pyfunc, '__name__'):
+            self.__name__ = pyfunc.__name__
+
+        self._ufunc = {}    # Caching to improve default performance
+        self._doc = None
+        self.__doc__ = doc
+        if doc is None and hasattr(pyfunc, '__doc__'):
+            self.__doc__ = pyfunc.__doc__
+        else:
+            self._doc = doc
+
+        if isinstance(otypes, str):
+            for char in otypes:
+                if char not in typecodes['All']:
+                    raise ValueError(f"Invalid otype specified: {char}")
+        elif iterable(otypes):
+            otypes = [_get_vectorize_dtype(_nx.dtype(x)) for x in otypes]
+        elif otypes is not None:
+            raise ValueError("Invalid otype specification")
+        self.otypes = otypes
+
+        # Excluded variable support
+        if excluded is None:
+            excluded = set()
+        self.excluded = set(excluded)
+
+        if signature is not None:
+            self._in_and_out_core_dims = _parse_gufunc_signature(signature)
+        else:
+            self._in_and_out_core_dims = None
+
+    def _init_stage_2(self, pyfunc, *args, **kwargs):
+        self.__name__ = pyfunc.__name__
+        self.pyfunc = pyfunc
+        if self._doc is None:
+            self.__doc__ = pyfunc.__doc__
+        else:
+            self.__doc__ = self._doc
+
+    def _call_as_normal(self, *args, **kwargs):
+        """
+        Return arrays with the results of `pyfunc` broadcast (vectorized) over
+        `args` and `kwargs` not in `excluded`.
+        """
+        excluded = self.excluded
+        if not kwargs and not excluded:
+            func = self.pyfunc
+            vargs = args
+        else:
+            # The wrapper accepts only positional arguments: we use `names` and
+            # `inds` to mutate `the_args` and `kwargs` to pass to the original
+            # function.
+            nargs = len(args)
+
+            names = [_n for _n in kwargs if _n not in excluded]
+            inds = [_i for _i in range(nargs) if _i not in excluded]
+            the_args = list(args)
+
+            def func(*vargs):
+                for _n, _i in enumerate(inds):
+                    the_args[_i] = vargs[_n]
+                kwargs.update(zip(names, vargs[len(inds):]))
+                return self.pyfunc(*the_args, **kwargs)
+
+            vargs = [args[_i] for _i in inds]
+            vargs.extend([kwargs[_n] for _n in names])
+
+        return self._vectorize_call(func=func, args=vargs)
+
+    def __call__(self, *args, **kwargs):
+        if self.pyfunc is np._NoValue:
+            self._init_stage_2(*args, **kwargs)
+            return self
+
+        return self._call_as_normal(*args, **kwargs)
+
+    def _get_ufunc_and_otypes(self, func, args):
+        """Return (ufunc, otypes)."""
+        # frompyfunc will fail if args is empty
+        if not args:
+            raise ValueError('args can not be empty')
+
+        if self.otypes is not None:
+            otypes = self.otypes
+
+            # self._ufunc is a dictionary whose keys are the number of
+            # arguments (i.e. len(args)) and whose values are ufuncs created
+            # by frompyfunc. len(args) can be different for different calls if
+            # self.pyfunc has parameters with default values.  We only use the
+            # cache when func is self.pyfunc, which occurs when the call uses
+            # only positional arguments and no arguments are excluded.
+
+            nin = len(args)
+            nout = len(self.otypes)
+            if func is not self.pyfunc or nin not in self._ufunc:
+                ufunc = frompyfunc(func, nin, nout)
+            else:
+                ufunc = None  # We'll get it from self._ufunc
+            if func is self.pyfunc:
+                ufunc = self._ufunc.setdefault(nin, ufunc)
+        else:
+            # Get number of outputs and output types by calling the function on
+            # the first entries of args.  We also cache the result to prevent
+            # the subsequent call when the ufunc is evaluated.
+            # Assumes that ufunc first evaluates the 0th elements in the input
+            # arrays (the input values are not checked to ensure this)
+            args = [asarray(a) for a in args]
+            if builtins.any(arg.size == 0 for arg in args):
+                raise ValueError('cannot call `vectorize` on size 0 inputs '
+                                 'unless `otypes` is set')
+
+            inputs = [arg.flat[0] for arg in args]
+            outputs = func(*inputs)
+
+            # Performance note: profiling indicates that -- for simple
+            # functions at least -- this wrapping can almost double the
+            # execution time.
+            # Hence we make it optional.
+            if self.cache:
+                _cache = [outputs]
+
+                def _func(*vargs):
+                    if _cache:
+                        return _cache.pop()
+                    else:
+                        return func(*vargs)
+            else:
+                _func = func
+
+            if isinstance(outputs, tuple):
+                nout = len(outputs)
+            else:
+                nout = 1
+                outputs = (outputs,)
+
+            otypes = ''.join([asarray(outputs[_k]).dtype.char
+                              for _k in range(nout)])
+
+            # Performance note: profiling indicates that creating the ufunc is
+            # not a significant cost compared with wrapping so it seems not
+            # worth trying to cache this.
+            ufunc = frompyfunc(_func, len(args), nout)
+
+        return ufunc, otypes
+
+    def _vectorize_call(self, func, args):
+        """Vectorized call to `func` over positional `args`."""
+        if self.signature is not None:
+            res = self._vectorize_call_with_signature(func, args)
+        elif not args:
+            res = func()
+        else:
+            ufunc, otypes = self._get_ufunc_and_otypes(func=func, args=args)
+            # gh-29196: `dtype=object` should eventually be removed
+            args = [asanyarray(a, dtype=object) for a in args]
+            outputs = ufunc(*args, out=...)
+
+            if ufunc.nout == 1:
+                res = asanyarray(outputs, dtype=otypes[0])
+            else:
+                res = tuple(asanyarray(x, dtype=t)
+                            for x, t in zip(outputs, otypes))
+        return res
+
+    def _vectorize_call_with_signature(self, func, args):
+        """Vectorized call over positional arguments with a signature."""
+        input_core_dims, output_core_dims = self._in_and_out_core_dims
+
+        if len(args) != len(input_core_dims):
+            raise TypeError('wrong number of positional arguments: '
+                            'expected %r, got %r'
+                            % (len(input_core_dims), len(args)))
+        args = tuple(asanyarray(arg) for arg in args)
+
+        broadcast_shape, dim_sizes = _parse_input_dimensions(
+            args, input_core_dims)
+        input_shapes = _calculate_shapes(broadcast_shape, dim_sizes,
+                                         input_core_dims)
+        args = [np.broadcast_to(arg, shape, subok=True)
+                for arg, shape in zip(args, input_shapes)]
+
+        outputs = None
+        otypes = self.otypes
+        nout = len(output_core_dims)
+
+        for index in np.ndindex(*broadcast_shape):
+            results = func(*(arg[index] for arg in args))
+
+            n_results = len(results) if isinstance(results, tuple) else 1
+
+            if nout != n_results:
+                raise ValueError(
+                    'wrong number of outputs from pyfunc: expected %r, got %r'
+                    % (nout, n_results))
+
+            if nout == 1:
+                results = (results,)
+
+            if outputs is None:
+                for result, core_dims in zip(results, output_core_dims):
+                    _update_dim_sizes(dim_sizes, result, core_dims)
+
+                outputs = _create_arrays(broadcast_shape, dim_sizes,
+                                         output_core_dims, otypes, results)
+
+            for output, result in zip(outputs, results):
+                output[index] = result
+
+        if outputs is None:
+            # did not call the function even once
+            if otypes is None:
+                raise ValueError('cannot call `vectorize` on size 0 inputs '
+                                 'unless `otypes` is set')
+            if builtins.any(dim not in dim_sizes
+                            for dims in output_core_dims
+                            for dim in dims):
+                raise ValueError('cannot call `vectorize` with a signature '
+                                 'including new output dimensions on size 0 '
+                                 'inputs')
+            outputs = _create_arrays(broadcast_shape, dim_sizes,
+                                     output_core_dims, otypes)
+
+        return outputs[0] if nout == 1 else outputs
+
+
+def _cov_dispatcher(m, y=None, rowvar=None, bias=None, ddof=None,
+                    fweights=None, aweights=None, *, dtype=None):
+    return (m, y, fweights, aweights)
+
+
+@array_function_dispatch(_cov_dispatcher)
+def cov(m, y=None, rowvar=True, bias=False, ddof=None, fweights=None,
+        aweights=None, *, dtype=None):
+    """
+    Estimate a covariance matrix, given data and weights.
+
+    Covariance indicates the level to which two variables vary together.
+    If we examine N-dimensional samples, :math:`X = [x_1, x_2, ... x_N]^T`,
+    then the covariance matrix element :math:`C_{ij}` is the covariance of
+    :math:`x_i` and :math:`x_j`. The element :math:`C_{ii}` is the variance
+    of :math:`x_i`.
+
+    See the notes for an outline of the algorithm.
+
+    Parameters
+    ----------
+    m : array_like
+        A 1-D or 2-D array containing multiple variables and observations.
+        Each row of `m` represents a variable, and each column a single
+        observation of all those variables. Also see `rowvar` below.
+    y : array_like, optional
+        An additional set of variables and observations. `y` has the same form
+        as that of `m`.
+    rowvar : bool, optional
+        If `rowvar` is True (default), then each row represents a
+        variable, with observations in the columns. Otherwise, the relationship
+        is transposed: each column represents a variable, while the rows
+        contain observations.
+    bias : bool, optional
+        Default normalization (False) is by ``(N - 1)``, where ``N`` is the
+        number of observations given (unbiased estimate). If `bias` is True,
+        then normalization is by ``N``. These values can be overridden by using
+        the keyword ``ddof`` in numpy versions >= 1.5.
+    ddof : int, optional
+        If not ``None`` the default value implied by `bias` is overridden.
+        Note that ``ddof=1`` will return the unbiased estimate, even if both
+        `fweights` and `aweights` are specified, and ``ddof=0`` will return
+        the simple average. See the notes for the details. The default value
+        is ``None``.
+    fweights : array_like, int, optional
+        1-D array of integer frequency weights; the number of times each
+        observation vector should be repeated.
+    aweights : array_like, optional
+        1-D array of observation vector weights. These relative weights are
+        typically large for observations considered "important" and smaller for
+        observations considered less "important". If ``ddof=0`` the array of
+        weights can be used to assign probabilities to observation vectors.
+    dtype : data-type, optional
+        Data-type of the result. By default, the return data-type will have
+        at least `numpy.float64` precision.
+
+        .. versionadded:: 1.20
+
+    Returns
+    -------
+    out : ndarray
+        The covariance matrix of the variables.
+
+    See Also
+    --------
+    corrcoef : Normalized covariance matrix
+
+    Notes
+    -----
+    Assume that the observations are in the columns of the observation
+    array `m` and let ``f = fweights`` and ``a = aweights`` for brevity. The
+    steps to compute the weighted covariance are as follows::
+
+        >>> m = np.arange(10, dtype=np.float64)
+        >>> f = np.arange(10) * 2
+        >>> a = np.arange(10) ** 2.
+        >>> ddof = 1
+        >>> w = f * a
+        >>> v1 = np.sum(w)
+        >>> v2 = np.sum(w * a)
+        >>> m -= np.sum(m * w, axis=None, keepdims=True) / v1
+        >>> cov = np.dot(m * w, m.T) * v1 / (v1**2 - ddof * v2)
+
+    Note that when ``a == 1``, the normalization factor
+    ``v1 / (v1**2 - ddof * v2)`` goes over to ``1 / (np.sum(f) - ddof)``
+    as it should.
+
+    Examples
+    --------
+    >>> import numpy as np
+
+    Consider two variables, :math:`x_0` and :math:`x_1`, which
+    correlate perfectly, but in opposite directions:
+
+    >>> x = np.array([[0, 2], [1, 1], [2, 0]]).T
+    >>> x
+    array([[0, 1, 2],
+           [2, 1, 0]])
+
+    Note how :math:`x_0` increases while :math:`x_1` decreases. The covariance
+    matrix shows this clearly:
+
+    >>> np.cov(x)
+    array([[ 1., -1.],
+           [-1.,  1.]])
+
+    Note that element :math:`C_{0,1}`, which shows the correlation between
+    :math:`x_0` and :math:`x_1`, is negative.
+
+    Further, note how `x` and `y` are combined:
+
+    >>> x = [-2.1, -1,  4.3]
+    >>> y = [3,  1.1,  0.12]
+    >>> X = np.stack((x, y), axis=0)
+    >>> np.cov(X)
+    array([[11.71      , -4.286     ], # may vary
+           [-4.286     ,  2.144133]])
+    >>> np.cov(x, y)
+    array([[11.71      , -4.286     ], # may vary
+           [-4.286     ,  2.144133]])
+    >>> np.cov(x)
+    array(11.71)
+
+    """
+    # Check inputs
+    if ddof is not None and ddof != int(ddof):
+        raise ValueError(
+            "ddof must be integer")
+
+    # Handles complex arrays too
+    m = np.asarray(m)
+    if m.ndim > 2:
+        raise ValueError("m has more than 2 dimensions")
+
+    if y is not None:
+        y = np.asarray(y)
+        if y.ndim > 2:
+            raise ValueError("y has more than 2 dimensions")
+
+    if dtype is None:
+        if y is None:
+            dtype = np.result_type(m, np.float64)
+        else:
+            dtype = np.result_type(m, y, np.float64)
+
+    X = array(m, ndmin=2, dtype=dtype)
+    if not rowvar and m.ndim != 1:
+        X = X.T
+    if X.shape[0] == 0:
+        return np.array([]).reshape(0, 0)
+    if y is not None:
+        y = array(y, copy=None, ndmin=2, dtype=dtype)
+        if not rowvar and y.shape[0] != 1:
+            y = y.T
+        X = np.concatenate((X, y), axis=0)
+
+    if ddof is None:
+        if bias == 0:
+            ddof = 1
+        else:
+            ddof = 0
+
+    # Get the product of frequencies and weights
+    w = None
+    if fweights is not None:
+        fweights = np.asarray(fweights, dtype=float)
+        if not np.all(fweights == np.around(fweights)):
+            raise TypeError(
+                "fweights must be integer")
+        if fweights.ndim > 1:
+            raise RuntimeError(
+                "cannot handle multidimensional fweights")
+        if fweights.shape[0] != X.shape[1]:
+            raise RuntimeError(
+                "incompatible numbers of samples and fweights")
+        if any(fweights < 0):
+            raise ValueError(
+                "fweights cannot be negative")
+        w = fweights
+    if aweights is not None:
+        aweights = np.asarray(aweights, dtype=float)
+        if aweights.ndim > 1:
+            raise RuntimeError(
+                "cannot handle multidimensional aweights")
+        if aweights.shape[0] != X.shape[1]:
+            raise RuntimeError(
+                "incompatible numbers of samples and aweights")
+        if any(aweights < 0):
+            raise ValueError(
+                "aweights cannot be negative")
+        if w is None:
+            w = aweights
+        else:
+            w *= aweights
+
+    avg, w_sum = average(X, axis=1, weights=w, returned=True)
+    w_sum = w_sum[0]
+
+    # Determine the normalization
+    if w is None:
+        fact = X.shape[1] - ddof
+    elif ddof == 0:
+        fact = w_sum
+    elif aweights is None:
+        fact = w_sum - ddof
+    else:
+        fact = w_sum - ddof * sum(w * aweights) / w_sum
+
+    if fact <= 0:
+        warnings.warn("Degrees of freedom <= 0 for slice",
+                      RuntimeWarning, stacklevel=2)
+        fact = 0.0
+
+    X -= avg[:, None]
+    if w is None:
+        X_T = X.T
+    else:
+        X_T = (X * w).T
+    c = dot(X, X_T.conj())
+    c *= np.true_divide(1, fact)
+    return c.squeeze()
+
+
+def _corrcoef_dispatcher(x, y=None, rowvar=None, bias=None, ddof=None, *,
+                         dtype=None):
+    return (x, y)
+
+
+@array_function_dispatch(_corrcoef_dispatcher)
+def corrcoef(x, y=None, rowvar=True, bias=np._NoValue, ddof=np._NoValue, *,
+             dtype=None):
+    """
+    Return Pearson product-moment correlation coefficients.
+
+    Please refer to the documentation for `cov` for more detail.  The
+    relationship between the correlation coefficient matrix, `R`, and the
+    covariance matrix, `C`, is
+
+    .. math:: R_{ij} = \\frac{ C_{ij} } { \\sqrt{ C_{ii} C_{jj} } }
+
+    The values of `R` are between -1 and 1, inclusive.
+
+    Parameters
+    ----------
+    x : array_like
+        A 1-D or 2-D array containing multiple variables and observations.
+        Each row of `x` represents a variable, and each column a single
+        observation of all those variables. Also see `rowvar` below.
+    y : array_like, optional
+        An additional set of variables and observations. `y` has the same
+        shape as `x`.
+    rowvar : bool, optional
+        If `rowvar` is True (default), then each row represents a
+        variable, with observations in the columns. Otherwise, the relationship
+        is transposed: each column represents a variable, while the rows
+        contain observations.
+    bias : _NoValue, optional
+        Has no effect, do not use.
+
+        .. deprecated:: 1.10.0
+    ddof : _NoValue, optional
+        Has no effect, do not use.
+
+        .. deprecated:: 1.10.0
+    dtype : data-type, optional
+        Data-type of the result. By default, the return data-type will have
+        at least `numpy.float64` precision.
+
+        .. versionadded:: 1.20
+
+    Returns
+    -------
+    R : ndarray
+        The correlation coefficient matrix of the variables.
+
+    See Also
+    --------
+    cov : Covariance matrix
+
+    Notes
+    -----
+    Due to floating point rounding the resulting array may not be Hermitian,
+    the diagonal elements may not be 1, and the elements may not satisfy the
+    inequality abs(a) <= 1. The real and imaginary parts are clipped to the
+    interval [-1,  1] in an attempt to improve on that situation but is not
+    much help in the complex case.
+
+    This function accepts but discards arguments `bias` and `ddof`.  This is
+    for backwards compatibility with previous versions of this function.  These
+    arguments had no effect on the return values of the function and can be
+    safely ignored in this and previous versions of numpy.
+
+    Examples
+    --------
+    >>> import numpy as np
+
+    In this example we generate two random arrays, ``xarr`` and ``yarr``, and
+    compute the row-wise and column-wise Pearson correlation coefficients,
+    ``R``. Since ``rowvar`` is  true by  default, we first find the row-wise
+    Pearson correlation coefficients between the variables of ``xarr``.
+
+    >>> import numpy as np
+    >>> rng = np.random.default_rng(seed=42)
+    >>> xarr = rng.random((3, 3))
+    >>> xarr
+    array([[0.77395605, 0.43887844, 0.85859792],
+           [0.69736803, 0.09417735, 0.97562235],
+           [0.7611397 , 0.78606431, 0.12811363]])
+    >>> R1 = np.corrcoef(xarr)
+    >>> R1
+    array([[ 1.        ,  0.99256089, -0.68080986],
+           [ 0.99256089,  1.        , -0.76492172],
+           [-0.68080986, -0.76492172,  1.        ]])
+
+    If we add another set of variables and observations ``yarr``, we can
+    compute the row-wise Pearson correlation coefficients between the
+    variables in ``xarr`` and ``yarr``.
+
+    >>> yarr = rng.random((3, 3))
+    >>> yarr
+    array([[0.45038594, 0.37079802, 0.92676499],
+           [0.64386512, 0.82276161, 0.4434142 ],
+           [0.22723872, 0.55458479, 0.06381726]])
+    >>> R2 = np.corrcoef(xarr, yarr)
+    >>> R2
+    array([[ 1.        ,  0.99256089, -0.68080986,  0.75008178, -0.934284  ,
+            -0.99004057],
+           [ 0.99256089,  1.        , -0.76492172,  0.82502011, -0.97074098,
+            -0.99981569],
+           [-0.68080986, -0.76492172,  1.        , -0.99507202,  0.89721355,
+             0.77714685],
+           [ 0.75008178,  0.82502011, -0.99507202,  1.        , -0.93657855,
+            -0.83571711],
+           [-0.934284  , -0.97074098,  0.89721355, -0.93657855,  1.        ,
+             0.97517215],
+           [-0.99004057, -0.99981569,  0.77714685, -0.83571711,  0.97517215,
+             1.        ]])
+
+    Finally if we use the option ``rowvar=False``, the columns are now
+    being treated as the variables and we will find the column-wise Pearson
+    correlation coefficients between variables in ``xarr`` and ``yarr``.
+
+    >>> R3 = np.corrcoef(xarr, yarr, rowvar=False)
+    >>> R3
+    array([[ 1.        ,  0.77598074, -0.47458546, -0.75078643, -0.9665554 ,
+             0.22423734],
+           [ 0.77598074,  1.        , -0.92346708, -0.99923895, -0.58826587,
+            -0.44069024],
+           [-0.47458546, -0.92346708,  1.        ,  0.93773029,  0.23297648,
+             0.75137473],
+           [-0.75078643, -0.99923895,  0.93773029,  1.        ,  0.55627469,
+             0.47536961],
+           [-0.9665554 , -0.58826587,  0.23297648,  0.55627469,  1.        ,
+            -0.46666491],
+           [ 0.22423734, -0.44069024,  0.75137473,  0.47536961, -0.46666491,
+             1.        ]])
+
+    """
+    if bias is not np._NoValue or ddof is not np._NoValue:
+        # 2015-03-15, 1.10
+        warnings.warn('bias and ddof have no effect and are deprecated',
+                      DeprecationWarning, stacklevel=2)
+    c = cov(x, y, rowvar, dtype=dtype)
+    try:
+        d = diag(c)
+    except ValueError:
+        # scalar covariance
+        # nan if incorrect value (nan, inf, 0), 1 otherwise
+        return c / c
+    stddev = sqrt(d.real)
+    c /= stddev[:, None]
+    c /= stddev[None, :]
+
+    # Clip real and imaginary parts to [-1, 1].  This does not guarantee
+    # abs(a[i,j]) <= 1 for complex arrays, but is the best we can do without
+    # excessive work.
+    np.clip(c.real, -1, 1, out=c.real)
+    if np.iscomplexobj(c):
+        np.clip(c.imag, -1, 1, out=c.imag)
+
+    return c
+
+
+@set_module('numpy')
+def blackman(M):
+    """
+    Return the Blackman window.
+
+    The Blackman window is a taper formed by using the first three
+    terms of a summation of cosines. It was designed to have close to the
+    minimal leakage possible.  It is close to optimal, only slightly worse
+    than a Kaiser window.
+
+    Parameters
+    ----------
+    M : int
+        Number of points in the output window. If zero or less, an empty
+        array is returned.
+
+    Returns
+    -------
+    out : ndarray
+        The window, with the maximum value normalized to one (the value one
+        appears only if the number of samples is odd).
+
+    See Also
+    --------
+    bartlett, hamming, hanning, kaiser
+
+    Notes
+    -----
+    The Blackman window is defined as
+
+    .. math::  w(n) = 0.42 - 0.5 \\cos(2\\pi n/M) + 0.08 \\cos(4\\pi n/M)
+
+    Most references to the Blackman window come from the signal processing
+    literature, where it is used as one of many windowing functions for
+    smoothing values.  It is also known as an apodization (which means
+    "removing the foot", i.e. smoothing discontinuities at the beginning
+    and end of the sampled signal) or tapering function. It is known as a
+    "near optimal" tapering function, almost as good (by some measures)
+    as the kaiser window.
+
+    References
+    ----------
+    Blackman, R.B. and Tukey, J.W., (1958) The measurement of power spectra,
+    Dover Publications, New York.
+
+    Oppenheim, A.V., and R.W. Schafer. Discrete-Time Signal Processing.
+    Upper Saddle River, NJ: Prentice-Hall, 1999, pp. 468-471.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import matplotlib.pyplot as plt
+    >>> np.blackman(12)
+    array([-1.38777878e-17,   3.26064346e-02,   1.59903635e-01, # may vary
+            4.14397981e-01,   7.36045180e-01,   9.67046769e-01,
+            9.67046769e-01,   7.36045180e-01,   4.14397981e-01,
+            1.59903635e-01,   3.26064346e-02,  -1.38777878e-17])
+
+    Plot the window and the frequency response.
+
+    .. plot::
+        :include-source:
+
+        import matplotlib.pyplot as plt
+        from numpy.fft import fft, fftshift
+        window = np.blackman(51)
+        plt.plot(window)
+        plt.title("Blackman window")
+        plt.ylabel("Amplitude")
+        plt.xlabel("Sample")
+        plt.show()  # doctest: +SKIP
+
+        plt.figure()
+        A = fft(window, 2048) / 25.5
+        mag = np.abs(fftshift(A))
+        freq = np.linspace(-0.5, 0.5, len(A))
+        with np.errstate(divide='ignore', invalid='ignore'):
+            response = 20 * np.log10(mag)
+        response = np.clip(response, -100, 100)
+        plt.plot(freq, response)
+        plt.title("Frequency response of Blackman window")
+        plt.ylabel("Magnitude [dB]")
+        plt.xlabel("Normalized frequency [cycles per sample]")
+        plt.axis('tight')
+        plt.show()
+
+    """
+    # Ensures at least float64 via 0.0.  M should be an integer, but conversion
+    # to double is safe for a range.
+    values = np.array([0.0, M])
+    M = values[1]
+
+    if M < 1:
+        return array([], dtype=values.dtype)
+    if M == 1:
+        return ones(1, dtype=values.dtype)
+    n = arange(1 - M, M, 2)
+    return 0.42 + 0.5 * cos(pi * n / (M - 1)) + 0.08 * cos(2.0 * pi * n / (M - 1))
+
+
+@set_module('numpy')
+def bartlett(M):
+    """
+    Return the Bartlett window.
+
+    The Bartlett window is very similar to a triangular window, except
+    that the end points are at zero.  It is often used in signal
+    processing for tapering a signal, without generating too much
+    ripple in the frequency domain.
+
+    Parameters
+    ----------
+    M : int
+        Number of points in the output window. If zero or less, an
+        empty array is returned.
+
+    Returns
+    -------
+    out : array
+        The triangular window, with the maximum value normalized to one
+        (the value one appears only if the number of samples is odd), with
+        the first and last samples equal to zero.
+
+    See Also
+    --------
+    blackman, hamming, hanning, kaiser
+
+    Notes
+    -----
+    The Bartlett window is defined as
+
+    .. math:: w(n) = \\frac{2}{M-1} \\left(
+              \\frac{M-1}{2} - \\left|n - \\frac{M-1}{2}\\right|
+              \\right)
+
+    Most references to the Bartlett window come from the signal processing
+    literature, where it is used as one of many windowing functions for
+    smoothing values.  Note that convolution with this window produces linear
+    interpolation.  It is also known as an apodization (which means "removing
+    the foot", i.e. smoothing discontinuities at the beginning and end of the
+    sampled signal) or tapering function. The Fourier transform of the
+    Bartlett window is the product of two sinc functions. Note the excellent
+    discussion in Kanasewich [2]_.
+
+    References
+    ----------
+    .. [1] M.S. Bartlett, "Periodogram Analysis and Continuous Spectra",
+           Biometrika 37, 1-16, 1950.
+    .. [2] E.R. Kanasewich, "Time Sequence Analysis in Geophysics",
+           The University of Alberta Press, 1975, pp. 109-110.
+    .. [3] A.V. Oppenheim and R.W. Schafer, "Discrete-Time Signal
+           Processing", Prentice-Hall, 1999, pp. 468-471.
+    .. [4] Wikipedia, "Window function",
+           https://en.wikipedia.org/wiki/Window_function
+    .. [5] W.H. Press,  B.P. Flannery, S.A. Teukolsky, and W.T. Vetterling,
+           "Numerical Recipes", Cambridge University Press, 1986, page 429.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import matplotlib.pyplot as plt
+    >>> np.bartlett(12)
+    array([ 0.        ,  0.18181818,  0.36363636,  0.54545455,  0.72727273, # may vary
+            0.90909091,  0.90909091,  0.72727273,  0.54545455,  0.36363636,
+            0.18181818,  0.        ])
+
+    Plot the window and its frequency response (requires SciPy and matplotlib).
+
+    .. plot::
+        :include-source:
+
+        import matplotlib.pyplot as plt
+        from numpy.fft import fft, fftshift
+        window = np.bartlett(51)
+        plt.plot(window)
+        plt.title("Bartlett window")
+        plt.ylabel("Amplitude")
+        plt.xlabel("Sample")
+        plt.show()
+        plt.figure()
+        A = fft(window, 2048) / 25.5
+        mag = np.abs(fftshift(A))
+        freq = np.linspace(-0.5, 0.5, len(A))
+        with np.errstate(divide='ignore', invalid='ignore'):
+            response = 20 * np.log10(mag)
+        response = np.clip(response, -100, 100)
+        plt.plot(freq, response)
+        plt.title("Frequency response of Bartlett window")
+        plt.ylabel("Magnitude [dB]")
+        plt.xlabel("Normalized frequency [cycles per sample]")
+        plt.axis('tight')
+        plt.show()
+
+    """
+    # Ensures at least float64 via 0.0.  M should be an integer, but conversion
+    # to double is safe for a range.
+    values = np.array([0.0, M])
+    M = values[1]
+
+    if M < 1:
+        return array([], dtype=values.dtype)
+    if M == 1:
+        return ones(1, dtype=values.dtype)
+    n = arange(1 - M, M, 2)
+    return where(less_equal(n, 0), 1 + n / (M - 1), 1 - n / (M - 1))
+
+
+@set_module('numpy')
+def hanning(M):
+    """
+    Return the Hanning window.
+
+    The Hanning window is a taper formed by using a weighted cosine.
+
+    Parameters
+    ----------
+    M : int
+        Number of points in the output window. If zero or less, an
+        empty array is returned.
+
+    Returns
+    -------
+    out : ndarray, shape(M,)
+        The window, with the maximum value normalized to one (the value
+        one appears only if `M` is odd).
+
+    See Also
+    --------
+    bartlett, blackman, hamming, kaiser
+
+    Notes
+    -----
+    The Hanning window is defined as
+
+    .. math::  w(n) = 0.5 - 0.5\\cos\\left(\\frac{2\\pi{n}}{M-1}\\right)
+               \\qquad 0 \\leq n \\leq M-1
+
+    The Hanning was named for Julius von Hann, an Austrian meteorologist.
+    It is also known as the Cosine Bell. Some authors prefer that it be
+    called a Hann window, to help avoid confusion with the very similar
+    Hamming window.
+
+    Most references to the Hanning window come from the signal processing
+    literature, where it is used as one of many windowing functions for
+    smoothing values.  It is also known as an apodization (which means
+    "removing the foot", i.e. smoothing discontinuities at the beginning
+    and end of the sampled signal) or tapering function.
+
+    References
+    ----------
+    .. [1] Blackman, R.B. and Tukey, J.W., (1958) The measurement of power
+           spectra, Dover Publications, New York.
+    .. [2] E.R. Kanasewich, "Time Sequence Analysis in Geophysics",
+           The University of Alberta Press, 1975, pp. 106-108.
+    .. [3] Wikipedia, "Window function",
+           https://en.wikipedia.org/wiki/Window_function
+    .. [4] W.H. Press,  B.P. Flannery, S.A. Teukolsky, and W.T. Vetterling,
+           "Numerical Recipes", Cambridge University Press, 1986, page 425.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> np.hanning(12)
+    array([0.        , 0.07937323, 0.29229249, 0.57115742, 0.82743037,
+           0.97974649, 0.97974649, 0.82743037, 0.57115742, 0.29229249,
+           0.07937323, 0.        ])
+
+    Plot the window and its frequency response.
+
+    .. plot::
+        :include-source:
+
+        import matplotlib.pyplot as plt
+        from numpy.fft import fft, fftshift
+        window = np.hanning(51)
+        plt.plot(window)
+        plt.title("Hann window")
+        plt.ylabel("Amplitude")
+        plt.xlabel("Sample")
+        plt.show()
+
+        plt.figure()
+        A = fft(window, 2048) / 25.5
+        mag = np.abs(fftshift(A))
+        freq = np.linspace(-0.5, 0.5, len(A))
+        with np.errstate(divide='ignore', invalid='ignore'):
+            response = 20 * np.log10(mag)
+        response = np.clip(response, -100, 100)
+        plt.plot(freq, response)
+        plt.title("Frequency response of the Hann window")
+        plt.ylabel("Magnitude [dB]")
+        plt.xlabel("Normalized frequency [cycles per sample]")
+        plt.axis('tight')
+        plt.show()
+
+    """
+    # Ensures at least float64 via 0.0.  M should be an integer, but conversion
+    # to double is safe for a range.
+    values = np.array([0.0, M])
+    M = values[1]
+
+    if M < 1:
+        return array([], dtype=values.dtype)
+    if M == 1:
+        return ones(1, dtype=values.dtype)
+    n = arange(1 - M, M, 2)
+    return 0.5 + 0.5 * cos(pi * n / (M - 1))
+
+
+@set_module('numpy')
+def hamming(M):
+    """
+    Return the Hamming window.
+
+    The Hamming window is a taper formed by using a weighted cosine.
+
+    Parameters
+    ----------
+    M : int
+        Number of points in the output window. If zero or less, an
+        empty array is returned.
+
+    Returns
+    -------
+    out : ndarray
+        The window, with the maximum value normalized to one (the value
+        one appears only if the number of samples is odd).
+
+    See Also
+    --------
+    bartlett, blackman, hanning, kaiser
+
+    Notes
+    -----
+    The Hamming window is defined as
+
+    .. math::  w(n) = 0.54 - 0.46\\cos\\left(\\frac{2\\pi{n}}{M-1}\\right)
+               \\qquad 0 \\leq n \\leq M-1
+
+    The Hamming was named for R. W. Hamming, an associate of J. W. Tukey
+    and is described in Blackman and Tukey. It was recommended for
+    smoothing the truncated autocovariance function in the time domain.
+    Most references to the Hamming window come from the signal processing
+    literature, where it is used as one of many windowing functions for
+    smoothing values.  It is also known as an apodization (which means
+    "removing the foot", i.e. smoothing discontinuities at the beginning
+    and end of the sampled signal) or tapering function.
+
+    References
+    ----------
+    .. [1] Blackman, R.B. and Tukey, J.W., (1958) The measurement of power
+           spectra, Dover Publications, New York.
+    .. [2] E.R. Kanasewich, "Time Sequence Analysis in Geophysics", The
+           University of Alberta Press, 1975, pp. 109-110.
+    .. [3] Wikipedia, "Window function",
+           https://en.wikipedia.org/wiki/Window_function
+    .. [4] W.H. Press,  B.P. Flannery, S.A. Teukolsky, and W.T. Vetterling,
+           "Numerical Recipes", Cambridge University Press, 1986, page 425.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> np.hamming(12)
+    array([ 0.08      ,  0.15302337,  0.34890909,  0.60546483,  0.84123594, # may vary
+            0.98136677,  0.98136677,  0.84123594,  0.60546483,  0.34890909,
+            0.15302337,  0.08      ])
+
+    Plot the window and the frequency response.
+
+    .. plot::
+        :include-source:
+
+        import matplotlib.pyplot as plt
+        from numpy.fft import fft, fftshift
+        window = np.hamming(51)
+        plt.plot(window)
+        plt.title("Hamming window")
+        plt.ylabel("Amplitude")
+        plt.xlabel("Sample")
+        plt.show()
+
+        plt.figure()
+        A = fft(window, 2048) / 25.5
+        mag = np.abs(fftshift(A))
+        freq = np.linspace(-0.5, 0.5, len(A))
+        response = 20 * np.log10(mag)
+        response = np.clip(response, -100, 100)
+        plt.plot(freq, response)
+        plt.title("Frequency response of Hamming window")
+        plt.ylabel("Magnitude [dB]")
+        plt.xlabel("Normalized frequency [cycles per sample]")
+        plt.axis('tight')
+        plt.show()
+
+    """
+    # Ensures at least float64 via 0.0.  M should be an integer, but conversion
+    # to double is safe for a range.
+    values = np.array([0.0, M])
+    M = values[1]
+
+    if M < 1:
+        return array([], dtype=values.dtype)
+    if M == 1:
+        return ones(1, dtype=values.dtype)
+    n = arange(1 - M, M, 2)
+    return 0.54 + 0.46 * cos(pi * n / (M - 1))
+
+
+## Code from cephes for i0
+
+_i0A = [
+    -4.41534164647933937950E-18,
+    3.33079451882223809783E-17,
+    -2.43127984654795469359E-16,
+    1.71539128555513303061E-15,
+    -1.16853328779934516808E-14,
+    7.67618549860493561688E-14,
+    -4.85644678311192946090E-13,
+    2.95505266312963983461E-12,
+    -1.72682629144155570723E-11,
+    9.67580903537323691224E-11,
+    -5.18979560163526290666E-10,
+    2.65982372468238665035E-9,
+    -1.30002500998624804212E-8,
+    6.04699502254191894932E-8,
+    -2.67079385394061173391E-7,
+    1.11738753912010371815E-6,
+    -4.41673835845875056359E-6,
+    1.64484480707288970893E-5,
+    -5.75419501008210370398E-5,
+    1.88502885095841655729E-4,
+    -5.76375574538582365885E-4,
+    1.63947561694133579842E-3,
+    -4.32430999505057594430E-3,
+    1.05464603945949983183E-2,
+    -2.37374148058994688156E-2,
+    4.93052842396707084878E-2,
+    -9.49010970480476444210E-2,
+    1.71620901522208775349E-1,
+    -3.04682672343198398683E-1,
+    6.76795274409476084995E-1
+    ]
+
+_i0B = [
+    -7.23318048787475395456E-18,
+    -4.83050448594418207126E-18,
+    4.46562142029675999901E-17,
+    3.46122286769746109310E-17,
+    -2.82762398051658348494E-16,
+    -3.42548561967721913462E-16,
+    1.77256013305652638360E-15,
+    3.81168066935262242075E-15,
+    -9.55484669882830764870E-15,
+    -4.15056934728722208663E-14,
+    1.54008621752140982691E-14,
+    3.85277838274214270114E-13,
+    7.18012445138366623367E-13,
+    -1.79417853150680611778E-12,
+    -1.32158118404477131188E-11,
+    -3.14991652796324136454E-11,
+    1.18891471078464383424E-11,
+    4.94060238822496958910E-10,
+    3.39623202570838634515E-9,
+    2.26666899049817806459E-8,
+    2.04891858946906374183E-7,
+    2.89137052083475648297E-6,
+    6.88975834691682398426E-5,
+    3.36911647825569408990E-3,
+    8.04490411014108831608E-1
+    ]
+
+
+def _chbevl(x, vals):
+    b0 = vals[0]
+    b1 = 0.0
+
+    for i in range(1, len(vals)):
+        b2 = b1
+        b1 = b0
+        b0 = x * b1 - b2 + vals[i]
+
+    return 0.5 * (b0 - b2)
+
+
+def _i0_1(x):
+    return exp(x) * _chbevl(x / 2.0 - 2, _i0A)
+
+
+def _i0_2(x):
+    return exp(x) * _chbevl(32.0 / x - 2.0, _i0B) / sqrt(x)
+
+
+def _i0_dispatcher(x):
+    return (x,)
+
+
+@array_function_dispatch(_i0_dispatcher)
+def i0(x):
+    """
+    Modified Bessel function of the first kind, order 0.
+
+    Usually denoted :math:`I_0`.
+
+    Parameters
+    ----------
+    x : array_like of float
+        Argument of the Bessel function.
+
+    Returns
+    -------
+    out : ndarray, shape = x.shape, dtype = float
+        The modified Bessel function evaluated at each of the elements of `x`.
+
+    See Also
+    --------
+    scipy.special.i0, scipy.special.iv, scipy.special.ive
+
+    Notes
+    -----
+    The scipy implementation is recommended over this function: it is a
+    proper ufunc written in C, and more than an order of magnitude faster.
+
+    We use the algorithm published by Clenshaw [1]_ and referenced by
+    Abramowitz and Stegun [2]_, for which the function domain is
+    partitioned into the two intervals [0,8] and (8,inf), and Chebyshev
+    polynomial expansions are employed in each interval. Relative error on
+    the domain [0,30] using IEEE arithmetic is documented [3]_ as having a
+    peak of 5.8e-16 with an rms of 1.4e-16 (n = 30000).
+
+    References
+    ----------
+    .. [1] C. W. Clenshaw, "Chebyshev series for mathematical functions", in
+           *National Physical Laboratory Mathematical Tables*, vol. 5, London:
+           Her Majesty's Stationery Office, 1962.
+    .. [2] M. Abramowitz and I. A. Stegun, *Handbook of Mathematical
+           Functions*, 10th printing, New York: Dover, 1964, pp. 379.
+           https://personal.math.ubc.ca/~cbm/aands/page_379.htm
+    .. [3] https://metacpan.org/pod/distribution/Math-Cephes/lib/Math/Cephes.pod#i0:-Modified-Bessel-function-of-order-zero
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> np.i0(0.)
+    array(1.0)
+    >>> np.i0([0, 1, 2, 3])
+    array([1.        , 1.26606588, 2.2795853 , 4.88079259])
+
+    """
+    x = np.asanyarray(x)
+    if x.dtype.kind == 'c':
+        raise TypeError("i0 not supported for complex values")
+    if x.dtype.kind != 'f':
+        x = x.astype(float)
+    x = np.abs(x)
+    return piecewise(x, [x <= 8.0], [_i0_1, _i0_2])
+
+## End of cephes code for i0
+
+
+@set_module('numpy')
+def kaiser(M, beta):
+    """
+    Return the Kaiser window.
+
+    The Kaiser window is a taper formed by using a Bessel function.
+
+    Parameters
+    ----------
+    M : int
+        Number of points in the output window. If zero or less, an
+        empty array is returned.
+    beta : float
+        Shape parameter for window.
+
+    Returns
+    -------
+    out : array
+        The window, with the maximum value normalized to one (the value
+        one appears only if the number of samples is odd).
+
+    See Also
+    --------
+    bartlett, blackman, hamming, hanning
+
+    Notes
+    -----
+    The Kaiser window is defined as
+
+    .. math::  w(n) = I_0\\left( \\beta \\sqrt{1-\\frac{4n^2}{(M-1)^2}}
+               \\right)/I_0(\\beta)
+
+    with
+
+    .. math:: \\quad -\\frac{M-1}{2} \\leq n \\leq \\frac{M-1}{2},
+
+    where :math:`I_0` is the modified zeroth-order Bessel function.
+
+    The Kaiser was named for Jim Kaiser, who discovered a simple
+    approximation to the DPSS window based on Bessel functions.  The Kaiser
+    window is a very good approximation to the Digital Prolate Spheroidal
+    Sequence, or Slepian window, which is the transform which maximizes the
+    energy in the main lobe of the window relative to total energy.
+
+    The Kaiser can approximate many other windows by varying the beta
+    parameter.
+
+    ====  =======================
+    beta  Window shape
+    ====  =======================
+    0     Rectangular
+    5     Similar to a Hamming
+    6     Similar to a Hanning
+    8.6   Similar to a Blackman
+    ====  =======================
+
+    A beta value of 14 is probably a good starting point. Note that as beta
+    gets large, the window narrows, and so the number of samples needs to be
+    large enough to sample the increasingly narrow spike, otherwise NaNs will
+    get returned.
+
+    Most references to the Kaiser window come from the signal processing
+    literature, where it is used as one of many windowing functions for
+    smoothing values.  It is also known as an apodization (which means
+    "removing the foot", i.e. smoothing discontinuities at the beginning
+    and end of the sampled signal) or tapering function.
+
+    References
+    ----------
+    .. [1] J. F. Kaiser, "Digital Filters" - Ch 7 in "Systems analysis by
+           digital computer", Editors: F.F. Kuo and J.F. Kaiser, p 218-285.
+           John Wiley and Sons, New York, (1966).
+    .. [2] E.R. Kanasewich, "Time Sequence Analysis in Geophysics", The
+           University of Alberta Press, 1975, pp. 177-178.
+    .. [3] Wikipedia, "Window function",
+           https://en.wikipedia.org/wiki/Window_function
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import matplotlib.pyplot as plt
+    >>> np.kaiser(12, 14)
+     array([7.72686684e-06, 3.46009194e-03, 4.65200189e-02, # may vary
+            2.29737120e-01, 5.99885316e-01, 9.45674898e-01,
+            9.45674898e-01, 5.99885316e-01, 2.29737120e-01,
+            4.65200189e-02, 3.46009194e-03, 7.72686684e-06])
+
+
+    Plot the window and the frequency response.
+
+    .. plot::
+        :include-source:
+
+        import matplotlib.pyplot as plt
+        from numpy.fft import fft, fftshift
+        window = np.kaiser(51, 14)
+        plt.plot(window)
+        plt.title("Kaiser window")
+        plt.ylabel("Amplitude")
+        plt.xlabel("Sample")
+        plt.show()
+
+        plt.figure()
+        A = fft(window, 2048) / 25.5
+        mag = np.abs(fftshift(A))
+        freq = np.linspace(-0.5, 0.5, len(A))
+        response = 20 * np.log10(mag)
+        response = np.clip(response, -100, 100)
+        plt.plot(freq, response)
+        plt.title("Frequency response of Kaiser window")
+        plt.ylabel("Magnitude [dB]")
+        plt.xlabel("Normalized frequency [cycles per sample]")
+        plt.axis('tight')
+        plt.show()
+
+    """
+    # Ensures at least float64 via 0.0.  M should be an integer, but conversion
+    # to double is safe for a range.  (Simplified result_type with 0.0
+    # strongly typed.  result-type is not/less order sensitive, but that mainly
+    # matters for integers anyway.)
+    values = np.array([0.0, M, beta])
+    M = values[1]
+    beta = values[2]
+
+    if M == 1:
+        return np.ones(1, dtype=values.dtype)
+    n = arange(0, M)
+    alpha = (M - 1) / 2.0
+    return i0(beta * sqrt(1 - ((n - alpha) / alpha)**2.0)) / i0(beta)
+
+
+def _sinc_dispatcher(x):
+    return (x,)
+
+
+@array_function_dispatch(_sinc_dispatcher)
+def sinc(x):
+    r"""
+    Return the normalized sinc function.
+
+    The sinc function is equal to :math:`\sin(\pi x)/(\pi x)` for any argument
+    :math:`x\ne 0`. ``sinc(0)`` takes the limit value 1, making ``sinc`` not
+    only everywhere continuous but also infinitely differentiable.
+
+    .. note::
+
+        Note the normalization factor of ``pi`` used in the definition.
+        This is the most commonly used definition in signal processing.
+        Use ``sinc(x / np.pi)`` to obtain the unnormalized sinc function
+        :math:`\sin(x)/x` that is more common in mathematics.
+
+    Parameters
+    ----------
+    x : ndarray
+        Array (possibly multi-dimensional) of values for which to calculate
+        ``sinc(x)``.
+
+    Returns
+    -------
+    out : ndarray
+        ``sinc(x)``, which has the same shape as the input.
+
+    Notes
+    -----
+    The name sinc is short for "sine cardinal" or "sinus cardinalis".
+
+    The sinc function is used in various signal processing applications,
+    including in anti-aliasing, in the construction of a Lanczos resampling
+    filter, and in interpolation.
+
+    For bandlimited interpolation of discrete-time signals, the ideal
+    interpolation kernel is proportional to the sinc function.
+
+    References
+    ----------
+    .. [1] Weisstein, Eric W. "Sinc Function." From MathWorld--A Wolfram Web
+           Resource. https://mathworld.wolfram.com/SincFunction.html
+    .. [2] Wikipedia, "Sinc function",
+           https://en.wikipedia.org/wiki/Sinc_function
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import matplotlib.pyplot as plt
+    >>> x = np.linspace(-4, 4, 41)
+    >>> np.sinc(x)
+     array([-3.89804309e-17,  -4.92362781e-02,  -8.40918587e-02, # may vary
+            -8.90384387e-02,  -5.84680802e-02,   3.89804309e-17,
+            6.68206631e-02,   1.16434881e-01,   1.26137788e-01,
+            8.50444803e-02,  -3.89804309e-17,  -1.03943254e-01,
+            -1.89206682e-01,  -2.16236208e-01,  -1.55914881e-01,
+            3.89804309e-17,   2.33872321e-01,   5.04551152e-01,
+            7.56826729e-01,   9.35489284e-01,   1.00000000e+00,
+            9.35489284e-01,   7.56826729e-01,   5.04551152e-01,
+            2.33872321e-01,   3.89804309e-17,  -1.55914881e-01,
+           -2.16236208e-01,  -1.89206682e-01,  -1.03943254e-01,
+           -3.89804309e-17,   8.50444803e-02,   1.26137788e-01,
+            1.16434881e-01,   6.68206631e-02,   3.89804309e-17,
+            -5.84680802e-02,  -8.90384387e-02,  -8.40918587e-02,
+            -4.92362781e-02,  -3.89804309e-17])
+
+    >>> plt.plot(x, np.sinc(x))
+    [<matplotlib.lines.Line2D object at 0x...>]
+    >>> plt.title("Sinc Function")
+    Text(0.5, 1.0, 'Sinc Function')
+    >>> plt.ylabel("Amplitude")
+    Text(0, 0.5, 'Amplitude')
+    >>> plt.xlabel("X")
+    Text(0.5, 0, 'X')
+    >>> plt.show()
+
+    """
+    x = np.asanyarray(x)
+    x = pi * x
+    # Hope that 1e-20 is sufficient for objects...
+    eps = np.finfo(x.dtype).eps if x.dtype.kind == "f" else 1e-20
+    y = where(x, x, eps)
+    return sin(y) / y
+
+
+def _ureduce(a, func, keepdims=False, **kwargs):
+    """
+    Internal Function.
+    Call `func` with `a` as first argument swapping the axes to use extended
+    axis on functions that don't support it natively.
+
+    Returns result and a.shape with axis dims set to 1.
+
+    Parameters
+    ----------
+    a : array_like
+        Input array or object that can be converted to an array.
+    func : callable
+        Reduction function capable of receiving a single axis argument.
+        It is called with `a` as first argument followed by `kwargs`.
+    kwargs : keyword arguments
+        additional keyword arguments to pass to `func`.
+
+    Returns
+    -------
+    result : tuple
+        Result of func(a, **kwargs) and a.shape with axis dims set to 1
+        which can be used to reshape the result to the same shape a ufunc with
+        keepdims=True would produce.
+
+    """
+    a = np.asanyarray(a)
+    axis = kwargs.get('axis')
+    out = kwargs.get('out')
+
+    if keepdims is np._NoValue:
+        keepdims = False
+
+    nd = a.ndim
+    if axis is not None:
+        axis = _nx.normalize_axis_tuple(axis, nd)
+
+        if keepdims and out is not None:
+            index_out = tuple(
+                0 if i in axis else slice(None) for i in range(nd))
+            kwargs['out'] = out[(Ellipsis, ) + index_out]
+
+        if len(axis) == 1:
+            kwargs['axis'] = axis[0]
+        else:
+            keep = set(range(nd)) - set(axis)
+            nkeep = len(keep)
+            # swap axis that should not be reduced to front
+            for i, s in enumerate(sorted(keep)):
+                a = a.swapaxes(i, s)
+            # merge reduced axis
+            a = a.reshape(a.shape[:nkeep] + (-1,))
+            kwargs['axis'] = -1
+    elif keepdims and out is not None:
+        index_out = (0, ) * nd
+        kwargs['out'] = out[(Ellipsis, ) + index_out]
+
+    r = func(a, **kwargs)
+
+    if out is not None:
+        return out
+
+    if keepdims:
+        if axis is None:
+            index_r = (np.newaxis, ) * nd
+        else:
+            index_r = tuple(
+                np.newaxis if i in axis else slice(None)
+                for i in range(nd))
+        r = r[(Ellipsis, ) + index_r]
+
+    return r
+
+
+def _median_dispatcher(
+        a, axis=None, out=None, overwrite_input=None, keepdims=None):
+    return (a, out)
+
+
+@array_function_dispatch(_median_dispatcher)
+def median(a, axis=None, out=None, overwrite_input=False, keepdims=False):
+    """
+    Compute the median along the specified axis.
+
+    Returns the median of the array elements.
+
+    Parameters
+    ----------
+    a : array_like
+        Input array or object that can be converted to an array.
+    axis : {int, sequence of int, None}, optional
+        Axis or axes along which the medians are computed. The default,
+        axis=None, will compute the median along a flattened version of
+        the array. If a sequence of axes, the array is first flattened
+        along the given axes, then the median is computed along the
+        resulting flattened axis.
+    out : ndarray, optional
+        Alternative output array in which to place the result. It must
+        have the same shape and buffer length as the expected output,
+        but the type (of the output) will be cast if necessary.
+    overwrite_input : bool, optional
+       If True, then allow use of memory of input array `a` for
+       calculations. The input array will be modified by the call to
+       `median`. This will save memory when you do not need to preserve
+       the contents of the input array. Treat the input as undefined,
+       but it will probably be fully or partially sorted. Default is
+       False. If `overwrite_input` is ``True`` and `a` is not already an
+       `ndarray`, an error will be raised.
+    keepdims : bool, optional
+        If this is set to True, the axes which are reduced are left
+        in the result as dimensions with size one. With this option,
+        the result will broadcast correctly against the original `arr`.
+
+    Returns
+    -------
+    median : ndarray
+        A new array holding the result. If the input contains integers
+        or floats smaller than ``float64``, then the output data-type is
+        ``np.float64``.  Otherwise, the data-type of the output is the
+        same as that of the input. If `out` is specified, that array is
+        returned instead.
+
+    See Also
+    --------
+    mean, percentile
+
+    Notes
+    -----
+    Given a vector ``V`` of length ``N``, the median of ``V`` is the
+    middle value of a sorted copy of ``V``, ``V_sorted`` - i
+    e., ``V_sorted[(N-1)/2]``, when ``N`` is odd, and the average of the
+    two middle values of ``V_sorted`` when ``N`` is even.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> a = np.array([[10, 7, 4], [3, 2, 1]])
+    >>> a
+    array([[10,  7,  4],
+           [ 3,  2,  1]])
+    >>> np.median(a)
+    np.float64(3.5)
+    >>> np.median(a, axis=0)
+    array([6.5, 4.5, 2.5])
+    >>> np.median(a, axis=1)
+    array([7.,  2.])
+    >>> np.median(a, axis=(0, 1))
+    np.float64(3.5)
+    >>> m = np.median(a, axis=0)
+    >>> out = np.zeros_like(m)
+    >>> np.median(a, axis=0, out=m)
+    array([6.5,  4.5,  2.5])
+    >>> m
+    array([6.5,  4.5,  2.5])
+    >>> b = a.copy()
+    >>> np.median(b, axis=1, overwrite_input=True)
+    array([7.,  2.])
+    >>> assert not np.all(a==b)
+    >>> b = a.copy()
+    >>> np.median(b, axis=None, overwrite_input=True)
+    np.float64(3.5)
+    >>> assert not np.all(a==b)
+
+    """
+    return _ureduce(a, func=_median, keepdims=keepdims, axis=axis, out=out,
+                    overwrite_input=overwrite_input)
+
+
+def _median(a, axis=None, out=None, overwrite_input=False):
+    # can't be reasonably be implemented in terms of percentile as we have to
+    # call mean to not break astropy
+    a = np.asanyarray(a)
+
+    # Set the partition indexes
+    if axis is None:
+        sz = a.size
+    else:
+        sz = a.shape[axis]
+    if sz % 2 == 0:
+        szh = sz // 2
+        kth = [szh - 1, szh]
+    else:
+        kth = [(sz - 1) // 2]
+
+    # We have to check for NaNs (as of writing 'M' doesn't actually work).
+    supports_nans = np.issubdtype(a.dtype, np.inexact) or a.dtype.kind in 'Mm'
+    if supports_nans:
+        kth.append(-1)
+
+    if overwrite_input:
+        if axis is None:
+            part = a.ravel()
+            part.partition(kth)
+        else:
+            a.partition(kth, axis=axis)
+            part = a
+    else:
+        part = partition(a, kth, axis=axis)
+
+    if part.shape == ():
+        # make 0-D arrays work
+        return part.item()
+    if axis is None:
+        axis = 0
+
+    indexer = [slice(None)] * part.ndim
+    index = part.shape[axis] // 2
+    if part.shape[axis] % 2 == 1:
+        # index with slice to allow mean (below) to work
+        indexer[axis] = slice(index, index + 1)
+    else:
+        indexer[axis] = slice(index - 1, index + 1)
+    indexer = tuple(indexer)
+
+    # Use mean in both odd and even case to coerce data type,
+    # using out array if needed.
+    rout = mean(part[indexer], axis=axis, out=out)
+    if supports_nans and sz > 0:
+        # If nans are possible, warn and replace by nans like mean would.
+        rout = np.lib._utils_impl._median_nancheck(part, rout, axis)
+
+    return rout
+
+
+def _percentile_dispatcher(a, q, axis=None, out=None, overwrite_input=None,
+                           method=None, keepdims=None, *, weights=None,
+                           interpolation=None):
+    return (a, q, out, weights)
+
+
+@array_function_dispatch(_percentile_dispatcher)
+def percentile(a,
+               q,
+               axis=None,
+               out=None,
+               overwrite_input=False,
+               method="linear",
+               keepdims=False,
+               *,
+               weights=None,
+               interpolation=None):
+    """
+    Compute the q-th percentile of the data along the specified axis.
+
+    Returns the q-th percentile(s) of the array elements.
+
+    Parameters
+    ----------
+    a : array_like of real numbers
+        Input array or object that can be converted to an array.
+    q : array_like of float
+        Percentage or sequence of percentages for the percentiles to compute.
+        Values must be between 0 and 100 inclusive.
+    axis : {int, tuple of int, None}, optional
+        Axis or axes along which the percentiles are computed. The
+        default is to compute the percentile(s) along a flattened
+        version of the array.
+    out : ndarray, optional
+        Alternative output array in which to place the result. It must
+        have the same shape and buffer length as the expected output,
+        but the type (of the output) will be cast if necessary.
+    overwrite_input : bool, optional
+        If True, then allow the input array `a` to be modified by intermediate
+        calculations, to save memory. In this case, the contents of the input
+        `a` after this function completes is undefined.
+    method : str, optional
+        This parameter specifies the method to use for estimating the
+        percentile.  There are many different methods, some unique to NumPy.
+        See the notes for explanation.  The options sorted by their R type
+        as summarized in the H&F paper [1]_ are:
+
+        1. 'inverted_cdf'
+        2. 'averaged_inverted_cdf'
+        3. 'closest_observation'
+        4. 'interpolated_inverted_cdf'
+        5. 'hazen'
+        6. 'weibull'
+        7. 'linear'  (default)
+        8. 'median_unbiased'
+        9. 'normal_unbiased'
+
+        The first three methods are discontinuous.  NumPy further defines the
+        following discontinuous variations of the default 'linear' (7.) option:
+
+        * 'lower'
+        * 'higher',
+        * 'midpoint'
+        * 'nearest'
+
+        .. versionchanged:: 1.22.0
+            This argument was previously called "interpolation" and only
+            offered the "linear" default and last four options.
+
+    keepdims : bool, optional
+        If this is set to True, the axes which are reduced are left in
+        the result as dimensions with size one. With this option, the
+        result will broadcast correctly against the original array `a`.
+
+     weights : array_like, optional
+        An array of weights associated with the values in `a`. Each value in
+        `a` contributes to the percentile according to its associated weight.
+        The weights array can either be 1-D (in which case its length must be
+        the size of `a` along the given axis) or of the same shape as `a`.
+        If `weights=None`, then all data in `a` are assumed to have a
+        weight equal to one.
+        Only `method="inverted_cdf"` supports weights.
+        See the notes for more details.
+
+        .. versionadded:: 2.0.0
+
+    interpolation : str, optional
+        Deprecated name for the method keyword argument.
+
+        .. deprecated:: 1.22.0
+
+    Returns
+    -------
+    percentile : scalar or ndarray
+        If `q` is a single percentile and `axis=None`, then the result
+        is a scalar. If multiple percentiles are given, first axis of
+        the result corresponds to the percentiles. The other axes are
+        the axes that remain after the reduction of `a`. If the input
+        contains integers or floats smaller than ``float64``, the output
+        data-type is ``float64``. Otherwise, the output data-type is the
+        same as that of the input. If `out` is specified, that array is
+        returned instead.
+
+    See Also
+    --------
+    mean
+    median : equivalent to ``percentile(..., 50)``
+    nanpercentile
+    quantile : equivalent to percentile, except q in the range [0, 1].
+
+    Notes
+    -----
+    The behavior of `numpy.percentile` with percentage `q` is
+    that of `numpy.quantile` with argument ``q/100``.
+    For more information, please see `numpy.quantile`.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> a = np.array([[10, 7, 4], [3, 2, 1]])
+    >>> a
+    array([[10,  7,  4],
+           [ 3,  2,  1]])
+    >>> np.percentile(a, 50)
+    3.5
+    >>> np.percentile(a, 50, axis=0)
+    array([6.5, 4.5, 2.5])
+    >>> np.percentile(a, 50, axis=1)
+    array([7.,  2.])
+    >>> np.percentile(a, 50, axis=1, keepdims=True)
+    array([[7.],
+           [2.]])
+
+    >>> m = np.percentile(a, 50, axis=0)
+    >>> out = np.zeros_like(m)
+    >>> np.percentile(a, 50, axis=0, out=out)
+    array([6.5, 4.5, 2.5])
+    >>> m
+    array([6.5, 4.5, 2.5])
+
+    >>> b = a.copy()
+    >>> np.percentile(b, 50, axis=1, overwrite_input=True)
+    array([7.,  2.])
+    >>> assert not np.all(a == b)
+
+    The different methods can be visualized graphically:
+
+    .. plot::
+
+        import matplotlib.pyplot as plt
+
+        a = np.arange(4)
+        p = np.linspace(0, 100, 6001)
+        ax = plt.gca()
+        lines = [
+            ('linear', '-', 'C0'),
+            ('inverted_cdf', ':', 'C1'),
+            # Almost the same as `inverted_cdf`:
+            ('averaged_inverted_cdf', '-.', 'C1'),
+            ('closest_observation', ':', 'C2'),
+            ('interpolated_inverted_cdf', '--', 'C1'),
+            ('hazen', '--', 'C3'),
+            ('weibull', '-.', 'C4'),
+            ('median_unbiased', '--', 'C5'),
+            ('normal_unbiased', '-.', 'C6'),
+            ]
+        for method, style, color in lines:
+            ax.plot(
+                p, np.percentile(a, p, method=method),
+                label=method, linestyle=style, color=color)
+        ax.set(
+            title='Percentiles for different methods and data: ' + str(a),
+            xlabel='Percentile',
+            ylabel='Estimated percentile value',
+            yticks=a)
+        ax.legend(bbox_to_anchor=(1.03, 1))
+        plt.tight_layout()
+        plt.show()
+
+    References
+    ----------
+    .. [1] R. J. Hyndman and Y. Fan,
+       "Sample quantiles in statistical packages,"
+       The American Statistician, 50(4), pp. 361-365, 1996
+
+    """
+    if interpolation is not None:
+        method = _check_interpolation_as_method(
+            method, interpolation, "percentile")
+
+    a = np.asanyarray(a)
+    if a.dtype.kind == "c":
+        raise TypeError("a must be an array of real numbers")
+
+    # Use dtype of array if possible (e.g., if q is a python int or float)
+    # by making the divisor have the dtype of the data array.
+    q = np.true_divide(q, a.dtype.type(100) if a.dtype.kind == "f" else 100, out=...)
+    if not _quantile_is_valid(q):
+        raise ValueError("Percentiles must be in the range [0, 100]")
+
+    if weights is not None:
+        if method != "inverted_cdf":
+            msg = ("Only method 'inverted_cdf' supports weights. "
+                   f"Got: {method}.")
+            raise ValueError(msg)
+        if axis is not None:
+            axis = _nx.normalize_axis_tuple(axis, a.ndim, argname="axis")
+        weights = _weights_are_valid(weights=weights, a=a, axis=axis)
+        if np.any(weights < 0):
+            raise ValueError("Weights must be non-negative.")
+
+    return _quantile_unchecked(
+        a, q, axis, out, overwrite_input, method, keepdims, weights)
+
+
+def _quantile_dispatcher(a, q, axis=None, out=None, overwrite_input=None,
+                         method=None, keepdims=None, *, weights=None,
+                         interpolation=None):
+    return (a, q, out, weights)
+
+
+@array_function_dispatch(_quantile_dispatcher)
+def quantile(a,
+             q,
+             axis=None,
+             out=None,
+             overwrite_input=False,
+             method="linear",
+             keepdims=False,
+             *,
+             weights=None,
+             interpolation=None):
+    """
+    Compute the q-th quantile of the data along the specified axis.
+
+    Parameters
+    ----------
+    a : array_like of real numbers
+        Input array or object that can be converted to an array.
+    q : array_like of float
+        Probability or sequence of probabilities of the quantiles to compute.
+        Values must be between 0 and 1 inclusive.
+    axis : {int, tuple of int, None}, optional
+        Axis or axes along which the quantiles are computed. The default is
+        to compute the quantile(s) along a flattened version of the array.
+    out : ndarray, optional
+        Alternative output array in which to place the result. It must have
+        the same shape and buffer length as the expected output, but the
+        type (of the output) will be cast if necessary.
+    overwrite_input : bool, optional
+        If True, then allow the input array `a` to be modified by
+        intermediate calculations, to save memory. In this case, the
+        contents of the input `a` after this function completes is
+        undefined.
+    method : str, optional
+        This parameter specifies the method to use for estimating the
+        quantile.  There are many different methods, some unique to NumPy.
+        The recommended options, numbered as they appear in [1]_, are:
+
+        1. 'inverted_cdf'
+        2. 'averaged_inverted_cdf'
+        3. 'closest_observation'
+        4. 'interpolated_inverted_cdf'
+        5. 'hazen'
+        6. 'weibull'
+        7. 'linear'  (default)
+        8. 'median_unbiased'
+        9. 'normal_unbiased'
+
+        The first three methods are discontinuous. For backward compatibility
+        with previous versions of NumPy, the following discontinuous variations
+        of the default 'linear' (7.) option are available:
+
+        * 'lower'
+        * 'higher',
+        * 'midpoint'
+        * 'nearest'
+
+        See Notes for details.
+
+        .. versionchanged:: 1.22.0
+            This argument was previously called "interpolation" and only
+            offered the "linear" default and last four options.
+
+    keepdims : bool, optional
+        If this is set to True, the axes which are reduced are left in
+        the result as dimensions with size one. With this option, the
+        result will broadcast correctly against the original array `a`.
+
+    weights : array_like, optional
+        An array of weights associated with the values in `a`. Each value in
+        `a` contributes to the quantile according to its associated weight.
+        The weights array can either be 1-D (in which case its length must be
+        the size of `a` along the given axis) or of the same shape as `a`.
+        If `weights=None`, then all data in `a` are assumed to have a
+        weight equal to one.
+        Only `method="inverted_cdf"` supports weights.
+        See the notes for more details.
+
+        .. versionadded:: 2.0.0
+
+    interpolation : str, optional
+        Deprecated name for the method keyword argument.
+
+        .. deprecated:: 1.22.0
+
+    Returns
+    -------
+    quantile : scalar or ndarray
+        If `q` is a single probability and `axis=None`, then the result
+        is a scalar. If multiple probability levels are given, first axis
+        of the result corresponds to the quantiles. The other axes are
+        the axes that remain after the reduction of `a`. If the input
+        contains integers or floats smaller than ``float64``, the output
+        data-type is ``float64``. Otherwise, the output data-type is the
+        same as that of the input. If `out` is specified, that array is
+        returned instead.
+
+    See Also
+    --------
+    mean
+    percentile : equivalent to quantile, but with q in the range [0, 100].
+    median : equivalent to ``quantile(..., 0.5)``
+    nanquantile
+
+    Notes
+    -----
+    Given a sample `a` from an underlying distribution, `quantile` provides a
+    nonparametric estimate of the inverse cumulative distribution function.
+
+    By default, this is done by interpolating between adjacent elements in
+    ``y``, a sorted copy of `a`::
+
+        (1-g)*y[j] + g*y[j+1]
+
+    where the index ``j`` and coefficient ``g`` are the integral and
+    fractional components of ``q * (n-1)``, and ``n`` is the number of
+    elements in the sample.
+
+    This is a special case of Equation 1 of H&F [1]_. More generally,
+
+    - ``j = (q*n + m - 1) // 1``, and
+    - ``g = (q*n + m - 1) % 1``,
+
+    where ``m`` may be defined according to several different conventions.
+    The preferred convention may be selected using the ``method`` parameter:
+
+    =============================== =============== ===============
+    ``method``                      number in H&F   ``m``
+    =============================== =============== ===============
+    ``interpolated_inverted_cdf``   4               ``0``
+    ``hazen``                       5               ``1/2``
+    ``weibull``                     6               ``q``
+    ``linear`` (default)            7               ``1 - q``
+    ``median_unbiased``             8               ``q/3 + 1/3``
+    ``normal_unbiased``             9               ``q/4 + 3/8``
+    =============================== =============== ===============
+
+    Note that indices ``j`` and ``j + 1`` are clipped to the range ``0`` to
+    ``n - 1`` when the results of the formula would be outside the allowed
+    range of non-negative indices. The ``- 1`` in the formulas for ``j`` and
+    ``g`` accounts for Python's 0-based indexing.
+
+    The table above includes only the estimators from H&F that are continuous
+    functions of probability `q` (estimators 4-9). NumPy also provides the
+    three discontinuous estimators from H&F (estimators 1-3), where ``j`` is
+    defined as above, ``m`` is defined as follows, and ``g`` is a function
+    of the real-valued ``index = q*n + m - 1`` and ``j``.
+
+    1. ``inverted_cdf``: ``m = 0`` and ``g = int(index - j > 0)``
+    2. ``averaged_inverted_cdf``: ``m = 0`` and
+       ``g = (1 + int(index - j > 0)) / 2``
+    3. ``closest_observation``: ``m = -1/2`` and
+       ``g = 1 - int((index == j) & (j%2 == 1))``
+
+    For backward compatibility with previous versions of NumPy, `quantile`
+    provides four additional discontinuous estimators. Like
+    ``method='linear'``, all have ``m = 1 - q`` so that ``j = q*(n-1) // 1``,
+    but ``g`` is defined as follows.
+
+    - ``lower``: ``g = 0``
+    - ``midpoint``: ``g = 0.5``
+    - ``higher``: ``g = 1``
+    - ``nearest``: ``g = (q*(n-1) % 1) > 0.5``
+
+    **Weighted quantiles:**
+    More formally, the quantile at probability level :math:`q` of a cumulative
+    distribution function :math:`F(y)=P(Y \\leq y)` with probability measure
+    :math:`P` is defined as any number :math:`x` that fulfills the
+    *coverage conditions*
+
+    .. math:: P(Y < x) \\leq q \\quad\\text{and}\\quad P(Y \\leq x) \\geq q
+
+    with random variable :math:`Y\\sim P`.
+    Sample quantiles, the result of `quantile`, provide nonparametric
+    estimation of the underlying population counterparts, represented by the
+    unknown :math:`F`, given a data vector `a` of length ``n``.
+
+    Some of the estimators above arise when one considers :math:`F` as the
+    empirical distribution function of the data, i.e.
+    :math:`F(y) = \\frac{1}{n} \\sum_i 1_{a_i \\leq y}`.
+    Then, different methods correspond to different choices of :math:`x` that
+    fulfill the above coverage conditions. Methods that follow this approach
+    are ``inverted_cdf`` and ``averaged_inverted_cdf``.
+
+    For weighted quantiles, the coverage conditions still hold. The
+    empirical cumulative distribution is simply replaced by its weighted
+    version, i.e.
+    :math:`P(Y \\leq t) = \\frac{1}{\\sum_i w_i} \\sum_i w_i 1_{x_i \\leq t}`.
+    Only ``method="inverted_cdf"`` supports weights.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> a = np.array([[10, 7, 4], [3, 2, 1]])
+    >>> a
+    array([[10,  7,  4],
+           [ 3,  2,  1]])
+    >>> np.quantile(a, 0.5)
+    3.5
+    >>> np.quantile(a, 0.5, axis=0)
+    array([6.5, 4.5, 2.5])
+    >>> np.quantile(a, 0.5, axis=1)
+    array([7.,  2.])
+    >>> np.quantile(a, 0.5, axis=1, keepdims=True)
+    array([[7.],
+           [2.]])
+    >>> m = np.quantile(a, 0.5, axis=0)
+    >>> out = np.zeros_like(m)
+    >>> np.quantile(a, 0.5, axis=0, out=out)
+    array([6.5, 4.5, 2.5])
+    >>> m
+    array([6.5, 4.5, 2.5])
+    >>> b = a.copy()
+    >>> np.quantile(b, 0.5, axis=1, overwrite_input=True)
+    array([7.,  2.])
+    >>> assert not np.all(a == b)
+
+    See also `numpy.percentile` for a visualization of most methods.
+
+    References
+    ----------
+    .. [1] R. J. Hyndman and Y. Fan,
+       "Sample quantiles in statistical packages,"
+       The American Statistician, 50(4), pp. 361-365, 1996
+
+    """
+    if interpolation is not None:
+        method = _check_interpolation_as_method(
+            method, interpolation, "quantile")
+
+    a = np.asanyarray(a)
+    if a.dtype.kind == "c":
+        raise TypeError("a must be an array of real numbers")
+
+    # Use dtype of array if possible (e.g., if q is a python int or float).
+    if isinstance(q, (int, float)) and a.dtype.kind == "f":
+        q = np.asanyarray(q, dtype=a.dtype)
+    else:
+        q = np.asanyarray(q)
+
+    if not _quantile_is_valid(q):
+        raise ValueError("Quantiles must be in the range [0, 1]")
+
+    if weights is not None:
+        if method != "inverted_cdf":
+            msg = ("Only method 'inverted_cdf' supports weights. "
+                   f"Got: {method}.")
+            raise ValueError(msg)
+        if axis is not None:
+            axis = _nx.normalize_axis_tuple(axis, a.ndim, argname="axis")
+        weights = _weights_are_valid(weights=weights, a=a, axis=axis)
+        if np.any(weights < 0):
+            raise ValueError("Weights must be non-negative.")
+
+    return _quantile_unchecked(
+        a, q, axis, out, overwrite_input, method, keepdims, weights)
+
+
+def _quantile_unchecked(a,
+                        q,
+                        axis=None,
+                        out=None,
+                        overwrite_input=False,
+                        method="linear",
+                        keepdims=False,
+                        weights=None):
+    """Assumes that q is in [0, 1], and is an ndarray"""
+    return _ureduce(a,
+                    func=_quantile_ureduce_func,
+                    q=q,
+                    weights=weights,
+                    keepdims=keepdims,
+                    axis=axis,
+                    out=out,
+                    overwrite_input=overwrite_input,
+                    method=method)
+
+
+def _quantile_is_valid(q):
+    # avoid expensive reductions, relevant for arrays with < O(1000) elements
+    if q.ndim == 1 and q.size < 10:
+        for i in range(q.size):
+            if not (0.0 <= q[i] <= 1.0):
+                return False
+    elif not (q.min() >= 0 and q.max() <= 1):
+        return False
+    return True
+
+
+def _check_interpolation_as_method(method, interpolation, fname):
+    # Deprecated NumPy 1.22, 2021-11-08
+    warnings.warn(
+        f"the `interpolation=` argument to {fname} was renamed to "
+        "`method=`, which has additional options.\n"
+        "Users of the modes 'nearest', 'lower', 'higher', or "
+        "'midpoint' are encouraged to review the method they used. "
+        "(Deprecated NumPy 1.22)",
+        DeprecationWarning, stacklevel=4)
+    if method != "linear":
+        # sanity check, we assume this basically never happens
+        raise TypeError(
+            "You shall not pass both `method` and `interpolation`!\n"
+            "(`interpolation` is Deprecated in favor of `method`)")
+    return interpolation
+
+
+def _compute_virtual_index(n, quantiles, alpha: float, beta: float):
+    """
+    Compute the floating point indexes of an array for the linear
+    interpolation of quantiles.
+    n : array_like
+        The sample sizes.
+    quantiles : array_like
+        The quantiles values.
+    alpha : float
+        A constant used to correct the index computed.
+    beta : float
+        A constant used to correct the index computed.
+
+    alpha and beta values depend on the chosen method
+    (see quantile documentation)
+
+    Reference:
+    Hyndman&Fan paper "Sample Quantiles in Statistical Packages",
+    DOI: 10.1080/00031305.1996.10473566
+    """
+    return n * quantiles + (
+            alpha + quantiles * (1 - alpha - beta)
+    ) - 1
+
+
+def _get_gamma(virtual_indexes, previous_indexes, method):
+    """
+    Compute gamma (a.k.a 'm' or 'weight') for the linear interpolation
+    of quantiles.
+
+    virtual_indexes : array_like
+        The indexes where the percentile is supposed to be found in the sorted
+        sample.
+    previous_indexes : array_like
+        The floor values of virtual_indexes.
+    interpolation : dict
+        The interpolation method chosen, which may have a specific rule
+        modifying gamma.
+
+    gamma is usually the fractional part of virtual_indexes but can be modified
+    by the interpolation method.
+    """
+    gamma = np.asanyarray(virtual_indexes - previous_indexes)
+    gamma = method["fix_gamma"](gamma, virtual_indexes)
+    # Ensure both that we have an array, and that we keep the dtype
+    # (which may have been matched to the input array).
+    return np.asanyarray(gamma, dtype=virtual_indexes.dtype)
+
+
+def _lerp(a, b, t, out=None):
+    """
+    Compute the linear interpolation weighted by gamma on each point of
+    two same shape array.
+
+    a : array_like
+        Left bound.
+    b : array_like
+        Right bound.
+    t : array_like
+        The interpolation weight.
+    out : array_like
+        Output array.
+    """
+    diff_b_a = subtract(b, a)
+    # asanyarray is a stop-gap until gh-13105
+    lerp_interpolation = asanyarray(add(a, diff_b_a * t, out=out))
+    subtract(b, diff_b_a * (1 - t), out=lerp_interpolation, where=t >= 0.5,
+             casting='unsafe', dtype=type(lerp_interpolation.dtype))
+    if lerp_interpolation.ndim == 0 and out is None:
+        lerp_interpolation = lerp_interpolation[()]  # unpack 0d arrays
+    return lerp_interpolation
+
+
+def _get_gamma_mask(shape, default_value, conditioned_value, where):
+    out = np.full(shape, default_value)
+    np.copyto(out, conditioned_value, where=where, casting="unsafe")
+    return out
+
+
+def _discrete_interpolation_to_boundaries(index, gamma_condition_fun):
+    previous = np.floor(index)
+    next = previous + 1
+    gamma = index - previous
+    res = _get_gamma_mask(shape=index.shape,
+                          default_value=next,
+                          conditioned_value=previous,
+                          where=gamma_condition_fun(gamma, index)
+                          ).astype(np.intp)
+    # Some methods can lead to out-of-bound integers, clip them:
+    res[res < 0] = 0
+    return res
+
+
+def _closest_observation(n, quantiles):
+    # "choose the nearest even order statistic at g=0" (H&F (1996) pp. 362).
+    # Order is 1-based so for zero-based indexing round to nearest odd index.
+    gamma_fun = lambda gamma, index: (gamma == 0) & (np.floor(index) % 2 == 1)
+    return _discrete_interpolation_to_boundaries((n * quantiles) - 1 - 0.5,
+                                                 gamma_fun)
+
+
+def _inverted_cdf(n, quantiles):
+    gamma_fun = lambda gamma, _: (gamma == 0)
+    return _discrete_interpolation_to_boundaries((n * quantiles) - 1,
+                                                 gamma_fun)
+
+
+def _quantile_ureduce_func(
+        a: np.array,
+        q: np.array,
+        weights: np.array,
+        axis: int | None = None,
+        out=None,
+        overwrite_input: bool = False,
+        method="linear",
+) -> np.array:
+    if q.ndim > 2:
+        # The code below works fine for nd, but it might not have useful
+        # semantics. For now, keep the supported dimensions the same as it was
+        # before.
+        raise ValueError("q must be a scalar or 1d")
+    if overwrite_input:
+        if axis is None:
+            axis = 0
+            arr = a.ravel()
+            wgt = None if weights is None else weights.ravel()
+        else:
+            arr = a
+            wgt = weights
+    elif axis is None:
+        axis = 0
+        arr = a.flatten()
+        wgt = None if weights is None else weights.flatten()
+    else:
+        arr = a.copy()
+        wgt = weights
+    result = _quantile(arr,
+                       quantiles=q,
+                       axis=axis,
+                       method=method,
+                       out=out,
+                       weights=wgt)
+    return result
+
+
+def _get_indexes(arr, virtual_indexes, valid_values_count):
+    """
+    Get the valid indexes of arr neighbouring virtual_indexes.
+    Note
+    This is a companion function to linear interpolation of
+    Quantiles
+
+    Returns
+    -------
+    (previous_indexes, next_indexes): Tuple
+        A Tuple of virtual_indexes neighbouring indexes
+    """
+    previous_indexes = np.asanyarray(np.floor(virtual_indexes))
+    next_indexes = np.asanyarray(previous_indexes + 1)
+    indexes_above_bounds = virtual_indexes >= valid_values_count - 1
+    # When indexes is above max index, take the max value of the array
+    if indexes_above_bounds.any():
+        previous_indexes[indexes_above_bounds] = -1
+        next_indexes[indexes_above_bounds] = -1
+    # When indexes is below min index, take the min value of the array
+    indexes_below_bounds = virtual_indexes < 0
+    if indexes_below_bounds.any():
+        previous_indexes[indexes_below_bounds] = 0
+        next_indexes[indexes_below_bounds] = 0
+    if np.issubdtype(arr.dtype, np.inexact):
+        # After the sort, slices having NaNs will have for last element a NaN
+        virtual_indexes_nans = np.isnan(virtual_indexes)
+        if virtual_indexes_nans.any():
+            previous_indexes[virtual_indexes_nans] = -1
+            next_indexes[virtual_indexes_nans] = -1
+    previous_indexes = previous_indexes.astype(np.intp)
+    next_indexes = next_indexes.astype(np.intp)
+    return previous_indexes, next_indexes
+
+
+def _quantile(
+        arr: np.array,
+        quantiles: np.array,
+        axis: int = -1,
+        method="linear",
+        out=None,
+        weights=None,
+):
+    """
+    Private function that doesn't support extended axis or keepdims.
+    These methods are extended to this function using _ureduce
+    See nanpercentile for parameter usage
+    It computes the quantiles of the array for the given axis.
+    A linear interpolation is performed based on the `interpolation`.
+
+    By default, the method is "linear" where alpha == beta == 1 which
+    performs the 7th method of Hyndman&Fan.
+    With "median_unbiased" we get alpha == beta == 1/3
+    thus the 8th method of Hyndman&Fan.
+    """
+    # --- Setup
+    arr = np.asanyarray(arr)
+    values_count = arr.shape[axis]
+    # The dimensions of `q` are prepended to the output shape, so we need the
+    # axis being sampled from `arr` to be last.
+    if axis != 0:  # But moveaxis is slow, so only call it if necessary.
+        arr = np.moveaxis(arr, axis, destination=0)
+    supports_nans = (
+        np.issubdtype(arr.dtype, np.inexact) or arr.dtype.kind in 'Mm'
+    )
+
+    if weights is None:
+        # --- Computation of indexes
+        # Index where to find the value in the sorted array.
+        # Virtual because it is a floating point value, not an valid index.
+        # The nearest neighbours are used for interpolation
+        try:
+            method_props = _QuantileMethods[method]
+        except KeyError:
+            raise ValueError(
+                f"{method!r} is not a valid method. Use one of: "
+                f"{_QuantileMethods.keys()}") from None
+        virtual_indexes = method_props["get_virtual_index"](values_count,
+                                                            quantiles)
+        virtual_indexes = np.asanyarray(virtual_indexes)
+
+        if method_props["fix_gamma"] is None:
+            supports_integers = True
+        else:
+            int_virtual_indices = np.issubdtype(virtual_indexes.dtype,
+                                                np.integer)
+            supports_integers = method == 'linear' and int_virtual_indices
+
+        if supports_integers:
+            # No interpolation needed, take the points along axis
+            if supports_nans:
+                # may contain nan, which would sort to the end
+                arr.partition(
+                    concatenate((virtual_indexes.ravel(), [-1])), axis=0,
+                )
+                slices_having_nans = np.isnan(arr[-1, ...])
+            else:
+                # cannot contain nan
+                arr.partition(virtual_indexes.ravel(), axis=0)
+                slices_having_nans = np.array(False, dtype=bool)
+            result = take(arr, virtual_indexes, axis=0, out=out)
+        else:
+            previous_indexes, next_indexes = _get_indexes(arr,
+                                                          virtual_indexes,
+                                                          values_count)
+            # --- Sorting
+            arr.partition(
+                np.unique(np.concatenate(([0, -1],
+                                          previous_indexes.ravel(),
+                                          next_indexes.ravel(),
+                                          ))),
+                axis=0)
+            if supports_nans:
+                slices_having_nans = np.isnan(arr[-1, ...])
+            else:
+                slices_having_nans = None
+            # --- Get values from indexes
+            previous = arr[previous_indexes]
+            next = arr[next_indexes]
+            # --- Linear interpolation
+            gamma = _get_gamma(virtual_indexes, previous_indexes, method_props)
+            result_shape = virtual_indexes.shape + (1,) * (arr.ndim - 1)
+            gamma = gamma.reshape(result_shape)
+            result = _lerp(previous,
+                        next,
+                        gamma,
+                        out=out)
+    else:
+        # Weighted case
+        # This implements method="inverted_cdf", the only supported weighted
+        # method, which needs to sort anyway.
+        weights = np.asanyarray(weights)
+        if axis != 0:
+            weights = np.moveaxis(weights, axis, destination=0)
+        index_array = np.argsort(arr, axis=0, kind="stable")
+
+        # arr = arr[index_array, ...]  # but this adds trailing dimensions of
+        # 1.
+        arr = np.take_along_axis(arr, index_array, axis=0)
+        if weights.shape == arr.shape:
+            weights = np.take_along_axis(weights, index_array, axis=0)
+        else:
+            # weights is 1d
+            weights = weights.reshape(-1)[index_array, ...]
+
+        if supports_nans:
+            # may contain nan, which would sort to the end
+            slices_having_nans = np.isnan(arr[-1, ...])
+        else:
+            # cannot contain nan
+            slices_having_nans = np.array(False, dtype=bool)
+
+        # We use the weights to calculate the empirical cumulative
+        # distribution function cdf
+        cdf = weights.cumsum(axis=0, dtype=np.float64)
+        cdf /= cdf[-1, ...]  # normalization to 1
+        # Search index i such that
+        #   sum(weights[j], j=0..i-1) < quantile <= sum(weights[j], j=0..i)
+        # is then equivalent to
+        #   cdf[i-1] < quantile <= cdf[i]
+        # Unfortunately, searchsorted only accepts 1-d arrays as first
+        # argument, so we will need to iterate over dimensions.
+
+        # Without the following cast, searchsorted can return surprising
+        # results, e.g.
+        #   np.searchsorted(np.array([0.2, 0.4, 0.6, 0.8, 1.]),
+        #                   np.array(0.4, dtype=np.float32), side="left")
+        # returns 2 instead of 1 because 0.4 is not binary representable.
+        if quantiles.dtype.kind == "f":
+            cdf = cdf.astype(quantiles.dtype)
+        # Weights must be non-negative, so we might have zero weights at the
+        # beginning leading to some leading zeros in cdf. The call to
+        # np.searchsorted for quantiles=0 will then pick the first element,
+        # but should pick the first one larger than zero. We
+        # therefore simply set 0 values in cdf to -1.
+        if np.any(cdf[0, ...] == 0):
+            cdf[cdf == 0] = -1
+
+        def find_cdf_1d(arr, cdf):
+            indices = np.searchsorted(cdf, quantiles, side="left")
+            # We might have reached the maximum with i = len(arr), e.g. for
+            # quantiles = 1, and need to cut it to len(arr) - 1.
+            indices = minimum(indices, values_count - 1)
+            result = take(arr, indices, axis=0)
+            return result
+
+        r_shape = arr.shape[1:]
+        if quantiles.ndim > 0:
+            r_shape = quantiles.shape + r_shape
+        if out is None:
+            result = np.empty_like(arr, shape=r_shape)
+        else:
+            if out.shape != r_shape:
+                msg = (f"Wrong shape of argument 'out', shape={r_shape} is "
+                       f"required; got shape={out.shape}.")
+                raise ValueError(msg)
+            result = out
+
+        # See apply_along_axis, which we do for axis=0. Note that Ni = (,)
+        # always, so we remove it here.
+        Nk = arr.shape[1:]
+        for kk in np.ndindex(Nk):
+            result[(...,) + kk] = find_cdf_1d(
+                arr[np.s_[:, ] + kk], cdf[np.s_[:, ] + kk]
+            )
+
+        # Make result the same as in unweighted inverted_cdf.
+        if result.shape == () and result.dtype == np.dtype("O"):
+            result = result.item()
+
+    if np.any(slices_having_nans):
+        if result.ndim == 0 and out is None:
+            # can't write to a scalar, but indexing will be correct
+            result = arr[-1]
+        else:
+            np.copyto(result, arr[-1, ...], where=slices_having_nans)
+    return result
+
+
+def _trapezoid_dispatcher(y, x=None, dx=None, axis=None):
+    return (y, x)
+
+
+@array_function_dispatch(_trapezoid_dispatcher)
+def trapezoid(y, x=None, dx=1.0, axis=-1):
+    r"""
+    Integrate along the given axis using the composite trapezoidal rule.
+
+    If `x` is provided, the integration happens in sequence along its
+    elements - they are not sorted.
+
+    Integrate `y` (`x`) along each 1d slice on the given axis, compute
+    :math:`\int y(x) dx`.
+    When `x` is specified, this integrates along the parametric curve,
+    computing :math:`\int_t y(t) dt =
+    \int_t y(t) \left.\frac{dx}{dt}\right|_{x=x(t)} dt`.
+
+    .. versionadded:: 2.0.0
+
+    Parameters
+    ----------
+    y : array_like
+        Input array to integrate.
+    x : array_like, optional
+        The sample points corresponding to the `y` values. If `x` is None,
+        the sample points are assumed to be evenly spaced `dx` apart. The
+        default is None.
+    dx : scalar, optional
+        The spacing between sample points when `x` is None. The default is 1.
+    axis : int, optional
+        The axis along which to integrate.
+
+    Returns
+    -------
+    trapezoid : float or ndarray
+        Definite integral of `y` = n-dimensional array as approximated along
+        a single axis by the trapezoidal rule. If `y` is a 1-dimensional array,
+        then the result is a float. If `n` is greater than 1, then the result
+        is an `n`-1 dimensional array.
+
+    See Also
+    --------
+    sum, cumsum
+
+    Notes
+    -----
+    Image [2]_ illustrates trapezoidal rule -- y-axis locations of points
+    will be taken from `y` array, by default x-axis distances between
+    points will be 1.0, alternatively they can be provided with `x` array
+    or with `dx` scalar.  Return value will be equal to combined area under
+    the red lines.
+
+
+    References
+    ----------
+    .. [1] Wikipedia page: https://en.wikipedia.org/wiki/Trapezoidal_rule
+
+    .. [2] Illustration image:
+           https://en.wikipedia.org/wiki/File:Composite_trapezoidal_rule_illustration.png
+
+    Examples
+    --------
+    >>> import numpy as np
+
+    Use the trapezoidal rule on evenly spaced points:
+
+    >>> np.trapezoid([1, 2, 3])
+    4.0
+
+    The spacing between sample points can be selected by either the
+    ``x`` or ``dx`` arguments:
+
+    >>> np.trapezoid([1, 2, 3], x=[4, 6, 8])
+    8.0
+    >>> np.trapezoid([1, 2, 3], dx=2)
+    8.0
+
+    Using a decreasing ``x`` corresponds to integrating in reverse:
+
+    >>> np.trapezoid([1, 2, 3], x=[8, 6, 4])
+    -8.0
+
+    More generally ``x`` is used to integrate along a parametric curve. We can
+    estimate the integral :math:`\int_0^1 x^2 = 1/3` using:
+
+    >>> x = np.linspace(0, 1, num=50)
+    >>> y = x**2
+    >>> np.trapezoid(y, x)
+    0.33340274885464394
+
+    Or estimate the area of a circle, noting we repeat the sample which closes
+    the curve:
+
+    >>> theta = np.linspace(0, 2 * np.pi, num=1000, endpoint=True)
+    >>> np.trapezoid(np.cos(theta), x=np.sin(theta))
+    3.141571941375841
+
+    ``np.trapezoid`` can be applied along a specified axis to do multiple
+    computations in one call:
+
+    >>> a = np.arange(6).reshape(2, 3)
+    >>> a
+    array([[0, 1, 2],
+           [3, 4, 5]])
+    >>> np.trapezoid(a, axis=0)
+    array([1.5, 2.5, 3.5])
+    >>> np.trapezoid(a, axis=1)
+    array([2.,  8.])
+    """
+
+    y = asanyarray(y)
+    if x is None:
+        d = dx
+    else:
+        x = asanyarray(x)
+        if x.ndim == 1:
+            d = diff(x)
+            # reshape to correct shape
+            shape = [1] * y.ndim
+            shape[axis] = d.shape[0]
+            d = d.reshape(shape)
+        else:
+            d = diff(x, axis=axis)
+    nd = y.ndim
+    slice1 = [slice(None)] * nd
+    slice2 = [slice(None)] * nd
+    slice1[axis] = slice(1, None)
+    slice2[axis] = slice(None, -1)
+    try:
+        ret = (d * (y[tuple(slice1)] + y[tuple(slice2)]) / 2.0).sum(axis)
+    except ValueError:
+        # Operations didn't work, cast to ndarray
+        d = np.asarray(d)
+        y = np.asarray(y)
+        ret = add.reduce(d * (y[tuple(slice1)] + y[tuple(slice2)]) / 2.0, axis)
+    return ret
+
+
+@set_module('numpy')
+def trapz(y, x=None, dx=1.0, axis=-1):
+    """
+    `trapz` is deprecated in NumPy 2.0.
+
+    Please use `trapezoid` instead, or one of the numerical integration
+    functions in `scipy.integrate`.
+    """
+    # Deprecated in NumPy 2.0, 2023-08-18
+    warnings.warn(
+        "`trapz` is deprecated. Use `trapezoid` instead, or one of the "
+        "numerical integration functions in `scipy.integrate`.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return trapezoid(y, x=x, dx=dx, axis=axis)
+
+
+def _meshgrid_dispatcher(*xi, copy=None, sparse=None, indexing=None):
+    return xi
+
+
+# Based on scitools meshgrid
+@array_function_dispatch(_meshgrid_dispatcher)
+def meshgrid(*xi, copy=True, sparse=False, indexing='xy'):
+    """
+    Return a tuple of coordinate matrices from coordinate vectors.
+
+    Make N-D coordinate arrays for vectorized evaluations of
+    N-D scalar/vector fields over N-D grids, given
+    one-dimensional coordinate arrays x1, x2,..., xn.
+
+    Parameters
+    ----------
+    x1, x2,..., xn : array_like
+        1-D arrays representing the coordinates of a grid.
+    indexing : {'xy', 'ij'}, optional
+        Cartesian ('xy', default) or matrix ('ij') indexing of output.
+        See Notes for more details.
+    sparse : bool, optional
+        If True the shape of the returned coordinate array for dimension *i*
+        is reduced from ``(N1, ..., Ni, ... Nn)`` to
+        ``(1, ..., 1, Ni, 1, ..., 1)``.  These sparse coordinate grids are
+        intended to be used with :ref:`basics.broadcasting`.  When all
+        coordinates are used in an expression, broadcasting still leads to a
+        fully-dimensonal result array.
+
+        Default is False.
+
+    copy : bool, optional
+        If False, a view into the original arrays are returned in order to
+        conserve memory.  Default is True.  Please note that
+        ``sparse=False, copy=False`` will likely return non-contiguous
+        arrays.  Furthermore, more than one element of a broadcast array
+        may refer to a single memory location.  If you need to write to the
+        arrays, make copies first.
+
+    Returns
+    -------
+    X1, X2,..., XN : tuple of ndarrays
+        For vectors `x1`, `x2`,..., `xn` with lengths ``Ni=len(xi)``,
+        returns ``(N1, N2, N3,..., Nn)`` shaped arrays if indexing='ij'
+        or ``(N2, N1, N3,..., Nn)`` shaped arrays if indexing='xy'
+        with the elements of `xi` repeated to fill the matrix along
+        the first dimension for `x1`, the second for `x2` and so on.
+
+    Notes
+    -----
+    This function supports both indexing conventions through the indexing
+    keyword argument.  Giving the string 'ij' returns a meshgrid with
+    matrix indexing, while 'xy' returns a meshgrid with Cartesian indexing.
+    In the 2-D case with inputs of length M and N, the outputs are of shape
+    (N, M) for 'xy' indexing and (M, N) for 'ij' indexing.  In the 3-D case
+    with inputs of length M, N and P, outputs are of shape (N, M, P) for
+    'xy' indexing and (M, N, P) for 'ij' indexing.  The difference is
+    illustrated by the following code snippet::
+
+        xv, yv = np.meshgrid(x, y, indexing='ij')
+        for i in range(nx):
+            for j in range(ny):
+                # treat xv[i,j], yv[i,j]
+
+        xv, yv = np.meshgrid(x, y, indexing='xy')
+        for i in range(nx):
+            for j in range(ny):
+                # treat xv[j,i], yv[j,i]
+
+    In the 1-D and 0-D case, the indexing and sparse keywords have no effect.
+
+    See Also
+    --------
+    mgrid : Construct a multi-dimensional "meshgrid" using indexing notation.
+    ogrid : Construct an open multi-dimensional "meshgrid" using indexing
+            notation.
+    :ref:`how-to-index`
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> nx, ny = (3, 2)
+    >>> x = np.linspace(0, 1, nx)
+    >>> y = np.linspace(0, 1, ny)
+    >>> xv, yv = np.meshgrid(x, y)
+    >>> xv
+    array([[0. , 0.5, 1. ],
+           [0. , 0.5, 1. ]])
+    >>> yv
+    array([[0.,  0.,  0.],
+           [1.,  1.,  1.]])
+
+    The result of `meshgrid` is a coordinate grid:
+
+    >>> import matplotlib.pyplot as plt
+    >>> plt.plot(xv, yv, marker='o', color='k', linestyle='none')
+    >>> plt.show()
+
+    You can create sparse output arrays to save memory and computation time.
+
+    >>> xv, yv = np.meshgrid(x, y, sparse=True)
+    >>> xv
+    array([[0. ,  0.5,  1. ]])
+    >>> yv
+    array([[0.],
+           [1.]])
+
+    `meshgrid` is very useful to evaluate functions on a grid. If the
+    function depends on all coordinates, both dense and sparse outputs can be
+    used.
+
+    >>> x = np.linspace(-5, 5, 101)
+    >>> y = np.linspace(-5, 5, 101)
+    >>> # full coordinate arrays
+    >>> xx, yy = np.meshgrid(x, y)
+    >>> zz = np.sqrt(xx**2 + yy**2)
+    >>> xx.shape, yy.shape, zz.shape
+    ((101, 101), (101, 101), (101, 101))
+    >>> # sparse coordinate arrays
+    >>> xs, ys = np.meshgrid(x, y, sparse=True)
+    >>> zs = np.sqrt(xs**2 + ys**2)
+    >>> xs.shape, ys.shape, zs.shape
+    ((1, 101), (101, 1), (101, 101))
+    >>> np.array_equal(zz, zs)
+    True
+
+    >>> h = plt.contourf(x, y, zs)
+    >>> plt.axis('scaled')
+    >>> plt.colorbar()
+    >>> plt.show()
+    """
+    ndim = len(xi)
+
+    if indexing not in ['xy', 'ij']:
+        raise ValueError(
+            "Valid values for `indexing` are 'xy' and 'ij'.")
+
+    s0 = (1,) * ndim
+    output = [np.asanyarray(x).reshape(s0[:i] + (-1,) + s0[i + 1:])
+              for i, x in enumerate(xi)]
+
+    if indexing == 'xy' and ndim > 1:
+        # switch first and second axis
+        output[0].shape = (1, -1) + s0[2:]
+        output[1].shape = (-1, 1) + s0[2:]
+
+    if not sparse:
+        # Return the full N-D matrix (not only the 1-D vector)
+        output = np.broadcast_arrays(*output, subok=True)
+
+    if copy:
+        output = tuple(x.copy() for x in output)
+
+    return output
+
+
+def _delete_dispatcher(arr, obj, axis=None):
+    return (arr, obj)
+
+
+@array_function_dispatch(_delete_dispatcher)
+def delete(arr, obj, axis=None):
+    """
+    Return a new array with sub-arrays along an axis deleted. For a one
+    dimensional array, this returns those entries not returned by
+    `arr[obj]`.
+
+    Parameters
+    ----------
+    arr : array_like
+        Input array.
+    obj : slice, int, array-like of ints or bools
+        Indicate indices of sub-arrays to remove along the specified axis.
+
+        .. versionchanged:: 1.19.0
+            Boolean indices are now treated as a mask of elements to remove,
+            rather than being cast to the integers 0 and 1.
+
+    axis : int, optional
+        The axis along which to delete the subarray defined by `obj`.
+        If `axis` is None, `obj` is applied to the flattened array.
+
+    Returns
+    -------
+    out : ndarray
+        A copy of `arr` with the elements specified by `obj` removed. Note
+        that `delete` does not occur in-place. If `axis` is None, `out` is
+        a flattened array.
+
+    See Also
+    --------
+    insert : Insert elements into an array.
+    append : Append elements at the end of an array.
+
+    Notes
+    -----
+    Often it is preferable to use a boolean mask. For example:
+
+    >>> arr = np.arange(12) + 1
+    >>> mask = np.ones(len(arr), dtype=bool)
+    >>> mask[[0,2,4]] = False
+    >>> result = arr[mask,...]
+
+    Is equivalent to ``np.delete(arr, [0,2,4], axis=0)``, but allows further
+    use of `mask`.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> arr = np.array([[1,2,3,4], [5,6,7,8], [9,10,11,12]])
+    >>> arr
+    array([[ 1,  2,  3,  4],
+           [ 5,  6,  7,  8],
+           [ 9, 10, 11, 12]])
+    >>> np.delete(arr, 1, 0)
+    array([[ 1,  2,  3,  4],
+           [ 9, 10, 11, 12]])
+
+    >>> np.delete(arr, np.s_[::2], 1)
+    array([[ 2,  4],
+           [ 6,  8],
+           [10, 12]])
+    >>> np.delete(arr, [1,3,5], None)
+    array([ 1,  3,  5,  7,  8,  9, 10, 11, 12])
+
+    """
+    conv = _array_converter(arr)
+    arr, = conv.as_arrays(subok=False)
+
+    ndim = arr.ndim
+    arrorder = 'F' if arr.flags.fnc else 'C'
+    if axis is None:
+        if ndim != 1:
+            arr = arr.ravel()
+        # needed for np.matrix, which is still not 1d after being ravelled
+        ndim = arr.ndim
+        axis = ndim - 1
+    else:
+        axis = normalize_axis_index(axis, ndim)
+
+    slobj = [slice(None)] * ndim
+    N = arr.shape[axis]
+    newshape = list(arr.shape)
+
+    if isinstance(obj, slice):
+        start, stop, step = obj.indices(N)
+        xr = range(start, stop, step)
+        numtodel = len(xr)
+
+        if numtodel <= 0:
+            return conv.wrap(arr.copy(order=arrorder), to_scalar=False)
+
+        # Invert if step is negative:
+        if step < 0:
+            step = -step
+            start = xr[-1]
+            stop = xr[0] + 1
+
+        newshape[axis] -= numtodel
+        new = empty(newshape, arr.dtype, arrorder)
+        # copy initial chunk
+        if start == 0:
+            pass
+        else:
+            slobj[axis] = slice(None, start)
+            new[tuple(slobj)] = arr[tuple(slobj)]
+        # copy end chunk
+        if stop == N:
+            pass
+        else:
+            slobj[axis] = slice(stop - numtodel, None)
+            slobj2 = [slice(None)] * ndim
+            slobj2[axis] = slice(stop, None)
+            new[tuple(slobj)] = arr[tuple(slobj2)]
+        # copy middle pieces
+        if step == 1:
+            pass
+        else:  # use array indexing.
+            keep = ones(stop - start, dtype=bool)
+            keep[:stop - start:step] = False
+            slobj[axis] = slice(start, stop - numtodel)
+            slobj2 = [slice(None)] * ndim
+            slobj2[axis] = slice(start, stop)
+            arr = arr[tuple(slobj2)]
+            slobj2[axis] = keep
+            new[tuple(slobj)] = arr[tuple(slobj2)]
+
+        return conv.wrap(new, to_scalar=False)
+
+    if isinstance(obj, (int, integer)) and not isinstance(obj, bool):
+        single_value = True
+    else:
+        single_value = False
+        _obj = obj
+        obj = np.asarray(obj)
+        # `size == 0` to allow empty lists similar to indexing, but (as there)
+        # is really too generic:
+        if obj.size == 0 and not isinstance(_obj, np.ndarray):
+            obj = obj.astype(intp)
+        elif obj.size == 1 and obj.dtype.kind in "ui":
+            # For a size 1 integer array we can use the single-value path
+            # (most dtypes, except boolean, should just fail later).
+            obj = obj.item()
+            single_value = True
+
+    if single_value:
+        # optimization for a single value
+        if (obj < -N or obj >= N):
+            raise IndexError(
+                f"index {obj} is out of bounds for axis {axis} with "
+                f"size {N}")
+        if (obj < 0):
+            obj += N
+        newshape[axis] -= 1
+        new = empty(newshape, arr.dtype, arrorder)
+        slobj[axis] = slice(None, obj)
+        new[tuple(slobj)] = arr[tuple(slobj)]
+        slobj[axis] = slice(obj, None)
+        slobj2 = [slice(None)] * ndim
+        slobj2[axis] = slice(obj + 1, None)
+        new[tuple(slobj)] = arr[tuple(slobj2)]
+    else:
+        if obj.dtype == bool:
+            if obj.shape != (N,):
+                raise ValueError('boolean array argument obj to delete '
+                                 'must be one dimensional and match the axis '
+                                 f'length of {N}')
+
+            # optimization, the other branch is slower
+            keep = ~obj
+        else:
+            keep = ones(N, dtype=bool)
+            keep[obj,] = False
+
+        slobj[axis] = keep
+        new = arr[tuple(slobj)]
+
+    return conv.wrap(new, to_scalar=False)
+
+
+def _insert_dispatcher(arr, obj, values, axis=None):
+    return (arr, obj, values)
+
+
+@array_function_dispatch(_insert_dispatcher)
+def insert(arr, obj, values, axis=None):
+    """
+    Insert values along the given axis before the given indices.
+
+    Parameters
+    ----------
+    arr : array_like
+        Input array.
+    obj : slice, int, array-like of ints or bools
+        Object that defines the index or indices before which `values` is
+        inserted.
+
+        .. versionchanged:: 2.1.2
+            Boolean indices are now treated as a mask of elements to insert,
+            rather than being cast to the integers 0 and 1.
+
+        Support for multiple insertions when `obj` is a single scalar or a
+        sequence with one element (similar to calling insert multiple
+        times).
+    values : array_like
+        Values to insert into `arr`. If the type of `values` is different
+        from that of `arr`, `values` is converted to the type of `arr`.
+        `values` should be shaped so that ``arr[...,obj,...] = values``
+        is legal.
+    axis : int, optional
+        Axis along which to insert `values`.  If `axis` is None then `arr`
+        is flattened first.
+
+    Returns
+    -------
+    out : ndarray
+        A copy of `arr` with `values` inserted.  Note that `insert`
+        does not occur in-place: a new array is returned. If
+        `axis` is None, `out` is a flattened array.
+
+    See Also
+    --------
+    append : Append elements at the end of an array.
+    concatenate : Join a sequence of arrays along an existing axis.
+    delete : Delete elements from an array.
+
+    Notes
+    -----
+    Note that for higher dimensional inserts ``obj=0`` behaves very different
+    from ``obj=[0]`` just like ``arr[:,0,:] = values`` is different from
+    ``arr[:,[0],:] = values``. This is because of the difference between basic
+    and advanced :ref:`indexing <basics.indexing>`.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> a = np.arange(6).reshape(3, 2)
+    >>> a
+    array([[0, 1],
+           [2, 3],
+           [4, 5]])
+    >>> np.insert(a, 1, 6)
+    array([0, 6, 1, 2, 3, 4, 5])
+    >>> np.insert(a, 1, 6, axis=1)
+    array([[0, 6, 1],
+           [2, 6, 3],
+           [4, 6, 5]])
+
+    Difference between sequence and scalars,
+    showing how ``obj=[1]`` behaves different from ``obj=1``:
+
+    >>> np.insert(a, [1], [[7],[8],[9]], axis=1)
+    array([[0, 7, 1],
+           [2, 8, 3],
+           [4, 9, 5]])
+    >>> np.insert(a, 1, [[7],[8],[9]], axis=1)
+    array([[0, 7, 8, 9, 1],
+           [2, 7, 8, 9, 3],
+           [4, 7, 8, 9, 5]])
+    >>> np.array_equal(np.insert(a, 1, [7, 8, 9], axis=1),
+    ...                np.insert(a, [1], [[7],[8],[9]], axis=1))
+    True
+
+    >>> b = a.flatten()
+    >>> b
+    array([0, 1, 2, 3, 4, 5])
+    >>> np.insert(b, [2, 2], [6, 7])
+    array([0, 1, 6, 7, 2, 3, 4, 5])
+
+    >>> np.insert(b, slice(2, 4), [7, 8])
+    array([0, 1, 7, 2, 8, 3, 4, 5])
+
+    >>> np.insert(b, [2, 2], [7.13, False]) # type casting
+    array([0, 1, 7, 0, 2, 3, 4, 5])
+
+    >>> x = np.arange(8).reshape(2, 4)
+    >>> idx = (1, 3)
+    >>> np.insert(x, idx, 999, axis=1)
+    array([[  0, 999,   1,   2, 999,   3],
+           [  4, 999,   5,   6, 999,   7]])
+
+    """
+    conv = _array_converter(arr)
+    arr, = conv.as_arrays(subok=False)
+
+    ndim = arr.ndim
+    arrorder = 'F' if arr.flags.fnc else 'C'
+    if axis is None:
+        if ndim != 1:
+            arr = arr.ravel()
+        # needed for np.matrix, which is still not 1d after being ravelled
+        ndim = arr.ndim
+        axis = ndim - 1
+    else:
+        axis = normalize_axis_index(axis, ndim)
+    slobj = [slice(None)] * ndim
+    N = arr.shape[axis]
+    newshape = list(arr.shape)
+
+    if isinstance(obj, slice):
+        # turn it into a range object
+        indices = arange(*obj.indices(N), dtype=intp)
+    else:
+        # need to copy obj, because indices will be changed in-place
+        indices = np.array(obj)
+        if indices.dtype == bool:
+            if obj.ndim != 1:
+                raise ValueError('boolean array argument obj to insert '
+                                'must be one dimensional')
+            indices = np.flatnonzero(obj)
+        elif indices.ndim > 1:
+            raise ValueError(
+                "index array argument obj to insert must be one dimensional "
+                "or scalar")
+    if indices.size == 1:
+        index = indices.item()
+        if index < -N or index > N:
+            raise IndexError(f"index {obj} is out of bounds for axis {axis} "
+                             f"with size {N}")
+        if (index < 0):
+            index += N
+
+        # There are some object array corner cases here, but we cannot avoid
+        # that:
+        values = array(values, copy=None, ndmin=arr.ndim, dtype=arr.dtype)
+        if indices.ndim == 0:
+            # broadcasting is very different here, since a[:,0,:] = ... behaves
+            # very different from a[:,[0],:] = ...! This changes values so that
+            # it works likes the second case. (here a[:,0:1,:])
+            values = np.moveaxis(values, 0, axis)
+        numnew = values.shape[axis]
+        newshape[axis] += numnew
+        new = empty(newshape, arr.dtype, arrorder)
+        slobj[axis] = slice(None, index)
+        new[tuple(slobj)] = arr[tuple(slobj)]
+        slobj[axis] = slice(index, index + numnew)
+        new[tuple(slobj)] = values
+        slobj[axis] = slice(index + numnew, None)
+        slobj2 = [slice(None)] * ndim
+        slobj2[axis] = slice(index, None)
+        new[tuple(slobj)] = arr[tuple(slobj2)]
+
+        return conv.wrap(new, to_scalar=False)
+
+    elif indices.size == 0 and not isinstance(obj, np.ndarray):
+        # Can safely cast the empty list to intp
+        indices = indices.astype(intp)
+
+    indices[indices < 0] += N
+
+    numnew = len(indices)
+    order = indices.argsort(kind='mergesort')   # stable sort
+    indices[order] += np.arange(numnew)
+
+    newshape[axis] += numnew
+    old_mask = ones(newshape[axis], dtype=bool)
+    old_mask[indices] = False
+
+    new = empty(newshape, arr.dtype, arrorder)
+    slobj2 = [slice(None)] * ndim
+    slobj[axis] = indices
+    slobj2[axis] = old_mask
+    new[tuple(slobj)] = values
+    new[tuple(slobj2)] = arr
+
+    return conv.wrap(new, to_scalar=False)
+
+
+def _append_dispatcher(arr, values, axis=None):
+    return (arr, values)
+
+
+@array_function_dispatch(_append_dispatcher)
+def append(arr, values, axis=None):
+    """
+    Append values to the end of an array.
+
+    Parameters
+    ----------
+    arr : array_like
+        Values are appended to a copy of this array.
+    values : array_like
+        These values are appended to a copy of `arr`.  It must be of the
+        correct shape (the same shape as `arr`, excluding `axis`).  If
+        `axis` is not specified, `values` can be any shape and will be
+        flattened before use.
+    axis : int, optional
+        The axis along which `values` are appended.  If `axis` is not
+        given, both `arr` and `values` are flattened before use.
+
+    Returns
+    -------
+    append : ndarray
+        A copy of `arr` with `values` appended to `axis`.  Note that
+        `append` does not occur in-place: a new array is allocated and
+        filled.  If `axis` is None, `out` is a flattened array.
+
+    See Also
+    --------
+    insert : Insert elements into an array.
+    delete : Delete elements from an array.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> np.append([1, 2, 3], [[4, 5, 6], [7, 8, 9]])
+    array([1, 2, 3, ..., 7, 8, 9])
+
+    When `axis` is specified, `values` must have the correct shape.
+
+    >>> np.append([[1, 2, 3], [4, 5, 6]], [[7, 8, 9]], axis=0)
+    array([[1, 2, 3],
+           [4, 5, 6],
+           [7, 8, 9]])
+
+    >>> np.append([[1, 2, 3], [4, 5, 6]], [7, 8, 9], axis=0)
+    Traceback (most recent call last):
+        ...
+    ValueError: all the input arrays must have same number of dimensions, but
+    the array at index 0 has 2 dimension(s) and the array at index 1 has 1
+    dimension(s)
+
+    >>> a = np.array([1, 2], dtype=int)
+    >>> c = np.append(a, [])
+    >>> c
+    array([1., 2.])
+    >>> c.dtype
+    float64
+
+    Default dtype for empty ndarrays is `float64` thus making the output of dtype
+    `float64` when appended with dtype `int64`
+
+    """
+    arr = asanyarray(arr)
+    if axis is None:
+        if arr.ndim != 1:
+            arr = arr.ravel()
+        values = ravel(values)
+        axis = arr.ndim - 1
+    return concatenate((arr, values), axis=axis)
+
+
+def _digitize_dispatcher(x, bins, right=None):
+    return (x, bins)
+
+
+@array_function_dispatch(_digitize_dispatcher)
+def digitize(x, bins, right=False):
+    """
+    Return the indices of the bins to which each value in input array belongs.
+
+    =========  =============  ============================
+    `right`    order of bins  returned index `i` satisfies
+    =========  =============  ============================
+    ``False``  increasing     ``bins[i-1] <= x < bins[i]``
+    ``True``   increasing     ``bins[i-1] < x <= bins[i]``
+    ``False``  decreasing     ``bins[i-1] > x >= bins[i]``
+    ``True``   decreasing     ``bins[i-1] >= x > bins[i]``
+    =========  =============  ============================
+
+    If values in `x` are beyond the bounds of `bins`, 0 or ``len(bins)`` is
+    returned as appropriate.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array to be binned. Prior to NumPy 1.10.0, this array had to
+        be 1-dimensional, but can now have any shape.
+    bins : array_like
+        Array of bins. It has to be 1-dimensional and monotonic.
+    right : bool, optional
+        Indicating whether the intervals include the right or the left bin
+        edge. Default behavior is (right==False) indicating that the interval
+        does not include the right edge. The left bin end is open in this
+        case, i.e., bins[i-1] <= x < bins[i] is the default behavior for
+        monotonically increasing bins.
+
+    Returns
+    -------
+    indices : ndarray of ints
+        Output array of indices, of same shape as `x`.
+
+    Raises
+    ------
+    ValueError
+        If `bins` is not monotonic.
+    TypeError
+        If the type of the input is complex.
+
+    See Also
+    --------
+    bincount, histogram, unique, searchsorted
+
+    Notes
+    -----
+    If values in `x` are such that they fall outside the bin range,
+    attempting to index `bins` with the indices that `digitize` returns
+    will result in an IndexError.
+
+    .. versionadded:: 1.10.0
+
+    `numpy.digitize` is  implemented in terms of `numpy.searchsorted`.
+    This means that a binary search is used to bin the values, which scales
+    much better for larger number of bins than the previous linear search.
+    It also removes the requirement for the input array to be 1-dimensional.
+
+    For monotonically *increasing* `bins`, the following are equivalent::
+
+        np.digitize(x, bins, right=True)
+        np.searchsorted(bins, x, side='left')
+
+    Note that as the order of the arguments are reversed, the side must be too.
+    The `searchsorted` call is marginally faster, as it does not do any
+    monotonicity checks. Perhaps more importantly, it supports all dtypes.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> x = np.array([0.2, 6.4, 3.0, 1.6])
+    >>> bins = np.array([0.0, 1.0, 2.5, 4.0, 10.0])
+    >>> inds = np.digitize(x, bins)
+    >>> inds
+    array([1, 4, 3, 2])
+    >>> for n in range(x.size):
+    ...   print(bins[inds[n]-1], "<=", x[n], "<", bins[inds[n]])
+    ...
+    0.0 <= 0.2 < 1.0
+    4.0 <= 6.4 < 10.0
+    2.5 <= 3.0 < 4.0
+    1.0 <= 1.6 < 2.5
+
+    >>> x = np.array([1.2, 10.0, 12.4, 15.5, 20.])
+    >>> bins = np.array([0, 5, 10, 15, 20])
+    >>> np.digitize(x,bins,right=True)
+    array([1, 2, 3, 4, 4])
+    >>> np.digitize(x,bins,right=False)
+    array([1, 3, 3, 4, 5])
+    """
+    x = _nx.asarray(x)
+    bins = _nx.asarray(bins)
+
+    # here for compatibility, searchsorted below is happy to take this
+    if np.issubdtype(x.dtype, _nx.complexfloating):
+        raise TypeError("x may not be complex")
+
+    mono = _monotonicity(bins)
+    if mono == 0:
+        raise ValueError("bins must be monotonically increasing or decreasing")
+
+    # this is backwards because the arguments below are swapped
+    side = 'left' if right else 'right'
+    if mono == -1:
+        # reverse the bins, and invert the results
+        return len(bins) - _nx.searchsorted(bins[::-1], x, side=side)
+    else:
+        return _nx.searchsorted(bins, x, side=side)
