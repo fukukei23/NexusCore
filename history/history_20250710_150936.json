@@ -1,0 +1,18 @@
+[
+  {
+    "role": "user",
+    "content": "こんにちは"
+  },
+  {
+    "role": "assistant",
+    "content": ""
+  },
+  {
+    "role": "user",
+    "content": "こんばんは"
+  },
+  {
+    "role": "assistant",
+    "content": ""
+  }
+]

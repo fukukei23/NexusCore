@@ -1,0 +1,46 @@
+{
+  "tech_stack": {
+    "frameworks": [
+      "gradio",
+      "openai",
+      "pytest",
+      "streamlit"
+    ],
+    "python_version": "3.11+"
+  },
+  "file_structure": {
+    "has_src_dir": true,
+    "has_tests_dir": true,
+    "has_venv": true
+  },
+  "dependencies": {
+    "external": [
+      "gradio",
+      "openai",
+      "pytest"
+    ],
+    "internal": [
+      "nexuscore"
+    ]
+  },
+  "environment": {
+    "platform": "nt",
+    "env_file_exists": true,
+    "in_venv": true
+  },
+  "dev_policy": {
+    "test_import_policy": "関数を直接埋め込み",
+    "error_language": "日本語",
+    "quality_requirements": [
+      "docstring必須",
+      "エラーハンドリング必須"
+    ],
+    "security_policy": [
+      "APIキー環境変数管理",
+      "ハードコーディング禁止"
+    ],
+    "configured_at": "2025-08-06T11:53:32.713323"
+  },
+  "last_updated": "2025-08-06T11:53:32.713323",
+  "version": "1.0-safe"
+}
