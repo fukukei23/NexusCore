@@ -1,8 +1,17 @@
 # ==============================================================================
-# フォルダ: src/nexuscore/config
-# ファイル: config.py
-# 目的  : アプリ全体の静的構成と、自動運転ポリシーのベースライン/上限を集中管理
-# 注意  : 環境変数で上書き可能。既存の AppConfig に項目を拡張しています。
+# 操作するソフト: VSCode (または任意のテキストエディタ)
+# レジストリ/フォルダ: C:\Users\USER\tools\NexusCore\src\nexuscore\config\
+# ファイル名: config.py
+# 日付: 2025/09/02
+#
+# 使用方法:
+#   この内容で既存のファイルを上書きしてください。
+#   あなたの最新のAppConfigクラス設計を完全に維持しつつ、ImportErrorを解決します。
+#
+# 改修内容:
+#   - ファイルの末尾で `config = AppConfig()` というインスタンスを生成。
+#     これにより、他のモジュールは `from .config import config` で安全に設定を
+#     インポートできるようになり、循環参照の問題が解消されます。
 # ==============================================================================
 
 from __future__ import annotations
@@ -62,3 +71,8 @@ class AppConfig:
             r"-----BEGIN (?:RSA|EC) PRIVATE KEY-----",
         ],
     }
+
+# --- シングルトンインスタンスのエクスポート ---
+# 他のファイルは `from nexuscore.config.config import config` でこのインスタンスをインポートする
+config = AppConfig()
+

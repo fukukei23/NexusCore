@@ -1,0 +1,10 @@
+❌ 例外が発生しました:
+UnicodeEncodeError('cp932', '👁\u200d🗨 プレビュー完了 (target=48.0MB)  -> C:\\Users\\USER\\tools\\NexusCore\\logs\\NexusCore_export_dryrun_20250828_075409.txt', 0, 1, 'illegal multibyte sequence')
+
+詳細:
+Traceback (most recent call last):
+  File "C:\Users\USER\tools\NexusCore\tools\code_export_gemini_fixed.py", line 580, in main
+    export_main(
+  File "C:\Users\USER\tools\NexusCore\tools\code_export_gemini_fixed.py", line 502, in export_main
+    print(f"👁‍🗨 プレビュー完了 (target={target_mb}MB)  -> {log.path}")
+UnicodeEncodeError: 'cp932' codec can't encode character '\U0001f441' in position 0: illegal multibyte sequence

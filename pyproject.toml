@@ -39,7 +39,7 @@ classifiers = [
 #  - コアユーティリティ: Git, HTTP, .env, YAML, 差分, 色付け
 #  - 数値/データ: numpy / pandas / scipy / scikit-learn
 #  - 解析: tree-sitter
-#  - Web/UI: Flask 系 + Gradio（FastAPI は optional に分離）
+#  - Web: Flask 系（UI は extras:ui に分離）
 dependencies = [
   "openai>=1.0.0",
   "anthropic>=0.7.0",
@@ -63,32 +63,38 @@ dependencies = [
   "flask>=2.3.0",
   "flask-cors>=4.0.0",
   "gunicorn>=20.1.0",
-  "werkzeug>=2.3.0",
-
-  "gradio>=4.0.0"
+  "werkzeug>=2.3.0"
 ]
 
-# --- 用途別オプション依存（extras） ---
+# --- オプション依存（extras） ---
 [project.optional-dependencies]
 # 開発（整形/静的解析/テスト）
 dev = [
-  "black>=23.0.0",
-  "isort>=5.0.0",
-  "autopep8>=2.0.0",
-  "flake8>=6.0.0",
-  "mypy>=1.0.0",
+  "black>=24.0",
+  "isort>=5.0",
+  "mypy>=1.0",
   "ruff>=0.1.0",
-  "pytest>=7.0.0",
-  "pytest-asyncio>=0.21.0",
-  "pytest-cov>=4.0.0"
-]
-
-# テスト拡張（モック等）
-test = [
-  "pytest>=7.0.0",
+  "pytest>=8.0",
   "pytest-asyncio>=0.21.0",
   "pytest-cov>=4.0.0",
   "pytest-mock>=3.10.0"
+]
+
+# テスト拡張（任意で anyio 等）
+test = [
+  "pytest-anyio"
+]
+
+# データベース (PostgreSQL + Redis)
+database = [
+  "sqlalchemy>=2.0",
+  "psycopg2-binary",
+  "redis>=5.0"
+]
+
+# UI (Gradio)
+ui = [
+  "gradio>=4.0"
 ]
 
 # ドキュメント
@@ -105,8 +111,8 @@ audio = [
   "pydub>=0.25.0",
   "soundfile>=0.12.0",
   "sounddevice>=0.4.0"
-  # 注: Python 3.13+ は aifc 廃止のため互換が必要
-  # "standard-aifc; python_version >= '3.13'"
+  # 注: Python 3.13+ の互換は将来サポート時に environment marker で追加
+  # 例: "standard-aifc; python_version >= '3.13'"
 ]
 
 # Web/API（FastAPI 系は分離）

@@ -1,0 +1,124 @@
+
+--- 過去の圧縮実績から学習した圧縮率を適用 ---
+  - .py: 0.22 (実績: 0.11, 重み: 0.45)
+  - .txt: 0.13 (実績: 0.11, 重み: 0.95)
+  - .md: 0.12 (実績: 0.11, 重み: 0.95)
+  - .html: 0.12 (実績: 0.11, 重み: 0.95)
+  - .md  set-clipboard: 0.50 (実績: 0.11, 重み: 0.00)
+  - .toml: 0.35 (実績: 0.11, 重み: 0.00)
+  - .json: 0.12 (実績: 0.11, 重み: 0.95)
+  - .csv: 0.50 (実績: 0.11, 重み: 0.01)
+  - : 0.40 (実績: 0.11, 重み: 0.25)
+  - .pem: 0.50 (実績: 0.11, 重み: 0.00)
+  - .c: 0.24 (実績: 0.11, 重み: 0.66)
+  - .h: 0.50 (実績: 0.11, 重み: 0.00)
+  - .ts: 0.28 (実績: 0.11, 重み: 0.00)
+  - .yml: 0.40 (実績: 0.11, 重み: 0.00)
+  - .ps1: 0.50 (実績: 0.11, 重み: 0.01)
+  - .code-workspace: 0.50 (実績: 0.11, 重み: 0.00)
+  - .sh: 0.45 (実績: 0.11, 重み: 0.00)
+  - .cfg: 0.50 (実績: 0.11, 重み: 0.00)
+  - .js: 0.27 (実績: 0.11, 重み: 0.03)
+  - .css: 0.25 (実績: 0.11, 重み: 0.02)
+  - .bat: 0.50 (実績: 0.11, 重み: 0.00)
+  - .lock: 0.50 (実績: 0.11, 重み: 0.00)
+  - .sum: 0.50 (実績: 0.11, 重み: 0.00)
+  - .swift: 0.50 (実績: 0.11, 重み: 0.00)
+  - .rs: 0.50 (実績: 0.11, 重み: 0.00)
+  - .scm: 0.50 (実績: 0.11, 重み: 0.00)
+  - .gyp: 0.50 (実績: 0.11, 重み: 0.00)
+  - .vsix: 0.50 (実績: 0.11, 重み: 0.00)
+  - .ini: 0.50 (実績: 0.11, 重み: 0.00)
+  - .cff: 0.50 (実績: 0.11, 重み: 0.00)
+  - .cc: 0.50 (実績: 0.11, 重み: 0.00)
+  - .tag: 0.50 (実績: 0.11, 重み: 0.00)
+  - .go: 0.50 (実績: 0.11, 重み: 0.00)
+  - .tx: 0.50 (実績: 0.11, 重み: 0.00)
+  - .exp: 0.50 (実績: 0.11, 重み: 0.00)
+  - .map: 0.50 (実績: 0.11, 重み: 0.00)
+...学習結果の適用完了。
+
+--- ファイル収集開始: C:\Users\USER\tools\NexusCore ---
+  - 収集完了: 1238 ファイル
+
+--- Importグラフ解析 ---
+  - 解析完了: 4ノード, 2エッジ
+
+--- ファイルスコアリング ---
+
+--- ファイル選択結果: 1230件 / 生データ合計 37.71 MB / 予測ZIPサイズ 5.35 MB ---
+  - (Top) run_vc_scout.py (score: 22.67)
+  - (Top) healing_sandbox\src\agents\orchestrator.py (score: 20.00)
+  - (Top) src\nexuscore\core\orchestrator.py (score: 20.00)
+  - (Top) tests\core\test_orchestrator.py (score: 20.00)
+  - (Top) tests\core\test_orchestrator_enhanced.py (score: 20.00)
+  - (Top) tests\core\test_orchestrator_mega.py (score: 20.00)
+  - (Top) tests\core\test_orchestrator_ultimate.py (score: 20.00)
+  - (Top) healing_sandbox\app\main.py (score: 18.00)
+  - (Top) my-crm-app\app\main.py (score: 18.00)
+  - (Top) my-crm-app\tests\test_main.py (score: 18.00)
+  - ...他 1220件
+
+--- サイズ超過等により除外されたファイル (上位10件) ---
+- 437.90 MB  output\NexusCore_combined_20250806_224858.txt
+- 324.50 MB  output\NexusCore_combined_20250801_130327.txt
+- 42.07 MB  exported_projects\app_20250703_223016\app\utils\models\deeplabv3_mnv3.onnx
+- 42.07 MB  exported_projects\project_export_m73owrzi\app\utils\models\deeplabv3_mnv3.onnx
+- 42.07 MB  exported_projects\project_export_xb_l70t8\app\utils\models\deeplabv3_mnv3.onnx
+- 42.07 MB  exported_projects\project_export_y7xxp1v8\app\utils\models\deeplabv3_mnv3.onnx
+- 33.97 MB  src\project_structure.json
+- 7.29 MB  src\project_structure.md
+
+--- 結合コードを生成中 ---
+  - 生成完了
+
+--- ZIPアーカイブ作成: C:\Users\USER\tools\NexusCore\exports\NexusCore_gemini-chronicle_20250830_190545.zip ---
+
+--- 今回の圧縮実績を統計に記録 ---
+  - .py: 生データ +2310.8 KB
+  - .txt: 生データ +10510.8 KB
+  - .md: 生データ +1809.0 KB
+  - .html: 生データ +12293.2 KB
+  - .md  set-clipboard: 生データ +3.6 KB
+  - .toml: 生データ +8.1 KB
+  - .json: 生データ +6627.1 KB
+  - .csv: 生データ +53.0 KB
+  - : 生データ +1266.9 KB
+  - .pem: 生データ +3.8 KB
+  - .c: 生データ +3365.1 KB
+  - .h: 生データ +18.5 KB
+  - .ts: 生データ +6.8 KB
+  - .yaml: 生データ +0.5 KB
+  - .yml: 生データ +16.4 KB
+  - .ps1: 生データ +36.8 KB
+  - .code-workspace: 生データ +1.2 KB
+  - .sh: 生データ +9.4 KB
+  - .cfg: 生データ +2.4 KB
+  - .js: 生データ +162.1 KB
+  - .css: 生データ +78.3 KB
+  - .bat: 生データ +2.1 KB
+  - .lock: 生データ +2.4 KB
+  - .sum: 生データ +3.8 KB
+  - .swift: 生データ +1.4 KB
+  - .rs: 生データ +2.5 KB
+  - .scm: 生データ +2.3 KB
+  - .vsix: 生データ +3.6 KB
+  - .gyp: 生データ +0.6 KB
+  - .ini: 生データ +1.3 KB
+  - .cff: 生データ +0.8 KB
+  - .cc: 生データ +0.6 KB
+  - .tag: 生データ +1.9 KB
+  - .resolved: 生データ +0.3 KB
+  - .go: 生データ +0.6 KB
+  - .in: 生データ +0.3 KB
+  - .template: 生データ +0.2 KB
+  - .pbtxt: 生データ +0.1 KB
+  - .tx: 生データ +2.8 KB
+  - .mod: 生データ +0.2 KB
+  - .pyi: 生データ +0.1 KB
+  - .exp: 生データ +0.7 KB
+  - .mjs: 生データ +0.1 KB
+  - .map: 生データ +4.2 KB
+  - 統計ファイルを更新しました: C:\Users\USER\tools\NexusCore\exports\compression_stats.json
+✅ 年代記パッケージのエクスポート完了: C:\Users\USER\tools\NexusCore\exports\NexusCore_gemini-chronicle_20250830_190545.zip
+  - 予測ZIP: 5.35 MB / 実際ZIP: 3.59 MB (予測精度: 67.1%)
