@@ -1,0 +1,10 @@
+{
+  "include_exts": [".py", ".md", ".toml", ".yaml", ".yml", ".json", ".ini", ".cfg", ".txt"],
+  "exclude_globs": [
+    "**/.git/**", "**/.venv/**", "**/venv/**", "**/__pycache__/**", "**/node_modules/**",
+    "**/*.log", "**/*.zip", "**/*.7z", "**/*.tar*", "**/*.png", "**/*.jpg", "**/*.pdf"
+  ],
+  "head_tail_lines": 120,
+  "zip_part_size_mb": 48,
+  "repo_name": "NexusCore"
+}

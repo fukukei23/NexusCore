@@ -1,0 +1,79 @@
+
+--- 過去の圧縮実績から学習した圧縮率を適用 ---
+  - .py: 0.20 (実績: 0.20, 重み: 0.95)
+  - .txt: 0.12 (実績: 0.10, 重み: 0.95)
+  - .md: 0.12 (実績: 0.11, 重み: 0.95)
+  - .html: 0.11 (実績: 0.10, 重み: 0.95)
+  - .md  set-clipboard: 0.50 (実績: 0.10, 重み: 0.00)
+  - .toml: 0.35 (実績: 0.10, 重み: 0.00)
+  - .json: 0.11 (実績: 0.10, 重み: 0.95)
+  - .csv: 0.49 (実績: 0.10, 重み: 0.03)
+  - : 0.33 (実績: 0.11, 重み: 0.43)
+  - .pem: 0.50 (実績: 0.10, 重み: 0.00)
+  - .c: 0.12 (実績: 0.10, 重み: 0.95)
+  - .h: 0.50 (実績: 0.10, 重み: 0.01)
+  - .ts: 0.28 (実績: 0.10, 重み: 0.00)
+  - .yaml: 0.40 (実績: 0.15, 重み: 0.00)
+  - .yml: 0.40 (実績: 0.10, 重み: 0.01)
+  - .ps1: 0.49 (実績: 0.10, 重み: 0.02)
+  - .code-workspace: 0.50 (実績: 0.10, 重み: 0.00)
+  - .sh: 0.45 (実績: 0.10, 重み: 0.00)
+  - .cfg: 0.50 (実績: 0.10, 重み: 0.00)
+  - .js: 0.27 (実績: 0.10, 重み: 0.08)
+  - .css: 0.24 (実績: 0.10, 重み: 0.04)
+  - .bat: 0.50 (実績: 0.11, 重み: 0.00)
+  - .lock: 0.50 (実績: 0.10, 重み: 0.00)
+  - .sum: 0.50 (実績: 0.10, 重み: 0.00)
+  - .swift: 0.50 (実績: 0.10, 重み: 0.00)
+  - .rs: 0.50 (実績: 0.10, 重み: 0.00)
+  - .scm: 0.50 (実績: 0.10, 重み: 0.00)
+  - .gyp: 0.50 (実績: 0.10, 重み: 0.00)
+  - .vsix: 0.50 (実績: 0.10, 重み: 0.00)
+  - .ini: 0.50 (実績: 0.10, 重み: 0.00)
+  - .cff: 0.50 (実績: 0.10, 重み: 0.00)
+  - .cc: 0.50 (実績: 0.10, 重み: 0.00)
+  - .tag: 0.50 (実績: 0.11, 重み: 0.00)
+  - .resolved: 0.50 (実績: 0.10, 重み: 0.00)
+  - .go: 0.50 (実績: 0.10, 重み: 0.00)
+  - .in: 0.50 (実績: 0.10, 重み: 0.00)
+  - .tx: 0.50 (実績: 0.10, 重み: 0.00)
+  - .exp: 0.50 (実績: 0.11, 重み: 0.00)
+  - .map: 0.50 (実績: 0.11, 重み: 0.00)
+...学習結果の適用完了。
+
+--- ファイル収集開始: C:\Users\USER\tools\atelier-kyo-manager ---
+  - 収集完了: 1693 ファイル
+
+--- Importグラフ解析 ---
+  - 解析完了: 16ノード, 14エッジ
+
+--- ファイルスコアリング ---
+
+--- ファイル選択結果: 198件 / 生データ合計 47.66 MB ---
+  - (Top) app\utils\ai_research_orchestrator.py (score: 20.00)
+  - (Top) run_orchestrator.py (score: 18.00)
+  - (Top) tests\test_orchestrator.py (score: 18.00)
+  - (Top) export\atelier-kyo-manager_export_20250811_005523\source_code\atelier-kyo-manager\price_optimization_system\main.py (score: 16.00)
+  - (Top) price_optimization_system\main.py (score: 16.00)
+  - (Top) exports_atelier\atelier-kyo-manager_AIAnalysisPack(forGemini)_20250825_120549\README.md (score: 5.25)
+  - (Top) exports_atelier\atelier-kyo-manager_AIAnalysisPack(forGemini)_20250824_115511\README.md (score: 4.91)
+  - (Top) exports_atelier\atelier-kyo-manager_AIAnalysisPack(forGemini)_20250824_074807\README.md (score: 3.58)
+  - (Top) config.py (score: 22.67)
+  - (Top) tests\run_test.py (score: 16.00)
+  - ...他 188件
+
+--- サイズ超過等により除外されたファイル (上位10件) ---
+- 42.07 MB  app\utils\models\deeplabv3_mnv3.onnx
+- 10.31 MB  exports_atelier\atelier-kyo-manager_AIAnalysisPack(forGemini)_20250825_120549\COMBINED_CODE.py
+- 10.28 MB  exports_atelier\atelier-kyo-manager_AIAnalysisPack(forGemini)_20250824_074807\COMBINED_CODE.py
+- 10.28 MB  exports_atelier\atelier-kyo-manager_AIAnalysisPack(forGemini)_20250824_115511\COMBINED_CODE.py
+- 8.31 MB  instance\pw_profile\Default\Code Cache\js\9fc108b9e3480d64_0
+- 8.01 MB  instance\pw_profile_supplier\Default\Cache\Cache_Data\data_3
+- 6.54 MB  export\atelier-kyo-manager_export_20250811_005523\summary_def_class.txt
+- 4.01 MB  instance\pw_profile\Default\Cache\Cache_Data\data_3
+- 4.01 MB  instance\pw_profile\GrShaderCache\data_3
+- 4.01 MB  instance\pw_profile_supplier\GrShaderCache\data_3
+
+--- 結合コードを生成中 ---
+  - 生成完了
+✅ シングルファイルレポートのエクスポート完了: C:\Users\USER\tools\NexusCore\exports\atelier-kyo-manager_gemini-single-file_20250905_102154.md

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>画像収集ツール</title>
+</head>
+<body>
+    <h1>画像収集ツール</h1>
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        商品名: <input type="text" name="keyword" required>
+        <br>
+        <label><input type="checkbox" name="use_bing" checked> Bing画像検索</label>
+        <label><input type="checkbox" name="use_google" checked> Google画像検索</label>
+        <br>
+        <input type="submit" value="画像収集">
+    </form>
+    <p>{{ message }}</p>
+</body>
+</html>

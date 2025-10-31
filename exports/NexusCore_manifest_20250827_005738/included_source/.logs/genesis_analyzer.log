@@ -1,0 +1,14 @@
+2025-08-09 13:48:06,260 - INFO - Project root: C:\Users\USER\tools\NexusCore
+2025-08-09 13:48:06,260 - INFO - Mode: snapshot
+2025-08-09 13:48:06,260 - INFO - Includes: ['src', 'tests', 'app', 'tools', 'evaluation', 'exports', 'dev_tools']
+2025-08-09 13:48:06,260 - INFO - Excludes: ['.git', '.venv', '__pycache__', 'node_modules', 'build', 'dist', '.logs', '.gradio', 'exports/_imports', 'exported_projects', 'sandbox_output', 'deploy_output', 'output', '*.zip', '*.7z', '*.log', '*.png', '*.jpg', '*.gif']
+2025-08-09 13:48:06,260 - INFO - Running SNAPSHOT mode
+2025-08-09 15:09:28,082 - INFO - Snapshot appended to Chronicle
+2025-08-09 15:09:28,082 - INFO - ✅ Completed
+2025-08-11 00:31:25,215 - INFO - Project root: C:\Users\USER\tools\NexusCore
+2025-08-11 00:31:25,215 - INFO - Mode: snapshot
+2025-08-11 00:31:25,215 - INFO - Includes: ['src', 'tests', 'app', 'tools', 'evaluation', 'exports', 'dev_tools']
+2025-08-11 00:31:25,215 - INFO - Excludes: ['.git', '.venv', '__pycache__', 'node_modules', 'build', 'dist', '.logs', '.gradio', 'exports/_imports', 'exported_projects', 'sandbox_output', 'deploy_output', 'output', '*.zip', '*.7z', '*.log', '*.png', '*.jpg', '*.gif']
+2025-08-11 00:31:25,215 - INFO - Running SNAPSHOT mode
+2025-08-11 01:12:37,352 - INFO - Snapshot appended to Chronicle
+2025-08-11 01:12:37,352 - INFO - ✅ Completed

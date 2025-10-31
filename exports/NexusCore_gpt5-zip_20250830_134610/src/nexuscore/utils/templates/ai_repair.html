@@ -1,0 +1,23 @@
+"""
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>AIコード修復</title>
+</head>
+<body>
+    <h1>AIコード修復ページ</h1>
+    <form method="post">
+        <textarea name="code_text" rows="20" cols="100" placeholder="修正対象のPythonコードを貼り付けてください">{{ code_text }}</textarea>
+        <br>
+        <button type="submit">修復＆実行</button>
+    </form>
+    {% if result_code %}
+    <h2>✅ 修正済コード:</h2>
+    <pre>{{ result_code }}</pre>
+    <h2>🖥 実行出力:</h2>
+    <pre>{{ output }}</pre>
+    {% endif %}
+</body>
+</html>
+"""

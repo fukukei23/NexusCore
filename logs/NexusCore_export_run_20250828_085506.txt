@@ -1,0 +1,4 @@
+Profile=gpt5-50, Target=49.5MB, Roots=['C:\\Users\\USER\\tools\\NexusCore']
+Manifest: C:\Users\USER\tools\NexusCore\exports\NexusCore_manifest_20250828_085506
+ZIP: C:\Users\USER\tools\NexusCore\exports\NexusCore_gpt5-50_20250828_085506.zip
+Log: C:\Users\USER\tools\NexusCore\logs\NexusCore_export_run_20250828_085506.txt

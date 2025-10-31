@@ -1,0 +1,139 @@
+{
+  "generated_at": "2025-08-10T07:02:14.847830Z",
+  "currency": "USD",
+  "unit": "1M tokens",
+  "models": {
+    "gpt-5": {
+      "in": 10.0,
+      "out": 30.0,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "custom_estimate",
+      "note": "社内仮置き。公式更新に合わせて要修正"
+    },
+    "gpt-5-mini": {
+      "in": 1.0,
+      "out": 3.0,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "custom_estimate",
+      "note": "社内仮置き"
+    },
+    "gpt-4o": {
+      "in": 2.5,
+      "out": 10.0,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual"
+    },
+    "gpt-4o-mini": {
+      "in": 0.5,
+      "out": 1.5,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual"
+    },
+    "gemini-1.5-flash-latest": {
+      "in": 0.0375,
+      "out": 0.15,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual",
+      "note": "階層により変動、低い方の目安"
+    },
+    "gemini-1.5-pro-latest": {
+      "in": 3.5,
+      "out": 10.5,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual"
+    },
+    "claude-3.5-sonnet": {
+      "in": 3.0,
+      "out": 15.0,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual"
+    },
+    "claude-3.5-haiku": {
+      "in": 0.8,
+      "out": 4.0,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual"
+    },
+    "deepseek-r1": {
+      "in": 0.55,
+      "out": 2.19,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual"
+    },
+    "deepseek-chat": {
+      "in": 0.27,
+      "out": 1.1,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual"
+    },
+    "kimi-k2": {
+      "in": 0.15,
+      "out": 2.5,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual",
+      "note": "公開情報にブレ有り。要自社確認"
+    },
+    "command-r-plus": {
+      "in": 2.5,
+      "out": 10.0,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual"
+    },
+    "mistral-small": {
+      "in": 0.25,
+      "out": 0.6,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual"
+    },
+    "mistral-medium": {
+      "in": 2.7,
+      "out": 8.1,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual"
+    },
+    "llama-3-8b-groq": {
+      "in": 0.0,
+      "out": 0.0,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual",
+      "note": "Groq 一部無料枠想定（変動あり）"
+    },
+    "llama-3-70b": {
+      "in": 1.0,
+      "out": 2.0,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual",
+      "note": "ベンダ依存の推定"
+    },
+    "qwen-1.5-7b": {
+      "in": 0.1,
+      "out": 0.2,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual"
+    },
+    "yi-1.5-9b": {
+      "in": 0.2,
+      "out": 0.4,
+      "unit": "1M tokens",
+      "currency": "USD",
+      "source": "manual"
+    }
+  }
+}

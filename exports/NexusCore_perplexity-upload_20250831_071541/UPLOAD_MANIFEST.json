@@ -1,0 +1,43 @@
+{
+  "timestamp_utc": "2025-08-30T22:16:06.644120",
+  "profile": "perplexity-upload",
+  "upload_summary": "Perplexity Pro\u3078\u306e\u30a2\u30c3\u30d7\u30ed\u30fc\u30c9\u51e6\u7406\u5b8c\u4e86\u30020/6\u500b\u306e\u30d5\u30a1\u30a4\u30eb\u304c\u30a2\u30c3\u30d7\u30ed\u30fc\u30c9\u3055\u308c\u307e\u3057\u305f\u3002",
+  "uploaded_files": [
+    {
+      "file_name": "PROJECT_CHRONICLE.txt",
+      "size_bytes": 355,
+      "sha256_hash": "a5ea422833c0f655e4c820d3f9a476e3a2572c13643532ca60a415a6866067d0",
+      "upload_status": "error"
+    },
+    {
+      "file_name": "COMBINED_CODE_1.txt",
+      "size_bytes": 1977365,
+      "sha256_hash": "48d9c4a2af414ab68d32287bcd9e890b0c8e18d287036413123347192ca80a98",
+      "upload_status": "error"
+    },
+    {
+      "file_name": "COMBINED_CODE_2.txt",
+      "size_bytes": 2105042,
+      "sha256_hash": "ef025e4899ff818d460a2423125a8f1418d9a988df8fcab962f61266a1c27831",
+      "upload_status": "error"
+    },
+    {
+      "file_name": "COMBINED_CODE_3.txt",
+      "size_bytes": 2100700,
+      "sha256_hash": "25bb06ac58022b299817b9c1de8cd2db136a1de48dca2704fd8815ef3b866fee",
+      "upload_status": "error"
+    },
+    {
+      "file_name": "COMBINED_CODE_4.txt",
+      "size_bytes": 2135540,
+      "sha256_hash": "2618660d1264a72801a02329e880c817f695a91764d455b707a468329988a6fd",
+      "upload_status": "error"
+    },
+    {
+      "file_name": "COMBINED_CODE_5.txt",
+      "size_bytes": 163964,
+      "sha256_hash": "0c66c3b31c587b0057648945368ecad41fd9992acaef5150a9a949ed9793ba7f",
+      "upload_status": "error"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "FKB-SUGGESTION-0001",
+    "error_signature": "ImportError: cannot import name '[a-zA-Z0-9_]+' from '[a-zA-Z0-9_\\.]+'",
+    "cause": "関数名が間違っているか、存在しない関数をインポートしようとしている。",
+    "target": "test_file",
+    "solution_pattern": {
+      "type": "llm_diagnose_and_fix",
+      "instruction": "テストコードでインポートしようとしている関数の名前が、ソースコードで定義されている関数名と一致しているか確認してください。\n\nこのケースでは、`app.calculator` から `add` という関数をインポートしようとしていますが、`app.calculator.py` には `add` という関数は定義されていません。正しくは `add_two_numbers` です。\n\nよって、`tests/test_calculator.py` の1行目を以下のように修正します。\n\n```python\nfrom app.calculator import add_two_numbers as add\n```\n\nまたは、すべての `add` の呼び出しを `add_two_numbers` に変更します。\n\n```python\nfrom app.calculator import add_two_numbers\n\n# ...\n\nassert add_two_numbers(2, 3) == 5\n# ...\n```"
+    },
+    "description": "インポートする関数名の誤りを修正することで、ImportErrorを解決する。"
+  }
+]

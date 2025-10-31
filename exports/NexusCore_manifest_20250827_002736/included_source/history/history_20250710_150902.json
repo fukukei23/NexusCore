@@ -1,0 +1,10 @@
+[
+  {
+    "role": "user",
+    "content": "こんにちは"
+  },
+  {
+    "role": "assistant",
+    "content": ""
+  }
+]

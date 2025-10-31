@@ -1,0 +1,20 @@
+{
+  "gpt-5": {
+    "input": 0.01,
+    "output": 0.03,
+    "unit": "1K tokens",
+    "currency": "USD"
+  },
+  "gpt-5-mini": {
+    "input": 0.003,
+    "output": 0.006,
+    "unit": "1K tokens",
+    "currency": "USD"
+  },
+  "gemini-1.5-flash-latest": {
+    "input": 0.00025,
+    "output": 0.0005,
+    "unit": "1K tokens",
+    "currency": "USD"
+  }
+}

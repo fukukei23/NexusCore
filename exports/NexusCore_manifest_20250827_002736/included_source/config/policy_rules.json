@@ -1,0 +1,34 @@
+[
+  {
+    "policy_id": "POLICY_SEC_001",
+    "description": "Prohibit hard-coded API keys or secrets.",
+    "target_file_pattern": "\\.py$",
+    "detection_pattern": "(api_key|secret|password)\\s*=\\s*['\"](?!env\\(|os\\.getenv)[a-zA-Z0-9_]{16,}['\"]",
+    "severity": "CRITICAL",
+    "suggestion": "Use environment variables (e.g., os.getenv('API_KEY')) to manage secrets instead of hard-coding them."
+  },
+  {
+    "policy_id": "POLICY_STYLE_001",
+    "description": "Discourage direct use of the 'os' module for path manipulation.",
+    "target_file_pattern": "\\.py$",
+    "detection_pattern": "^\\s*import\\s+os\\b|^\\s*from\\s+os\\s+import\\s+(path|system)",
+    "severity": "MAJOR",
+    "suggestion": "Consider using the object-oriented 'pathlib' module for OS-agnostic path manipulations."
+  },
+  {
+    "policy_id": "POLICY_STYLE_002",
+    "description": "Ensure all public functions have a docstring.",
+    "target_file_pattern": "\\.py$",
+    "detection_pattern": "^def\\s+((?!_)[a-zA-Z0-9_]+)\\s*\\([^)]*\\):\\s*$",
+    "severity": "MINOR",
+    "suggestion": "Add a docstring to explain the function's purpose, arguments, and return value."
+  },
+  {
+    "policy_id": "POLICY_LINT_001",
+    "description": "Detect 'print()' statements that may have been left for debugging.",
+    "target_file_pattern": "\\.py$",
+    "detection_pattern": "\\bprint\\s*\\(",
+    "severity": "MINOR",
+    "suggestion": "Use the 'logging' module for debug output instead of 'print()' statements."
+  }
+]

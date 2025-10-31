@@ -1,0 +1,176 @@
+2025-07-25 00:35:15,850 - __main__ - INFO - Setting up test environment at: ./quality_gate_test_sandbox
+2025-07-25 00:35:15,850 - ArchitectAgent - INFO - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-25 00:35:15,864 - PlannerAgent - INFO - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-25 00:35:15,864 - CoderAgent - INFO - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-25 00:35:15,864 - TesterAgent - INFO - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-25 00:35:15,864 - DebuggerAgent - INFO - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-25 00:35:15,865 - DebuggerAgent - WARNING - EMPTY knowledge base. File not found or empty at: fkb_local.json
+2025-07-25 00:35:15,866 - GuardianAgent - INFO - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-25 00:35:15,867 - PolicyAgent - INFO - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-25 00:35:15,867 - PolicyAgent - INFO - Loaded 0 policies from quality_gate_test_sandbox/config/policy_rules.json
+2025-07-25 00:35:15,867 - PostmortemAgent - INFO - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-25 00:35:15,868 - Orchestrator - INFO - Production Orchestrator initialized for project: C:\Users\USER\tools\NexusCore\quality_gate_test_sandbox
+2025-07-25 00:35:15,868 - Orchestrator - INFO - Logging to: C:\Users\USER\tools\NexusCore\quality_gate_test_sandbox\.nexus_logs
+2025-07-25 00:35:15,868 - __main__ - INFO - 
+==================================================
+2025-07-25 00:35:15,868 - __main__ - INFO - 🚀 STARTING TEST: QUALITY GATE FEEDBACK LOOP
+2025-07-25 00:35:15,868 - __main__ - INFO - ==================================================
+
+2025-07-25 00:35:15,869 - Orchestrator - INFO - --- 🧑‍💻 Executing Task: add_two_numbers ---
+2025-07-25 00:35:15,869 - Orchestrator - INFO - --- Quality Improvement Loop: Attempt 1/3 ---
+2025-07-25 00:35:15,869 - Orchestrator - INFO - 1. CoderAgent is working on 'add_two_numbers'...
+2025-07-25 00:35:17,257 - Orchestrator - INFO - Code implemented and saved to 'app/calculator.py'.
+2025-07-25 00:35:17,257 - Orchestrator - INFO - 2. TesterAgent is generating tests...
+2025-07-25 00:35:25,274 - Orchestrator - INFO - Tests generated and saved to 'tests/test_calculator.py'.
+2025-07-25 00:35:25,274 - Orchestrator - INFO - 3. Initiating functional validation and self-healing cycle...
+2025-07-25 00:35:25,274 - Orchestrator - INFO - Starting self-healing cycle for 'test_calculator.py'
+2025-07-25 00:35:25,274 - Orchestrator - INFO - --- Self-Healing Attempt 1/5 ---
+2025-07-25 00:35:26,307 - Orchestrator - WARNING - Tests failed. DebuggerAgent invoked.
+2025-07-25 00:35:26,307 - DebuggerAgent - INFO - Debugging error... (log size: 1368 chars)
+2025-07-25 00:35:26,307 - DebuggerAgent - WARNING - No known solution found in FKB for this error.
+2025-07-25 00:35:26,307 - Orchestrator - WARNING - No applicable solution found in FKB. Initiating learning cycle.
+2025-07-25 00:35:26,307 - PostmortemAgent - INFO - Analyzing failed test to generate new FKB entry (source=app\calculator.py, test=tests\test_calculator.py)
+2025-07-25 00:35:32,095 - PostmortemAgent - INFO - Successfully generated a new FKB suggestion.
+2025-07-25 00:35:32,095 - KnowledgeCuratorAgent - INFO - Starting validation for FKB suggestion: FKB-SUGGESTION-0001
+2025-07-25 00:35:32,119 - DebuggerAgent - INFO - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-25 00:35:32,149 - DebuggerAgent - INFO - 1 known issues loaded from: C:\Users\USER\AppData\Local\Temp\k_curator_8f1nomjk\temp_fkb.json
+2025-07-25 00:35:32,149 - DebuggerAgent - INFO - Debugging error... (log size: 1368 chars)
+2025-07-25 00:35:32,152 - DebuggerAgent - INFO - Found known issue: 関数名が間違っているか、存在しない関数をインポートしようとしている。
+2025-07-25 00:35:32,152 - DebuggerAgent - INFO - Found target file 'C:\Users\USER\AppData\Local\Temp\k_curator_8f1nomjk\tests\test_calculator.py' using symbolic hint 'test_file'.
+2025-07-25 00:35:32,155 - DebuggerAgent - INFO - Attempting LLM-based diagnosis and fix...
+2025-07-25 00:35:33,733 - DebuggerAgent - INFO - LLM generated a valid-looking patch:
+--- a/tests/test_calculator.py
++++ b/tests/test_calculator.py
+@@ -1,5 +1,5 @@
+-from app.calculator import add
+ import pytest
++from app.calculator import add_two_numbers as add
+ 
+ 
+ def test_add_positive_numbers():
+
+2025-07-25 00:35:33,742 - patch - INFO - successfully patched 1/1:	 b'tests/test_calculator.py'
+2025-07-25 00:35:33,742 - root - INFO - Successfully applied patch within project: C:\Users\USER\AppData\Local\Temp\k_curator_8f1nomjk
+2025-07-25 00:35:34,356 - KnowledgeCuratorAgent - INFO - ✅ Validation successful! The new knowledge correctly fixed the bug.
+2025-07-25 00:35:34,370 - Orchestrator - INFO - Knowledge validation successful. Updating FKB automatically.
+2025-07-25 00:35:34,370 - Orchestrator - INFO - ✅ fkb_local.json has been automatically updated.
+2025-07-25 00:35:34,370 - DebuggerAgent - INFO - New knowledge for '関数名が間違っているか、存在しない関数をインポートしようとしている。' added to in-memory FKB.
+2025-07-25 00:35:34,370 - Orchestrator - INFO - Retrying self-healing cycle with new knowledge.
+2025-07-25 00:35:34,370 - Orchestrator - INFO - --- Self-Healing Attempt 2/5 ---
+2025-07-25 00:35:35,135 - Orchestrator - WARNING - Tests failed. DebuggerAgent invoked.
+2025-07-25 00:35:35,135 - DebuggerAgent - INFO - Debugging error... (log size: 1368 chars)
+2025-07-25 00:35:35,135 - DebuggerAgent - INFO - Found known issue: 関数名が間違っているか、存在しない関数をインポートしようとしている。
+2025-07-25 00:35:35,135 - DebuggerAgent - INFO - Found target file 'C:\Users\USER\tools\NexusCore\quality_gate_test_sandbox\tests/test_calculator.py' using symbolic hint 'test_file'.
+2025-07-25 00:35:35,135 - DebuggerAgent - INFO - Attempting LLM-based diagnosis and fix...
+2025-07-25 00:35:36,660 - DebuggerAgent - INFO - LLM generated a valid-looking patch:
+--- a/tests/test_calculator.py
++++ b/tests/test_calculator.py
+@@ -1,5 +1,5 @@
+-from app.calculator import add
+ import pytest
++from app.calculator import add_two_numbers as add
+ 
+ 
+ def test_add_positive_numbers():
+
+2025-07-25 00:35:36,660 - patch - INFO - successfully patched 1/1:	 b'tests/test_calculator.py'
+2025-07-25 00:35:36,660 - root - INFO - Successfully applied patch within project: C:\Users\USER\tools\NexusCore\quality_gate_test_sandbox
+2025-07-25 00:35:36,660 - Orchestrator - INFO - Patch applied successfully. Retrying tests...
+2025-07-25 00:35:36,660 - Orchestrator - INFO - --- Self-Healing Attempt 3/5 ---
+2025-07-25 00:35:37,401 - Orchestrator - INFO - ✅ Tests passed. Self-healing cycle successful.
+2025-07-25 00:35:37,401 - Orchestrator - INFO - 4. PolicyAgent is auditing the code...
+2025-07-25 00:35:37,401 - PolicyAgent - INFO - Starting policy audit for 1 file(s)...
+2025-07-25 00:35:37,401 - PolicyAgent - WARNING - No policies loaded. Skipping audit and approving by default.
+2025-07-25 00:35:37,401 - Orchestrator - INFO - ✅ Policy check passed.
+2025-07-25 00:35:37,403 - Orchestrator - INFO - ---  GATE: Running Quality Gate ---
+2025-07-25 00:35:37,403 - Orchestrator - INFO - Checking test coverage (min: 90%)
+2025-07-25 00:35:37,405 - Orchestrator - WARNING - QUALITY GATE VIOLATION: Test coverage is 0.0%, which is below the required 90%.
+2025-07-25 00:35:37,405 - Orchestrator - INFO - Checking Pylint score (min: 8.0/10)
+2025-07-25 00:35:37,428 - Orchestrator - WARNING - QUALITY GATE VIOLATION: Pylint score is 0.0/10, which is below the required 8.0/10.
+2025-07-25 00:35:37,428 - Orchestrator - INFO - Checking MyPy for type errors...
+2025-07-25 00:35:37,442 - Orchestrator - WARNING - QUALITY GATE VIOLATION: MyPy found type errors:
+
+2025-07-25 00:35:37,442 - Orchestrator - WARNING - ❌ Quality Gate FAILED. Looping back to CoderAgent...
+2025-07-25 00:35:37,442 - Orchestrator - INFO - --- Quality Improvement Loop: Attempt 2/3 ---
+2025-07-25 00:35:37,442 - Orchestrator - INFO - 1. CoderAgent is working on 'add_two_numbers'...
+2025-07-25 00:35:40,840 - Orchestrator - INFO - Code implemented and saved to 'app/calculator.py'.
+2025-07-25 00:35:40,840 - Orchestrator - INFO - 2. TesterAgent is generating tests...
+2025-07-25 00:35:48,850 - Orchestrator - INFO - Tests generated and saved to 'tests/test_calculator.py'.
+2025-07-25 00:35:48,850 - Orchestrator - INFO - 3. Initiating functional validation and self-healing cycle...
+2025-07-25 00:35:48,850 - Orchestrator - INFO - Starting self-healing cycle for 'test_calculator.py'
+2025-07-25 00:35:48,850 - Orchestrator - INFO - --- Self-Healing Attempt 1/5 ---
+2025-07-25 00:35:49,740 - Orchestrator - WARNING - Tests failed. DebuggerAgent invoked.
+2025-07-25 00:35:49,740 - DebuggerAgent - INFO - Debugging error... (log size: 1368 chars)
+2025-07-25 00:35:49,740 - DebuggerAgent - INFO - Found known issue: 関数名が間違っているか、存在しない関数をインポートしようとしている。
+2025-07-25 00:35:49,740 - DebuggerAgent - INFO - Found target file 'C:\Users\USER\tools\NexusCore\quality_gate_test_sandbox\tests/test_calculator.py' using symbolic hint 'test_file'.
+2025-07-25 00:35:49,740 - DebuggerAgent - INFO - Attempting LLM-based diagnosis and fix...
+2025-07-25 00:35:51,425 - DebuggerAgent - INFO - LLM generated a valid-looking patch:
+--- a/tests/test_calculator.py
++++ b/tests/test_calculator.py
+@@ -1,5 +1,5 @@
+-from app.calculator import add
+-import pytest
++from app.calculator import add_two_numbers as add
++
+ 
+ class TestAdd:
+     def test_positive_numbers(self):
+
+2025-07-25 00:35:51,425 - patch - INFO - successfully patched 1/1:	 b'tests/test_calculator.py'
+2025-07-25 00:35:51,439 - root - INFO - Successfully applied patch within project: C:\Users\USER\tools\NexusCore\quality_gate_test_sandbox
+2025-07-25 00:35:51,439 - Orchestrator - INFO - Patch applied successfully. Retrying tests...
+2025-07-25 00:35:51,439 - Orchestrator - INFO - --- Self-Healing Attempt 2/5 ---
+2025-07-25 00:35:52,318 - Orchestrator - WARNING - Tests failed. DebuggerAgent invoked.
+2025-07-25 00:35:52,318 - DebuggerAgent - INFO - Debugging error... (log size: 1408 chars)
+2025-07-25 00:35:52,318 - DebuggerAgent - WARNING - No known solution found in FKB for this error.
+2025-07-25 00:35:52,318 - Orchestrator - WARNING - No applicable solution found in FKB. Initiating learning cycle.
+2025-07-25 00:35:52,318 - PostmortemAgent - INFO - Analyzing failed test to generate new FKB entry (source=app\calculator.py, test=tests\test_calculator.py)
+2025-07-25 00:35:54,775 - PostmortemAgent - INFO - Successfully generated a new FKB suggestion.
+2025-07-25 00:35:54,790 - KnowledgeCuratorAgent - INFO - Starting validation for FKB suggestion: FKB-SUGGESTION-0001
+2025-07-25 00:35:54,799 - DebuggerAgent - INFO - Google Gemini client initialized for model: gemini-1.5-pro-latest
+2025-07-25 00:35:54,825 - DebuggerAgent - INFO - 1 known issues loaded from: C:\Users\USER\AppData\Local\Temp\k_curator_jsq6jj93\temp_fkb.json
+2025-07-25 00:35:54,825 - DebuggerAgent - INFO - Debugging error... (log size: 1408 chars)
+2025-07-25 00:35:54,825 - DebuggerAgent - INFO - Found known issue: テストコードでpytestがインポートされていない。
+2025-07-25 00:35:54,841 - DebuggerAgent - INFO - Found target file 'C:\Users\USER\AppData\Local\Temp\k_curator_jsq6jj93\tests\test_calculator.py' using symbolic hint 'test_file'.
+2025-07-25 00:35:54,841 - DebuggerAgent - INFO - Attempting LLM-based diagnosis and fix...
+2025-07-25 00:35:56,247 - DebuggerAgent - INFO - LLM generated a valid-looking patch:
+--- a/tests/test_calculator.py
++++ b/tests/test_calculator.py
+@@ -1,3 +1,5 @@
++import pytest
++
+ from app.calculator import add_two_numbers as add
+
+2025-07-25 00:35:56,247 - patch - WARNING - error: patch stream is incomplete!
+2025-07-25 00:35:56,247 - root - ERROR - Failed to parse patch string. It might be invalid or malformed.
+2025-07-25 00:35:56,247 - KnowledgeCuratorAgent - WARNING - Validation failed: Generated patch could not be applied.
+2025-07-25 00:35:56,263 - Orchestrator - ERROR - Knowledge validation failed. The suggestion will be logged but not applied.
+2025-07-25 00:35:56,263 - Orchestrator - ERROR - Could not repair the code in this attempt.
+2025-07-25 00:35:56,263 - Orchestrator - ERROR - Functional tests failed and could not be self-healed. Aborting task.
+2025-07-25 00:35:56,263 - __main__ - INFO - 
+==================================================
+2025-07-25 00:35:56,263 - __main__ - INFO - 🔬 FINAL VERIFICATION
+2025-07-25 00:35:56,263 - __main__ - INFO - ==================================================
+2025-07-25 00:35:56,263 - __main__ - INFO - Final generated code in quality_gate_test_sandbox\app\calculator.py:
+---
+def add_two_numbers(a: int, b: int) -> int:
+    """
+    Create a function 'add' that takes two integers 'a' and 'b' and returns their sum.
+    """
+    return a + b
+
+
+def test_add_two_numbers():
+    """Test cases for add_two_numbers function."""
+    assert add_two_numbers(2, 3) == 5
+    assert add_two_numbers(-2, 3) == 1
+    assert add_two_numbers(2, -3) == -1
+    assert add_two_numbers(0, 0) == 0
+    assert add_two_numbers(100, 200) == 300
+---
+2025-07-25 00:35:56,263 - __main__ - INFO - ✅ VERIFICATION PASSED: Final code contains a docstring.
+2025-07-25 00:35:56,304 - __main__ - INFO - ✅ VERIFICATION PASSED: 'QUALITY GATE VIOLATION' found in logs, indicating the gate was triggered.
+2025-07-25 00:35:56,305 - __main__ - INFO - 
+--------------------
+2025-07-25 00:35:56,305 - __main__ - INFO - 🎉🎉🎉 OVERALL TEST RESULT: PASSED 🎉🎉🎉
+2025-07-25 00:35:56,305 - __main__ - INFO - --------------------

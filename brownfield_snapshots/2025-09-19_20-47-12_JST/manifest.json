@@ -1,0 +1,13 @@
+{
+  "snapshot_tag": "2025-09-19_20-47-12_JST",
+  "project_root": "C:\\Users\\USER\\tools\\Project-Kenshiki",
+  "generated_at": "2025-09-19T20:47:12.901534+09:00",
+  "phases": {},
+  "tool_root": "C:\\Users\\USER\\tools\\NexusCore",
+  "orchestrator": "brownfield_orchestrator.py@v2.11",
+  "richness_mode": "Light (fast)",
+  "full_source_archive_included": false,
+  "policy_profile": "general",
+  "policy_version": "v1",
+  "policy_icon": "🏷️"
+}

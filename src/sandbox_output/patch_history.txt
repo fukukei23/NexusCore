@@ -1,0 +1,1393 @@
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+initial pass
+[📤 GPTプロンプト]:
+(none)
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    for i in range(2, n):
+        if n % i == 0:
+            return False
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+（理由が抽出できませんでした）
+[📤 GPTプロンプト]:
+# Context
+以下はPython関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+def is_prime(n):
+    # バグ: 2を素数として扱えていない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto)
+
+# バージョン要約（最新版）
+auto-runner: current version from file
+
+# 修正履歴（直近）
+auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.14s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントを付けるのは歓迎です
+- 既存コードの行番号や差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    # 2は素数なので、2以下ではなく、2未満とする
+    if n < 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+（理由が抽出できませんでした）
+[📤 GPTプロンプト]:
+# Context
+以下はPython関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+def is_prime(n):
+    # バグ: 2を素数として扱えていない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto)
+
+# バージョン要約（最新版）
+auto-runner: current version from file
+
+# 修正履歴（直近）
+auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.09s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントを付けるのは歓迎です
+- 既存コードの行番号や差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n <= 1:
+        return False
+    if n == 2:
+        return True
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+Handle n=2 and even numbers; standard primality check.
+[📤 GPTプロンプト]:
+# Context
+以下は Python 関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+# ==============================================================================
+# ファイル名: sample.py
+# レジストリ: src/sandbox_output/
+# 日付: 2025-09-06
+# バージョン: buggy-1
+#
+# バグ内容:
+#   - 2 を素数として扱えない（is_prime(2) が False になる）
+# ==============================================================================
+
+def is_prime(n):
+    # バグ: 2を素数と扱えない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto-revision)
+
+# バージョン要約（最新版）
+Auto-runner: current version from file
+
+# 修正履歴（直近）
+Auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.06s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントは歓迎します
+- 差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
+        return False
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+Handle n=2 and even numbers; standard primality check.
+[📤 GPTプロンプト]:
+# Context
+以下は Python 関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+# ==============================================================================
+# ファイル名: sample.py
+# レジストリ: src/sandbox_output/
+# 日付: 2025-09-06
+# バージョン: buggy-1
+#
+# バグ内容:
+#   - 2 を素数として扱えない（is_prime(2) が False になる）
+# ==============================================================================
+
+def is_prime(n):
+    # バグ: 2を素数と扱えない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto-revision)
+
+# バージョン要約（最新版）
+Auto-runner: current version from file
+
+# 修正履歴（直近）
+Auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.16s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントは歓迎します
+- 差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
+        return False
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+Handle n=2 and even numbers; standard primality check.
+[📤 GPTプロンプト]:
+# Context
+以下は Python 関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+# ==============================================================================
+# ファイル名: sample.py
+# レジストリ: src/sandbox_output/
+# 日付: 2025-09-06
+# バージョン: buggy-1
+#
+# バグ内容:
+#   - 2 を素数として扱えない（is_prime(2) が False になる）
+# ==============================================================================
+
+def is_prime(n):
+    # バグ: 2を素数と扱えない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto-revision)
+
+# バージョン要約（最新版）
+Auto-runner: current version from file
+
+# 修正履歴（直近）
+Auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.07s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントは歓迎します
+- 差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
+        return False
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+Handle n=2 and even numbers; standard primality check.
+[📤 GPTプロンプト]:
+# Context
+以下は Python 関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+# ==============================================================================
+# ファイル名: sample.py
+# レジストリ: src/sandbox_output/
+# 日付: 2025-09-06
+# バージョン: buggy-1
+#
+# バグ内容:
+#   - 2 を素数として扱えない（is_prime(2) が False になる）
+# ==============================================================================
+
+def is_prime(n):
+    # バグ: 2を素数と扱えない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto-revision)
+
+# バージョン要約（最新版）
+Auto-runner: current version from file
+
+# 修正履歴（直近）
+Auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.20s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントは歓迎します
+- 差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
+        return False
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+Handle n=2 and even numbers; standard primality check.
+[📤 GPTプロンプト]:
+# Context
+以下は Python 関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+# ==============================================================================
+# ファイル名: sample.py
+# レジストリ: src/sandbox_output/
+# 日付: 2025-09-06
+# バージョン: buggy-1
+#
+# バグ内容:
+#   - 2 を素数として扱えない（is_prime(2) が False になる）
+# ==============================================================================
+
+def is_prime(n):
+    # バグ: 2を素数と扱えない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto-revision)
+
+# バージョン要約（最新版）
+Auto-runner: current version from file
+
+# 修正履歴（直近）
+Auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.13s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントは歓迎します
+- 差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
+        return False
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+Handle n=2 and even numbers; standard primality check.
+[📤 GPTプロンプト]:
+# Context
+以下は Python 関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+# ==============================================================================
+# ファイル名: sample.py
+# レジストリ: src/sandbox_output/
+# 日付: 2025-09-06
+# バージョン: buggy-1
+#
+# バグ内容:
+#   - 2 を素数として扱えない（is_prime(2) が False になる）
+# ==============================================================================
+
+def is_prime(n):
+    # バグ: 2を素数と扱えない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto-revision)
+
+# バージョン要約（最新版）
+Auto-runner: current version from file
+
+# 修正履歴（直近）
+Auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.11s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントは歓迎します
+- 差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
+        return False
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+Handle n=2 and even numbers; standard primality check.
+[📤 GPTプロンプト]:
+# Context
+以下は Python 関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+# ==============================================================================
+# ファイル名: sample.py
+# レジストリ: src/sandbox_output/
+# 日付: 2025-09-06
+# バージョン: buggy-1
+#
+# バグ内容:
+#   - 2 を素数として扱えない（is_prime(2) が False になる）
+# ==============================================================================
+
+def is_prime(n):
+    # バグ: 2を素数と扱えない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto-revision)
+
+# バージョン要約（最新版）
+Auto-runner: current version from file
+
+# 修正履歴（直近）
+Auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.11s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントは歓迎します
+- 差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
+        return False
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+Handle n=2 and even numbers; standard primality check.
+[📤 GPTプロンプト]:
+# Context
+以下は Python 関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+# ==============================================================================
+# ファイル名: sample.py
+# レジストリ: src/sandbox_output/
+# 日付: 2025-09-06
+# バージョン: buggy-1
+#
+# バグ内容:
+#   - 2 を素数として扱えない（is_prime(2) が False になる）
+# ==============================================================================
+
+def is_prime(n):
+    # バグ: 2を素数と扱えない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto-revision)
+
+# バージョン要約（最新版）
+Auto-runner: current version from file
+
+# 修正履歴（直近）
+Auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.06s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントは歓迎します
+- 差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
+        return False
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+Handle n=2 and even numbers; standard primality check.
+[📤 GPTプロンプト]:
+# Context
+以下は Python 関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+# ==============================================================================
+# ファイル名: sample.py
+# レジストリ: src/sandbox_output/
+# 日付: 2025-09-06
+# バージョン: buggy-1
+#
+# バグ内容:
+#   - 2 を素数として扱えない（is_prime(2) が False になる）
+# ==============================================================================
+
+def is_prime(n):
+    # バグ: 2を素数と扱えない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto-revision)
+
+# バージョン要約（最新版）
+Auto-runner: current version from file
+
+# 修正履歴（直近）
+Auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.13s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントは歓迎します
+- 差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
+        return False
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+Handle n=2 and even numbers; standard primality check.
+[📤 GPTプロンプト]:
+# Context
+以下は Python 関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+# ==============================================================================
+# ファイル名: sample.py
+# レジストリ: src/sandbox_output/
+# 日付: 2025-09-06
+# バージョン: buggy-1
+#
+# バグ内容:
+#   - 2 を素数として扱えない（is_prime(2) が False になる）
+# ==============================================================================
+
+def is_prime(n):
+    # バグ: 2を素数と扱えない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto-revision)
+
+# バージョン要約（最新版）
+Auto-runner: current version from file
+
+# 修正履歴（直近）
+Auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.07s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントは歓迎します
+- 差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
+        return False
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+Handle n=2 and even numbers; standard primality check.
+[📤 GPTプロンプト]:
+# Context
+以下は Python 関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+# ==============================================================================
+# ファイル名: sample.py
+# レジストリ: src/sandbox_output/
+# 日付: 2025-09-06
+# バージョン: buggy-1
+#
+# バグ内容:
+#   - 2 を素数として扱えない（is_prime(2) が False になる）
+# ==============================================================================
+
+def is_prime(n):
+    # バグ: 2を素数と扱えない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto-revision)
+
+# バージョン要約（最新版）
+Auto-runner: current version from file
+
+# 修正履歴（直近）
+Auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.08s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントは歓迎します
+- 差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
+        return False
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+Handle n=2 and even numbers; standard primality check.
+[📤 GPTプロンプト]:
+# Context
+以下は Python 関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+# ==============================================================================
+# ファイル名: sample.py
+# レジストリ: src/sandbox_output/
+# 日付: 2025-09-06
+# バージョン: buggy-1
+#
+# バグ内容:
+#   - 2 を素数として扱えない（is_prime(2) が False になる）
+# ==============================================================================
+
+def is_prime(n):
+    # バグ: 2を素数と扱えない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto-revision)
+
+# バージョン要約（最新版）
+Auto-runner: current version from file
+
+# 修正履歴（直近）
+Auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.06s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントは歓迎します
+- 差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
+        return False
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+Handle n=2 and even numbers; standard primality check.
+[📤 GPTプロンプト]:
+# Context
+以下は Python 関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+# ==============================================================================
+# ファイル名: sample.py
+# レジストリ: src/sandbox_output/
+# 日付: 2025-09-06
+# バージョン: buggy-1
+#
+# バグ内容:
+#   - 2 を素数として扱えない（is_prime(2) が False になる）
+# ==============================================================================
+
+def is_prime(n):
+    # バグ: 2を素数と扱えない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto-revision)
+
+# バージョン要約（最新版）
+Auto-runner: current version from file
+
+# 修正履歴（直近）
+Auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.11s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントは歓迎します
+- 差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
+        return False
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+=== 新しい修正案 ===
+[📝 修正理由]:
+Handle n=2 and even numbers; standard primality check.
+[📤 GPTプロンプト]:
+# Context
+以下は Python 関数（sample.py）と対応するテスト（test_sample.py）です。
+
+# sample.py
+# ==============================================================================
+# ファイル名: sample.py
+# レジストリ: src/sandbox_output/
+# 日付: 2025-09-06
+# バージョン: buggy-1
+#
+# バグ内容:
+#   - 2 を素数として扱えない（is_prime(2) が False になる）
+# ==============================================================================
+
+def is_prime(n):
+    # バグ: 2を素数と扱えない
+    if n <= 2:
+        return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# test_sample.py
+import pytest
+from sandbox_output.sample import is_prime
+
+def test_primes():
+    assert is_prime(2) is True   # ここで失敗するはず
+    assert is_prime(3) is True
+    assert is_prime(4) is False
+
+
+# ユーザーの目的
+(auto-revision)
+
+# バージョン要約（最新版）
+Auto-runner: current version from file
+
+# 修正履歴（直近）
+Auto-runner attempt=0
+
+# テスト結果
+F                                                                        [100%]
+================================== FAILURES ===================================
+_________________________________ test_primes _________________________________
+
+    def test_primes():
+>       assert is_prime(2) is True   # ここで失敗するはず
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert False is True
+E        +  where False = is_prime(2)
+
+test_sample.py:5: AssertionError
+=========================== short test summary info ===========================
+FAILED test_sample.py::test_primes - assert False is True
+1 failed in 0.11s
+
+
+# 指示
+上記情報を踏まえて、ユーザーが意図した動作を達成できるように `sample.py` の修正コードを提案してください。
+
+- コードのみを返してください
+- 余計な説明文、Markdown記法、```python や ``` は不要です
+- すべてのコードは sample.py に直接書き込める内容にしてください
+- コメントは歓迎します
+- 差分ではなく、完全な最新コードを提示してください
+
+[💻 修正コード]:
+def is_prime(n):
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0:
+        return False
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True

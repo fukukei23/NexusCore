@@ -1,0 +1,10 @@
+{
+    "name": "single_file_project",
+    "type": "folder",
+    "children": [
+        {
+            "name": "buyma_catalog_manager.py",
+            "type": "file"
+        }
+    ]
+}

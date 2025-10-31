@@ -1,0 +1,89 @@
+
+--- 過去の圧縮実績から学習した圧縮率を適用 ---
+  - .py: 0.17 (実績: 0.11, 重み: 0.68)
+  - .txt: 0.12 (実績: 0.11, 重み: 0.95)
+  - .md: 0.12 (実績: 0.11, 重み: 0.95)
+  - .html: 0.11 (実績: 0.11, 重み: 0.95)
+  - .md  set-clipboard: 0.50 (実績: 0.11, 重み: 0.00)
+  - .toml: 0.35 (実績: 0.11, 重み: 0.00)
+  - .json: 0.11 (実績: 0.11, 重み: 0.95)
+  - .csv: 0.49 (実績: 0.11, 重み: 0.02)
+  - : 0.35 (実績: 0.11, 重み: 0.37)
+  - .pem: 0.50 (実績: 0.11, 重み: 0.00)
+  - .c: 0.13 (実績: 0.11, 重み: 0.95)
+  - .h: 0.50 (実績: 0.11, 重み: 0.01)
+  - .ts: 0.28 (実績: 0.11, 重み: 0.00)
+  - .yaml: 0.40 (実績: 0.11, 重み: 0.00)
+  - .yml: 0.40 (実績: 0.11, 重み: 0.00)
+  - .ps1: 0.50 (実績: 0.11, 重み: 0.01)
+  - .code-workspace: 0.50 (実績: 0.11, 重み: 0.00)
+  - .sh: 0.45 (実績: 0.11, 重み: 0.00)
+  - .cfg: 0.50 (実績: 0.11, 重み: 0.00)
+  - .js: 0.27 (実績: 0.11, 重み: 0.05)
+  - .css: 0.25 (実績: 0.11, 重み: 0.02)
+  - .bat: 0.50 (実績: 0.11, 重み: 0.00)
+  - .lock: 0.50 (実績: 0.11, 重み: 0.00)
+  - .sum: 0.50 (実績: 0.11, 重み: 0.00)
+  - .swift: 0.50 (実績: 0.11, 重み: 0.00)
+  - .rs: 0.50 (実績: 0.11, 重み: 0.00)
+  - .scm: 0.50 (実績: 0.11, 重み: 0.00)
+  - .gyp: 0.50 (実績: 0.10, 重み: 0.00)
+  - .vsix: 0.50 (実績: 0.11, 重み: 0.00)
+  - .ini: 0.50 (実績: 0.11, 重み: 0.00)
+  - .cff: 0.50 (実績: 0.11, 重み: 0.00)
+  - .cc: 0.50 (実績: 0.10, 重み: 0.00)
+  - .tag: 0.50 (実績: 0.11, 重み: 0.00)
+  - .go: 0.50 (実績: 0.10, 重み: 0.00)
+  - .tx: 0.50 (実績: 0.11, 重み: 0.00)
+  - .exp: 0.50 (実績: 0.11, 重み: 0.00)
+  - .map: 0.50 (実績: 0.11, 重み: 0.00)
+...学習結果の適用完了。
+
+--- ファイル収集開始: C:\Users\USER\tools\NexusCore ---
+  - 収集完了: 1246 ファイル
+
+--- Importグラフ解析 ---
+  - 解析完了: 4ノード, 2エッジ
+
+--- ファイルスコアリング ---
+
+--- ファイル選択結果: 490件 / 生データ合計 19.50 MB ---
+  - (Top) healing_sandbox\src\agents\orchestrator.py (score: 20.00)
+  - (Top) src\nexuscore\core\orchestrator.py (score: 20.00)
+  - (Top) healing_sandbox\app\main.py (score: 18.00)
+  - (Top) my-crm-app\app\main.py (score: 18.00)
+  - (Top) workspace\crm_project\app\main.py (score: 18.00)
+  - (Top) workspace\test_crm_app\app\main.py (score: 18.00)
+  - (Top) workspace\default_project\app\main.py (score: 17.81)
+  - (Top) sandbox_repo\app\main.py (score: 16.70)
+  - (Top) quality_loop_test_sandbox\app\main.py (score: 15.32)
+  - (Top) tree_sitter_languages\tree-sitter-python\test\tags\main.py (score: 15.00)
+  - ...他 480件
+
+--- サイズ超過等により除外されたファイル (上位10件) ---
+- 437.90 MB  output\NexusCore_combined_20250806_224858.txt
+- 324.50 MB  output\NexusCore_combined_20250801_130327.txt
+- 42.07 MB  exported_projects\app_20250703_223016\app\utils\models\deeplabv3_mnv3.onnx
+- 42.07 MB  exported_projects\project_export_m73owrzi\app\utils\models\deeplabv3_mnv3.onnx
+- 42.07 MB  exported_projects\project_export_xb_l70t8\app\utils\models\deeplabv3_mnv3.onnx
+- 42.07 MB  exported_projects\project_export_y7xxp1v8\app\utils\models\deeplabv3_mnv3.onnx
+- 38.08 MB  exports\NexusCore_gemini-single-file_20250830_201244.md
+- 33.97 MB  src\project_structure.json
+- 7.29 MB  src\project_structure.md
+- 3.27 MB  tree_sitter_languages\tree-sitter-python\src\parser.c
+ローカル保存先: C:\Users\USER\tools\NexusCore\exports\NexusCore_perplexity-upload_20250830_220441
+
+--- Perplexity用コンテンツを生成・保存中... ---
+
+--- 結合コードを生成中 ---
+  - 生成完了
+  - ローカルファイル保存完了
+
+--- Perplexity Proファイルアップロード開始 (2件) ---
+  - ❌ HTTPエラー: PROJECT_CHRONICLE.txt - 403 Forbidden
+    レスポンス: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}html{line-height:1.15;-webkit-text-size-adjust:100%;color:#313131;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji"}body{display:flex;flex-direction:column;height:100vh;min-height:100vh}.main-content{margin:8rem auto;padding-left:1.5rem;max-width:60rem}@media (width <= 720px){.main-content{margin-top:4rem}}.h2{line-height:2.25rem;font-size:1.5rem;font-weight:500}@media (width <= 720px){.h2{line-height:1.5rem;font-size:1.25rem}}#challenge-error-text{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgZmlsbD0ibm9uZSI+PHBhdGggZmlsbD0iI0IyMEYwMyIgZD0iTTE2IDNhMTMgMTMgMCAxIDAgMTMgMTNBMTMuMDE1IDEzLjAxNSAwIDAgMCAxNiAzbTAgMjRhMTEgMTEgMCAxIDEgMTEtMTEgMTEuMDEgMTEuMDEgMCAwIDEtMTEgMTEiLz48cGF0aCBmaWxsPSIjQjIwRjAzIiBkPSJNMTcuMDM4IDE4LjYxNUgxNC44N0wxNC41NjMgOS41aDIuNzgzem0tMS4wODQgMS40MjdxLjY2IDAgMS4wNTcuMzg4LjQwNy4zODkuNDA3Ljk5NCAwIC41OTYtLjQwNy45ODQtLjM5Ny4zOS0xLjA1Ny4zODktLjY1IDAtMS4wNTYtLjM4OS0uMzk4LS4zODktLjM5OC0uOTg0IDAtLjU5Ny4zOTgtLjk4NS40MDYtLjM5NyAxLjA1Ni0uMzk3Ii8+PC9zdmc+");background-repeat:no-repeat;background-size:contain;padding-left:34px}@media (prefers-color-scheme: dark){body{background-color:#222;color:#d9d9d9}}</style><meta http-equiv="refresh" content="360"></head><body><div class="main-wrapper" role="main"><div class="main-content"><noscript><div class="h2"><span id="challenge-error-text">Enable JavaScript and cookies to continue</span></div></noscript></div></div><script>(function(){window._cf_chl_opt = {cvId: '3',cZone: 'www.perplexity.ai',cType: 'managed',cRay: '97747edb49f8d3fa',cH: '5EpbInumV7EWrSP9cKvNGK9Vxeto5afduitpdMV.k6s-1756559082-1.2.1.1-235avEg_rO4VkoxYYLQQnqCdmLUdxyp5oeYv.RujAnOia4Ms2uNGR4AYmh5zwKCp',cUPMDTk:"\/account\/files?__cf_chl_tk=7Cynzni.RtuNS2qmVjt_VDNu1rjHJ4YHCXuJBBYl.FE-1756559082-1.0.1.1-buYgLZcLCMvLnYyiJ0z.xb_tG2VebWc2R7axoc0WYLs",cFPWv: 'b',cITimeS: '1756559082',cTplC:0,cTplV:5,cTplB: 'cf',fa:"\/account\/files?__cf_chl_f_tk=7Cynzni.RtuNS2qmVjt_VDNu1rjHJ4YHCXuJBBYl.FE-1756559082-1.0.1.1-buYgLZcLCMvLnYyiJ0z.xb_tG2VebWc2R7axoc0WYLs",md: 'fgNGQMyRFmo6eF5isrI6NREL5VxaCZp5Dw7QKknK3KE-1756559082-1.2.1.1-ejfdzyvcHfVfHBZ7OUkE_J5NXi42Jg4D_ykNCdYArjkXkx8cP3On0KF1.DdEzP31AU8fIHG0VrHBkPGJeDPpIyzjuqqo2l8oN6.EtbO7CQlW7FU8gnjigMeUYU4OZulbx9FA48g6i7O6bRcyxjIUEB4DX61hap29PYjta0FkYU.YNZ52n_68ik8Js5EG.ZLDswQ9Y0I0s0cr_AZz_lW0VYyy80b4EXXelB15yR9h5n8Yfey08RqhUDDjira0wR5V5do91D1u.M2HbcT1mghKLUOowNeXQwxh7JpBnbxLu0T6dglKg71RJxlzsjS07WQqoKCziylbdBFf4p96iE1oS2jbXFlcNF9BJ0FbEU77i0BI3eAv0p.g0kwXe8LZBQHvUf1p_ExovWVykRBXSLTPfFDQm56gpgX9hAUhzUPWqKs6cqn8SaTwo1La_CnooNqHv_ZmEJrhdBMmFs2cRUPR3rqykro5G.knk.fIlU.sjCuo3zW3qRBGjNA0NTBegAbz5N6cnBvyb4TMgmNzBbrOIKcaRxIiTnbesfsutYrD01vmDCv02vBIe9uY_6UQaBhB36D_eAOS5rD_82a5UDVSH_qiNMzxZm6Y5yhVwXLEPzw0e6Uhng49FyPSgzd7aJipFbhotEC1.5gNwJlddWWprQGmy5oFtSXmJfpPiDoHcE4754MuhkcVZstP2pHKeZ0jBeUOrBKDC_HtnfVPE6pJRlPOU0fVbEFD_WYmhSJwbC4_PEx4eJsHzgyQ.bRWr0LYkaytnIlwTql94WbHw0qnK1D6u_p3jqSiN7uGIDgIBGaLkNaQe7NFt2D4NpU1WQdCbtALG5YrQHi7c4Kln8nFligzOfOWC6T30_4onFH8_mwKyIOEL2WkwJJEnrPGaL573Bie9PR7y7HD7F8tse27IpDlPfsVKG6LfD_jTr02QAellf3cYGdVvFVNbnPosWDHNtiVHOqrEoiyat9zXD2EEo7ppr3hjTYDZsxDExV09_I',mdrd: 'WvU4dvwO3tFajzLvJThDptypcJ1taDODG0XRapYHD_g-1756559082-1.2.1.1-JIgZmSzp6Ua.yWjlQMLXcDMRY2xybQdXgw6M3ATLU4g0PxA7mmCVpNZVhXKNbKFJNVbj81o3w3W5WhHI8TjH34L3HfKg1CamwtQ7by_y7Tv.S3033hAezviEF7hbpWAB2qYMZaPXdx3vIF7TKf87zAtSuUz.4cSLDX15kezj1qeTocIAJuJIcQ7u1NRpy2xh17voKklGv3bzRdyRvjalld7VGcDgQPEULoyMosVtTU8Sko408EFy53y2LMXtjQDZBcsGafl.CbkYkRY.MjJ.X.3rqm9RyCL2HFxAobrL48.Me5Es5BZEHitoktFaZ4xN95uFO8GMPiPTG2P1MDotmtpJzodCAvGOyb1tWWo.aCk792Q6PQDxfXyzE.k46pgR_tC_qEE5lYR93MsEzyOXJycPqSnI1AdvHwNFOwTfvnJJ3WpChE81ClaL4oobz3wR5tdlbFXSWHsUVRgmdMHu9Zxy.7WnLnphV67en6mBtmO5fgqdH_8pop2I8mLT3Efz8Nk2K9TpXb8Xbc3mMYOORPHK3suydXPg3X2D8ZF7LZcWEaRE4ZgUfXB4I2ObRvN0KKmiyICwdMNHyk5auBsfIzWfvKXhzjYdxKKcNmYrp.UzqgZuVu86zPBfW2FoaUHQQTk.xjJ5CODnore6YsciYVfzjBhGnDfOFzavzW8KeuFU7_h3sKIrj0gTOB9FvN8hKpYF1FJuL8wX1ugSXqZ8Jw13_fZDNcDvdqNBuBd382mdqVobbr90dxQ_IdSMaRHZFmInQtgZPzbUHmTkES8UsJv79u_dVybENYEIQ.x8WH33V2Cgohvp1DMddQgCEt3hH3oVLSlLNLe4t1rqS.jqdh0jf5jOP3b2fNCbPw_jT2Ym3yP_cHWLAc0F1uDQovk92zMLVeWQos.pmKDiypNGwgvK_PFChl0R6bUNYqx05siLOiA6f79AtDQprb4lbyMDgAeNa6aOnSL6jfE6eXzGI2.GHFIHgEm7pfwHQkci2OqMmGGeKxbK8.PvGXNFUy2l7LD.KRUupbeoiAJviSo5KE3aVNFOVn0hovQV9hCpFbv0FV2hxxHY2GexJGUpcCS.7maUfWdk9.HXAfJiluETpvrQDkx.q7LELW_vfwK21IsojjpE6r7oT2SlasVW95ZIrM85pJtUixG84.GjjvDC749XssyAY6_Tp6O1gdJGd65RFU8oZzkbVig_NIz8CVF4LWOp5KcmLnfPp1pFRlQ5.vVsgc9LmmcECe5H8meYhUlAOhMH9ZNrlkuruQnDlR6es7ir8UAjEQ2dc4jSCuvIY8.8GwdJTwsr3sxJnkyt5PTDSXLQbH1WPXmpVY7aZyv8VTKnC28CDQt5dMHJv.qvkHHRUVJVO5WEhTWsWW3cfeBaXcWtf8p.g7LbnGzgmwB9CQcv8gvkXWwUO5CvpzAcEZfrWXsenXVnYvKxuErS5OfD3j2Ins4NrGQTLBgA8ewqqwgTstQsfxCwBJnILH3wiNcLifvDVSBHFZj1p0zvCx1DWSuQhZjJbXbBtmya0wPVRWucaBGQrUi1Pl2Cq5wRNUDNmJPgTaM9ttxIaGqfrlw59fVRmtFwAHWIflfMmQO2ajD8WYmRBgk8U_yvKAjSgSYEpDxBBEsmRkplKSLw34qyZl94sBdhsn3NXes3nuzqurYyJH4lEUvAmK..PgIrwHsWPsrEkqrCvXO.UUX_3_y3UC9d8hFYVA5NJ.4Q_6HurQRUlHArsaIMHrzEMAW1tL9V8wUMi1EDk_3M9jXWpppXuPzddXJ5SpKcF9y_Wda5e651RWVcLgf15FuvJpx2t9ly86BLRM2VsBqbFQ_BxX_9d6V2ZKcqOqkLWe9tkRKLJg5KK102dv2KkESWGUkE1KGX2EVda81l0z6B9n9YEcobL_8qpFVdQWorMHiEEy5AUHbfMz3EB1nuwIlJtIXTLWK67mhFu1hxHkUrewXCttNVXUR8jgVxP82IG5KOVB3Mpc0wV7OlFkj12Y3U4l.am0yK6cyeZq2m1qMi93vCCRhIaItgitYT1MuYcrNqPuBjhScRwLr0k.ar9yxgSoxOF6goMHs6mV2SGoPGBh3YCav66EB.BCLKGnVG5vk05VaVB1GyuvYepqdFOX5LGC0duYrfja6xX_yIFoumh0COW_eqUiGZD5sS7XcVFYoV6Cp0JrWVfhSQcdyHw1mSgpE5P6UXvFaAW90exJGi2lWhG8rYK9yB1w70pVdbgc3WIeISQy1AJC0sBBq5wvO6MaIuyH4rpttbg_4pJj1XA_i6pyFqnd77ymf1P7.rKIXUciRXeD8QSolMp9wT0WlGBXxxjUbB7MKX.l9VMtgT7kkkccEXTCQ8SnUumqipZrMaofmTOBrRyHf3G1.X9pnbS0WWDTBzDG0snDesSMharmMdlJfEQPiaQ0wl3PmOdvt5muztwxEo.zRzPeG33tMNk5BnmSD.yXtDsXHS1R7ofXU6xERn1mkhkuqblAK2LScUkXn3.wPVEwBdQ_ejEbEJnhHJkLylnIcfiTpdDTCxdHnIfbk',};var a = document.createElement('script');a.src = '/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1?ray=97747edb49f8d3fa';window._cf_chl_opt.cOgUHash = location.hash === '' && location.href.indexOf('#') !== -1 ? '#' : location.hash;window._cf_chl_opt.cOgUQuery = location.search === '' && location.href.slice(0, location.href.length - window._cf_chl_opt.cOgUHash.length).indexOf('?') !== -1 ? '?' : location.search;if (window.history && window.history.replaceState) {var ogU = location.pathname + window._cf_chl_opt.cOgUQuery + window._cf_chl_opt.cOgUHash;history.replaceState(null, null,"\/account\/files?__cf_chl_rt_tk=7Cynzni.RtuNS2qmVjt_VDNu1rjHJ4YHCXuJBBYl.FE-1756559082-1.0.1.1-buYgLZcLCMvLnYyiJ0z.xb_tG2VebWc2R7axoc0WYLs"+ window._cf_chl_opt.cOgUHash);a.onload = function() {history.replaceState(null, null, ogU);}}document.getElementsByTagName('head')[0].appendChild(a);}());</script></body></html>
+  - ❌ HTTPエラー: COMBINED_CODE.txt - 403 Forbidden
+    レスポンス: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}html{line-height:1.15;-webkit-text-size-adjust:100%;color:#313131;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji"}body{display:flex;flex-direction:column;height:100vh;min-height:100vh}.main-content{margin:8rem auto;padding-left:1.5rem;max-width:60rem}@media (width <= 720px){.main-content{margin-top:4rem}}.h2{line-height:2.25rem;font-size:1.5rem;font-weight:500}@media (width <= 720px){.h2{line-height:1.5rem;font-size:1.25rem}}#challenge-error-text{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgZmlsbD0ibm9uZSI+PHBhdGggZmlsbD0iI0IyMEYwMyIgZD0iTTE2IDNhMTMgMTMgMCAxIDAgMTMgMTNBMTMuMDE1IDEzLjAxNSAwIDAgMCAxNiAzbTAgMjRhMTEgMTEgMCAxIDEgMTEtMTEgMTEuMDEgMTEuMDEgMCAwIDEtMTEgMTEiLz48cGF0aCBmaWxsPSIjQjIwRjAzIiBkPSJNMTcuMDM4IDE4LjYxNUgxNC44N0wxNC41NjMgOS41aDIuNzgzem0tMS4wODQgMS40MjdxLjY2IDAgMS4wNTcuMzg4LjQwNy4zODkuNDA3Ljk5NCAwIC41OTYtLjQwNy45ODQtLjM5Ny4zOS0xLjA1Ny4zODktLjY1IDAtMS4wNTYtLjM4OS0uMzk4LS4zODktLjM5OC0uOTg0IDAtLjU5Ny4zOTgtLjk4NS40MDYtLjM5NyAxLjA1Ni0uMzk3Ii8+PC9zdmc+");background-repeat:no-repeat;background-size:contain;padding-left:34px}@media (prefers-color-scheme: dark){body{background-color:#222;color:#d9d9d9}}</style><meta http-equiv="refresh" content="360"></head><body><div class="main-wrapper" role="main"><div class="main-content"><noscript><div class="h2"><span id="challenge-error-text">Enable JavaScript and cookies to continue</span></div></noscript></div></div><script>(function(){window._cf_chl_opt = {cvId: '3',cZone: 'www.perplexity.ai',cType: 'managed',cRay: '97747f2c28d619d5',cH: 'B2.v3va8g_k1rAtpwxa7GHx8Sc.PlLsj.KHgL5QFiMI-1756559095-1.2.1.1-NFHDy1T7VzumXVAPysDF.zvlHLIf2R4._2Jjxiee6CH0bGWxjQqOT5wO3IEUtC99',cUPMDTk:"\/account\/files?__cf_chl_tk=FxkzwoJje5qyg_HXcMw9MoEKnS7776qFE2GF7nf0QsA-1756559095-1.0.1.1-lo0WiVbB7g7hi3cZkMZs8QXRy8_0kZsq0vGhpoIbMpo",cFPWv: 'b',cITimeS: '1756559095',cTplC:0,cTplV:5,cTplB: 'cf',fa:"\/account\/files?__cf_chl_f_tk=FxkzwoJje5qyg_HXcMw9MoEKnS7776qFE2GF7nf0QsA-1756559095-1.0.1.1-lo0WiVbB7g7hi3cZkMZs8QXRy8_0kZsq0vGhpoIbMpo",md: 'NxclPq6W6sFFqA0Anjh23Pk5zahsu41Wjy3pIZj39vM-1756559095-1.2.1.1-0gKNXg0ucnTlSDTJpedmR9tmluiKE8y._u4MnGnpooLI1YXPGBO49LW6NKOfjN8Sf0Gi776u60ucrJMn9F4eKb1bp5Acr6.8ZQ9Yd63R9n.AJjRq_0g9f7OCHlBMfEK1yCyYdOzrwD2H24PNUgCr2Ab1_U_J8T58Bis097TV.bk8oLNebLSckVvHvf8tn9dJja3BIOFAwH2ySlAGjw6Pz1NEThb997lXUqtnGGfskedBIJv75ocklZAZkZ6dVtqx1hwv8bVL2SF7cfckMfF9nWFuVxDuNY6SKjjg3Pw67DW0OqDaCfIj4Hop1dIliRE7fkM0mlKZj91tcQuUisnWASVotAXkF_4asGgQ3MWno2_MnHj.UR_uFS93wvpH41W4DtYA4Y8FIKfJFgils0VAhG8hc_jJck2Qor0gp41kddjffg4q_Ica5v2QhrOBbx6c6ea8nGw5WJvc3yzLoq0ntXh02HuK.WEM3MVRIPZ_3W_JukSUMltPiB6pC2.MiVyaXxnc559bg761xTogkm0R6LAZefmLH5WxNtTT_xKb4dcVyIvP1iWlPcBElDdhxb8ZNlLioB8jmFFu0T6xQTmzRpUn735mWNhrSEvSassBB3Zl09hxHj.YqwQVu3Pn8iyGAUb38.GpoIYZ.5siG3uHentXfpTOPSMrsaMEPqYxbYV_dypMLJWUcyXt2lQdBOd5O5ig_1CnAwIAoDeOqlQ.xS5ex8oy9SRXBSQnjK9U2lH.6YO4IffP1UVk3s9h8FyXrl9om90Smfikg_drcGFTDiMxiOzM5w2y4wrzb3CnIRK_yiTxTbsw3fjkn5qzdXe7nqa3nePozgAyR696_JKgRueIybNW.RnrVzxTHj9sDAoc06qGBcGWrHh75Joolu3HicczlWApgdfAthAy77yDAr2d9apza4IVU7tRt8Yqiktqwb4SNHzyjuZhqCtWo4SI0u9o.w_1XZm9zrh1ehaV6uu_SSGPXLDlkKKKp.UNqzY',mdrd: 'i2vVD9V0vi5aNjx.FLZTxrpzOI8JMqHDtb3CMKIgT3k-1756559095-1.2.1.1-6UrkdzRBCKNRMr5mnZPW_w8wmmeDI.Cvflzb2zCEvQIQvccvrpPvMjvE7sBBZsKpm0mv1DX1LdgziDhaxmD0F2SovZtiWkrD5oz5HtendQu6msjxWoYnSX5WZ8VFS.4W9_vpENNNKTsTCSLEUqAD7Sk2Qm9cPwsB8bghrzrSZrMA1BBXDDcgOvFj1ecbvb_kOt5PqQQCFVQHEDjuolzGLjw2vhbmcnch5.Q6wQmmkC.6cYLwLsPiF2CdOuuvW_L6DwQhVTtKX76jWkJsYyg1Fb0pt1UwZXp6ZYoxab7mt825tUe05naijbN9bpmZmQoFsMubeZxwZu9f8ftuuwFtke7in2fuM90V.LFWsWp6N0DmDffLLjnNvmbnqJqjLy9DtfeXkpzbGoSU6NFTZgiDLQno.gmqTN0ydelsZRTpjIFVNJpnTmVb3cYzlUsQcLC4zcRtXhnComnFTBMK5fr1zJZQUIjba0mNPkVxiL4hDtK3Vr74xm8IwmO3bTtzEOfL2tjUYAIJH3W77JShvvod45Lx.8igkw6k3eQYSQoEgjsyK2VbTD5L9xOCOv1wULhYM7ZTZJMK4uK8SM3bhezcbX7GH5yiiomq0caSQE8BFW3qwo7PQtSPyuSwap2fmreXTq4Vk1xzikUboomNCZt34IPwXHeJKcwRT04emQbi3VGt2vcu0WVEiPzoakZy40vw9xBhfvPaUujIYadkNQpof0wGWZ9eMgynYRdg0KPALogQE25YYl3PuSQ85zKtLu3J50owSu0TbvBdSIsxdSk7xzlrQBH24A3kgox46JBAIcbmmrsKBrVj9NvkcsVysdaKfgyJcA8RbxjHMJCo.bBM6wfh_JNs9Bprq6SG_gppdfOhLmMB7ttWQq3WHBgBQGrV2x6h5Pao1jKjiJGpY56Ug_Ndxbc1CDGfoVnI90VVWm.i4Fq4tof.J1h03OTUM7Fqw3M_sGJ0u5imNs7aHsa8fooyfGJPN3tikuHF3B00tFmYT6enw0lFL.1wBTgyQTuFZfikUCN09zW77Ld9x8Y_6CfZVc5DL5np92f2ePRc.5inTSrQByQeio764M7nFGthJ_HANMKu9YD.OYDCb.w1o1zPuae2rECSaj3CvvZjnqm.2jLZs0onUWNmJBXLF2VePjhl7TFzGWusnCrUmBq2c.VONovmQ5L0oEo8sdAzGZhfOV9Af8NYnRnVopespWow1bh2mldsXhIjw9RySPLD8lX.sP7A2J_aycL1sig9KaSrRSVDlBJrrzcrWlXgl54JFTvNCs.3L1mj8Mlop3LWqlEE0S7Wdj4LvqmWvDTDm_YJ9opnkTTnHVwkUWgJiNFuOXdN4yZlqCwu82_jl6S2ei.rN.GugKKEiJAHETyx8i095p.nlL4sUnggxUa3_2jNvN3mxf2QE5BezVzw57KuDZXZkh1yuESl07OcCCKVz36fqYjy4alwHQ3a_qKQU4F7vIpVDuiOf4DDwjNuBGETfXGybFB_hjphkILh0Wtu6rqNED8OdibIBQECco69ceMkuWkuw5dI31TbSYQJ4Ldz4gVrENxo3QySyUbkyU0qZqLiuWqShtsERjo4jmxSnSZD.7E7zfgfzjdLcF_tyzHc2xbBEDrFqwXcI51BbZ8302dfG8Glni5Eu6dopufKjzfB0_IYPRF84A.WKsSN8.1B8jfEZe6rHNjAGYYIAotdFmSoA63MO5QkES1mKq4r_Jt9UU5l2yyT75VnjgjPYiRJ.jPV0_XPZfWpBDKVyca5lvFZ3baoUR3Kyoh_wAVUIqHdnyUJn9Mi78t6lt03jlYJjoLuQK1C4j0yab39sMF9qkgusBATwX4R3bR__ykgbVwFSrVsI1fLdskU81ZkRNTHn7wy.tvnFTeYFeNmoZs9Tm82HL41kfleP1_WLLm9mb8NQuFEsaJyELaZElXB2miF7Yx1QtPL6teeu81gnYpNErr0LrxacoW2tn32e3GypwyC9uLI.QBCcrUw6jI.dMCdgE8s9s8khYddZFsBbzr.8wgQ5B5Vo7nDVNDPRtXJJrZaHRp8PB7yvVcXo2EoimzaECa.MJJP4kIAupwXGZBD9RVGTqBSpcmoXn0PJup.ysNpcf8xz2a0y_qNgDNBKAZa2b6_hMI1kvrj5o90dX1gSe0LvuDV73LKAbjxSv5De7ifyFOVKyg8eQOXwMH9a_WeGVt_13HR__7S.K2MXvfsruEdfhoZ0M4VBIQt0pqPzzjvR4LMQU3DGnD7w_KA.1fkdmONVtQ3S8pCMcbHG2KXla_spUMCF9Jy3KtOSonutjo100zxUlz6bosbWgnPK0mdlvA5QLeSnySXQJcnztFJqr31hnvBT5I2v6ipYZ4OrM11z8lB8cb.jOYcfdok2thaB0AtSfaHkZqUY9_P9jPsY3o2Tk89wX1PCzxc68TY1FxeASey_6vuLE_3SwISTot0RI_DdRDwxdeE270HplOU0A8BugUjkaqjPmx98gK.sWVpuGSLuw3_Bm6sAW0ILLJxVaTx0562P0iLzlQ8GXTNM34',};var a = document.createElement('script');a.src = '/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1?ray=97747f2c28d619d5';window._cf_chl_opt.cOgUHash = location.hash === '' && location.href.indexOf('#') !== -1 ? '#' : location.hash;window._cf_chl_opt.cOgUQuery = location.search === '' && location.href.slice(0, location.href.length - window._cf_chl_opt.cOgUHash.length).indexOf('?') !== -1 ? '?' : location.search;if (window.history && window.history.replaceState) {var ogU = location.pathname + window._cf_chl_opt.cOgUQuery + window._cf_chl_opt.cOgUHash;history.replaceState(null, null,"\/account\/files?__cf_chl_rt_tk=FxkzwoJje5qyg_HXcMw9MoEKnS7776qFE2GF7nf0QsA-1756559095-1.0.1.1-lo0WiVbB7g7hi3cZkMZs8QXRy8_0kZsq0vGhpoIbMpo"+ window._cf_chl_opt.cOgUHash);a.onload = function() {history.replaceState(null, null, ogU);}}document.getElementsByTagName('head')[0].appendChild(a);}());</script></body></html>
+Perplexity Proへのアップロード処理完了。0/2個のファイルがアップロードされました。
+  - 監査証跡ファイルを保存しました: C:\Users\USER\tools\NexusCore\exports\NexusCore_perplexity-upload_20250830_220441\UPLOAD_MANIFEST.json
+✅ Perplexity処理完了。ローカルにもファイルを保存しました: C:\Users\USER\tools\NexusCore\exports\NexusCore_perplexity-upload_20250830_220441

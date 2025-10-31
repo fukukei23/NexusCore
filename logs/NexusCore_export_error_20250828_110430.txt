@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "C:\Users\USER\.pyenv\pyenv-win\versions\3.11.9\Lib\pathlib.py", line 1116, in mkdir
+    os.mkdir(self, mode)
+FileNotFoundError: [WinError 206] ファイル名または拡張子が長すぎます。: 'C:\\Users\\USER\\tools\\NexusCore\\exports\\NexusCore_manifest_20250828_110344\\included_source\\exports\\NexusCore_manifest_20250828_064703\\exports\\NexusCore_manifest_20250828_064132\\exports\\NexusCore_manifest_20250826_222907\\included_source\\src\\nexuscore\\core'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\USER\tools\NexusCore\tools\code_export_gemini_fixed.py", line 424, in main
+    export_main(args)
+  File "C:\Users\USER\tools\NexusCore\tools\code_export_gemini_fixed.py", line 371, in export_main
+    mapping = copy_manifest(pick.picked, args.roots, manifest_dir)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\tools\NexusCore\tools\code_export_gemini_fixed.py", line 245, in copy_manifest
+    dest.parent.mkdir(parents=True, exist_ok=True)
+  File "C:\Users\USER\.pyenv\pyenv-win\versions\3.11.9\Lib\pathlib.py", line 1121, in mkdir
+    self.mkdir(mode, parents=False, exist_ok=exist_ok)
+  File "C:\Users\USER\.pyenv\pyenv-win\versions\3.11.9\Lib\pathlib.py", line 1116, in mkdir
+    os.mkdir(self, mode)
+FileNotFoundError: [WinError 206] ファイル名または拡張子が長すぎます。: 'C:\\Users\\USER\\tools\\NexusCore\\exports\\NexusCore_manifest_20250828_110344\\included_source\\exports\\NexusCore_manifest_20250828_064703\\exports\\NexusCore_manifest_20250828_064132\\exports\\NexusCore_manifest_20250826_222907\\included_source\\src\\nexuscore\\core'
