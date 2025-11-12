@@ -1,102 +1,92 @@
 # ==============================================================================
-# 操作するソフト: VSCode (または任意のテキストエディタ)
-# フォルダ: src/nexuscore/npe/
-# ファイル名: engine.py
-#
-# 日付: 2025年9月28日
-# 日本時間: 06:25
-#
-# バージョン: 8.0 (Grand Unification)
-#
-# 改修内容:
-#   - ModuleNotFoundError の原因となっていた、存在しない `llms.py` への
-#     依存を完全に撤廃しました。
-#   - 代わりに、システムの公式なLLM司令塔である `LLMRouter` をインポートし、
-#     すべてのLLMの選択、起動、コスト計算を `LLMRouter` に委任するように
-#     アーキテクチャを近代化しました。
-#   - これにより、NPEがシステムの他の部分と完全に調和して動作するようになり、
-#     一貫したガバナンスとルーティングが実現します。
+# File: src/nexuscore/npe/engine.py
+# Purpose:
+#   - LLM実行の直前直後に BudgetGuard を噛ませる
+#   - 推定トークンで事前判定 → 実行後に実測で再記録
 # ==============================================================================
-
 from __future__ import annotations
-import logging
-from typing import Any, Dict
-
-# --- ★★★★★ ここからが v8.0 統合の核心 ★★★★★ ---
-# 存在しない .llms の代わりに、公式の LLMRouter とそのユーティリティをインポート
-from nexuscore.llm.llm_router import LLMRouter, _estimate_cost_usd
-# --- ★★★★★ ここまで ★★★★★ ---
-
-from .policies import context_scanner, secure_context_builder
+from typing import Optional, Dict, Any
+import math
+import re
+from . import budget
 from .logger import log_transaction
-from .budget import budget_manager
 
-class NexusProtocolEngine:
+TOKEN_AVG_CHARS = 3.8  # 粗い見積り。必要ならモデル別に補正
+
+def _estimate_tokens(text: str) -> int:
+    # 依存を増やさず簡易見積
+    if not text:
+        return 0
+    return max(1, int(math.ceil(len(text) / TOKEN_AVG_CHARS)))
+
+def guarded_llm_call(
+    *,
+    model: str,
+    task: str,
+    system_prompt: str,
+    user_prompt: str,
+    llm_complete_fn,
+) -> Dict[str, Any]:
     """
-    NPE v8.0: LLMRouterと統合され、ガバナンスとルーティングを一元管理する。
+    予算ガード付きで LLM を実行する。
+      - llm_complete_fn は (model, system_prompt, user_prompt) -> dict を想定
+      - 戻り値は {"ok": bool, "reason": str, "content": str, "usage": {...}} を基本とする
     """
-    def __init__(self):
-        self.logger = logging.getLogger(self.__class__.__name__)
-        # LLM司令塔であるLLMRouterのインスタンスを生成
-        self.llm_router = LLMRouter()
-        self.logger.info("Nexus Protocol Engine (v8.0) with LLMRouter integration is running.")
+    # ---- 事前見積り ----------------------------------------------------------
+    est_prompt_tokens    = _estimate_tokens(system_prompt) + _estimate_tokens(user_prompt)
+    est_completion_tokens = 512  # ワースト見積り（必要なら呼び出し側から渡す仕様に拡張可）
 
-    def process_task(self, prompt: str, metadata: Dict[str, Any], project_id: str = "proj-001") -> str:
-        log_data = {"project_id": project_id, "task_metadata": metadata}
+    decision = budget.preflight_check(
+        model=model,
+        task=task,
+        est_prompt_tokens=est_prompt_tokens,
+        est_completion_tokens=est_completion_tokens,
+    )
+    budget.record_estimate(model, task, decision)
 
-        # --- ガバナンス・フェーズ ---
-        # 1. セキュリティスキャン
-        context_type = context_scanner(prompt)
-        log_data["context_type"] = context_type
-        if context_type == "sensitive":
-            self.logger.warning("[NPE Security] Sensitive data detected. Applying security protocols.")
-            prompt = secure_context_builder(prompt)
-            log_data["is_masked"] = True
+    if not decision.allow:
+        log_transaction({
+            "event": "llm_blocked",
+            "model": model,
+            "task": task,
+            "reason": decision.reason,
+            "est_cost_jpy": decision.est_cost_jpy,
+            "caps": decision.caps,
+        })
+        return {
+            "ok": False,
+            "reason": f"Budget guard rejected: {decision.reason}",
+            "content": "",
+            "usage": {
+                "prompt_tokens": est_prompt_tokens,
+                "completion_tokens": 0,
+                "cost_estimated_jpy": decision.est_cost_jpy,
+            },
+        }
 
-        # 2. ルーティング判断 (LLMRouterを使用)
-        # LLMRouterがプロンプトを分析し、最適なLLMクライアントを選択
-        llm_client = self.llm_router.get_llm_for_task(prompt)
-        model_name = llm_client.model_name
-        log_data["initial_route_decision"] = model_name
-        
-        # 3. 経済性チェック (LLMRouterのコスト計算ロジックを使用)
-        # トークン数は概算。正確な値は実際のAPI応答から取得するのが望ましい。
-        estimated_in_tokens = len(prompt) // 2 
-        estimated_out_tokens = 2000 # デフォルトの想定
-        
-        cost_in, cost_out = _estimate_cost_usd(
-            provider=model_name.split(':')[0] if ':' in model_name else 'unknown',
-            model=model_name.split(':')[-1],
-            in_tokens=estimated_in_tokens,
-            out_tokens=estimated_out_tokens
-        )
-        estimated_cost = (cost_in or 0) + (cost_out or 0)
-        log_data["estimated_cost"] = estimated_cost
+    # ---- 実行 ----------------------------------------------------------------
+    result = llm_complete_fn(model=model, system_prompt=system_prompt, user_prompt=user_prompt)
 
-        if not budget_manager.check_budget(project_id, estimated_cost):
-            self.logger.error(f"[NPE Economic] ERROR: Budget insufficient for model '{model_name}'. Task aborted.")
-            log_transaction({**log_data, "status": "aborted_budget_exceeded"})
-            # 予算オーバー時は、エラーを示す空の文字列を返す
-            return ""
-        
-        log_data["final_route_decision"] = model_name
+    # ---- 実測使用量の確定（なければ推定のまま）--------------------------------
+    usage = result.get("usage", {}) if isinstance(result, dict) else {}
+    pt = usage.get("prompt_tokens", est_prompt_tokens)
+    ct = usage.get("completion_tokens", _estimate_tokens(result.get("content", "")) if isinstance(result, dict) else 0)
+    cost = budget._estimate_cost_jpy(model, pt, ct)
+    budget.record_usage(model=model, task=task, cost_jpy=cost, prompt_tokens=pt, completion_tokens=ct)
 
-        # --- 実行フェーズ ---
-        self.logger.info(f"[NPE Executor] Executing task with model '{model_name}'.")
-        try:
-            # LLMRouterが選択したクライアントでタスクを実行
-            result = llm_client.execute(prompt, system_prompt="", as_json=metadata.get("as_json", False))
-            # (注: 実際のコストはAPI応答から取得し、ここで記録するのが理想)
-            actual_cost = estimated_cost 
-        except Exception as e:
-            self.logger.error(f"[NPE Executor] Task execution failed with model '{model_name}': {e}", exc_info=True)
-            log_transaction({**log_data, "status": "error_execution_failed"})
-            return ""
+    # ---- 監査ログ ------------------------------------------------------------
+    log_transaction({
+        "event": "llm_call",
+        "model": model,
+        "task": task,
+        "ok": bool(result.get("ok", True)) if isinstance(result, dict) else True,
+        "reason": result.get("reason", "") if isinstance(result, dict) else "",
+        "usage": {"prompt_tokens": pt, "completion_tokens": ct, "cost_jpy": round(cost, 6)},
+    })
 
-        # --- 記録フェーズ ---
-        budget_manager.record_cost(project_id, actual_cost)
-        log_data["status"] = "success"
-        log_data["actual_cost"] = actual_cost
-        log_transaction(log_data)
-        
+    # ---- 返却 ---------------------------------------------------------------
+    if isinstance(result, dict):
+        result.setdefault("usage", {})
+        result["usage"].update({"prompt_tokens": pt, "completion_tokens": ct, "cost_jpy": cost})
         return result
+    return {"ok": True, "reason": "", "content": str(result), "usage": {"prompt_tokens": pt, "completion_tokens": ct, "cost_jpy": cost}}
