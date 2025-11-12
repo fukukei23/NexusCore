@@ -1,0 +1,4 @@
+{"ts": 1762083257, "provider": "moonshot", "model": "kimi-k2-turbo-preview", "input_tokens": 311, "output_tokens": 938, "cost_in_usd": 0.0, "cost_out_usd": 0.0, "total_usd": 0.0}
+{"ts": 1762083268, "provider": "moonshot", "model": "kimi-k2-turbo-preview", "input_tokens": 410, "output_tokens": 1024, "cost_in_usd": 0.0, "cost_out_usd": 0.0, "total_usd": 0.0}
+{"ts": 1762083821, "provider": "moonshot", "model": "kimi-k2-turbo-preview", "input_tokens": 311, "output_tokens": 854, "cost_in_usd": 0.0, "cost_out_usd": 0.0, "total_usd": 0.0}
+{"ts": 1762083831, "provider": "moonshot", "model": "kimi-k2-turbo-preview", "input_tokens": 410, "output_tokens": 1192, "cost_in_usd": 0.0, "cost_out_usd": 0.0, "total_usd": 0.0}

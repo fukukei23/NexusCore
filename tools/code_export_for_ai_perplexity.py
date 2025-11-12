@@ -42,7 +42,7 @@ from dataclasses import dataclass
 from math import log2
 from pathlib import Path
 from threading import Event
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # --- オプションライブラリの安全なインポート ---
 try:
@@ -503,13 +503,14 @@ def create_gradio_interface():
         def on_profile_change(profile_name: str):
             profile_data = PROFILES.get(profile_name, {}); mode = profile_data.get("output_mode")
             is_perplexity, is_standard_zip = (mode=="perplexity_upload"), (mode=="standard_zip")
-            return {
-                profile_info: gr.Markdown(visible=True, value=f"**選択中**: {profile_data.get('description', '')}"),
-                accordion: gr.Accordion(visible=is_perplexity or is_standard_zip),
-                api_token_tb: gr.Textbox(visible=is_perplexity, interactive=True),
-                emit_zip_cb: gr.Checkbox(visible=is_standard_zip, interactive=is_standard_zip),
-                emit_folder_cb: gr.Checkbox(visible=is_standard_zip, interactive=is_standard_zip),
-            }
+            description = profile_data.get('description', '')
+            return (
+                gr.update(visible=True, value=f"**選択中**: {description}"),
+                gr.update(visible=is_perplexity or is_standard_zip),
+                gr.update(visible=is_perplexity, interactive=is_perplexity),
+                gr.update(visible=is_standard_zip, interactive=is_standard_zip),
+                gr.update(visible=is_standard_zip, interactive=is_standard_zip),
+            )
 
         run_btn.click(fn=start_export_wrapper,inputs=[root_tb, profile_dd, api_token_tb, emit_zip_cb, emit_folder_cb, gr.State(False)],outputs=[status_out])
         dry_run_btn.click(fn=start_export_wrapper,inputs=[root_tb, profile_dd, api_token_tb, emit_zip_cb, emit_folder_cb, gr.State(True)],outputs=[status_out])

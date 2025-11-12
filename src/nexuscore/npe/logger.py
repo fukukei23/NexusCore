@@ -1,44 +1,68 @@
 # ==============================================================================
-# ファイル名: C:\Users\USER\tools\NexusCore\src\nexuscore\npe\logger.py
+# File: src/nexuscore/npe/logger.py
+# Purpose:
+#   - システム全体の監査証跡（Audit Trail）を記録する
+#   - スレッドセーフ (Lock)
+#   - 簡易ローテーション
 # ==============================================================================
-# 目的:
-# システム全体の監査証跡（Audit Trail）を記録するための汎用ロガー。
-# NPEの活動だけでなく、Orchestratorや各Agentの行動も記録することで、
-# トレーサビリティとガバナンスを確保する。
-# ==============================================================================
+from __future__ import annotations
 import datetime
 import json
+import os
+import threading
+from pathlib import Path
 
-def log_transaction(log_data: dict, log_file: str = "npe_audit_log.jsonl"):
-    """
-    実行された処理（トランザクション）をJSON Lines形式で記録する。
-    
-    Args:
-        log_data (dict): ログとして記録したいデータ。
-        log_file (str): ログの出力先ファイル名。
-    """
-    # ログに必須の情報を付与
-    log_data["event_timestamp_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    
-    # ログエントリをJSON形式の文字列に変換（人間が読みやすいようにインデント）
-    log_entry_pretty = json.dumps(log_data, indent=2, ensure_ascii=False)
-    
-    # --- コンソールへの出力（PoCでの確認用）---
-    print("\n--- NPE AUDIT LOG ---")
-    print(log_entry_pretty)
-    print("---------------------\n")
-    # ----------------------------------------
-    
-    # 永続化のためのファイル書き込み
-    # 監査ログは追記が基本なので、'a'モードでオープンする
+_lock = threading.Lock()
+AUDIT_DIR = Path(os.getenv("NPE_AUDIT_DIR", "logs/npe"))
+AUDIT_DIR.mkdir(parents=True, exist_ok=True)
+DEFAULT_LOG = AUDIT_DIR / "npe_audit_log.jsonl"
+ROTATE_BYTES = int(os.getenv("NPE_AUDIT_ROTATE_BYTES", "5242880"))  # 5MB
+ROTATE_KEEP  = int(os.getenv("NPE_AUDIT_ROTATE_KEEP", "3"))
+
+def _rotate_if_needed(path: Path) -> None:
     try:
-        # 実際にファイルに書き込む際は、インデントなしの1行JSON（JSON Lines形式）が一般的
-        log_entry_compact = json.dumps(log_data, ensure_ascii=False)
-        
-        # プロジェクトのルートディレクトリにログファイルを出力することを想定
-        # (実際にはconfigでログディレクトリを指定できるようにすべき)
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(log_entry_compact + "\n")
-            
+        if not path.exists():
+            return
+        if path.stat().st_size < ROTATE_BYTES:
+            return
+        # ローテーション: .1, .2, ...
+        for i in range(ROTATE_KEEP, 0, -1):
+            older = path.with_suffix(path.suffix + f".{i}")
+            newer = path.with_suffix(path.suffix + (f".{i-1}" if i > 1 else ""))
+            if newer.exists():
+                if older.exists():
+                    older.unlink(missing_ok=True)
+                newer.rename(older)
+        path.rename(path.with_suffix(path.suffix + ".1"))
     except Exception as e:
-        print(f"[NPE-Logger] CRITICAL: Failed to write to audit log file '{log_file}'. Error: {e}")
+        print(f"[NPE-Logger] WARN: rotation failed: {e}")
+
+def log_transaction(log_data: dict, log_file: str | Path = DEFAULT_LOG):
+    """
+    監査証跡をJSONLで追記。排他＋簡易ローテーション＋フォールバック出力。
+    """
+    if isinstance(log_file, str):
+        log_file = Path(log_file)
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    log_data["event_timestamp_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    entry_compact = json.dumps(log_data, ensure_ascii=False)
+
+    # コンソール（開発者の可視性）
+    try:
+        pretty = json.dumps(log_data, indent=2, ensure_ascii=False)
+        print("\n--- NPE AUDIT LOG ---")
+        print(pretty)
+        print("---------------------\n")
+    except Exception:
+        pass
+
+    with _lock:
+        try:
+            _rotate_if_needed(log_file)
+            with log_file.open("a", encoding="utf-8") as f:
+                f.write(entry_compact + "\n")
+        except Exception as e:
+            # ファイルに書けない状況でも“監査の消失”を避ける
+            print(f"[NPE-Logger] CRITICAL: failed to write audit file '{log_file}': {e}")
+            print(entry_compact)
