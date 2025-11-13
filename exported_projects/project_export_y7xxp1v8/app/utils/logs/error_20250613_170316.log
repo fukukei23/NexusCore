@@ -1,2 +1,0 @@
-HTTP Error: 400
-{"error":{"message":"Invalid model 'llama-3-sonar-large-32k-online'. Permitted models can be found in the documentation at https://docs.perplexity.ai/guides/model-cards.","type":"invalid_model","code":400}}

@@ -1,1 +1,0 @@
-{"id": "FKB-SUGGESTION-0001", "error_signature": "NameError: name 'pytest' is not defined", "cause": "テストコードでpytestがインポートされていない。", "target": "test_file", "solution_pattern": {"type": "llm_diagnose_and_fix", "instruction": "テストコードでpytestモジュールがインポートされていないため、NameErrorが発生しています。テストコードの先頭に`import pytest`を追加してください。"}, "description": "pytestのインポート漏れによるNameErrorを解決するための知識。"}
