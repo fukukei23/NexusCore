@@ -1,0 +1,80 @@
+
+--- 過去の圧縮実績から学習した圧縮率を適用 ---
+  - .py: 0.28 (実績: 0.18, 重み: 0.17)
+  - .md: 0.34 (実績: 0.18, 重み: 0.04)
+  - .md  set-clipboard: 0.50 (実績: 0.18, 重み: 0.00)
+  - .txt: 0.34 (実績: 0.18, 重み: 0.25)
+  - .code-workspace: 0.50 (実績: 0.18, 重み: 0.00)
+  - .toml: 0.35 (実績: 0.18, 重み: 0.00)
+  - .ts: 0.28 (実績: 0.18, 重み: 0.00)
+  - .json: 0.25 (実績: 0.18, 重み: 0.02)
+  - .pem: 0.50 (実績: 0.18, 重み: 0.00)
+  - : 0.50 (実績: 0.18, 重み: 0.01)
+  - .ps1: 0.50 (実績: 0.18, 重み: 0.00)
+  - .bak: 0.50 (実績: 0.18, 重み: 0.00)
+  - .yml: 0.40 (実績: 0.18, 重み: 0.00)
+  - .bat: 0.50 (実績: 0.18, 重み: 0.00)
+  - .diff: 0.48 (実績: 0.18, 重み: 0.07)
+  - .vsix: 0.50 (実績: 0.18, 重み: 0.00)
+  - .sh: 0.45 (実績: 0.18, 重み: 0.00)
+  - .cfg: 0.50 (実績: 0.18, 重み: 0.00)
+  - .ini: 0.50 (実績: 0.18, 重み: 0.00)
+  - .tx: 0.50 (実績: 0.18, 重み: 0.00)
+...学習結果の適用完了。
+
+--- ファイル収集開始: /home/yn441611/NexusCore ---
+  - 収集完了: 578 ファイル
+
+--- ファイルスコアリング ---
+
+--- ファイル選択結果: 576件 / 生データ合計 5.92 MB ---
+  - (Top) tests/core/test_orchestrator.py (score: 20.00)
+  - (Top) healing_sandbox/src/agents/orchestrator.py (score: 20.00)
+  - (Top) src/nexuscore/core/orchestrator.py (score: 20.00)
+  - (Top) healing_sandbox/app/main.py (score: 18.00)
+  - (Top) tools/brownfield_orchestrator.py (score: 18.00)
+  - (Top) workspace/test_crm_app/tests/test_main.py (score: 18.00)
+  - (Top) workspace/test_crm_app/app/main.py (score: 18.00)
+  - (Top) workspace/crm_project/app/main.py (score: 18.00)
+  - (Top) workspace/default_project/app/main.py (score: 17.81)
+  - (Top) healing_sandbox/tests/test_main.py (score: 16.00)
+  - ...他 566件
+
+--- サイズ超過等により除外されたファイル (上位10件) ---
+- 33.51 MB  src/project_structure.json
+- 7.18 MB  src/project_structure.md
+
+--- 結合コードを生成中 ---
+  - 生成完了
+
+--- ZIPアーカイブ作成: /home/yn441611/NexusCore/exports/NexusCore_gemini-chronicle_20251116_205543.zip ---
+
+--- 今回の圧縮実績を統計に記録 ---
+  - .py: 生データ +1778.0 KB
+  - .md: 生データ +441.1 KB
+  - .md  set-clipboard: 生データ +3.6 KB
+  - .txt: 生データ +2604.7 KB
+  - .code-workspace: 生データ +1.5 KB
+  - .toml: 生データ +4.6 KB
+  - .ts: 生データ +6.2 KB
+  - .json: 生データ +255.6 KB
+  - .pem: 生データ +3.8 KB
+  - .html: 生データ +0.6 KB
+  - : 生データ +131.5 KB
+  - .yaml: 生データ +0.4 KB
+  - .ps1: 生データ +35.2 KB
+  - .bak: 生データ +1.9 KB
+  - .yml: 生データ +7.5 KB
+  - .template: 生データ +0.8 KB
+  - .bat: 生データ +2.0 KB
+  - .diff: 生データ +765.4 KB
+  - .vsix: 生データ +3.6 KB
+  - .sh: 生データ +9.0 KB
+  - .cfg: 生データ +1.7 KB
+  - .ini: 生データ +1.3 KB
+  - .cff: 生データ +0.8 KB
+  - .tx: 生データ +2.8 KB
+  - .in: 生データ +0.0 KB
+  - 統計ファイルを更新しました: /home/yn441611/NexusCore/exports/compression_stats.json
+✅ 年代記パッケージのエクスポート完了: /home/yn441611/NexusCore/exports/NexusCore_gemini-chronicle_20251116_205543.zip
+  - 予測ZIP: 1.93 MB / 実際ZIP: 1.05 MB (予測精度: 54.2%)

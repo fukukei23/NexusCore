@@ -109,6 +109,29 @@ class TesterAgent(BaseAgent):
         # (統合的改善提案) _call_llm から execute_llm_task に置き換え
         return self.execute_llm_task(prompt, as_json=True)
 
+    def generate_tests(self, requirement_summary: str) -> str:
+        """
+        Fast-Lane モードで要求テキストのみを渡された場合のフォールバック。
+        """
+        prompt = f"""
+# ユーザー要件 (Requirement)
+{requirement_summary}
+
+# あなたへの指示
+上記の要件に対して、pytest で実行できる回帰テストと、それぞれのテストで検証する
+観点の短い解説（testimony）を JSON で返してください。
+
+# 出力形式
+{{
+  "test_code": "...pytest code...",
+  "testimony": "...why these tests cover the requirement..."
+}}
+
+- test_code には pytest テストファイル全体を記述してください。
+- 外部サービスへの依存がある場合は、スタブやフェイクを用いた形で表現してください。
+"""
+        return self.execute_llm_task(prompt, as_json=True)
+
 # -----------------------------------------------------------------------------
 # END OF FILE: src/nexuscore/agents/tester_agent.py
 # -----------------------------------------------------------------------------

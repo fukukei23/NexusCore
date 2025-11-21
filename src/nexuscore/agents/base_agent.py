@@ -52,7 +52,7 @@ class BaseAgent:
             self.llm_router = None
 
     # ---------------------------- Public API ---------------------------- #
-    def execute_llm_task(self, prompt: str, as_json: bool = False, **kwargs) -> str:
+    def execute_llm_task(self, prompt: str, as_json: bool = False, task_type: Optional[str] = None, **kwargs) -> str:
         """
         ルーター経由で最適な LLM を取得し実行。
         as_json=True のときは、system に JSON-only ガード文を自動付与する。
@@ -71,7 +71,7 @@ class BaseAgent:
         llm = None
         try:
             if self.llm_router and hasattr(self.llm_router, "get_llm_for_task"):
-                llm = self.llm_router.get_llm_for_task(prompt)
+                llm = self.llm_router.get_llm_for_task(prompt, task_type=task_type)
             elif self.llm_router and hasattr(self.llm_router, "get_default_llm"):
                 llm = self.llm_router.get_default_llm()
         except Exception as e:

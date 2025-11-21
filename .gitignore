@@ -48,7 +48,8 @@ db.sqlite3
 
 # --- Project-specific ignores ---
 # 生成されたファイルが出力されるフォルダ
-output/
+output/*
+!output/core_files.txt
 
 # VSCode settings
 .vscode/
@@ -62,4 +63,3 @@ output/
 # Log files
 logs/ # ← こちらの行を追加
 # ----------------------------------
-

@@ -20,7 +20,7 @@
 from __future__ import annotations
 # ---- .env ロード (v2.2.5) ---------------------------------------------------
 from pathlib import Path
-import os, logging
+import os, logging, json
 try:
     from dotenv import load_dotenv, find_dotenv
     _here = Path(__file__).resolve()
@@ -61,7 +61,59 @@ except ImportError:
 import time
 # import logging (↑でインポート済み)
 # from pathlib import Path (↑でインポート済み)
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, List, Any
+
+DEFAULT_STUB_CONTENT = {
+    "summary": "Stubbed response: real LLM call was skipped or unavailable.",
+    "plan": [
+        {"step": "analyze_requirement", "owner": "PlannerAgent", "status": "pending"},
+        {"step": "implement_core_logic", "owner": "CoderAgent", "status": "blocked_stub"},
+        {"step": "write_tests_and_docs", "owner": "TesterAgent", "status": "blocked_stub"}
+    ]
+}
+
+def _real_call_enabled(api_key: Optional[str]) -> bool:
+    """環境変数から実コールを許可するか判定する（キー無しならスタブ）。"""
+    if os.getenv("LLM_DRY_RUN", "0") == "1":
+        return False
+    return bool(api_key) and os.getenv("NEXUS_REAL_CALLS", "0") == "1"
+
+
+def _stub_response(model_name: str, mode: str, reason: str, as_json: bool) -> str:
+    """スタブ応答を一元生成し、呼び出し側に明示する。"""
+    payload = {
+        "model": model_name,
+        "mode": mode,
+        "preview": reason,
+        "content": DEFAULT_STUB_CONTENT,
+    }
+    return json.dumps(payload, ensure_ascii=False) if as_json else reason
+
+def _ensure_env_var(target: str, aliases: list[str]) -> None:
+    """
+    Align legacy/custom environment variables with the canonical ones expected by the router.
+    """
+    if os.getenv(target):
+        return
+    logger = logging.getLogger("LLMRouter-Bootstrap")
+    for alias in aliases:
+        val = os.getenv(alias)
+        if val:
+            os.environ[target] = val
+            logger.info("ENV sync: %s was missing. Using value from %s.", target, alias)
+            return
+
+
+_ensure_env_var("GEMINI_API_KEY", ["GEMINI_API_KEY_AGENT_A", "GEMINI_API_KEY_AGENT_B"])
+_ensure_env_var("DEEPSEEK_API_KEY", ["DEEPSEEK_KEY", "DEEPSEEK"])
+_ensure_env_var("KIMI_API_KEY", ["MOONSHOT_API_KEY", "MOONSHOT"])
+
+if not os.getenv("NEXUS_REAL_CALLS"):
+    if any(os.getenv(k) for k in ["OPENAI_API_KEY", "GEMINI_API_KEY", "DEEPSEEK_API_KEY", "KIMI_API_KEY"]):
+        os.environ["NEXUS_REAL_CALLS"] = "1"
+        logging.getLogger("LLMRouter-Bootstrap").info(
+            "NEXUS_REAL_CALLS was not set. Enabling REAL-CALL mode because API keys are detected."
+        )
 
 # ---- ★ v2.3.5 堅牢化パッチ (requests + Retry) ------------------------------
 try:
@@ -170,15 +222,172 @@ except Exception:
 # -----------------------------------------------------------------------------
 # モデル割り当てポリシー（最新版）
 # -----------------------------------------------------------------------------
-TASK_MODEL_MAP_DEFAULT: Dict[str, str] = {
-    "requirements": "gemini-2.5-flash",
-    "planning":     "gemini-2.5-flash",
-    "coding":       "gpt-5",
-    "testing":      "gpt-5-mini",
-    "debugging":    "gpt-5",
-    "review":       "gemini-2.5-pro",
-    "policy":       "gemini-2.5-pro",
-    "general":      "gemini-2.5-flash",
+TASK_MODEL_MAP_DEFAULT: Dict[str, Dict[str, Any]] = {
+    # ===== 開発フロー（コード/テスト）=====
+    "code_generate": {
+        "primary": "openai:gpt-5.1",
+        "fallbacks": [
+            "google:gemini-2.5-pro-latest",
+            "deepseek-coder",
+            "anthropic:claude-3.5-sonnet",
+        ],
+    },
+    "code_refactor": {
+        "primary": "openai:gpt-5.1",
+        "fallbacks": [
+            "openai:gpt-5.1-instant",
+            "anthropic:claude-3.5-sonnet",
+        ],
+    },
+    "code_review": {
+        "primary": "openai:gpt-5.1-thinking",
+        "fallbacks": [
+            "anthropic:claude-3.5-sonnet",
+            "google:gemini-2.5-pro-latest",
+        ],
+    },
+    "test_generate": {
+        "primary": "openai:gpt-5.1",
+        "fallbacks": [
+            "anthropic:claude-3.5-sonnet",
+            "google:gemini-2.5-pro-latest",
+        ],
+    },
+    "self_heal": {
+        "primary": "openai:gpt-5.1-thinking",
+        "fallbacks": [
+            "anthropic:claude-3.5-sonnet",
+            "openai:gpt-5.1",
+        ],
+    },
+    # ===== 要件・計画・アーキ =====
+    "requirement_elicit": {
+        "primary": "google:gemini-2.5-pro-latest",
+        "fallbacks": [
+            "openai:gpt-5.1-thinking",
+            "anthropic:claude-3.5-sonnet",
+        ],
+    },
+    "plan_generate": {
+        "primary": "google:gemini-2.5-pro-latest",
+        "fallbacks": [
+            "openai:gpt-5.1-thinking",
+            "anthropic:claude-3.5-sonnet",
+        ],
+    },
+    "arch_design": {
+        "primary": "google:gemini-2.5-pro-latest",
+        "fallbacks": [
+            "openai:gpt-5.1-thinking",
+            "anthropic:claude-3.5-sonnet",
+        ],
+    },
+    # ===== BUYMA / スクレイピング =====
+    "scraping_analyze": {
+        "primary": "openai:gpt-5.1-thinking",
+        "fallbacks": [
+            "google:gemini-2.5-pro-latest",
+            "anthropic:claude-3.5-sonnet",
+        ],
+    },
+    "pricing_strategy": {
+        "primary": "google:gemini-2.5-pro-latest",
+        "fallbacks": [
+            "openai:gpt-5.1-thinking",
+            "anthropic:claude-3.5-sonnet",
+        ],
+    },
+    "catalog_enrich": {
+        "primary": "google:gemini-2.5-flash-latest",
+        "fallbacks": [
+            "openai:gpt-5.1-instant",
+        ],
+    },
+    "shipping_infer": {
+        "primary": "google:gemini-2.5-pro-latest",
+        "fallbacks": [
+            "openai:gpt-5.1",
+            "anthropic:claude-3.5-sonnet",
+        ],
+    },
+    # ===== ガバナンス / ポリシー / NPE =====
+    "routing_classify": {
+        "primary": "openai:gpt-5.1-instant",
+        "fallbacks": [
+            "google:gemini-2.5-flash-latest",
+        ],
+    },
+    "policy_check": {
+        "primary": "anthropic:claude-3.5-sonnet",
+        "fallbacks": [
+            "openai:gpt-5.1-thinking",
+            "google:gemini-2.5-pro-latest",
+        ],
+    },
+    "postmortem_analyze": {
+        "primary": "openai:gpt-5.1-thinking",
+        "fallbacks": [
+            "anthropic:claude-3.5-sonnet",
+            "google:gemini-2.5-pro-latest",
+        ],
+    },
+    "knowledge_curate": {
+        "primary": "google:gemini-2.5-pro-latest",
+        "fallbacks": [
+            "anthropic:claude-3.5-sonnet",
+            "openai:gpt-5.1-thinking",
+        ],
+    },
+    # ===== 汎用 / VC / NPE =====
+    "chat_general": {
+        "primary": "openai:gpt-5.1-instant",
+        "fallbacks": [
+            "google:gemini-2.5-flash-latest",
+            "anthropic:claude-3.5-sonnet",
+        ],
+    },
+    # ==== Test / latest spec alignment (updated) ====
+    "creative": {
+        "primary": "openai:gpt-5.1",
+        "fallbacks": [
+            "openai:gpt-5.1-instant",
+            "google:gemini-2.5-pro-latest",
+        ],
+    },
+    "analytical": {
+        "primary": "google:gemini-2.5-pro-latest",
+        "fallbacks": [
+            "google:gemini-2.5-pro-latest",
+            "openai:gpt-5.1-thinking",
+        ],
+    },
+    "secure": {
+        "primary": "anthropic:claude-3.5-sonnet",
+        "fallbacks": [
+            "openai:gpt-5.1-thinking",
+            "google:gemini-2.5-pro-latest",
+        ],
+    },
+    "general": {
+        "primary": "google:gemini-2.5-flash-latest",
+        "fallbacks": [
+            "openai:gpt-5.1-instant",
+        ],
+    },
+    "vc_analysis": {
+        "primary": "anthropic:claude-3.5-sonnet",
+        "fallbacks": [
+            "openai:gpt-5.1-thinking",
+            "google:gemini-2.5-pro-latest",
+        ],
+    },
+    "npe_govern": {
+        "primary": "openai:gpt-5.1-thinking",
+        "fallbacks": [
+            "anthropic:claude-3.5-sonnet",
+            "google:gemini-2.5-pro-latest",
+        ],
+    },
 }
 
 # 旧名称→新タスク種別のマッピング(後方互換)
@@ -206,6 +415,10 @@ def normalize_model(name: str) -> str:
     if not name:
         return "local-mock"
     name = name.strip()
+    # vendor:model_name の形式なら model 名部分だけ整形
+    if ":" in name:
+        vendor, model = name.split(":", 1)
+        name = f"{vendor.strip()}:{model.strip()}"
     # よくあるゆらぎ: -latest / :latest / -turbo など
     replacements = {
         "gemini-2.5-flash-latest": "gemini-2.5-flash",
@@ -222,6 +435,13 @@ def model_family(name: str) -> str:
     Routerがクライアントを生成する時に使う。
     """
     n = name.lower()
+    if n in {"openai", "google", "anthropic", "deepseek", "kimi", "gemini", "local"}:
+        return {"google": "gemini"}.get(n, n)
+    if ":" in n:
+        vendor, model = n.split(":", 1)
+        if vendor in {"openai", "google", "anthropic", "deepseek", "kimi", "local"}:
+            return {"google": "gemini"}.get(vendor, vendor)
+        n = model  # ベンダーが未知ならモデル名側で判定
     if n.startswith("gpt-") or n.startswith("o") or n.startswith("openai-"):
         return "openai"
     if n.startswith("gemini"):
@@ -230,6 +450,10 @@ def model_family(name: str) -> str:
         return "deepseek"
     if n.startswith("kimi"):
         return "kimi"
+    if n.startswith("claude") or n.startswith("anthropic"):
+        return "anthropic"
+    if n.startswith("llama") or n.startswith("local"):
+        return "local"
     return "local"
 
 # -----------------------------------------------------------------------------
@@ -273,6 +497,16 @@ class BaseLLM:
         raise NotImplementedError("Subclasses must implement execute()")
 
 
+def _split_provider(model_name: str) -> Tuple[str, str]:
+    """
+    "vendor:model" 形式を分離し、デフォルトはベンダーを推定する。
+    """
+    if ":" in model_name:
+        vendor, model = model_name.split(":", 1)
+        return vendor.lower().strip(), model.strip()
+    return model_family(model_name), model_name
+
+
 class OpenAILLM(BaseLLM):
     """
     gpt-5 / gpt-5-mini 等のOpenAI系モデル想定
@@ -281,8 +515,10 @@ class OpenAILLM(BaseLLM):
     def __init__(self, model_name: str):
         super().__init__(model_name)
         self.api_key = os.getenv("OPENAI_API_KEY")
-        if not self.api_key:
-            raise ValueError("OPENAI_API_KEY is not set.")
+        self.real_calls = _real_call_enabled(self.api_key) and REQUESTS_AVAILABLE
+        if not self.api_key and self.real_calls:
+            self.logger.warning("OPENAI_API_KEY is not set. Falling back to stub mode.")
+            self.real_calls = False
 
         # ★ パッチ 3) Azure 互換スイッチ (v2.3.3)
         # ★ Bugfix (v2.3.5) BASE URL 誤植修正（Markdown表記を素のURLに）
@@ -292,13 +528,14 @@ class OpenAILLM(BaseLLM):
         self.azure_api_version = os.getenv("OPENAI_AZURE_API_VERSION", "2024-08-01-preview")
 
         # 実コール or スタブを環境変数で切替 (v2.3.3)
-        self.real_calls = (os.getenv("NEXUS_REAL_CALLS", "0") == "1") and REQUESTS_AVAILABLE
         if self.real_calls:
+            if self.azure and not self.azure_deployment:
+                raise ValueError("OPENAI_AZURE=1 requires OPENAI_AZURE_DEPLOYMENT to be set.")
             # ★ v2.3.5 リトライセッション作成
             self.session = create_retry_session()
             self.logger.info("OpenAILLM initialized in REAL-CALL mode (Azure: %s, Retry: On).", self.azure)
         else:
-            self.logger.info("OpenAILLM initialized in STUB mode.")
+            self.logger.info("OpenAILLM initialized in STUB mode (reason: missing key or dry-run).")
 
     def execute(self, prompt: str, system_prompt: str, **kwargs) -> str:
         temperature = kwargs.get("temperature", 0.2)
@@ -409,7 +646,8 @@ class OpenAILLM(BaseLLM):
                 fake = {
                     "model": self.model_name,
                     "mode": "openai-stub-fallback",
-                    "preview": "Real call failed. Fallback to stub."
+                    "preview": "Real call failed. Fallback to stub.",
+                    "content": DEFAULT_STUB_CONTENT
                 }
                 return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
             except Exception as e:
@@ -419,7 +657,8 @@ class OpenAILLM(BaseLLM):
                 fake = {
                     "model": self.model_name,
                     "mode": "openai-stub-fallback",
-                    "preview": "Real call failed. Fallback to stub."
+                    "preview": "Real call failed. Fallback to stub.",
+                    "content": DEFAULT_STUB_CONTENT
                 }
                 return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
 
@@ -429,7 +668,8 @@ class OpenAILLM(BaseLLM):
             "model": self.model_name,
             "mode": "openai-stub",
             "as_json": as_json,
-            "preview": "This is a stubbed OpenAI model response."
+            "preview": "This is a stubbed OpenAI model response.",
+            "content": DEFAULT_STUB_CONTENT
         }
         return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
 
@@ -443,10 +683,7 @@ class GeminiLLM(BaseLLM):
     def __init__(self, model_name: str):
         super().__init__(model_name)
         api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY is not set.")
-        # 実コール or スタブを環境変数で切替 (v2.3.2)
-        self.real_calls = os.getenv("NEXUS_REAL_CALLS", "0") == "1"
+        self.real_calls = _real_call_enabled(api_key)
         if self.real_calls:
             # ライブラリが無くてもスタブモードなら動くよう、ここでimport
             try:
@@ -460,6 +697,7 @@ class GeminiLLM(BaseLLM):
                 self.real_calls = False # 強制的にスタブモードに戻す
         else:
             self.client = None  # スタブ
+            self.logger.info("GeminiLLM initialized in STUB mode (reason: missing key or dry-run).")
             self.logger.info("GeminiLLM initialized in STUB mode.")
 
 
@@ -527,7 +765,8 @@ class GeminiLLM(BaseLLM):
                     fake = {
                         "model": self.model_name,
                         "mode": "gemini-stub-fallback",
-                        "preview": "No text returned (possibly blocked)."
+                        "preview": "No text returned (possibly blocked).",
+                        "content": DEFAULT_STUB_CONTENT
                     }
                     return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
 
@@ -543,7 +782,8 @@ class GeminiLLM(BaseLLM):
                 fake = {
                     "model": self.model_name,
                     "mode": "gemini-stub-fallback",
-                    "preview": "Real call failed. Fallback to stub."
+                    "preview": "Real call failed. Fallback to stub.",
+                    "content": DEFAULT_STUB_CONTENT
                 }
                 return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
 
@@ -553,7 +793,8 @@ class GeminiLLM(BaseLLM):
             "model": self.model_name,
             "mode": "gemini-stub",
             "as_json": as_json,
-            "preview": "This is a stubbed Gemini model response."
+            "preview": "This is a stubbed Gemini model response.",
+            "content": DEFAULT_STUB_CONTENT
         }
         return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
     # --- ★★★★★ v2.3.2 堅牢化 execute() (ここまで) ★★★★★ ---
@@ -567,19 +808,20 @@ class MoonshotLLM(BaseLLM):
     def __init__(self, model_name: str):
         super().__init__(model_name)
         self.api_key = os.getenv("KIMI_API_KEY")
-        if not self.api_key:
-            raise ValueError("KIMI_API_KEY is not set.")
+        self.real_calls = _real_call_enabled(self.api_key) and REQUESTS_AVAILABLE
+        if not self.api_key and self.real_calls:
+            self.logger.warning("KIMI_API_KEY is not set. Falling back to stub mode.")
+            self.real_calls = False
         
         # ★ Bugfix (v2.3.5) BASE URL 誤植修正（Markdown表記を素のURLに）
         self.base_url = (os.getenv("KIMI_BASE_URL") or "https://api.moonshot.cn").rstrip("/")
         
-        self.real_calls = (os.getenv("NEXUS_REAL_CALLS", "0") == "1") and REQUESTS_AVAILABLE
         if self.real_calls:
             # ★ v2.3.5 リトライセッション作成
             self.session = create_retry_session()
             self.logger.info("MoonshotLLM initialized in REAL-CALL mode (Retry: On).")
         else:
-            self.logger.info("MoonshotLLM initialized in STUB mode.")
+            self.logger.info("MoonshotLLM initialized in STUB mode (reason: missing key or dry-run).")
 
     def execute(self, prompt: str, system_prompt: str, **kwargs) -> str:
         temperature = kwargs.get("temperature", 0.3) # Kimi は 0.3 がデフォルト
@@ -639,7 +881,8 @@ class MoonshotLLM(BaseLLM):
                 fake = {
                     "model": self.model_name,
                     "mode": "kimi-stub-fallback",
-                    "preview": "Real call failed. Fallback to stub."
+                    "preview": "Real call failed. Fallback to stub.",
+                    "content": DEFAULT_STUB_CONTENT
                 }
                 return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
 
@@ -649,7 +892,91 @@ class MoonshotLLM(BaseLLM):
             "model": self.model_name,
             "mode": "kimi-stub",
             "as_json": as_json,
-            "preview": "This is a stubbed Kimi model response."
+            "preview": "This is a stubbed Kimi model response.",
+            "content": DEFAULT_STUB_CONTENT
+        }
+        return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+
+
+class AnthropicLLM(BaseLLM):
+    """
+    Claude 3.x 系 (Anthropic)
+    """
+    def __init__(self, model_name: str):
+        super().__init__(model_name)
+        self.api_key = os.getenv("ANTHROPIC_API_KEY")
+        self.real_calls = _real_call_enabled(self.api_key) and REQUESTS_AVAILABLE
+        if not self.api_key and self.real_calls:
+            self.logger.warning("ANTHROPIC_API_KEY is not set. Falling back to stub mode.")
+            self.real_calls = False
+        self.base_url = (os.getenv("ANTHROPIC_BASE_URL") or "https://api.anthropic.com").rstrip("/")
+        if self.real_calls:
+            self.session = create_retry_session()
+            self.logger.info("AnthropicLLM initialized in REAL-CALL mode (Retry: On).")
+        else:
+            self.logger.info("AnthropicLLM initialized in STUB mode (reason: missing key or dry-run).")
+
+    def execute(self, prompt: str, system_prompt: str, **kwargs) -> str:
+        temperature = kwargs.get("temperature", 0.3)
+        as_json = kwargs.get("as_json", False)
+        max_out = kwargs.get("max_tokens") or os.getenv("NEXUS_DEFAULT_MAX_OUT_TOKENS")
+        if self.real_calls and self.session:
+            try:
+                url = f"{self.base_url}/v1/messages"
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                    "anthropic-version": "2023-06-01",
+                }
+                payload = {
+                    "model": self.model_name,
+                    "messages": [
+                        {"role": "user", "content": prompt},
+                    ],
+                    "system": system_prompt,
+                    "temperature": float(temperature),
+                }
+                if max_out:
+                    payload["max_tokens"] = int(max_out)
+                # Anthropicはresponse_format未対応のため、JSON出力はプロンプトで誘導
+                resp = self.session.post(url, headers=headers, json=payload, timeout=float(os.getenv("NEXUS_REQUEST_TIMEOUT_SEC", "120")))
+                resp.raise_for_status()
+                data = resp.json()
+                content_blocks = data.get("content") or []
+                text_parts = []
+                for blk in content_blocks:
+                    if isinstance(blk, dict) and blk.get("type") == "text" and blk.get("text"):
+                        text_parts.append(str(blk["text"]))
+                text = "\n".join(text_parts).strip()
+
+                usage = data.get("usage") or {}
+                self._last_usage = {
+                    "prompt_tokens": usage.get("input_tokens"),
+                    "completion_tokens": usage.get("output_tokens"),
+                }
+
+                if not text:
+                    raise RuntimeError("Anthropic returned no text.")
+                self.last_call_mode = "real"
+                return _strip_jsonish(text) if as_json else text
+            except Exception as e:
+                self.logger.error(f"AnthropicLLM REAL-CALL failed (after retries): {e}")
+                self.last_call_mode = "stub-fallback"
+                fake = {
+                    "model": self.model_name,
+                    "mode": "anthropic-stub-fallback",
+                    "preview": "Real call failed. Fallback to stub.",
+                    "content": DEFAULT_STUB_CONTENT,
+                }
+                return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+
+        self.last_call_mode = "stub"
+        fake = {
+            "model": self.model_name,
+            "mode": "anthropic-stub",
+            "as_json": as_json,
+            "preview": "This is a stubbed Anthropic model response.",
+            "content": DEFAULT_STUB_CONTENT,
         }
         return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
 
@@ -662,19 +989,20 @@ class DeepSeekLLM(BaseLLM):
     def __init__(self, model_name: str):
         super().__init__(model_name)
         self.api_key = os.getenv("DEEPSEEK_API_KEY")
-        if not self.api_key:
-            raise ValueError("DEEPSEEK_API_KEY is not set.")
+        self.real_calls = _real_call_enabled(self.api_key) and REQUESTS_AVAILABLE
+        if not self.api_key and self.real_calls:
+            self.logger.warning("DEEPSEEK_API_KEY is not set. Falling back to stub mode.")
+            self.real_calls = False
         
         # ★ Bugfix (v2.3.5) BASE URL 誤植修正（Markdown表記を素のURLに）
         self.base_url = (os.getenv("DEEPSEEK_BASE_URL") or "https://api.deepseek.com").rstrip("/")
 
-        self.real_calls = (os.getenv("NEXUS_REAL_CALLS", "0") == "1") and REQUESTS_AVAILABLE
         if self.real_calls:
             # ★ v2.3.5 リトライセッション作成
             self.session = create_retry_session()
             self.logger.info("DeepSeekLLM initialized in REAL-CALL mode (Retry: On).")
         else:
-            self.logger.info("DeepSeekLLM initialized in STUB mode.")
+            self.logger.info("DeepSeekLLM initialized in STUB mode (reason: missing key or dry-run).")
 
     def execute(self, prompt: str, system_prompt: str, **kwargs) -> str:
         temperature = kwargs.get("temperature", 0.2)
@@ -734,7 +1062,8 @@ class DeepSeekLLM(BaseLLM):
                 fake = {
                     "model": self.model_name,
                     "mode": "deepseek-stub-fallback",
-                    "preview": "Real call failed. Fallback to stub."
+                    "preview": "Real call failed. Fallback to stub.",
+                    "content": DEFAULT_STUB_CONTENT
                 }
                 return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
 
@@ -744,7 +1073,15 @@ class DeepSeekLLM(BaseLLM):
             "model": self.model_name,
             "mode": "deepseek-stub",
             "as_json": as_json,
-            "preview": "This is a stubbed DeepSeek model response."
+            "preview": "This is a stubbed DeepSeek model response.",
+            "content": {
+                "summary": "Stubbed DeepSeek response",
+                "plan": [
+                    {"step": "analyze_requirement", "owner": "PlannerAgent", "status": "pending"},
+                    {"step": "implement_core_logic", "owner": "CoderAgent", "status": "blocked_stub"},
+                    {"step": "write_tests", "owner": "TesterAgent", "status": "blocked_stub"}
+                ]
+            }
         }
         return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
 
@@ -771,6 +1108,14 @@ class LocalLLM(BaseLLM):
                     "model": self.model_name,
                     "mode": "local-fallback",
                     "preview": preview,
+                    "content": {
+                        "summary": "Stubbed local response",
+                        "plan": [
+                            {"step": "analyze_requirement", "owner": "PlannerAgent", "status": "pending"},
+                            {"step": "implement_core_logic", "owner": "CoderAgent", "status": "blocked_stub"},
+                            {"step": "write_tests", "owner": "TesterAgent", "status": "blocked_stub"}
+                        ]
+                    }
                 },
                 ensure_ascii=False,
             )
@@ -837,7 +1182,12 @@ class RoutedLLM(BaseLLM):
 
         # --- 2) 実際のLLM呼び出し (実コール or スタブ) ------------------
         self.inner._last_usage = None # usage 格納庫をリセット
+        # task別の温度上書き（code_generateなど）
+        temp_override = self.router.task_temperature_overrides.get(self.task_type)
+        if temp_override is not None and "temperature" not in kwargs:
+            kwargs["temperature"] = temp_override
         output_text = self.inner.execute(prompt, system_prompt, **kwargs)
+        self.router.last_mode = getattr(self.inner, "last_call_mode", "stub")
 
         # --- 3) 実コスト記録 (NPE v1.x IF) ---
         # ★ パッチ 1) 実トークン優先 (v2.3.3)
@@ -904,6 +1254,9 @@ class LLMRouter:
     - 呼び出し側(BaseAgentなど)には RoutedLLM を返す
     """
 
+    CLASSIFIER_MODEL_DEFAULT = "openai:gpt-5.1-instant"
+    CLASSIFIER_MODEL: str = CLASSIFIER_MODEL_DEFAULT
+
     LONG_THRESHOLD = 8000  # 文字数しきい値などでモデルを切り替えたい場合に使う
 
     def __init__(
@@ -915,9 +1268,14 @@ class LLMRouter:
         self.logger = logging.getLogger("LLMRouter")
         self.logger.setLevel(logging.INFO)
         self.env = os.environ  # ★v2.1.1 維持
+        self.last_mode: str = "init"
 
         # モデル振り分けテーブル
         self.task_model_map = task_model_map or TASK_MODEL_MAP_DEFAULT.copy()
+        self.default_model = (self.task_model_map.get("general") or {}).get("primary")
+        self.task_temperature_overrides = {
+            "code_generate": float(os.getenv("NEXUS_CODEGEN_TEMP", "0.1")),
+        }
 
         # ログディレクトリ・ログファイルパス
         self.log_dir = Path(log_dir)
@@ -942,16 +1300,16 @@ class LLMRouter:
         )
         self.logger.info("[Budget] API variant detected: %s", BUDGET_API)
 
-        # "タスク分類用" の軽量モデル。基本はGemini FlashでOK。
-        classifier_model_name = self.task_model_map.get("general", "gemini-2.5-flash")
-        try:
-            self._classifier = self._make_client(classifier_model_name)
-        except Exception as e:
-            self.logger.warning(
-                f"Classifier init failed for model='{classifier_model_name}': {e}. "
-                "Falling back to LocalLLM."
-            )
-            self._classifier = LocalLLM("local-mock")
+        # "タスク分類用" モデル（デフォルト: openai:gpt-5.1-instant）
+        classifier_model_name = (
+            self.env.get("NEXUS_CLASSIFIER_MODEL")
+            or (self.task_model_map.get("routing_classify") or {}).get("primary")
+            or self.CLASSIFIER_MODEL_DEFAULT
+        )
+        LLMRouter.CLASSIFIER_MODEL = classifier_model_name
+        self.CLASSIFIER_MODEL = classifier_model_name
+        # モデルが初期化できない場合はスタブに逃げず明示的に失敗させる
+        self._classifier = self._make_client(classifier_model_name)
 
         # 起動ログ
         self.logger.info(
@@ -1046,22 +1404,27 @@ class LLMRouter:
         (v2.3.5: 各クラスが Bugfix/Retry 適用済み)
         """
         model_name = normalize_model(model_name)
-        fam = model_family(model_name)
+        vendor, pure_model = _split_provider(model_name)
+        fam = model_family(vendor or pure_model)
 
         if fam == "openai":
-            return OpenAILLM(model_name)
+            return OpenAILLM(pure_model)
         if fam == "gemini":
-            return GeminiLLM(model_name)
+            return GeminiLLM(pure_model)
         if fam == "kimi":
-            return MoonshotLLM(model_name)
+            return MoonshotLLM(pure_model)
         if fam == "deepseek":
-            return DeepSeekLLM(model_name)
-        return LocalLLM(model_name)
+            return DeepSeekLLM(pure_model)
+        if fam == "anthropic":
+            return AnthropicLLM(pure_model)
+        if fam == "local":
+            return LocalLLM(pure_model)
+        raise ValueError(f"Unsupported model family for '{model_name}'. LocalLLM fallback is disabled.")
 
     # -----------------------------------------------------------------
     # public: 呼び出し側(BaseAgent)が使うエントリポイント
     # -----------------------------------------------------------------
-    def get_llm_for_task(self, prompt: str) -> RoutedLLM:
+    def get_llm_for_task(self, prompt: str, task_type: Optional[str] = None) -> RoutedLLM:
         """
         1. タスク分類
         2. (v2.1.1) 安価モデル強制対象かチェック
@@ -1069,9 +1432,33 @@ class LLMRouter:
         4. モデル名から vendor LLM クライアントを初期化 (v2.3.5)
         5. それを RoutedLLM で包んで返す (v2.3.5)
         """
-        task_type = self._classify_task_type(prompt)
+        task_type = task_type or self._classify_task_type(prompt)
 
-        model_name = self.task_model_map.get(task_type, self.task_model_map["general"])
+        llm_mode = os.getenv("NEXUS_LLM_MODE", "production").strip().lower()
+
+        def _resolve(task: str) -> Tuple[str, List[str]]:
+            entry = self.task_model_map.get(task) or self.task_model_map.get("general", {})
+            if isinstance(entry, dict):
+                primary = entry.get("primary")
+                fb = entry.get("fallbacks", [])
+            else:
+                primary = entry
+                fb = []
+            return primary, fb
+
+        if llm_mode == "cheap":
+            cheap_map = {
+                "routing_classify": "openai:gpt-5.1-instant",
+                "catalog_enrich": "google:gemini-2.5-flash-latest",
+                "chat_general": "openai:gpt-5.1-instant",
+            }
+            cheap_model = cheap_map.get(task_type)
+            if cheap_model:
+                model_name, fallbacks = cheap_model, []
+            else:
+                model_name, fallbacks = _resolve(task_type)
+        else:
+            model_name, fallbacks = _resolve(task_type)
 
         # --- ★★★★★ v2.1.1 統合コード (リファイン) ★★★★★ ---
         if task_type in self.force_tasks and self.cheap_model:
@@ -1082,15 +1469,19 @@ class LLMRouter:
             model_name = self.cheap_model
         # --- ★★★★★ v2.1.1 統合コード (ここまで) ★★★★★ ---
 
-        try:
-            base_client = self._make_client(model_name)
-        except Exception as e:
-            self.logger.warning(
-                "Failed to init client for model='%s': %s. Falling back to LocalLLM.",
-                model_name,
-                e,
-            )
-            base_client = LocalLLM("local-mock")
+        candidates = [m for m in [model_name] + fallbacks if m]
+        base_client = None
+        last_err: Optional[Exception] = None
+        for candidate in candidates:
+            try:
+                base_client = self._make_client(candidate)
+                model_name = candidate
+                break
+            except Exception as e:
+                last_err = e
+                self.logger.warning("Failed to init client for model='%s': %s", candidate, e)
+        if base_client is None:
+            raise RuntimeError(f"No available LLM client for task '{task_type}'. last_error={last_err}")
 
         # RoutedLLM で包む (v2.3.5: ログ強化済みの RoutedLLM)
         routed = RoutedLLM(
@@ -1105,6 +1496,71 @@ class LLMRouter:
             task_type,
         )
         return routed
+
+    # -----------------------------------------------------------------
+    # NPE 経由で使うための complete() API
+    # -----------------------------------------------------------------
+    def complete(
+        self,
+        *,
+        model: Optional[str] = None,
+        system_prompt: str,
+        user_prompt: str,
+        task: Optional[str] = None,
+        as_json: bool = False,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        guarded_llm_call から呼ばれる統一エントリ。
+        戻り値は {"ok": bool, "reason": str, "content": str, "usage": {...}} 形式。
+        """
+        task_type = task or None
+        try:
+            routed = None
+            if model:
+                base_client = self._make_client(model)
+                routed = RoutedLLM(inner_llm=base_client, router=self, task_type=task or "general")
+            else:
+                routed = self.get_llm_for_task(user_prompt, task_type=task)
+
+            output_text = routed.execute(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                as_json=as_json,
+                **kwargs,
+            )
+
+            inner = getattr(routed, "inner", routed)
+            usage = getattr(inner, "_last_usage", None) or {}
+
+            # 推定トークン（実測が無い場合のみ）
+            def _estimate_tokens(text: str) -> int:
+                if not text:
+                    return 0
+                return (len(text) + 2) // 3
+
+            prompt_tokens = usage.get("prompt_tokens") or _estimate_tokens(system_prompt + user_prompt)
+            completion_tokens = usage.get("completion_tokens") or _estimate_tokens(str(output_text))
+            usage = {"prompt_tokens": int(prompt_tokens), "completion_tokens": int(completion_tokens)}
+
+            return {
+                "ok": True,
+                "reason": "",
+                "content": output_text,
+                "usage": usage,
+                "task_type": task or getattr(routed, "task_type", "general"),
+                "mode": getattr(inner, "last_call_mode", getattr(routed, "last_call_mode", "stub")),
+            }
+        except Exception as e:
+            self.logger.error("LLMRouter.complete failed: %s", e, exc_info=True)
+            return {
+                "ok": False,
+                "reason": str(e),
+                "content": "",
+                "usage": {"prompt_tokens": 0, "completion_tokens": 0},
+                "task_type": task or "general",
+                "mode": "error",
+            }
 
 
 # -----------------------------------------------------------------------------
@@ -1177,4 +1633,3 @@ if __name__ == "__main__":
     if router:
         print(f"--- (To see logs, check: {router.call_log_path}) ---")
         print(f"--- (Real calls use 3 retries on 429/5xx, timeout={os.getenv('NEXUS_REQUEST_TIMEOUT_SEC', '120')}s) ---")
-
