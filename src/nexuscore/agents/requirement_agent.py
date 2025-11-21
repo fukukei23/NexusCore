@@ -52,11 +52,13 @@ class StateMachine:
     def transition(self, user_input: Optional[str] = None): self.state["state"] = "FINALIZING"; return [(None, "仕様を生成します。")] # 仮実装
 
 class RequirementAgent(BaseAgent):
-    def __init__(self, language: str = "ja"):
+    def __init__(self, language: str = "ja", use_ui: bool = False):
         super().__init__()
         self.language = language
         self.text = TextLocalization(language)
         self.final_requirements: Optional[Dict[str, Any]] = None
+        self.use_ui = use_ui
+        self._initial_requirement: str = ""
 
     def _get_initial_state(self) -> Dict[str, Any]:
         return { "session_id": str(uuid.uuid4()), "history": [], "state": "INIT" }
@@ -65,7 +67,48 @@ class RequirementAgent(BaseAgent):
         last_user_msg = next((h['content'] for h in reversed(history) if h['role'] == 'user'), "No user input.")
         return {"summary": "Final Specification", "details": last_user_msg}
 
+    def set_initial_requirement(self, requirement: str) -> None:
+        self._initial_requirement = requirement
+
+    def analyze_requirement(self, requirement: str) -> Dict[str, Any]:
+        """
+        Headless requirement digestion fallback using LLM or heuristic summary.
+        """
+        requirement = requirement.strip() or self._initial_requirement or "No requirement provided."
+        prompt = f"""
+You are a requirements analyst. Convert the user's request into a concise JSON specification.
+
+# User Requirement
+{requirement}
+
+# Output JSON schema
+{{
+  "summary": "<overall goal>",
+  "features": ["<feature1>", "<feature2>"],
+  "constraints": ["<constraint>", "..."],
+  "acceptance_criteria": ["<criteria>", "..."]
+}}
+
+Ensure the response is strictly valid JSON with filled arrays (no empty strings).
+"""
+        response = self.execute_llm_task(prompt, as_json=True)
+        try:
+            data = sanitize_json_like(json.loads(response))
+        except Exception:
+            data = {
+                "summary": requirement[:80],
+                "features": ["Auto-generated draft feature list"],
+                "constraints": [],
+                "acceptance_criteria": []
+            }
+        self.final_requirements = data
+        return data
+
     def launch_gradio_ui(self, share: bool = False) -> Dict[str, Any]:
+        if not self.use_ui:
+            self.logger.info("RequirementAgent running in headless mode.")
+            return self.analyze_requirement(self._initial_requirement)
+
         fsm = StateMachine(self)
 
         with gr.Blocks(title=self.text["title"]) as demo:
@@ -144,4 +187,3 @@ if __name__ == "__main__":
     if specs:
         print("\n--- [最終生成仕様] ---")
         print(json.dumps(specs, indent=2, ensure_ascii=False))
-

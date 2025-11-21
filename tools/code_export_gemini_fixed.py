@@ -54,9 +54,9 @@ PROFILES = {
     "gemini-10": {
         "target_mb": 9.5,
         "max_files": 5000,
-        "include_exts": {".py", ".md", ".rst", ".txt"},  # all-py-first + docs
+        "include_exts": {".py", ".md", ".rst", ".txt", ".json"},  # all-py-first + docs + structure json
         "include_configs": set(),
-        "per_file_soft_limit_mb": 3.0,
+        "per_file_soft_limit_mb": 5.0,
         "exclude_globs": [
             "**/__pycache__/**", "**/.mypy_cache/**", "**/.pytest_cache/**",
             "**/.git/**", "**/.github/**", "**/.venv/**", "**/env/**", "**/venv/**",
@@ -70,7 +70,7 @@ PROFILES = {
         ],
     },
     "gpt5-50": {
-        "target_mb": 49.5,
+        "target_mb": 80.0,
         "max_files": 5000,
         "include_exts": {
             ".py", ".ipynb",
@@ -79,7 +79,7 @@ PROFILES = {
             ".proto", ".graphql",
         },
         "include_configs": {".toml", ".yaml", ".yml", ".json", ".ini", ".cfg"},
-        "per_file_soft_limit_mb": 8.0,
+        "per_file_soft_limit_mb": 80.0,
         "exclude_globs": [
             "**/__pycache__/**", "**/.mypy_cache/**", "**/.pytest_cache/**",
             "**/.git/**", "**/.github/**", "**/.venv/**", "**/env/**", "**/venv/**",
@@ -164,8 +164,8 @@ def should_exclude(p: Path, exclude_globs: List[str], dynamic_prefixes: List[str
     for pref in dynamic_prefixes:
         if s.startswith(pref):
             return True
-    # fast contains for common noisy dirs
-    if "/exports/" in s or "/logs/" in s:
+    # fast contains for common noisy dirs (.venv/site-packages等を強制除外)
+    if "/exports/" in s or "/logs/" in s or "/.venv/" in s or "/venv/" in s or "/env/" in s or "/site-packages/" in s:
         return True
     # glob-like check (Path.match understands **)
     from pathlib import PurePath
@@ -219,23 +219,31 @@ def list_candidates(roots: List[str], profile: dict, max_files: int,
 class PickResult:
     picked: List[Tuple[Path, float]]  # (path, est_zip_mb)
     est_total_mb: float
+    heavy: List[Tuple[float, Path, str]]  # (actual_mb, rel_path, reason)
 
-def pick_files_for_target(files: List[Path], target_mb: float, per_file_soft_limit_mb: float) -> PickResult:
+def pick_files_for_target(files: List[Path], target_mb: float, per_file_soft_limit_mb: float, roots: List[str]) -> PickResult:
     picked: List[Tuple[Path, float]] = []
+    heavy: List[Tuple[float, Path, str]] = []
     total = 0.0
     for p in files:
         est = estimate_zip_mb(p)
         if est <= 0:
             continue
+        try:
+            actual_mb = p.stat().st_size / (1024 * 1024)
+        except Exception:
+            actual_mb = est
         if est > per_file_soft_limit_mb:
+            heavy.append((actual_mb, compute_rel(p, roots), "per_file_soft_limit"))
             continue
         if total + est > target_mb * 1.02:
+            heavy.append((actual_mb, compute_rel(p, roots), "over_budget"))
             continue
         picked.append((p, est))
         total = round(total + est, 2)
         if total >= target_mb * 0.995:
             break
-    return PickResult(picked, total)
+    return PickResult(picked, total, heavy)
 
 def compute_rel(p: Path, roots: List[str]) -> Path:
     for r in roots:
@@ -263,7 +271,7 @@ def copy_manifest(picked: List[Tuple[Path, float]], roots: List[str], out_dir: P
     return mapping
 
 def write_manifest_readme(manifest_dir: Path, args, picked_map: List[Tuple[Path, Path]],
-                          est_total_mb: float, ts: str):
+                          est_total_mb: float, ts: str, heavy: List[Tuple[float, Path, str]]):
     readme = manifest_dir / "README_MANIFEST.md"
     lines = []
     lines.append(f"# NexusCore Export Manifest")
@@ -308,6 +316,14 @@ def write_manifest_readme(manifest_dir: Path, args, picked_map: List[Tuple[Path,
     lines.append("## Notes")
     lines.append("- Windows long path is mitigated by flattening deep paths via hashed middle segments.")
     lines.append("- Logs are written to `logs/` and mirrored into this manifest directory.")
+    if heavy:
+        lines.append("")
+        lines.append("## Excluded Large Files (Top 10)")
+        for sz, rel, reason in sorted(heavy, key=lambda h: h[0], reverse=True)[:10]:
+            reason_label = "soft-limit" if reason == "per_file_soft_limit" else "budget"
+            lines.append(f"- {sz:.2f} MB\t{rel}\t[{reason_label}]")
+        if len(heavy) > 10:
+            lines.append(f"- ...others: {len(heavy) - 10}")
     readme.write_text("\n".join(lines), encoding="utf-8")
 
 def write_text_log(path: Path, text: str):
@@ -357,7 +373,8 @@ def export_main(args):
     files = list_candidates(args.roots, profile, max_files=max_files,
                             dynamic_prefixes=dynamic_prefixes)
     pick = pick_files_for_target(files, target_mb=target_mb,
-                                 per_file_soft_limit_mb=per_file_soft_limit_mb)
+                                 per_file_soft_limit_mb=per_file_soft_limit_mb,
+                                 roots=args.roots)
 
     # build progress log
     lines = []
@@ -368,6 +385,14 @@ def export_main(args):
         acc = round(acc + est, 2)
         rel = compute_rel(src, args.roots)
         lines.append(f"+ included_source/{rel} -> {acc:.2f} MB ( +{est:.2f} )")
+    if pick.heavy:
+        lines.append("")
+        lines.append("Excluded (Top 10 by size):")
+        for sz, rel, reason in sorted(pick.heavy, key=lambda h: h[0], reverse=True)[:10]:
+            reason_label = "soft-limit" if reason == "per_file_soft_limit" else "budget"
+            lines.append(f"- {sz:.2f} MB\t{rel}\t[{reason_label}]")
+        if len(pick.heavy) > 10:
+            lines.append(f"- ...others: {len(pick.heavy) - 10}")
 
     # dry-run only
     if args.dry_run:
@@ -381,14 +406,14 @@ def export_main(args):
     mapping: List[Tuple[Path, Path]] = []
     if args.emit_folder:
         mapping = copy_manifest(pick.picked, args.roots, manifest_dir)
-        write_manifest_readme(manifest_dir, args, mapping, pick.est_total_mb, ts)
+        write_manifest_readme(manifest_dir, args, mapping, pick.est_total_mb, ts, pick.heavy)
 
     # emit ZIP
     if args.emit_zip:
         tmp_dir = manifest_dir if args.emit_folder else (exports_dir / f"_tmp_manifest_{ts}")
         if not args.emit_folder:
             copy_manifest(pick.picked, args.roots, tmp_dir)
-            write_manifest_readme(tmp_dir, args, [], pick.est_total_mb, ts)
+            write_manifest_readme(tmp_dir, args, [], pick.est_total_mb, ts, pick.heavy)
         zip_dir(tmp_dir, zip_path)
         if not args.emit_folder:
             shutil.rmtree(tmp_dir, ignore_errors=True)

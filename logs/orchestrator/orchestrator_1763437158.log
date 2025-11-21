@@ -1,0 +1,9 @@
+2025-11-18 12:39:18 [INFO] Orchestrator - Orchestrator v8.2 initialized.
+2025-11-18 12:39:18 [INFO] Orchestrator - Project path: /home/yn441611/NexusCore
+2025-11-18 12:39:18 [INFO] Orchestrator - NPE (function-based guarded_llm_call) is ready.
+2025-11-18 12:39:18 [INFO] Orchestrator - LLMRouter is attached to Orchestrator.
+2025-11-18 12:39:18 [INFO] Orchestrator - === Full Project Run Start === requirement='サンプルの要件です'
+2025-11-18 12:39:18 [INFO] Orchestrator - [1682dc604f45422cb3fdb91b345e9e7d] Phase 1: Requirement Definition
+2025-11-18 12:39:18 [INFO] Orchestrator - [1682dc604f45422cb3fdb91b345e9e7d] Phase 2: Planning (fast_lane=False)
+2025-11-18 12:39:18 [INFO] Orchestrator - [1682dc604f45422cb3fdb91b345e9e7d] Phase 3: Development Cycle (tasks=0)
+2025-11-18 12:39:18 [INFO] Orchestrator - === Full Project Run Finished === requirement='サンプルの要件です'

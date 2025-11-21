@@ -49,63 +49,27 @@
     }
   },
   {
-    "id": "FKB-SUGGESTION-0001",
+    "id": "FKB-SUGGESTION-0001A",
     "error_signature": "ImportError: cannot import name '\\w+' from '\\w+\\.\\w+'",
-    "cause": "関数が他の関数の中にネストされているため、直接インポートできない。",
+    "cause": "関数が他の関数の中にネストされているため、直接インポートできません。",
     "target": "test_file",
     "solution_pattern": {
       "type": "regex_replace",
       "search": "from app\\.calculator import add",
       "replace": "from app.calculator import add_two_numbers\\n\\nadd = add_two_numbers()"
     },
-    "description": "ネストされた関数を直接インポートしようとしたエラーを修正。"
+    "description": "ネストされた関数を直接インポートしようとした際に、代替の公開ファクトリを使うパターン。"
   },
   {
-    "id": "FKB-SUGGESTION-0001",
+    "id": "FKB-SUGGESTION-0001B",
     "error_signature": "ImportError: cannot import name '\\w+' from 'app\\.\\w+'",
-    "cause": "関数が他の関数の中にネストされているため、テストコードから直接インポートできない。",
+    "cause": "関数が他の関数の中にネストされているため、テストコードから直接インポートできません。",
     "target": "test_file",
     "solution_pattern": {
       "type": "regex_replace",
-      "search": "from app.calculator import add",
-      "replace": "from app.calculator import add_two_numbers\\n\\nadd = add_two_numbers()"
+      "search": "from app\\.calculator import ([a-zA-Z0-9_]+)",
+      "replace": "from app.calculator import add_two_numbers\\n\\1 = add_two_numbers()"
     },
-    "description": "ネストされた関数を直接インポートしようとした場合のエラーを修正するための知識。"
-  },
-  {
-    "id": "FKB-SUGGESTION-0001",
-    "error_signature": "ImportError: cannot import name '\\w+' from 'app\\.\\w+'",
-    "cause": "関数が他の関数の中にネストされているため、テストコードから直接インポートできない。",
-    "target": "test_file",
-    "solution_pattern": {
-      "type": "regex_replace",
-      "search": "from app\\.calculator import add",
-      "replace": "from app.calculator import add_two_numbers\\n\\nadd = add_two_numbers()"
-    },
-    "description": "ネストされた関数を直接インポートしようとした場合のエラーを修正するための知識。"
-  },
-  {
-    "id": "FKB-SUGGESTION-0001",
-    "error_signature": "ImportError: cannot import name '\\w+' from '\\w+\\.\\w+'",
-    "cause": "関数が他の関数の中にネストされているため、テストコードから直接インポートできない。",
-    "target": "test_file",
-    "solution_pattern": {
-      "type": "regex_replace",
-      "search": "from app.calculator import add",
-      "replace": "from app.calculator import add_two_numbers\\n\\nadd = add_two_numbers()"
-    },
-    "description": "ネストされた関数を直接インポートしようとした場合のエラーを修正するための知識。"
-  },
-  {
-    "id": "FKB-SUGGESTION-0001",
-    "error_signature": "ImportError: cannot import name '[a-zA-Z0-9_]+' from '[a-zA-Z0-9_.]+'",
-    "cause": "関数が別の関数内で定義されているため、直接インポートできない。",
-    "target": "test_file",
-    "solution_pattern": {
-      "type": "regex_replace",
-      "search": "from app\\.calculator import ([a-zA-Z0-9_]+)\\n",
-      "replace": "from app.calculator import add_two_numbers\\n\\1 = add_two_numbers()\\n"
-    },
-    "description": "ネストされた関数を直接インポートしようとした場合のエラーを修正するための知識。"
+    "description": "ネスト関数をモジュールレベルに露出させる際の一般化パターン。"
   }
 ]

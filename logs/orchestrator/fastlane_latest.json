@@ -1,0 +1,60 @@
+{
+  "code": "import argparse\nimport subprocess\nimport sys\nimport pathlib\nfrom typing import List, Optional\n\n\ndef run(cmd: List[str], cwd: Optional[pathlib.Path] = None) -> int:\n    process = subprocess.Popen(\n        cmd,\n        cwd=str(cwd) if cwd else None,\n        stdout=subprocess.PIPE,\n        stderr=subprocess.STDOUT,\n        text=True,\n    )\n    assert process.stdout is not None\n    for line in process.stdout:\n        sys.stdout.write(line)\n    process.wait()\n    return process.returncode\n\n\ndef parse_args() -> argparse.Namespace:\n    parser = argparse.ArgumentParser(\n        description=\"Fast lane regression check runner.\"\n    )\n    parser.add_argument(\n        \"--tests\",\n        \"-t\",\n        nargs=\"*\",\n        default=[],\n        help=\"Specific tests or directories to run (pytest style).\",\n    )\n    parser.add_argument(\n        \"--marker\",\n        \"-m\",\n        default=\"fast\",\n        help=\"Pytest marker to use for fast-lane regression (default: fast).\",\n    )\n    parser.add_argument(\n        \"--no-marker\",\n        action=\"store_true\",\n        help=\"Do not filter by marker; run given tests directly.\",\n    )\n    parser.add_argument(\n        \"--extra-args\",\n        nargs=argparse.REMAINDER,\n        help=\"Extra arguments passed through to pytest.\",\n    )\n    return parser.parse_args()\n\n\ndef build_pytest_command(args: argparse.Namespace) -> List[str]:\n    cmd = [sys.executable, \"-m\", \"pytest\"]\n    if args.tests:\n        cmd.extend(args.tests)\n    if not args.no_marker and args.marker:\n        cmd.extend([\"-m\", args.marker])\n    if args.extra_args:\n        cmd.extend(args.extra_args)\n    return cmd\n\n\ndef main() -> int:\n    args = parse_args()\n    pytest_cmd = build_pytest_command(args)\n    print(\"Running fast lane regression check:\")\n    print(\" \", \" \".join(pytest_cmd))\n    code = run(pytest_cmd)\n    if code != 0:\n        print(f\"Fast lane regression check failed with exit code {code}\")\n    else:\n        print(\"Fast lane regression check passed\")\n    return code\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())",
+  "tests": "{\n  \"test_code\": \"import pytest\\n\\n\\nclass FakeService:\\n    \\\"\\\"\\\"A simple fake external service to mimic production behavior in fast regression.\\\"\\\"\\\"\\n\\n    def __init__(self, should_fail=False, latency_ms=0):\\n        self.should_fail = should_fail\\n        self.latency_ms = latency_ms\\n\\n    def do_work(self, payload: dict) -> dict:\\n        if self.should_fail:\\n            raise RuntimeError(\\\"Service failure\\\")\\n        # fast lane: no real sleep, just assert latency budget via configuration\\n        return {\\n            \\\"status\\\": \\\"ok\\\",\\n            \\\"echo\\\": payload,\\n            \\\"latency_ms\\\": self.latency_ms,\\n        }\\n\\n\\ndef process_request(payload: dict, service: FakeService) -> dict:\\n    \\\"\\\"\\\"Core logic under fast-lane regression.\\n\\n    This is a sample function representing the main path of the system:\\n    - validates input structure\\n    - calls an external service (here: FakeService)\\n    - normalizes the response\\n    \\\"\\\"\\\"\\n    if not isinstance(payload, dict):\\n        raise TypeError(\\\"payload must be dict\\\")\\n\\n    if \\\"id\\\" not in payload or \\\"value\\\" not in payload:\\n        raise ValueError(\\\"missing required keys: id, value\\\")\\n\\n    if not isinstance(payload[\\\"id\\\"], int):\\n        raise TypeError(\\\"id must be int\\\")\\n\\n    response = service.do_work(payload)\\n\\n    return {\\n        \\\"id\\\": payload[\\\"id\\\"],\\n        \\\"result\\\": response[\\\"echo\\\"][\\\"value\\\"],\\n        \\\"service_status\\\": response[\\\"status\\\"],\\n    }\\n\\n\\n# -------------------------\\n# Fast lane regression tests\\n# -------------------------\\n\\n@pytest.fixture\\ndef fast_lane_service():\\n    \\\"\\\"\\\"A fast, deterministic fake service for regression checks.\\\"\\\"\\\"\\n    return FakeService(should_fail=False, latency_ms=5)\\n\\n\\ndef test_fast_lane_happy_path(fast_lane_service):\\n    \\\"\\\"\\\"Main success path: ensures the core behavior is intact.\\\"\\\"\\\"\\n    payload = {\\\"id\\\": 1, \\\"value\\\": \\\"foo\\\"}\\n\\n    result = process_request(payload, fast_lane_service)\\n\\n    assert result[\\\"id\\\"] == 1\\n    assert result[\\\"result\\\"] == \\\"foo\\\"\\n    assert result[\\\"service_status\\\"] == \\\"ok\\\"\\n\\n\\n@pytest.mark.parametrize(\\n    \\\"payload,expected_error\\\",\\n    [\\n        (None, TypeError),\\n        ({}, ValueError),\\n        ({\\\"id\\\": \\\"1\\\", \\\"value\\\": \\\"x\\\"}, TypeError),\\n        ({\\\"id\\\": 1}, ValueError),\\n    ],\\n)\\ndef test_fast_lane_input_validation(payload, expected_error, fast_lane_service):\\n    \\\"\\\"\\\"Fast regression on input validation: type and required fields.\\\"\\\"\\\"\\n    with pytest.raises(expected_error):\\n        process_request(payload, fast_lane_service)\\n\\n\\ndef test_fast_lane_service_error_is_propagated():\\n    \\\"\\\"\\\"Service errors must not silently succeed in the fast lane path.\\\"\\\"\\\"\\n    failing_service = FakeService(should_fail=True)\\n    payload = {\\\"id\\\": 2, \\\"value\\\": \\\"bar\\\"}\\n\\n    with pytest.raises(RuntimeError):\\n        process_request(payload, failing_service)\\n\\n\\ndef test_fast_lane_regression_is_deterministic(fast_lane_service):\\n    \\\"\\\"\\\"Fast lane should be deterministic across invocations (no randomness, timing-free).\\\"\\\"\\\"\\n    payload = {\\\"id\\\": 3, \\\"value\\\": \\\"baz\\\"}\\n\\n    result1 = process_request(payload, fast_lane_service)\\n    result2 = process_request(payload, fast_lane_service)\\n\\n    assert result1 == result2\\n\\n\\n@pytest.mark.parametrize(\\\"value\\\", [\\\"quick\\\", \\\"smoke\\\", \\\"regression\\\"])\\ndef test_fast_lane_minimal_data_variations(fast_lane_service, value):\\n    \\\"\\\"\\\"Small set of representative inputs to detect obvious regressions quickly.\\\"\\\"\\\"\\n    payload = {\\\"id\\\": 10, \\\"value\\\": value}\\n\\n    result = process_request(payload, fast_lane_service)\\n\\n    assert result[\\\"id\\\"] == 10\\n    assert result[\\\"result\\\"] == value\\n\\n\\ndef test_fast_lane_does_not_depend_on_real_network(monkeypatch):\\n    \\\"\\\"\\\"Guarantee that fast regression does not call real external resources.\\\"\\\"\\\"\\n\\n    class NetworkService:\\n        def call_remote(self):  # pragma: no cover - safety check only\\n            raise AssertionError(\\\"Real network should not be used in fast lane\\\")\\n\\n    # Illustrative target that would be patched in real code\\n    dummy_target = NetworkService()\\n\\n    def fake_remote():\\n        return \\\"stubbed\\\"\\n\\n    monkeypatch.setattr(dummy_target, \\\"call_remote\\\", fake_remote)\\n\\n    assert dummy_target.call_remote() == \\\"stubbed\\\"\\n\",\n  \"testimony\": \"These tests implement a fast lane regression check by focusing on the shortest, most stable path through the core logic, using only in-memory fakes and avoiding real I/O:\\n\\n1. test_fast_lane_happy_path: Verifies that the main success scenario (valid payload, healthy service) produces the expected normalized output. This guards against accidental changes in the primary functional path.\\n2. test_fast_lane_input_validation: Checks key validation rules (type checks and required keys) using a small parameterized matrix. This quickly detects regressions in input contracts without broad combinatorial explosion.\\n3. test_fast_lane_service_error_is_propagated: Ensures that when the service fails, the error is surfaced instead of being silently swallowed or mis-translated. This is critical for detecting behavior-breaking changes in error handling.\\n4. test_fast_lane_regression_is_deterministic: Confirms that repeated invocations with the same input and fake service produce identical results, catching hidden sources of nondeterminism that could destabilize a fast regression suite.\\n5. test_fast_lane_minimal_data_variations: Runs a tiny, representative set of input values through the main path to broaden coverage just enough to detect obvious regressions in value handling while keeping execution fast.\\n6. test_fast_lane_does_not_depend_on_real_network: Demonstrates and enforces the rule that fast-lane regression must not touch real external services by requiring stubbed behavior via monkeypatch. This keeps the suite reliable, fast, and independent of the environment.\\n\\nCollectively, these tests form a light but effective safety net that can be executed frequently (e.g., on each commit) to catch core regressions early while maintaining very low runtime and zero external dependencies, which is the essence of a “fast lane regression check.”\"\n}",
+  "plan": {
+    "functions_to_implement": [
+      {
+        "name": "summary_fast_lane_regression_check_features_auto_generated_draft_feature_list_constraints_acceptance_criteria_spec_analysis",
+        "description": "要件をJSON仕様にまとめ、主要エンティティとユースケースを洗い出す（要求: {\n  \"summary\": \"Fast lane regression check\",\n  \"features\": [...）",
+        "args": [],
+        "returns": "None",
+        "dependencies": [],
+        "tests": [
+          "pytest が成功すること",
+          "主要フローで例外が発生しないこと"
+        ],
+        "acceptance_criteria": [
+          "要件で述べられたユースケースがCLI経由で実行できること",
+          "主要コマンドに対するドキュメントが整備されていること"
+        ],
+        "priority": "P1"
+      },
+      {
+        "name": "summary_fast_lane_regression_check_features_auto_generated_draft_feature_list_constraints_acceptance_criteria_core_implementation",
+        "description": "アプリケーションの主要コマンド/機能を実装し、エラー処理を整備する（要求: {\n  \"summary\": \"Fast lane regression check\",\n  \"features\": [...）",
+        "args": [],
+        "returns": "None",
+        "dependencies": [
+          "summary_fast_lane_regression_check_features_auto_generated_draft_feature_list_constraints_acceptance_criteria_spec_analysis"
+        ],
+        "tests": [
+          "pytest が成功すること",
+          "主要フローで例外が発生しないこと"
+        ],
+        "acceptance_criteria": [
+          "要件で述べられたユースケースがCLI経由で実行できること",
+          "主要コマンドに対するドキュメントが整備されていること"
+        ],
+        "priority": "P0"
+      },
+      {
+        "name": "summary_fast_lane_regression_check_features_auto_generated_draft_feature_list_constraints_acceptance_criteria_testing_and_docs",
+        "description": "pytest用のテストとREADME/使用手順を整備する（要求: {\n  \"summary\": \"Fast lane regression check\",\n  \"features\": [...）",
+        "args": [],
+        "returns": "None",
+        "dependencies": [
+          "summary_fast_lane_regression_check_features_auto_generated_draft_feature_list_constraints_acceptance_criteria_core_implementation"
+        ],
+        "tests": [
+          "pytest が成功すること",
+          "主要フローで例外が発生しないこと"
+        ],
+        "acceptance_criteria": [
+          "要件で述べられたユースケースがCLI経由で実行できること",
+          "主要コマンドに対するドキュメントが整備されていること"
+        ],
+        "priority": "P2"
+      }
+    ]
+  }
+}

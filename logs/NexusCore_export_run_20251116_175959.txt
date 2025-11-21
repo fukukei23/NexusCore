@@ -1,0 +1,57 @@
+
+--- ファイル収集開始: /home/yn441611/NexusCore ---
+  - 収集完了: 578 ファイル
+
+--- ファイルスコアリング ---
+
+--- ファイル選択結果: 576件 / 生データ合計 5.92 MB ---
+  - (Top) tests/core/test_orchestrator.py (score: 20.00)
+  - (Top) healing_sandbox/src/agents/orchestrator.py (score: 20.00)
+  - (Top) src/nexuscore/core/orchestrator.py (score: 20.00)
+  - (Top) healing_sandbox/app/main.py (score: 18.00)
+  - (Top) tools/brownfield_orchestrator.py (score: 18.00)
+  - (Top) workspace/test_crm_app/tests/test_main.py (score: 18.00)
+  - (Top) workspace/test_crm_app/app/main.py (score: 18.00)
+  - (Top) workspace/crm_project/app/main.py (score: 18.00)
+  - (Top) workspace/default_project/app/main.py (score: 17.81)
+  - (Top) healing_sandbox/tests/test_main.py (score: 16.00)
+  - ...他 566件
+
+--- サイズ超過等により除外されたファイル (上位10件) ---
+- 33.51 MB  src/project_structure.json
+- 7.18 MB  src/project_structure.md
+
+--- 結合コードを生成中 ---
+  - 生成完了
+
+--- ZIPアーカイブ作成: /home/yn441611/NexusCore/exports/NexusCore_gemini-chronicle_20251116_180001.zip ---
+
+--- 今回の圧縮実績を統計に記録 ---
+  - .py: 生データ +1778.0 KB
+  - .md: 生データ +441.1 KB
+  - .md  set-clipboard: 生データ +3.6 KB
+  - .txt: 生データ +2604.7 KB
+  - .code-workspace: 生データ +1.5 KB
+  - .toml: 生データ +4.6 KB
+  - .ts: 生データ +6.2 KB
+  - .json: 生データ +255.6 KB
+  - .pem: 生データ +3.8 KB
+  - .html: 生データ +0.6 KB
+  - : 生データ +131.5 KB
+  - .yaml: 生データ +0.4 KB
+  - .ps1: 生データ +35.2 KB
+  - .bak: 生データ +1.9 KB
+  - .yml: 生データ +7.5 KB
+  - .template: 生データ +0.8 KB
+  - .bat: 生データ +2.0 KB
+  - .diff: 生データ +765.4 KB
+  - .vsix: 生データ +3.6 KB
+  - .sh: 生データ +9.0 KB
+  - .cfg: 生データ +1.7 KB
+  - .ini: 生データ +1.3 KB
+  - .cff: 生データ +0.8 KB
+  - .tx: 生データ +2.8 KB
+  - .in: 生データ +0.0 KB
+  - 統計ファイルを更新しました: /home/yn441611/NexusCore/exports/compression_stats.json
+✅ 年代記パッケージのエクスポート完了: /home/yn441611/NexusCore/exports/NexusCore_gemini-chronicle_20251116_180001.zip
+  - 予測ZIP: 2.12 MB / 実際ZIP: 1.05 MB (予測精度: 49.3%)

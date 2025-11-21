@@ -1,0 +1,13 @@
+{
+  "timestamp": "20250907_111602",
+  "status": "attempt_0",
+  "source_file": "src\\sandbox_output\\sample.py",
+  "test_file": "src\\sandbox_output\\test_sample.py",
+  "reason": "Initial pytest failed. Starting self-healing loop.",
+  "llm_prompt": "(auto-revision bootstrap)",
+  "prompt": "(auto-revision bootstrap)",
+  "code_diff": "",
+  "full_code_after": "# ==============================================================================\n# ファイル名: sample.py\n# レジストリ: src/sandbox_output/\n# 日付: 2025-09-06\n# バージョン: buggy-1\n#\n# バグ内容:\n#   - 2 を素数として扱えない（is_prime(2) が False になる）\n# ==============================================================================\n\ndef is_prime(n):\n    # バグ: 2を素数と扱えない\n    if n <= 2:\n        return False\n    for i in range(2, int(n**0.5) + 1):\n        if n % i == 0:\n            return False\n    return True\n",
+  "code": "# ==============================================================================\n# ファイル名: sample.py\n# レジストリ: src/sandbox_output/\n# 日付: 2025-09-06\n# バージョン: buggy-1\n#\n# バグ内容:\n#   - 2 を素数として扱えない（is_prime(2) が False になる）\n# ==============================================================================\n\ndef is_prime(n):\n    # バグ: 2を素数と扱えない\n    if n <= 2:\n        return False\n    for i in range(2, int(n**0.5) + 1):\n        if n % i == 0:\n            return False\n    return True\n",
+  "test_log": "F                                                                        [100%]\n================================== FAILURES ===================================\n_________________________________ test_primes _________________________________\n\n    def test_primes():\n>       assert is_prime(2) is True   # ここで失敗するはず\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^\nE       assert False is True\nE        +  where False = is_prime(2)\n\ntest_sample.py:5: AssertionError\n=========================== short test summary info ===========================\nFAILED test_sample.py::test_primes - assert False is True\n1 failed in 0.16s\n"
+}

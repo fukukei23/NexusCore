@@ -1,0 +1,10 @@
+2025-11-18 22:50:21 [INFO] Orchestrator - Orchestrator v8.2 initialized.
+2025-11-18 22:50:21 [INFO] Orchestrator - Project path: .
+2025-11-18 22:50:21 [INFO] Orchestrator - NPE (function-based guarded_llm_call) is ready.
+2025-11-18 22:50:21 [INFO] Orchestrator - LLMRouter is attached to Orchestrator.
+2025-11-18 22:50:21 [INFO] Orchestrator - === Full Project Run Start === requirement='テスト要件を短く流します'
+2025-11-18 22:50:21 [INFO] Orchestrator - [f6f54a8310b8458ca5a638a68c1cf1b4] Phase 1: Requirement Definition
+2025-11-18 22:50:21 [INFO] Orchestrator - [f6f54a8310b8458ca5a638a68c1cf1b4] Phase 2: Planning (fast_lane=True)
+2025-11-18 22:50:21 [INFO] Orchestrator - [FastLane] coder output length=40, tester output length=0
+2025-11-18 22:50:21 [INFO] Orchestrator - [f6f54a8310b8458ca5a638a68c1cf1b4] Phase 3: Development Cycle (tasks=0)
+2025-11-18 22:50:21 [INFO] Orchestrator - === Full Project Run Finished === requirement='テスト要件を短く流します'
