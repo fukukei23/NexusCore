@@ -1,0 +1,1412 @@
+diff --git a/.env.template b/.env.template
+index c96534e..eb144c1 100644
+--- a/.env.template
++++ b/.env.template
+@@ -1,7 +1,57 @@
+-# .env.template - 自動生成ファイル
+-# 各項目を手動で入力してください
++# .env.template - NexusCore
++# ここから `.env` をコピーして各自の資格情報を設定してください
++
++# === OpenAI ===
+ OPENAI_API_KEY=
+-MAX_INPUT_TOKEN_LENGTH=
+-GEMINI_API_KEY_AGENT_B=
++OPENAI_PROJECT=
++
++# === LLM 実行設定 ===
++MAX_INPUT_TOKEN_LENGTH=4096
++NEXUS_REAL_CALLS=1
++LLM_DRY_RUN=false
++NEXUS_LLM_MODE=cheap  # production / cheap
++NEXUS_LLM_DAILY_CAP_USD=2.0
++NEXUS_LLM_MAX_OUTPUT_TOKENS=1024
++NEXUS_DEFAULT_MAX_OUT_TOKENS=1024
++NEXUS_LIGHT_OUTPUT_THRESHOLD=300
++NEXUS_LONG_PROMPT_THRESHOLD=6000
++NEXUS_CLASSIFIER_MODEL=gemini-2.5-flash
++NEXUS_SHARED_PREAMBLE_FILE=./config/shared_preamble.txt
++
++# === GEMINI ===
++GEMINI_API_KEY=
+ GEMINI_API_KEY_AGENT_A=
+-SLACK_WEBHOOK_URL=
+\ No newline at end of file
++GEMINI_API_KEY_AGENT_B=
++
++# === DeepSeek ===
++DEEPSEEK_API_KEY=
++DEEPSEEK_PREPAID_USD=10
++DEEPSEEK_ALERT_USD=3
++
++# === Moonshot / Kimi ===
++KIMI_API_KEY=
++MOONSHOT_BUDGET_USD=50
++MOONSHOT_ALERT_RATIO=0.8
++
++# === Perplexity ===
++PERPLEXITY_API_KEY=
++
++# === Slack ===
++SLACK_WEBHOOK_URL=
++
++# === Redis / DB ===
++REDIS_URL=redis://localhost:6379/0
++REDIS_NAMESPACE=nexus
++DATABASE_URL=sqlite:///./nexus_local.db
++
++# === 価格表 / 使用量ログ ===
++NEXUS_COST_TABLE_JSON=./data/nexus_cost_table.json
++NEXUS_USAGE_DIR=./data/usage
++
++# === Optional: タスク別モデル強制 ===
++NEXUS_TASK_MODEL_CODING=gpt-5
++NEXUS_TASK_MODEL_REVIEW=gpt-5-mini
++NEXUS_TASK_MODEL_GENERAL=kimi-latest
++
++# === Web / Flask ===
++FLASK_SECRET_KEY=
+diff --git a/OpenCodeInterpreter.code-workspace b/OpenCodeInterpreter.code-workspace
+deleted file mode 100644
+index b67f720..0000000
+--- a/OpenCodeInterpreter.code-workspace
++++ /dev/null
+@@ -1,57 +0,0 @@
+-{
+-  "folders": [
+-    {
+-      "path": "."
+-    }
+-  ],
+-  "settings": {
+-    "terminal.integrated.defaultProfile.windows": "PowerShell",
+-    "files.exclude": {
+-      "**/__pycache__": true
+-    }
+-  },
+-  "tasks": {
+-    "version": "2.0.0",
+-    "tasks": [
+-      {
+-        "label": "🟢 開発用 UI 起動 (launch_dev.ps1)",
+-        "type": "shell",
+-        "command": "powershell",
+-        "args": [
+-          "-NoExit",
+-          "-ExecutionPolicy",
+-          "Bypass",
+-          "-File",
+-          "${workspaceFolder}/launch_dev.ps1"
+-        ],
+-        "problemMatcher": [],
+-        "group": {
+-          "kind": "build",
+-          "isDefault": true
+-        },
+-        "presentation": {
+-          "reveal": "always",
+-          "panel": "shared"
+-        }
+-      },
+-      {
+-        "label": "🟡 Streamlit (旧UI)",
+-        "type": "shell",
+-        "command": "powershell",
+-        "args": [
+-          "-NoExit",
+-          "-ExecutionPolicy",
+-          "Bypass",
+-          "-File",
+-          "${workspaceFolder}/launch_streamlit_legacy.ps1"
+-        ],
+-        "problemMatcher": [],
+-        "group": "build",
+-        "presentation": {
+-          "reveal": "always",
+-          "panel": "shared"
+-        }
+-      }
+-    ]
+-  }
+-}
+diff --git a/fkb_local.json b/fkb_local.json
+index 813cb13..7db2812 100644
+--- a/fkb_local.json
++++ b/fkb_local.json
+@@ -49,63 +49,27 @@
+     }
+   },
+   {
+-    "id": "FKB-SUGGESTION-0001",
++    "id": "FKB-SUGGESTION-0001A",
+     "error_signature": "ImportError: cannot import name '\\w+' from '\\w+\\.\\w+'",
+-    "cause": "関数が他の関数の中にネストされているため、直接インポートできない。",
++    "cause": "関数が他の関数の中にネストされているため、直接インポートできません。",
+     "target": "test_file",
+     "solution_pattern": {
+       "type": "regex_replace",
+       "search": "from app\\.calculator import add",
+       "replace": "from app.calculator import add_two_numbers\\n\\nadd = add_two_numbers()"
+     },
+-    "description": "ネストされた関数を直接インポートしようとしたエラーを修正。"
++    "description": "ネストされた関数を直接インポートしようとした際に、代替の公開ファクトリを使うパターン。"
+   },
+   {
+-    "id": "FKB-SUGGESTION-0001",
++    "id": "FKB-SUGGESTION-0001B",
+     "error_signature": "ImportError: cannot import name '\\w+' from 'app\\.\\w+'",
+-    "cause": "関数が他の関数の中にネストされているため、テストコードから直接インポートできない。",
++    "cause": "関数が他の関数の中にネストされているため、テストコードから直接インポートできません。",
+     "target": "test_file",
+     "solution_pattern": {
+       "type": "regex_replace",
+-      "search": "from app.calculator import add",
+-      "replace": "from app.calculator import add_two_numbers\\n\\nadd = add_two_numbers()"
+-    },
+-    "description": "ネストされた関数を直接インポートしようとした場合のエラーを修正するための知識。"
+-  },
+-  {
+-    "id": "FKB-SUGGESTION-0001",
+-    "error_signature": "ImportError: cannot import name '\\w+' from 'app\\.\\w+'",
+-    "cause": "関数が他の関数の中にネストされているため、テストコードから直接インポートできない。",
+-    "target": "test_file",
+-    "solution_pattern": {
+-      "type": "regex_replace",
+-      "search": "from app\\.calculator import add",
+-      "replace": "from app.calculator import add_two_numbers\\n\\nadd = add_two_numbers()"
+-    },
+-    "description": "ネストされた関数を直接インポートしようとした場合のエラーを修正するための知識。"
+-  },
+-  {
+-    "id": "FKB-SUGGESTION-0001",
+-    "error_signature": "ImportError: cannot import name '\\w+' from '\\w+\\.\\w+'",
+-    "cause": "関数が他の関数の中にネストされているため、テストコードから直接インポートできない。",
+-    "target": "test_file",
+-    "solution_pattern": {
+-      "type": "regex_replace",
+-      "search": "from app.calculator import add",
+-      "replace": "from app.calculator import add_two_numbers\\n\\nadd = add_two_numbers()"
+-    },
+-    "description": "ネストされた関数を直接インポートしようとした場合のエラーを修正するための知識。"
+-  },
+-  {
+-    "id": "FKB-SUGGESTION-0001",
+-    "error_signature": "ImportError: cannot import name '[a-zA-Z0-9_]+' from '[a-zA-Z0-9_.]+'",
+-    "cause": "関数が別の関数内で定義されているため、直接インポートできない。",
+-    "target": "test_file",
+-    "solution_pattern": {
+-      "type": "regex_replace",
+-      "search": "from app\\.calculator import ([a-zA-Z0-9_]+)\\n",
+-      "replace": "from app.calculator import add_two_numbers\\n\\1 = add_two_numbers()\\n"
++      "search": "from app\\.calculator import ([a-zA-Z0-9_]+)",
++      "replace": "from app.calculator import add_two_numbers\\n\\1 = add_two_numbers()"
+     },
+-    "description": "ネストされた関数を直接インポートしようとした場合のエラーを修正するための知識。"
++    "description": "ネスト関数をモジュールレベルに露出させる際の一般化パターン。"
+   }
+-]
+\ No newline at end of file
++]
+diff --git a/main_cli.py b/main_cli.py
+index 29b172b..c6ee35a 100644
+--- a/main_cli.py
++++ b/main_cli.py
+@@ -1,5 +1,8 @@
+ # ==============================================================================
+ # ファイル: main_cli.py
++# レジストリ: Git (NexusCore repo)
++# 日付・日時: 2025-11-15 04:51:11 JST
++# 使用/操作メモ: WSL上のVSCodeから本CLIを編集・デバッグ
+ # メモ: 【統合・最終版】
+ #      - RequirementAgentを統合し、全自動開発フローの起点とする。
+ #      - ユーザー実装の堅牢なCLI引数、ロギング、品質ゲート設定を完全に継承。
+@@ -9,6 +12,9 @@ import sys
+ import os
+ import argparse
+ import logging
++import shutil
++import subprocess
++from datetime import datetime
+ 
+ # ------------------------------------------------------------------------------
+ # パス設定
+@@ -36,8 +42,15 @@ from nexuscore.agents.guardian_agent import GuardianAgent
+ from nexuscore.agents.policy_agent import PolicyAgent
+ from nexuscore.agents.postmortem_agent import PostmortemAgent
+ from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
++from nexuscore.agents.patch_applier import PatchApplier
++from nexuscore.llm.llm_router import LLMRouter
+ # from nexuscore.utils.config import config # .envからの読み込みはdotenvで直接行う
+ 
++# ------------------------------------------------------------------------------
++# Codex連携フォルダ設定
++# ------------------------------------------------------------------------------
++CODEX_HISTORY_DIR = os.path.join(project_root, "codex_history")
++
+ def setup_logging(verbose: bool):
+     """ロギングの基本設定（旧コードの優れた実装を維持）"""
+     log_level = logging.DEBUG if verbose else logging.INFO
+@@ -51,6 +64,79 @@ def setup_logging(verbose: bool):
+     )
+     logging.info(f"Log level set to {logging.getLevelName(log_level)}")
+ 
++def _prepare_local_knowledge_base(project_path: str) -> str | None:
++    """
++    Ensure each project has its own writable knowledge base copy so DebuggerAgent
++    can learn locally without touching the global template.
++    """
++    template_path = os.path.join(project_root, "fkb_local.json")
++    project_kb_path = os.path.join(project_path, "fkb_local.json")
++
++    if not os.path.exists(template_path):
++        logging.warning("Global knowledge base template not found at %s", template_path)
++        return None
++
++    if os.path.exists(project_kb_path):
++        return project_kb_path
++
++    try:
++        shutil.copy(template_path, project_kb_path)
++        logging.info("Copied fkb_local.json template into project directory.")
++    except PermissionError as copy_error:
++        logging.error("Failed to copy knowledge base template: %s", copy_error, exc_info=True)
++        logging.info("Falling back to shared template at %s", template_path)
++        return template_path
++    except Exception as copy_error:
++        logging.error("Failed to copy knowledge base template: %s", copy_error, exc_info=True)
++        return None
++
++    return project_kb_path
++
++
++def _load_guardian_credentials() -> tuple[str, str]:
++    """
++    Fetch GuardianAgent credentials from the environment with safe fallbacks.
++    """
++    api_key = os.getenv("GUARDIAN_API_KEY") or os.getenv("OPENAI_API_KEY") or "guardian-api-key-placeholder"
++    model = os.getenv("GUARDIAN_MODEL") or "gpt-5"
++
++    if api_key == "guardian-api-key-placeholder":
++        logging.warning("GUARDIAN_API_KEY/OPENAI_API_KEY is not set. Using placeholder key.")
++
++    logging.info("GuardianAgent configured with model '%s'.", model)
++    return api_key, model
++
++def _save_codex_artifacts(status_tag: str) -> None:
++    """
++    nexus_core_run.log と git diff を codex_history に自動保存する。
++    """
++    try:
++        os.makedirs(CODEX_HISTORY_DIR, exist_ok=True)
++        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
++        base_name = f"{timestamp}_{status_tag}"
++
++        run_log_path = os.path.join(project_root, "nexus_core_run.log")
++        if os.path.exists(run_log_path):
++            shutil.copy(run_log_path, os.path.join(CODEX_HISTORY_DIR, f"{base_name}_run.log"))
++
++        diff_result = subprocess.run(
++            ["git", "diff"],
++            cwd=project_root,
++            capture_output=True,
++            text=True,
++            check=False
++        )
++        diff_output = diff_result.stdout.strip()
++        if diff_output:
++            diff_path = os.path.join(CODEX_HISTORY_DIR, f"{base_name}_changes.diff")
++            with open(diff_path, "w", encoding="utf-8") as diff_file:
++                diff_file.write(diff_output)
++        else:
++            logging.info("Git diff is empty; skipping diff export for %s.", base_name)
++    except Exception as artifact_error:
++        logging.warning("Codex artifact export failed: %s", artifact_error, exc_info=True)
++
++
+ def main():
+     """
+     コマンドラインからタスクを受け取り、Orchestratorを実行するメイン関数。
+@@ -92,6 +178,11 @@ def main():
+         action="store_true",
+         help="詳細なデバッグログをコンソールに出力します。"
+     )
++    parser.add_argument(
++        "--requirement-ui",
++        action="store_true",
++        help="RequirementAgentのGradio UIを起動して対話的に要件を決める場合に指定します。"
++    )
+ 
+     args = parser.parse_args()
+ 
+@@ -104,6 +195,7 @@ def main():
+     logging.info(f"Project Path: {project_path}")
+     logging.info(f"User Initial Requirement: {args.requirement}")
+     logging.info(f"Language: {args.language}")
++    local_kb_path = _prepare_local_knowledge_base(project_path)
+ 
+     # --- プロジェクト憲法（品質ゲート含む）の定義（旧コードの優れた実装を維持） ---
+     constitution = {
+@@ -115,6 +207,7 @@ def main():
+     }
+     logging.info(f"Full Constitution with Quality Gate: {constitution}")
+ 
++    run_status = "success"
+     try:
+         # --- 3. AI開発チーム（エージェント群）の招集 ---
+         logging.info("Initializing AI agent team...")
+@@ -122,18 +215,23 @@ def main():
+         # BaseAgentとLLMRouterにより、APIキーやモデル名は自動で管理される
+         
+         # ▼▼▼▼▼ 統合点 (3/4): RequirementAgentをチームに追加 ▼▼▼▼▼
+-        requirement_agent = RequirementAgent(language=args.language)
++        requirement_agent = RequirementAgent(language=args.language, use_ui=args.requirement_ui)
++        if hasattr(requirement_agent, "set_initial_requirement"):
++            requirement_agent.set_initial_requirement(args.requirement)
+         # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+         architect = ArchitectAgent()
+         planner = PlannerAgent()
+         coder = CoderAgent()
+         tester = TesterAgent()
+         # 外部パスの注入（旧コードの堅牢な実装を維持）
+-        debugger = DebuggerAgent(knowledge_base_path=os.path.join(project_path, "fkb_local.json"), project_path=project_path)
+-        guardian = GuardianAgent()
++        debugger = DebuggerAgent(knowledge_base_path=local_kb_path)
++        guardian_api_key, guardian_model = _load_guardian_credentials()
++        guardian = GuardianAgent(api_key=guardian_api_key, model=guardian_model)
+         policy_agent = PolicyAgent(policy_rules_path=os.path.join(project_root, "config", "policy_rules.json"))
+         postmortem_agent = PostmortemAgent()
+-        knowledge_curator_agent = KnowledgeCuratorAgent()
++        knowledge_curator_agent = KnowledgeCuratorAgent(api_key=guardian_api_key, model=guardian_model)
++        patch_applier = PatchApplier()
++        llm_router = LLMRouter()
+ 
+         # --- 4. 司令塔 (Orchestrator) の任命 ---
+         logging.info("Initializing Orchestrator...")
+@@ -143,29 +241,34 @@ def main():
+             # ▼▼▼▼▼ 統合点 (4/4): OrchestratorにRequirementAgentを渡す ▼▼▼▼▼
+             requirement_agent=requirement_agent,
+             # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+-            architect=architect,
+-            planner=planner,
+-            coder=coder,
+-            tester=tester,
+-            debugger=debugger,
+-            guardian=guardian,
++            architect_agent=architect,
++            planner_agent=planner,
++            coder_agent=coder,
++            tester_agent=tester,
++            debugger_agent=debugger,
++            guardian_agent=guardian,
+             policy_agent=policy_agent,
+             postmortem_agent=postmortem_agent,
+-            knowledge_curator_agent=knowledge_curator_agent
++            knowledge_curator_agent=knowledge_curator_agent,
++            patch_applier_agent=patch_applier,
++            llm_router=llm_router
+         )
+ 
+         # --- 5. 開発プロセスの開始 ---
+         logging.info("Starting full development process...")
+         # 新しい一括実行メソッドを、CLI引数を渡して呼び出す
+         orchestrator.run_full_project(
+-            user_initial_request=args.requirement,
++            user_requirement=args.requirement,
+             language=args.language
+         )
+         logging.info("Development process finished successfully.")
+ 
+     except Exception as e:
++        run_status = "failure"
+         logging.critical(f"An unexpected error occurred in the main CLI: {e}", exc_info=True)
+-        sys.exit(1)
++        raise SystemExit(1)
++    finally:
++        _save_codex_artifacts(run_status)
+ 
+ if __name__ == "__main__":
+     main()
+diff --git a/src/nexuscore/agents/knowledge_curator_agent.py b/src/nexuscore/agents/knowledge_curator_agent.py
+index c60a14c..a200560 100644
+--- a/src/nexuscore/agents/knowledge_curator_agent.py
++++ b/src/nexuscore/agents/knowledge_curator_agent.py
+@@ -61,17 +61,36 @@ class KnowledgeCuratorAgent:
+                 self.logger.debug("Created temporary FKB with new suggestion.")
+ 
+                 # 3. サンドボックス内でDebuggerAgentを初期化
+-                debugger = DebuggerAgent(self.api_key, self.model, knowledge_base_path=temp_fkb_path, project_path=sandbox_path)
++                debugger = DebuggerAgent(knowledge_base_path=temp_fkb_path)
+                 patcher = PatchApplier()
+ 
+-                # 4. 自己修復を試行
+-                # ▼▼▼▼▼ 【最重要修正点】サンドボックス内でテストを再実行するのではなく、元のエラーログを使用 ▼▼▼▼▼
+-                files_context = {
+-                    "source_file": os.path.join(sandbox_path, os.path.relpath(related_source_path, original_project_path)),
+-                    "test_file": os.path.join(sandbox_path, os.path.relpath(failed_test_path, original_project_path))
+-                }
+-                debug_result = debugger.debug(original_test_output, files_context)
+-                # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
++                # 4. 自己修復を試行（LLM診断で得たパッチを適用）
++                source_rel = os.path.relpath(related_source_path, original_project_path)
++                test_rel = os.path.relpath(failed_test_path, original_project_path)
++                sandbox_source_path = os.path.join(sandbox_path, source_rel)
++                sandbox_test_path = os.path.join(sandbox_path, test_rel)
++
++                files_content = {}
++                try:
++                    with open(sandbox_source_path, "r", encoding="utf-8") as src_file:
++                        files_content[sandbox_source_path] = src_file.read()
++                except FileNotFoundError:
++                    self.logger.warning("Source file missing in sandbox: %s", sandbox_source_path)
++                try:
++                    with open(sandbox_test_path, "r", encoding="utf-8") as test_file:
++                        files_content[sandbox_test_path] = test_file.read()
++                except FileNotFoundError:
++                    self.logger.warning("Test file missing in sandbox: %s", sandbox_test_path)
++
++                if not files_content:
++                    self.logger.error("No files available for debugging in sandbox. Aborting validation.")
++                    return False
++
++                debug_result = debugger.debug_and_patch(
++                    error_log=original_test_output,
++                    files_content=files_content,
++                    project_path=sandbox_path
++                )
+ 
+                 if not (debug_result and debug_result.get("patch")):
+                     self.logger.warning("Validation failed: Debugger did not generate a patch with the new knowledge.")
+diff --git a/src/nexuscore/agents/planner_agent.py b/src/nexuscore/agents/planner_agent.py
+index 65df931..9819f1c 100644
+--- a/src/nexuscore/agents/planner_agent.py
++++ b/src/nexuscore/agents/planner_agent.py
+@@ -57,37 +57,66 @@ class PlannerAgent(BaseAgent):
+         file_context_str = self._get_file_context(context.get("project_path", ".")) if context else ""
+ 
+         prompt = f"""
+-# あなたへの指示
+-以下のユーザー要件と、関連する既存のファイルコンテキストを分析し、実装計画をJSON形式で生成してください。
++# 指示
++あなたは熟練したソフトウェア設計者です。以下の要件・制約・既存構造を踏まえ、
++最低でも3件の実装タスクを含むJSON計画を必ず生成してください。
+ 
+-# ユーザー要件
++# プロジェクト要件（ユーザー入力をそのまま記載）
+ {user_requirement}
+ 
+-# 関連ファイルコンテキスト
++# 制約と期待されるアウトプット
++- すべてのタスクは CLI ベースの ToDo アプリに直接関係すること。
++- 永続化・エラー処理・テスト・ドキュメント等も必要であればタスクに含める。
++- それぞれのタスクは単一責任・単一ファイルを原則とし、依存関係を明示する。
++- ~~UI~~ のような不要要素は含めない。
++
++# 参考となる既存ファイル一覧
+ {file_context_str}
+ 
+-# 出力要件
+-- 出力は、`functions_to_implement` というキーを持つ単一のJSONオブジェクトでなければなりません。
+-- `functions_to_implement` の値は、実装すべき機能のリスト（配列）です。
+-- 各機能は、以下のキーを持つJSONオブジェクトです:
+-  - `name`: 関数名 (snake_case)
+-  - `description`: 機能の短い説明
+-  - `args`: 引数のリスト (例: `["arg1: str", "arg2: int"]`)
+-  - `returns`: 戻り値の型 (例: `"str"`, `"List[Dict]"`, `"None"`)
+-  - `dependencies`: 依存する他の関数やモジュールのリスト
+-  - `tests`: この機能を検証するためのテストケースのリスト（文字列）
+-  - `acceptance_criteria`: 受け入れ基準のリスト（文字列）
+-  - `priority`: 優先度 (例: "P0", "P1", "P2")
+-- 説明や追加のテキストは一切含めないでください。
++# 出力フォーマット（STRICT JSON）
++{{
++  "functions_to_implement": [
++    {{
++      "name": "snake_case_function_name",
++      "description": "短い説明",
++      "args": ["arg_name: type"],
++      "returns": "type",
++      "dependencies": ["other_function"],
++      "tests": ["テスト内容"],
++      "acceptance_criteria": ["条件1", "条件2"],
++      "priority": "P0 | P1 | P2"
++    }}
++  ]
++}}
++
++必ず上記スキーマ通りのJSONのみを返してください。追加の文章やコードフェンスは禁止です。
+ """
+         response_str = self.execute_llm_task(prompt, as_json=True)
++        llm_mode = getattr(getattr(self, "llm_router", None), "last_mode", "real")
++        if llm_mode != "real":
++            self.logger.warning(f"PlannerAgent detected router mode='{llm_mode}'. Falling back to heuristic plan.")
++            return self._fallback_plan(user_requirement, context)
+         try:
+-            sanitized = sanitize_json_like(response_str)
+-            if self._is_plan_valid(sanitized):
+-                return sanitized
+-            else:
++            parsed = json.loads(response_str)
++            if isinstance(parsed, dict):
++                mode = str(parsed.get("mode", "")).lower()
++                if "stub" in mode or "fallback" in mode:
++                    self.logger.warning("PlannerAgent detected stub response (%s); using fallback plan.", mode)
++                    return self._fallback_plan(user_requirement, context)
++            sanitized = sanitize_json_like(parsed)
++            if not self._is_plan_valid(sanitized):
+                 self.logger.warning(f"Generated plan is invalid or empty. Raw response: {response_str}")
+                 return self._fallback_plan(user_requirement, context)
++            if len(sanitized.get("functions_to_implement", [])) < 3:
++                self.logger.info("Plan contained fewer than 3 tasks; merging with fallback tasks.")
++                fb = self._fallback_plan(user_requirement, context)
++                existing = sanitized["functions_to_implement"]
++                names = {entry["name"] for entry in existing}
++                for fb_task in fb["functions_to_implement"]:
++                    if fb_task["name"] not in names:
++                        existing.append(fb_task)
++                sanitized["functions_to_implement"] = existing
++            return sanitized
+         except Exception:
+             self.logger.error(f"Failed to decode or validate JSON plan. Raw response: {response_str}", exc_info=True)
+             return self._fallback_plan(user_requirement, context)
+@@ -120,19 +149,33 @@ class PlannerAgent(BaseAgent):
+         return isinstance(f, list) and len(f) > 0
+ 
+     def _fallback_plan(self, user_requirement: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+-        name = self._to_snake_case(user_requirement)[:32] or "planned_function"
+-        return {
+-            "functions_to_implement": [{
+-                "name": name,
+-                "description": f"Auto-generated stub for: {user_requirement[:80]}",
++        base_name = self._to_snake_case(user_requirement) or "planned_function"
++        core_steps = [
++            ("spec_analysis", "要件をJSON仕様にまとめ、主要エンティティとユースケースを洗い出す"),
++            ("core_implementation", "アプリケーションの主要コマンド/機能を実装し、エラー処理を整備する"),
++            ("testing_and_docs", "pytest用のテストとREADME/使用手順を整備する")
++        ]
++
++        functions = []
++        for idx, (suffix, description) in enumerate(core_steps, start=1):
++            functions.append({
++                "name": f"{base_name}_{suffix}",
++                "description": f"{description}（要求: {user_requirement[:60]}...）",
+                 "args": [],
+                 "returns": "None",
+-                "dependencies": [],
+-                "tests": ["Should run without exceptions.", "Smoke import succeeds."],
+-                "acceptance_criteria": ["Code compiles and minimal flow executes."],
+-                "priority": "P2",
+-            }]
+-        }
++                "dependencies": [] if idx == 1 else [functions[idx - 2]["name"]],
++                "tests": [
++                    "pytest が成功すること",
++                    "主要フローで例外が発生しないこと"
++                ],
++                "acceptance_criteria": [
++                    "要件で述べられたユースケースがCLI経由で実行できること",
++                    "主要コマンドに対するドキュメントが整備されていること"
++                ],
++                "priority": "P1" if idx == 1 else ("P0" if idx == 2 else "P2"),
++            })
++
++        return {"functions_to_implement": functions}
+ 
+     @staticmethod
+     def _to_snake_case(s: str) -> str:
+diff --git a/src/nexuscore/agents/requirement_agent.py b/src/nexuscore/agents/requirement_agent.py
+index 7acd146..5b46329 100644
+--- a/src/nexuscore/agents/requirement_agent.py
++++ b/src/nexuscore/agents/requirement_agent.py
+@@ -52,11 +52,13 @@ class StateMachine:
+     def transition(self, user_input: Optional[str] = None): self.state["state"] = "FINALIZING"; return [(None, "仕様を生成します。")] # 仮実装
+ 
+ class RequirementAgent(BaseAgent):
+-    def __init__(self, language: str = "ja"):
++    def __init__(self, language: str = "ja", use_ui: bool = False):
+         super().__init__()
+         self.language = language
+         self.text = TextLocalization(language)
+         self.final_requirements: Optional[Dict[str, Any]] = None
++        self.use_ui = use_ui
++        self._initial_requirement: str = ""
+ 
+     def _get_initial_state(self) -> Dict[str, Any]:
+         return { "session_id": str(uuid.uuid4()), "history": [], "state": "INIT" }
+@@ -65,7 +67,48 @@ class RequirementAgent(BaseAgent):
+         last_user_msg = next((h['content'] for h in reversed(history) if h['role'] == 'user'), "No user input.")
+         return {"summary": "Final Specification", "details": last_user_msg}
+ 
++    def set_initial_requirement(self, requirement: str) -> None:
++        self._initial_requirement = requirement
++
++    def analyze_requirement(self, requirement: str) -> Dict[str, Any]:
++        """
++        Headless requirement digestion fallback using LLM or heuristic summary.
++        """
++        requirement = requirement.strip() or self._initial_requirement or "No requirement provided."
++        prompt = f"""
++You are a requirements analyst. Convert the user's request into a concise JSON specification.
++
++# User Requirement
++{requirement}
++
++# Output JSON schema
++{{
++  "summary": "<overall goal>",
++  "features": ["<feature1>", "<feature2>"],
++  "constraints": ["<constraint>", "..."],
++  "acceptance_criteria": ["<criteria>", "..."]
++}}
++
++Ensure the response is strictly valid JSON with filled arrays (no empty strings).
++"""
++        response = self.execute_llm_task(prompt, as_json=True)
++        try:
++            data = sanitize_json_like(json.loads(response))
++        except Exception:
++            data = {
++                "summary": requirement[:80],
++                "features": ["Auto-generated draft feature list"],
++                "constraints": [],
++                "acceptance_criteria": []
++            }
++        self.final_requirements = data
++        return data
++
+     def launch_gradio_ui(self, share: bool = False) -> Dict[str, Any]:
++        if not self.use_ui:
++            self.logger.info("RequirementAgent running in headless mode.")
++            return self.analyze_requirement(self._initial_requirement)
++
+         fsm = StateMachine(self)
+ 
+         with gr.Blocks(title=self.text["title"]) as demo:
+@@ -144,4 +187,3 @@ if __name__ == "__main__":
+     if specs:
+         print("\n--- [最終生成仕様] ---")
+         print(json.dumps(specs, indent=2, ensure_ascii=False))
+-
+diff --git a/src/nexuscore/core/orchestrator.py b/src/nexuscore/core/orchestrator.py
+index 778a1d5..a460168 100644
+--- a/src/nexuscore/core/orchestrator.py
++++ b/src/nexuscore/core/orchestrator.py
+@@ -1,69 +1,92 @@
+ # ==============================================================================
+-# 操作するソフト: VSCode (または任意のテキストエージェタ)
+-# フォルダ: src/nexuscore/core/
+-# ファイル名: orchestrator.py
++# 操作するソフト : VSCode（推奨）
++# フォルダ       : src/nexuscore/core/
++# ファイル名     : orchestrator.py
+ #
+-# 日付: 2025年9月28日
+-# 日本時間: 06:45
++# 日付 (JST)     : 2025-11-14
++# バージョン     : 8.2.0J (NPE Function-Based Integration + WSL Safe)
+ #
+-# バージョン: 8.1 (Hybrid Architecture Fix)
+-#
+-# 改修内容:
+-#   - エラーの根本原因であった、エージェントの初期化問題を完全に解決しました。
+-#   - `assemble_agent_team`関数を全面的に改良し、あなたのシステムの優れた
+-#     「ハイブリッド・アーキテクチャ」に完全準拠させました。
+-#   - CoderAgentのような「近代化」エージェントと、GuardianAgentのような
+-#     「特殊任務」エージェントを、それぞれの役割に応じて正しく初期化します。
+-#   - これにより、システム全体のアーキテクチャに一貫性が生まれ、CLIからの
+-#     起動が正常に完了するようになります。
++# 要旨:
++#   - 旧設計の NexusProtocolEngine クラス依存を完全に排除。
++#   - NPE は engine.guardedd_llm_call() を中核とする「関数ベース・プロトコル」として統合。
++#   - Orchestrator に LLMRouter を正式に注入し、NPE → Router → Provider の経路を確立。
++#   - WSL/Windows の差異に依存しないよう、ファイルパス/ログ周りをシンプル化。
++#   - main_cli.py からの import 時に ImportError が出ないことを最優先設計。
+ # ==============================================================================
+ 
+ from __future__ import annotations
+ 
++import argparse
++import json
++import logging
+ import os
+ import sys
+-import json
+ import time
+ import uuid
+-import logging
+-import argparse
+ from dataclasses import dataclass, field
+-from typing import Any, Dict
+ from pathlib import Path
++from typing import Any, Dict
+ 
+-# --- パス設定 (自己完結性を高めるため) ---
++# ------------------------------------------------------------------------------
++# パス設定 (自己完結性を高めるため: src/ を sys.path に追加)
++# ------------------------------------------------------------------------------
+ try:
+-    current_dir = Path(__file__).resolve().parent
+-    # src/nexuscore/core -> src
+-    src_dir = current_dir.parents[2]
++    current_dir = Path(__file__).resolve().parent          # .../src/nexuscore/core
++    src_dir = current_dir.parents[2]                       # .../src
+     if str(src_dir) not in sys.path:
+         sys.path.insert(0, str(src_dir))
+ except Exception:
+-    print("Warning: Could not automatically determine and set the 'src' directory path.")
++    print("[orchestrator] Warning: could not determine src directory.", file=sys.stderr)
+ 
+-# --- 依存エージェントとユーティリティ ---
++# ------------------------------------------------------------------------------
++# 依存モジュール (Agents / NPE / Router / Utils)
++# ------------------------------------------------------------------------------
++
++# エージェント群
+ from nexuscore.agents.requirement_agent import RequirementAgent
++from nexuscore.agents.architect_agent import ArchitectAgent
+ from nexuscore.agents.planner_agent import PlannerAgent
+ from nexuscore.agents.coder_agent import CoderAgent
+ from nexuscore.agents.tester_agent import TesterAgent
+-from nexuscore.agents.guardian_agent import GuardianAgent
+-from nexuscore.agents.architect_agent import ArchitectAgent
+ from nexuscore.agents.debugger_agent import DebuggerAgent
++from nexuscore.agents.guardian_agent import GuardianAgent
++from nexuscore.agents.policy_agent import PolicyAgent
+ from nexuscore.agents.postmortem_agent import PostmortemAgent
+ from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
+ from nexuscore.agents.patch_applier import PatchApplier
+-from nexuscore.agents.policy_agent import PolicyAgent
+ 
+-# --- v8.0 アーキテクチャの核心 ---
+-from nexuscore.npe.engine import NexusProtocolEngine
++# NPE: クラスではなく「関数ベース・プロトコル」として利用
++from nexuscore.npe.engine import guarded_llm_call
++
++# LLM ルーター
+ from nexuscore.llm.llm_router import LLMRouter
+-from nexuscore.utils.clean_output import clean_output
++
++# ユーティリティ (必要に応じて使用)
++try:
++    from nexuscore.utils.clean_output import clean_output
++except Exception:
++    # クリーンアップ関数が存在しない場合でも Orchestrator 自体は動作させる
++    def clean_output(x: str) -> str:
++        return x
++
++
++# ==============================================================================
++# Orchestrator 本体
++# ==============================================================================
+ 
+ @dataclass
+ class Orchestrator:
+-    # ... (v8.0のクラス定義は変更なし) ...
++    """
++    NexusCore の中核となるオーケストレータ。
++    - Requirement → Planning → Architecture → Coding → Testing → Review → Postmortem
++    の大まかな流れを制御する。
++    - 実際の LLM 呼び出しは「NPE (guarded_llm_call) → LLMRouter.complete」に委譲する。
++    """
++
+     project_path: str
+     constitution: Dict[str, Any]
++
++    # --- エージェント群 ---
+     requirement_agent: RequirementAgent
+     architect_agent: ArchitectAgent
+     planner_agent: PlannerAgent
+@@ -75,131 +98,290 @@ class Orchestrator:
+     postmortem_agent: PostmortemAgent
+     knowledge_curator_agent: KnowledgeCuratorAgent
+     patch_applier_agent: PatchApplier
++
++    # --- LLM Router / 設定 ---
++    llm_router: LLMRouter
+     max_retries: int = 5
++
++    # --- 内部状態 ---
+     logger: logging.Logger = field(init=False)
+-    npe_instance: NexusProtocolEngine = field(init=False)
+ 
+-    def __post_init__(self):
+-        log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+-        logging.basicConfig(level=logging.INFO, format=log_format)
+-        self.logger = logging.getLogger(self.__class__.__name__)
+-        log_dir = os.path.join(self.project_path, ".nexus_logs")
++    # ------------------------------------------------------------------
++    # 初期化
++    # ------------------------------------------------------------------
++    def __post_init__(self) -> None:
++        # ロガーの準備
++        self._setup_logger()
++        self.logger.info("Orchestrator v8.2 initialized.")
++        self.logger.info(f"Project path: {self.project_path}")
++        self.logger.info("NPE (function-based guarded_llm_call) is ready.")
++        self.logger.info("LLMRouter is attached to Orchestrator.")
++
++    def _setup_logger(self) -> None:
++        log_dir = os.path.join(self.project_path, "logs", "orchestrator")
+         os.makedirs(log_dir, exist_ok=True)
+-        file_handler = logging.FileHandler(os.path.join(log_dir, f"orchestrator_{int(time.time())}.log"))
+-        file_handler.setFormatter(logging.Formatter(log_format))
+-        self.logger.addHandler(file_handler)
+-        self.logger.info(f"Orchestrator v8.1 initialized for project: {self.project_path}")
+-        
+-        self.npe_instance = NexusProtocolEngine()
+-        self.logger.info("Nexus Protocol Engine (NPE) has been integrated.")
+ 
++        self.logger = logging.getLogger(self.__class__.__name__)
++        self.logger.setLevel(logging.INFO)
++
++        # 重複ハンドラ防止
++        if not self.logger.handlers:
++            log_path = os.path.join(log_dir, f"orchestrator_{int(time.time())}.log")
++            fh = logging.FileHandler(log_path, encoding="utf-8")
++            ch = logging.StreamHandler(sys.stdout)
++
++            fmt = logging.Formatter(
++                fmt="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
++                datefmt="%Y-%m-%d %H:%M:%S",
++            )
++            fh.setFormatter(fmt)
++            ch.setFormatter(fmt)
++
++            self.logger.addHandler(fh)
++            self.logger.addHandler(ch)
++
++    # ------------------------------------------------------------------
++    # NPE 経由で LLM を叩くヘルパー
++    # ------------------------------------------------------------------
+     def _execute_task_via_npe(self, prompt: str, metadata: Dict[str, Any]) -> str:
+-        self.logger.info(f"Delegating task '{metadata.get('task_type')}' to NPE.")
+-        project_id = os.path.basename(self.project_path)
+-        
+-        response = self.npe_instance.process_task(
+-            prompt=prompt,
+-            metadata=metadata,
+-            project_id=project_id
++        """
++        最新 NPE 仕様に基づき、guarded_llm_call() 経由で LLMRouter を呼び出す。
++        - 予算ガード / ログ / ポリシーは NPE 側の engine/budget/logger/policies に委譲。
++        """
++        task_type = metadata.get("task_type") or "generic"
++        self.logger.info(f"[NPE] Delegating task '{task_type}' to guarded_llm_call().")
++
++        # Router 側の task_model_map / default_model を尊重
++        task_model_map = getattr(self.llm_router, "task_model_map", {}) or {}
++        default_model = getattr(self.llm_router, "default_model", None)
++        model = task_model_map.get(task_type, default_model)
++
++        # system_prompt は軽量な規律程度に留める（必要なら今後強化）
++        system_prompt = (
++            "You are the NexusCore Orchestration LLM. "
++            "Follow metadata.task_type and return concise, machine-consumable output. "
++            "If metadata.as_json is True, return strictly valid JSON."
++        )
++
++        result = guarded_llm_call(
++            model=model,
++            task=task_type,
++            system_prompt=system_prompt,
++            user_prompt=prompt,
++            llm_complete_fn=self.llm_router.complete,
+         )
+-        return response
+ 
+-    def run_full_project(self, user_requirement: str, language: str = "ja"):
+-        self.logger.info(f"--- Starting Full Project Run for: '{user_requirement}' ---")
++        # NPE 戻り値の標準形: dict {"ok": bool, "reason": str, "content": str, "usage": {...}}
++        if isinstance(result, dict):
++            content = result.get("content", "")
++        else:
++            content = str(result)
++
++        return clean_output(content)
++
++    # ------------------------------------------------------------------
++    # メインフロー (必要に応じて段階的に強化していく)
++    # ------------------------------------------------------------------
++    def run_full_project(self, user_requirement: str, language: str = "ja") -> None:
++        """
++        高レベルな「フルプロジェクト」実行フロー。
++        - 現時点では Requirement → Planning までを安全に通すことを優先。
++        - 以降のフェーズ（Architecture / Coding / Testing ...）は今後拡張。
++        """
++        self.logger.info(f"=== Full Project Run Start === requirement='{user_requirement}'")
+         task_id = uuid.uuid4().hex
+ 
+-        # (UIを持つRequirementAgentは現時点では直接呼び出し)
++        # --------------------------------------------------------------
++        # Phase 1: Requirement Definition
++        # --------------------------------------------------------------
+         self.logger.info(f"[{task_id}] Phase 1: Requirement Definition")
+-        specs = self.requirement_agent.launch_gradio_ui(share=False)
++        specs: Dict[str, Any] = {}
++
++        try:
++            use_ui = bool(getattr(self.requirement_agent, "use_ui", False))
++            if use_ui and hasattr(self.requirement_agent, "launch_gradio_ui"):
++                specs = self.requirement_agent.launch_gradio_ui(share=False)
++            elif hasattr(self.requirement_agent, "analyze_requirement"):
++                specs = self.requirement_agent.analyze_requirement(user_requirement)
++            else:
++                # 最低限、テキストとして持っておく
++                specs = {"raw_requirement": user_requirement}
++        except Exception as e:
++            self.logger.error(f"[{task_id}] Requirement phase failed: {e}", exc_info=True)
++            return
++
+         if not specs:
+-            self.logger.error(f"[{task_id}] Requirement definition failed. Aborting.")
++            self.logger.error(f"[{task_id}] Requirement definition returned empty specs. Aborting.")
+             return
+ 
+-        # (以降のフェーズはNPEを経由)
+-        self.logger.info(f"[{task_id}] Phase 2: Planning")
+-        plan_prompt = self.planner_agent.generate_plan(json.dumps(specs, ensure_ascii=False))
+-        plan_response = self._execute_task_via_npe(
+-            prompt=plan_prompt,
+-            metadata={"task_type": "planning", "task_id": task_id, "as_json": True}
+-        )
+-        plan = json.loads(clean_output(plan_response))
+-        tasks = plan.get("functions_to_implement", [])
+-        
+-        self.logger.info(f"[{task_id}] Phase 3: Development Cycle with {len(tasks)} tasks")
+-        for task in tasks:
+-            # (... 開発サイクル ... )
+-            pass
++        # --------------------------------------------------------------
++        # Phase 2: Planning (NPE 経由)
++        # --------------------------------------------------------------
++        self.logger.info(f"[{task_id}] Phase 2: Planning via NPE")
++        plan: Dict[str, Any] = {}
++
++        try:
++            if hasattr(self.planner_agent, "generate_plan"):
++                # エージェント固有メソッドがある場合はそれを優先
++                req_json = json.dumps(specs, ensure_ascii=False, indent=2)
++                plan_text = self.planner_agent.generate_plan(req_json)
++            else:
++                # NPE を経由して LLM にプラン生成を委譲
++                plan_prompt = (
++                    "以下の要件仕様に基づき、実装タスクの計画を立ててください。\n"
++                    "可能であれば JSON 形式で 'functions_to_implement' 配列を含めてください。\n\n"
++                    f"{json.dumps(specs, ensure_ascii=False, indent=2)}"
++                )
++                plan_text = self._execute_task_via_npe(
++                    prompt=plan_prompt,
++                    metadata={"task_type": "planning", "as_json": False},
++                )
++
++            # JSON っぽければパースを試みるが、失敗しても致命傷にはしない
++            try:
++                plan = json.loads(plan_text)
++            except Exception:
++                plan = {"raw_plan": plan_text}
++        except Exception as e:
++            self.logger.error(f"[{task_id}] Planning phase failed: {e}", exc_info=True)
++            plan = {"error": str(e), "raw_specs": specs}
++
++        # --------------------------------------------------------------
++        # Phase 3 以降は将来拡張用のフック
++        # --------------------------------------------------------------
++        tasks = plan.get("functions_to_implement", []) if isinstance(plan, dict) else []
++        self.logger.info(f"[{task_id}] Phase 3: Development Cycle (tasks={len(tasks)})")
+ 
+-        self.logger.info(f"--- Full Project Run Finished for: '{user_requirement}' ---")
++        # ここではまだ実際のコード生成・テストは行わず、拡張ポイントとして残しておく。
++        # 既存の CoderAgent / TesterAgent / GuardianAgent 等は、今後ここに順次統合していく。
++        # for task in tasks:
++        #     ...
++        #     code_result = self.coder_agent.generate_code(...)
++        #     test_result = self.tester_agent.generate_and_run_tests(...)
++        #     review_result = self.guardian_agent.review(...)
++        #     ...
++
++        self.logger.info(f"=== Full Project Run Finished === requirement='{user_requirement}'")
++
++
++# ==============================================================================
++# Agent チームの組成
++# ==============================================================================
+ 
+-# --- ★★★★★ ここからが v8.1 修正の核心 ★★★★★ ---
+ def assemble_agent_team(project_path: str) -> Dict[str, Any]:
+     """
+-    ハイブリッド・アーキテクチャに基づき、完全なエージェントチームを編成する。
++    ハイブリッド・アーキテクチャに基づき、Orchestrator に渡すエージェント群と LLMRouter を生成する。
++
++    戻り値:
++        {
++            "requirement_agent": RequirementAgent(...),
++            "architect_agent":   ArchitectAgent(...),
++            ...
++            "patch_applier_agent": PatchApplier(...),
++            "llm_router":        LLMRouter(...),
++        }
+     """
+     logger = logging.getLogger("AgentAssembler")
+-    logger.info("Assembling the agent team according to the hybrid architecture...")
+-    
+-    # 司令塔とAPIキーを準備
++    logger.info("Assembling agent team for NexusCore Orchestrator v8.2...")
++
++    # LLM Router を最初に作成しておく（必要ならエージェントに渡せるようにする）
+     llm_router = LLMRouter()
+-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
+-    if not api_key:
+-        raise ValueError("A primary API key (e.g., GEMINI_API_KEY) must be set.")
+-
+-    # 1. 近代化されたエージェントの招集 (引数なし)
+-    # これらはBaseAgentを継承し、内部で自動的にLLMRouterをセットアップする
+-    agents = {
+-        "requirement_agent": RequirementAgent(),
+-        "architect_agent": ArchitectAgent(),
+-        "planner_agent": PlannerAgent(),
+-        "coder_agent": CoderAgent(),
+-        "tester_agent": TesterAgent(),
+-        "debugger_agent": DebuggerAgent(),
+-        "postmortem_agent": PostmortemAgent(),
+-        "policy_agent": PolicyAgent(),
++
++    # ここでは、各 Agent がデフォルトコンストラクタで生成できる前提とし、
++    # 追加の依存は将来的に渡せるよう拡張余地を残す。
++    requirement_agent = RequirementAgent()
++    architect_agent = ArchitectAgent()
++    planner_agent = PlannerAgent()
++    coder_agent = CoderAgent()
++    tester_agent = TesterAgent()
++    debugger_agent = DebuggerAgent()
++    guardian_agent = GuardianAgent()
++    policy_agent = PolicyAgent()
++    postmortem_agent = PostmortemAgent()
++    knowledge_curator_agent = KnowledgeCuratorAgent()
++    patch_applier_agent = PatchApplier()
++
++    agents: Dict[str, Any] = {
++        "requirement_agent": requirement_agent,
++        "architect_agent": architect_agent,
++        "planner_agent": planner_agent,
++        "coder_agent": coder_agent,
++        "tester_agent": tester_agent,
++        "debugger_agent": debugger_agent,
++        "guardian_agent": guardian_agent,
++        "policy_agent": policy_agent,
++        "postmortem_agent": postmortem_agent,
++        "knowledge_curator_agent": knowledge_curator_agent,
++        "patch_applier_agent": patch_applier_agent,
++        "llm_router": llm_router,
+     }
+-    logger.info(f"Instantiated {len(agents)} modernized agents.")
+-
+-    # 2. 特殊任務エージェントのプロビジョニング (引数あり)
+-    # これらは特定のモデルや設定を明示的に要求する
+-    
+-    # GuardianAgent: 'review'タスク用のモデルを動的に取得して設定
+-    review_model = llm_router.task_model_map.get('review', llm_router.default_model)
+-    agents["guardian_agent"] = GuardianAgent(api_key=api_key, model=review_model)
+-    logger.info(f"Provisioned GuardianAgent for 'review' with model '{review_model}'.")
+-
+-    # KnowledgeCuratorAgent: 'general'タスク用のモデルを動的に取得して設定
+-    general_model = llm_router.task_model_map.get('general', llm_router.default_model)
+-    agents["knowledge_curator_agent"] = KnowledgeCuratorAgent(api_key=api_key, model=general_model)
+-    logger.info(f"Provisioned KnowledgeCuratorAgent for 'general' with model '{general_model}'.")
+-    
+-    # 3. ユーティリティの任命 (LLM不要)
+-    agents["patch_applier_agent"] = PatchApplier()
+-    
+-    logger.info(f"Full team of {len(agents)} agents assembled and ready.")
++
++    logger.info(f"Agent team assembled. total={len(agents)} (including llm_router).")
+     return agents
+-# --- ★★★★★ ここまで ★★★★★ ---
+ 
+-if __name__ == "__main__":
+-    parser = argparse.ArgumentParser(description="NexusCore Orchestrator v8.1")
+-    parser.add_argument("--project", required=True, help="プロジェクトを管理するフォルダの絶対パス")
+-    parser.add_argument("--autonomy-level", type=int, default=1, help="自律レベル")
+-    parser.add_argument("--requirement", required=True, help="生成したいプロジェクトの説明文")
++
++# ==============================================================================
++# CLI エントリポイント (main_cli.py からも直接 import されることを想定)
++# ==============================================================================
++
++def _build_arg_parser() -> argparse.ArgumentParser:
++    parser = argparse.ArgumentParser(
++        description="NexusCore Orchestrator v8.2 (NPE + Router Integrated)"
++    )
++    parser.add_argument(
++        "--project",
++        type=str,
++        default=str(Path.cwd()),
++        help="プロジェクトのルートパス（デフォルト: カレントディレクトリ）",
++    )
++    parser.add_argument(
++        "--requirement",
++        type=str,
++        default="サンプルの要件です。",
++        help="自然言語での要件（デモ・テスト用）",
++    )
++    parser.add_argument(
++        "--autonomy-level",
++        type=int,
++        default=1,
++        help="自動化レベル（0=対話中心, 1=半自動, 2=ほぼ全自動）",
++    )
++    return parser
++
++
++def main() -> None:
++    logging.basicConfig(
++        level=logging.INFO,
++        format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
++        datefmt="%Y-%m-%d %H:%M:%S",
++    )
++
++    parser = _build_arg_parser()
+     args = parser.parse_args()
+ 
+-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+     logger = logging.getLogger("CLI_LAUNCHER")
+-    logger.info("Orchestrator launch sequence initiated.")
++    logger.info("Orchestrator launch sequence initiated (v8.2).")
+ 
+-    constitution = { "automation_policy": {"autonomy_level": args.autonomy_level} }
++    constitution = {
++        "automation_policy": {
++            "autonomy_level": args.autonomy_level,
++        }
++    }
+ 
+     try:
+         agent_team = assemble_agent_team(project_path=args.project)
+-        orch = Orchestrator(project_path=args.project, constitution=constitution, **agent_team)
+-        logger.info("Orchestrator instance created. Starting the process.")
++        orch = Orchestrator(
++            project_path=args.project,
++            constitution=constitution,
++            **agent_team,
++        )
++        logger.info("Orchestrator instance created. Starting full project run.")
+         orch.run_full_project(args.requirement)
+         logger.info("Orchestrator process finished successfully.")
+     except Exception as e:
+-        logger.critical(f"A critical error occurred: {e}", exc_info=True)
++        logger.critical(f"A critical error occurred in Orchestrator: {e}", exc_info=True)
+         sys.exit(1)
+ 
++
++if __name__ == "__main__":
++    main()
+diff --git a/src/nexuscore/llm/llm_router.py b/src/nexuscore/llm/llm_router.py
+index d79b7ad..0dcfdb9 100644
+--- a/src/nexuscore/llm/llm_router.py
++++ b/src/nexuscore/llm/llm_router.py
+@@ -63,6 +63,41 @@ import time
+ # from pathlib import Path (↑でインポート済み)
+ from typing import Dict, Optional, Tuple
+ 
++DEFAULT_STUB_CONTENT = {
++    "summary": "Stubbed response: real LLM call was skipped or unavailable.",
++    "plan": [
++        {"step": "analyze_requirement", "owner": "PlannerAgent", "status": "pending"},
++        {"step": "implement_core_logic", "owner": "CoderAgent", "status": "blocked_stub"},
++        {"step": "write_tests_and_docs", "owner": "TesterAgent", "status": "blocked_stub"}
++    ]
++}
++
++def _ensure_env_var(target: str, aliases: list[str]) -> None:
++    """
++    Align legacy/custom environment variables with the canonical ones expected by the router.
++    """
++    if os.getenv(target):
++        return
++    logger = logging.getLogger("LLMRouter-Bootstrap")
++    for alias in aliases:
++        val = os.getenv(alias)
++        if val:
++            os.environ[target] = val
++            logger.info("ENV sync: %s was missing. Using value from %s.", target, alias)
++            return
++
++
++_ensure_env_var("GEMINI_API_KEY", ["GEMINI_API_KEY_AGENT_A", "GEMINI_API_KEY_AGENT_B"])
++_ensure_env_var("DEEPSEEK_API_KEY", ["DEEPSEEK_KEY", "DEEPSEEK"])
++_ensure_env_var("KIMI_API_KEY", ["MOONSHOT_API_KEY", "MOONSHOT"])
++
++if not os.getenv("NEXUS_REAL_CALLS"):
++    if any(os.getenv(k) for k in ["OPENAI_API_KEY", "GEMINI_API_KEY", "DEEPSEEK_API_KEY", "KIMI_API_KEY"]):
++        os.environ["NEXUS_REAL_CALLS"] = "1"
++        logging.getLogger("LLMRouter-Bootstrap").info(
++            "NEXUS_REAL_CALLS was not set. Enabling REAL-CALL mode because API keys are detected."
++        )
++
+ # ---- ★ v2.3.5 堅牢化パッチ (requests + Retry) ------------------------------
+ try:
+     import requests
+@@ -409,7 +444,8 @@ class OpenAILLM(BaseLLM):
+                 fake = {
+                     "model": self.model_name,
+                     "mode": "openai-stub-fallback",
+-                    "preview": "Real call failed. Fallback to stub."
++                    "preview": "Real call failed. Fallback to stub.",
++                    "content": DEFAULT_STUB_CONTENT
+                 }
+                 return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+             except Exception as e:
+@@ -419,7 +455,8 @@ class OpenAILLM(BaseLLM):
+                 fake = {
+                     "model": self.model_name,
+                     "mode": "openai-stub-fallback",
+-                    "preview": "Real call failed. Fallback to stub."
++                    "preview": "Real call failed. Fallback to stub.",
++                    "content": DEFAULT_STUB_CONTENT
+                 }
+                 return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+ 
+@@ -429,7 +466,8 @@ class OpenAILLM(BaseLLM):
+             "model": self.model_name,
+             "mode": "openai-stub",
+             "as_json": as_json,
+-            "preview": "This is a stubbed OpenAI model response."
++            "preview": "This is a stubbed OpenAI model response.",
++            "content": DEFAULT_STUB_CONTENT
+         }
+         return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+ 
+@@ -527,7 +565,8 @@ class GeminiLLM(BaseLLM):
+                     fake = {
+                         "model": self.model_name,
+                         "mode": "gemini-stub-fallback",
+-                        "preview": "No text returned (possibly blocked)."
++                        "preview": "No text returned (possibly blocked).",
++                        "content": DEFAULT_STUB_CONTENT
+                     }
+                     return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+ 
+@@ -543,7 +582,8 @@ class GeminiLLM(BaseLLM):
+                 fake = {
+                     "model": self.model_name,
+                     "mode": "gemini-stub-fallback",
+-                    "preview": "Real call failed. Fallback to stub."
++                    "preview": "Real call failed. Fallback to stub.",
++                    "content": DEFAULT_STUB_CONTENT
+                 }
+                 return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+ 
+@@ -553,7 +593,8 @@ class GeminiLLM(BaseLLM):
+             "model": self.model_name,
+             "mode": "gemini-stub",
+             "as_json": as_json,
+-            "preview": "This is a stubbed Gemini model response."
++            "preview": "This is a stubbed Gemini model response.",
++            "content": DEFAULT_STUB_CONTENT
+         }
+         return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+     # --- ★★★★★ v2.3.2 堅牢化 execute() (ここまで) ★★★★★ ---
+@@ -639,7 +680,8 @@ class MoonshotLLM(BaseLLM):
+                 fake = {
+                     "model": self.model_name,
+                     "mode": "kimi-stub-fallback",
+-                    "preview": "Real call failed. Fallback to stub."
++                    "preview": "Real call failed. Fallback to stub.",
++                    "content": DEFAULT_STUB_CONTENT
+                 }
+                 return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+ 
+@@ -649,7 +691,8 @@ class MoonshotLLM(BaseLLM):
+             "model": self.model_name,
+             "mode": "kimi-stub",
+             "as_json": as_json,
+-            "preview": "This is a stubbed Kimi model response."
++            "preview": "This is a stubbed Kimi model response.",
++            "content": DEFAULT_STUB_CONTENT
+         }
+         return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+ 
+@@ -734,7 +777,8 @@ class DeepSeekLLM(BaseLLM):
+                 fake = {
+                     "model": self.model_name,
+                     "mode": "deepseek-stub-fallback",
+-                    "preview": "Real call failed. Fallback to stub."
++                    "preview": "Real call failed. Fallback to stub.",
++                    "content": DEFAULT_STUB_CONTENT
+                 }
+                 return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+ 
+@@ -744,7 +788,15 @@ class DeepSeekLLM(BaseLLM):
+             "model": self.model_name,
+             "mode": "deepseek-stub",
+             "as_json": as_json,
+-            "preview": "This is a stubbed DeepSeek model response."
++            "preview": "This is a stubbed DeepSeek model response.",
++            "content": {
++                "summary": "Stubbed DeepSeek response",
++                "plan": [
++                    {"step": "analyze_requirement", "owner": "PlannerAgent", "status": "pending"},
++                    {"step": "implement_core_logic", "owner": "CoderAgent", "status": "blocked_stub"},
++                    {"step": "write_tests", "owner": "TesterAgent", "status": "blocked_stub"}
++                ]
++            }
+         }
+         return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+ 
+@@ -771,6 +823,14 @@ class LocalLLM(BaseLLM):
+                     "model": self.model_name,
+                     "mode": "local-fallback",
+                     "preview": preview,
++                    "content": {
++                        "summary": "Stubbed local response",
++                        "plan": [
++                            {"step": "analyze_requirement", "owner": "PlannerAgent", "status": "pending"},
++                            {"step": "implement_core_logic", "owner": "CoderAgent", "status": "blocked_stub"},
++                            {"step": "write_tests", "owner": "TesterAgent", "status": "blocked_stub"}
++                        ]
++                    }
+                 },
+                 ensure_ascii=False,
+             )
+@@ -838,6 +898,7 @@ class RoutedLLM(BaseLLM):
+         # --- 2) 実際のLLM呼び出し (実コール or スタブ) ------------------
+         self.inner._last_usage = None # usage 格納庫をリセット
+         output_text = self.inner.execute(prompt, system_prompt, **kwargs)
++        self.router.last_mode = getattr(self.inner, "last_call_mode", "stub")
+ 
+         # --- 3) 実コスト記録 (NPE v1.x IF) ---
+         # ★ パッチ 1) 実トークン優先 (v2.3.3)
+@@ -915,6 +976,7 @@ class LLMRouter:
+         self.logger = logging.getLogger("LLMRouter")
+         self.logger.setLevel(logging.INFO)
+         self.env = os.environ  # ★v2.1.1 維持
++        self.last_mode: str = "init"
+ 
+         # モデル振り分けテーブル
+         self.task_model_map = task_model_map or TASK_MODEL_MAP_DEFAULT.copy()
+@@ -1071,7 +1133,21 @@ class LLMRouter:
+         """
+         task_type = self._classify_task_type(prompt)
+ 
+-        model_name = self.task_model_map.get(task_type, self.task_model_map["general"])
++        llm_mode = os.getenv("NEXUS_LLM_MODE", "production").strip().lower()
++        if llm_mode == "cheap":
++            cheap_map = {
++                "requirements": "kimi-latest",
++                "planning": "deepseek-chat",
++                "coding": "deepseek-chat",
++                "testing": "deepseek-chat",
++                "debugging": "deepseek-chat",
++                "review": "kimi-latest",
++                "policy": "kimi-latest",
++                "general": "deepseek-chat",
++            }
++            model_name = cheap_map.get(task_type, "deepseek-chat")
++        else:
++            model_name = self.task_model_map.get(task_type, self.task_model_map["general"])
+ 
+         # --- ★★★★★ v2.1.1 統合コード (リファイン) ★★★★★ ---
+         if task_type in self.force_tasks and self.cheap_model:
+@@ -1177,4 +1253,3 @@ if __name__ == "__main__":
+     if router:
+         print(f"--- (To see logs, check: {router.call_log_path}) ---")
+         print(f"--- (Real calls use 3 retries on 429/5xx, timeout={os.getenv('NEXUS_REQUEST_TIMEOUT_SEC', '120')}s) ---")
+-

@@ -1,0 +1,38 @@
+
+--- ファイル収集開始: /home/yn441611/NexusCore ---
+  - 収集完了: 578 ファイル
+
+--- ファイルスコアリング ---
+
+--- ファイル選択結果: 576件 / 生データ合計 5.92 MB ---
+  - (Top) tests/core/test_orchestrator.py (score: 20.00)
+  - (Top) healing_sandbox/src/agents/orchestrator.py (score: 20.00)
+  - (Top) src/nexuscore/core/orchestrator.py (score: 20.00)
+  - (Top) healing_sandbox/app/main.py (score: 18.00)
+  - (Top) tools/brownfield_orchestrator.py (score: 18.00)
+  - (Top) workspace/test_crm_app/tests/test_main.py (score: 18.00)
+  - (Top) workspace/test_crm_app/app/main.py (score: 18.00)
+  - (Top) workspace/crm_project/app/main.py (score: 18.00)
+  - (Top) workspace/default_project/app/main.py (score: 17.81)
+  - (Top) healing_sandbox/tests/test_main.py (score: 16.00)
+  - ...他 566件
+
+--- サイズ超過等により除外されたファイル (上位10件) ---
+- 33.51 MB  src/project_structure.json
+- 7.18 MB  src/project_structure.md
+
+--- 結合コードを生成中 ---
+  - 生成完了
+
+--- ZIPアーカイブ作成: /home/yn441611/NexusCore/exports/NexusCore_gemini-chronicle_20251116_175220.zip ---
+❌ 致命的なエラー:
+Traceback (most recent call last):
+  File "/home/yn441611/NexusCore/tools/code_export_for_ai.py", line 648, in export_main_generator
+    with zipfile.ZipFile(to_win_long(zip_path), "w", zipfile.ZIP_DEFLATED) as zf:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/zipfile/__init__.py", line 1331, in __init__
+    self.fp = io.open(file, filemode)
+              ^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/yn441611/NexusCore/exports/NexusCore_gemini-chronicle_20251116_175220.zip'
+
+エラーにより処理が中断されました。

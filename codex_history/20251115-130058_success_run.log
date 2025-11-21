@@ -1,0 +1,73 @@
+2025-11-15 13:00:29,284 - INFO     - root                 - Log level set to INFO
+2025-11-15 13:00:29,286 - INFO     - root                 - Project Path: /home/yn441611/test_app
+2025-11-15 13:00:29,287 - INFO     - root                 - User Initial Requirement: 簡単なToDoアプリを作って。CLI ベースで。
+2025-11-15 13:00:29,287 - INFO     - root                 - Language: ja
+2025-11-15 13:00:29,289 - INFO     - root                 - Full Constitution with Quality Gate: {'description': 'このプロジェクトのコードは、常にクリーンで読みやすく、保守性が高いこと。また、すべてのコードには型ヒントとdocstringが付与されている必要がある。', 'quality_gate': {'MIN_COVERAGE': 90, 'MIN_PYLINT_SCORE': 8.0}}
+2025-11-15 13:00:29,290 - INFO     - root                 - Initializing AI agent team...
+2025-11-15 13:00:29,291 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 13:00:35,731 - INFO     - GeminiLLM            - GeminiLLM initialized in REAL-CALL mode.
+2025-11-15 13:00:35,734 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=set, DEEPSEEK_API_KEY=set, KIMI_API_KEY=set, GEMINI_API_KEY=set, ENV_FILE=/home/yn441611/NexusCore/.env
+2025-11-15 13:00:35,734 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 13:00:35,734 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 13:00:35,735 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 13:00:35,736 - INFO     - GeminiLLM            - GeminiLLM initialized in REAL-CALL mode.
+2025-11-15 13:00:35,736 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=set, DEEPSEEK_API_KEY=set, KIMI_API_KEY=set, GEMINI_API_KEY=set, ENV_FILE=/home/yn441611/NexusCore/.env
+2025-11-15 13:00:35,736 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 13:00:35,737 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 13:00:35,737 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 13:00:35,737 - INFO     - GeminiLLM            - GeminiLLM initialized in REAL-CALL mode.
+2025-11-15 13:00:35,745 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=set, DEEPSEEK_API_KEY=set, KIMI_API_KEY=set, GEMINI_API_KEY=set, ENV_FILE=/home/yn441611/NexusCore/.env
+2025-11-15 13:00:35,761 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 13:00:35,775 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 13:00:35,779 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 13:00:35,780 - INFO     - GeminiLLM            - GeminiLLM initialized in REAL-CALL mode.
+2025-11-15 13:00:35,780 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=set, DEEPSEEK_API_KEY=set, KIMI_API_KEY=set, GEMINI_API_KEY=set, ENV_FILE=/home/yn441611/NexusCore/.env
+2025-11-15 13:00:35,781 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 13:00:35,781 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 13:00:35,786 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 13:00:35,787 - INFO     - GeminiLLM            - GeminiLLM initialized in REAL-CALL mode.
+2025-11-15 13:00:35,787 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=set, DEEPSEEK_API_KEY=set, KIMI_API_KEY=set, GEMINI_API_KEY=set, ENV_FILE=/home/yn441611/NexusCore/.env
+2025-11-15 13:00:35,787 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 13:00:35,787 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 13:00:35,787 - INFO     - DebuggerAgent        - Using local temporary knowledge base: /home/yn441611/test_app/fkb_local.json
+2025-11-15 13:00:35,788 - INFO     - root                 - GuardianAgent configured with model 'gpt-5'.
+2025-11-15 13:00:35,788 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 13:00:35,788 - INFO     - GeminiLLM            - GeminiLLM initialized in REAL-CALL mode.
+2025-11-15 13:00:35,788 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=set, DEEPSEEK_API_KEY=set, KIMI_API_KEY=set, GEMINI_API_KEY=set, ENV_FILE=/home/yn441611/NexusCore/.env
+2025-11-15 13:00:35,788 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 13:00:35,788 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 13:00:35,800 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 13:00:35,800 - INFO     - GeminiLLM            - GeminiLLM initialized in REAL-CALL mode.
+2025-11-15 13:00:35,800 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=set, DEEPSEEK_API_KEY=set, KIMI_API_KEY=set, GEMINI_API_KEY=set, ENV_FILE=/home/yn441611/NexusCore/.env
+2025-11-15 13:00:35,800 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 13:00:35,800 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 13:00:35,801 - INFO     - PolicyAgent          - Loaded 4 policies from /home/yn441611/NexusCore/config/policy_rules.json
+2025-11-15 13:00:35,801 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 13:00:35,802 - INFO     - GeminiLLM            - GeminiLLM initialized in REAL-CALL mode.
+2025-11-15 13:00:35,802 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=set, DEEPSEEK_API_KEY=set, KIMI_API_KEY=set, GEMINI_API_KEY=set, ENV_FILE=/home/yn441611/NexusCore/.env
+2025-11-15 13:00:35,802 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 13:00:35,802 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 13:00:35,803 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 13:00:35,803 - INFO     - GeminiLLM            - GeminiLLM initialized in REAL-CALL mode.
+2025-11-15 13:00:35,803 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=set, DEEPSEEK_API_KEY=set, KIMI_API_KEY=set, GEMINI_API_KEY=set, ENV_FILE=/home/yn441611/NexusCore/.env
+2025-11-15 13:00:35,803 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 13:00:35,803 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 13:00:35,803 - INFO     - root                 - Initializing Orchestrator...
+2025-11-15 13:00:35,814 - INFO     - Orchestrator         - Orchestrator v8.2 initialized.
+2025-11-15 13:00:35,814 - INFO     - Orchestrator         - Project path: /home/yn441611/test_app
+2025-11-15 13:00:35,815 - INFO     - Orchestrator         - NPE (function-based guarded_llm_call) is ready.
+2025-11-15 13:00:35,815 - INFO     - Orchestrator         - LLMRouter is attached to Orchestrator.
+2025-11-15 13:00:35,815 - INFO     - root                 - Starting full development process...
+2025-11-15 13:00:35,815 - INFO     - Orchestrator         - === Full Project Run Start === requirement='簡単なToDoアプリを作って。CLI ベースで。'
+2025-11-15 13:00:35,826 - INFO     - Orchestrator         - [11c3aa58a5424c8784cd39e15f0035b2] Phase 1: Requirement Definition
+2025-11-15 13:00:38,554 - INFO     - LLMRouter            - Task classified as 'requirements'.
+2025-11-15 13:00:38,555 - INFO     - MoonshotLLM          - MoonshotLLM initialized in REAL-CALL mode (Retry: On).
+2025-11-15 13:00:38,555 - INFO     - LLMRouter            - Selecting model 'kimi-latest' (Provider: kimi) for task 'requirements'
+2025-11-15 13:00:41,446 - ERROR    - MoonshotLLM          - MoonshotLLM REAL-CALL failed (after retries): 401 Client Error: Unauthorized for url: https://api.moonshot.cn/v1/chat/completions
+2025-11-15 13:00:41,482 - INFO     - Orchestrator         - [11c3aa58a5424c8784cd39e15f0035b2] Phase 2: Planning via NPE
+2025-11-15 13:00:43,018 - INFO     - LLMRouter            - Task classified as 'planning'.
+2025-11-15 13:00:43,019 - INFO     - DeepSeekLLM          - DeepSeekLLM initialized in REAL-CALL mode (Retry: On).
+2025-11-15 13:00:43,019 - INFO     - LLMRouter            - Selecting model 'deepseek-chat' (Provider: deepseek) for task 'planning'
+2025-11-15 13:00:58,135 - INFO     - Orchestrator         - [11c3aa58a5424c8784cd39e15f0035b2] Phase 3: Development Cycle (tasks=0)
+2025-11-15 13:00:58,136 - INFO     - Orchestrator         - === Full Project Run Finished === requirement='簡単なToDoアプリを作って。CLI ベースで。'
+2025-11-15 13:00:58,136 - INFO     - root                 - Development process finished successfully.

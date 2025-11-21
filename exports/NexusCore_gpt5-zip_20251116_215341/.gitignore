@@ -1,0 +1,65 @@
+# フォルダ名: C:\Users\USER\tools\NexusCore
+# ファイル名: .gitignore
+
+# --- Secrets ---
+# APIキーやパスワードなどの秘密情報
+.env
+!.env.template
+# secrets.py は追跡しない
+src/nexuscore/config/secrets.py
+
+# --- Byte-compiled / optimized / DLL files ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Distribution / packaging ---
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# --- venv ---
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# --- Django specific ---
+# 開発用データベース
+db.sqlite3
+
+# --- Project-specific ignores ---
+# 生成されたファイルが出力されるフォルダ
+output/
+
+# VSCode settings
+.vscode/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# ----------------------------------
+# Git LFSで管理しない場合は以下の行を残す
+# **/combined_code.txt
+# Log files
+logs/ # ← こちらの行を追加
+# ----------------------------------
+

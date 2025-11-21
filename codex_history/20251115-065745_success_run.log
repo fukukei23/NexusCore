@@ -1,0 +1,74 @@
+2025-11-15 06:57:45,511 - INFO     - root                 - Log level set to INFO
+2025-11-15 06:57:45,511 - INFO     - root                 - Project Path: /home/yn441611/test_app
+2025-11-15 06:57:45,511 - INFO     - root                 - User Initial Requirement: 簡単なToDoアプリを作って。CLI ベースで。
+2025-11-15 06:57:45,511 - INFO     - root                 - Language: ja
+2025-11-15 06:57:45,512 - INFO     - root                 - Full Constitution with Quality Gate: {'description': 'このプロジェクトのコードは、常にクリーンで読みやすく、保守性が高いこと。また、すべてのコードには型ヒントとdocstringが付与されている必要がある。', 'quality_gate': {'MIN_COVERAGE': 90, 'MIN_PYLINT_SCORE': 8.0}}
+2025-11-15 06:57:45,512 - INFO     - root                 - Initializing AI agent team...
+2025-11-15 06:57:45,512 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 06:57:45,512 - WARNING  - LLMRouter            - Classifier init failed for model='gemini-2.5-flash': GEMINI_API_KEY is not set.. Falling back to LocalLLM.
+2025-11-15 06:57:45,513 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=unset, DEEPSEEK_API_KEY=unset, KIMI_API_KEY=unset, GEMINI_API_KEY=unset, ENV_FILE=(auto-detect failed)
+2025-11-15 06:57:45,513 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 06:57:45,513 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 06:57:45,513 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 06:57:45,513 - WARNING  - LLMRouter            - Classifier init failed for model='gemini-2.5-flash': GEMINI_API_KEY is not set.. Falling back to LocalLLM.
+2025-11-15 06:57:45,514 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=unset, DEEPSEEK_API_KEY=unset, KIMI_API_KEY=unset, GEMINI_API_KEY=unset, ENV_FILE=(auto-detect failed)
+2025-11-15 06:57:45,514 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 06:57:45,514 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 06:57:45,514 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 06:57:45,514 - WARNING  - LLMRouter            - Classifier init failed for model='gemini-2.5-flash': GEMINI_API_KEY is not set.. Falling back to LocalLLM.
+2025-11-15 06:57:45,514 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=unset, DEEPSEEK_API_KEY=unset, KIMI_API_KEY=unset, GEMINI_API_KEY=unset, ENV_FILE=(auto-detect failed)
+2025-11-15 06:57:45,515 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 06:57:45,515 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 06:57:45,515 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 06:57:45,515 - WARNING  - LLMRouter            - Classifier init failed for model='gemini-2.5-flash': GEMINI_API_KEY is not set.. Falling back to LocalLLM.
+2025-11-15 06:57:45,515 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=unset, DEEPSEEK_API_KEY=unset, KIMI_API_KEY=unset, GEMINI_API_KEY=unset, ENV_FILE=(auto-detect failed)
+2025-11-15 06:57:45,515 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 06:57:45,515 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 06:57:45,516 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 06:57:45,516 - WARNING  - LLMRouter            - Classifier init failed for model='gemini-2.5-flash': GEMINI_API_KEY is not set.. Falling back to LocalLLM.
+2025-11-15 06:57:45,516 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=unset, DEEPSEEK_API_KEY=unset, KIMI_API_KEY=unset, GEMINI_API_KEY=unset, ENV_FILE=(auto-detect failed)
+2025-11-15 06:57:45,516 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 06:57:45,516 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 06:57:45,516 - INFO     - DebuggerAgent        - Using local temporary knowledge base: /home/yn441611/test_app/fkb_local.json
+2025-11-15 06:57:45,517 - WARNING  - root                 - GUARDIAN_API_KEY/OPENAI_API_KEY is not set. Using placeholder key.
+2025-11-15 06:57:45,517 - INFO     - root                 - GuardianAgent configured with model 'gpt-5'.
+2025-11-15 06:57:45,517 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 06:57:45,517 - WARNING  - LLMRouter            - Classifier init failed for model='gemini-2.5-flash': GEMINI_API_KEY is not set.. Falling back to LocalLLM.
+2025-11-15 06:57:45,517 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=unset, DEEPSEEK_API_KEY=unset, KIMI_API_KEY=unset, GEMINI_API_KEY=unset, ENV_FILE=(auto-detect failed)
+2025-11-15 06:57:45,517 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 06:57:45,518 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 06:57:45,518 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 06:57:45,519 - WARNING  - LLMRouter            - Classifier init failed for model='gemini-2.5-flash': GEMINI_API_KEY is not set.. Falling back to LocalLLM.
+2025-11-15 06:57:45,519 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=unset, DEEPSEEK_API_KEY=unset, KIMI_API_KEY=unset, GEMINI_API_KEY=unset, ENV_FILE=(auto-detect failed)
+2025-11-15 06:57:45,519 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 06:57:45,519 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 06:57:45,519 - INFO     - PolicyAgent          - Loaded 4 policies from /home/yn441611/NexusCore/config/policy_rules.json
+2025-11-15 06:57:45,520 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 06:57:45,520 - WARNING  - LLMRouter            - Classifier init failed for model='gemini-2.5-flash': GEMINI_API_KEY is not set.. Falling back to LocalLLM.
+2025-11-15 06:57:45,520 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=unset, DEEPSEEK_API_KEY=unset, KIMI_API_KEY=unset, GEMINI_API_KEY=unset, ENV_FILE=(auto-detect failed)
+2025-11-15 06:57:45,520 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 06:57:45,520 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 06:57:45,521 - INFO     - LLMRouter            - [Budget] API variant detected: v2
+2025-11-15 06:57:45,521 - WARNING  - LLMRouter            - Classifier init failed for model='gemini-2.5-flash': GEMINI_API_KEY is not set.. Falling back to LocalLLM.
+2025-11-15 06:57:45,521 - INFO     - LLMRouter            - ENV sanity: OPENAI_API_KEY=unset, DEEPSEEK_API_KEY=unset, KIMI_API_KEY=unset, GEMINI_API_KEY=unset, ENV_FILE=(auto-detect failed)
+2025-11-15 06:57:45,521 - INFO     - LLMRouter            - TASK MODEL MAP = {'requirements': 'gemini-2.5-flash', 'planning': 'gemini-2.5-flash', 'coding': 'gpt-5', 'testing': 'gpt-5-mini', 'debugging': 'gpt-5', 'review': 'gemini-2.5-pro', 'policy': 'gemini-2.5-pro', 'general': 'gemini-2.5-flash'}
+2025-11-15 06:57:45,521 - INFO     - LLMRouter            - BudgetManager Daily Limit (USD) = 5.0000
+2025-11-15 06:57:45,521 - INFO     - root                 - Initializing Orchestrator...
+2025-11-15 06:57:45,522 - INFO     - Orchestrator         - Orchestrator v8.2 initialized.
+2025-11-15 06:57:45,523 - INFO     - Orchestrator         - Project path: /home/yn441611/test_app
+2025-11-15 06:57:45,523 - INFO     - Orchestrator         - NPE (function-based guarded_llm_call) is ready.
+2025-11-15 06:57:45,523 - INFO     - Orchestrator         - LLMRouter is attached to Orchestrator.
+2025-11-15 06:57:45,523 - INFO     - root                 - Starting full development process...
+2025-11-15 06:57:45,523 - INFO     - Orchestrator         - === Full Project Run Start === requirement='簡単なToDoアプリを作って。CLI ベースで。'
+2025-11-15 06:57:45,523 - INFO     - Orchestrator         - [0d0d1eab95ea42cda3226935f00a6da0] Phase 1: Requirement Definition
+2025-11-15 06:57:45,523 - INFO     - LLMRouter            - Task classified as 'general'.
+2025-11-15 06:57:45,523 - WARNING  - LLMRouter            - Failed to init client for model='gemini-2.5-flash': GEMINI_API_KEY is not set.. Falling back to LocalLLM.
+2025-11-15 06:57:45,523 - INFO     - LLMRouter            - Selecting model 'local-mock' (Provider: local) for task 'general'
+2025-11-15 06:57:45,525 - INFO     - Orchestrator         - [0d0d1eab95ea42cda3226935f00a6da0] Phase 2: Planning via NPE
+2025-11-15 06:57:45,525 - INFO     - LLMRouter            - Task classified as 'general'.
+2025-11-15 06:57:45,525 - WARNING  - LLMRouter            - Failed to init client for model='gemini-2.5-flash': GEMINI_API_KEY is not set.. Falling back to LocalLLM.
+2025-11-15 06:57:45,525 - INFO     - LLMRouter            - Selecting model 'local-mock' (Provider: local) for task 'general'
+2025-11-15 06:57:45,526 - WARNING  - PlannerAgent         - PlannerAgent detected router mode='stub'. Falling back to heuristic plan.
+2025-11-15 06:57:45,526 - INFO     - Orchestrator         - [0d0d1eab95ea42cda3226935f00a6da0] Phase 3: Development Cycle (tasks=0)
+2025-11-15 06:57:45,527 - INFO     - Orchestrator         - === Full Project Run Finished === requirement='簡単なToDoアプリを作って。CLI ベースで。'
+2025-11-15 06:57:45,527 - INFO     - root                 - Development process finished successfully.

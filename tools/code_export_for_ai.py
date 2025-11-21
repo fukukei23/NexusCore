@@ -117,10 +117,10 @@ PROFILES: Dict[str, Dict[str, Any]] = {
         "priority_files": ["**/readme.md", "**/main.py", "**/app.py", "**/orchestrator.py"],
     },
     "gpt5-zip": {
-        "description": "GPT-5向け。多数のファイルをそのまま格納したZIP/フォルダ。",
-        "target_mb": 48.0, "output_mode": "standard_zip", "max_single_mb": 8.0,
+        "description": "GPT-5向け。多数のファイルをそのまま格納したZIP/フォルダ（大容量構造ファイルも含む）。",
+        "target_mb": 80.0, "output_mode": "standard_zip", "max_single_mb": 80.0,
         "exclude_globs": {"dirs": COMMON_EXCLUDE_DIRS, "files": COMMON_EXCLUDE_FILES},
-        "priority_files": [],
+        "priority_files": ["**/project_structure.json", "**/project_structure.md"],
     },
     "perplexity-prepare": {
         "description": "Perplexity Pro(手動)向け。最適化されたチャンクファイル群を準備。",
@@ -415,10 +415,19 @@ def select_files(items: List[FileItem], profile: Dict[str, Any], compression_rat
 # ============================================================================
 # 5. 出力ファイル生成 & Perplexityアップロード
 # ============================================================================
-def create_report_md(items: List[FileItem], profile_name: str, total_predicted_zip_bytes: float, actual_zip_mb: Optional[float]) -> str:
+def create_report_md(
+    items: List[FileItem],
+    profile_name: str,
+    total_predicted_zip_bytes: float,
+    actual_zip_mb: Optional[float],
+    heavy: Optional[List[Tuple[float, Path]]] = None,
+) -> str:
     stats = defaultdict(lambda: {"files": 0, "lines": 0})
     for item in items:
-        ext = item.path.suffix or "NoExt"; stats[ext]["files"] += 1; stats[ext]["lines"] += item.loc
+        ext_raw = (item.path.suffix or "NoExt").strip() or "NoExt"
+        ext = ext_raw.split()[0]  # drop trailing clipboard artifacts等
+        stats[ext]["files"] += 1
+        stats[ext]["lines"] += item.loc
     stats["total"] = {"files": len(items), "lines": sum(s["lines"] for s in stats.values())}
     stats_table = "|拡張子|ファイル数|コード行数|\n|---|---|---|\n" + "\n".join(f"|`{e}`|{d['files']:,}|{d['lines']:,}|" for e, d in sorted(stats.items(), key=lambda x: x[1]['files'], reverse=True))
     report_lines = ["\n## 4. パッケージ品質レポート (自己診断)"]
@@ -438,6 +447,14 @@ def create_report_md(items: List[FileItem], profile_name: str, total_predicted_z
         report_lines.append(f"### 予測精度: {pred_accuracy:.1f}%")
         if pred_accuracy < 80: report_lines.append("- 🟡 **情報**: 予測と実際のZIPサイズに乖離があります。自己学習機能により次回以降精度が向上します。")
         else: report_lines.append("- ✅ **評価**: 圧縮サイズの予測は非常に正確です。")
+    excluded_lines = []
+    if heavy:
+        heavy_sorted = sorted(heavy, key=lambda h: h[0], reverse=True)
+        excluded_lines.append("\n## 3. 除外された大容量ファイル (Top 10)")
+        for sz_mb, rel in heavy_sorted[:10]:
+            excluded_lines.append(f"- {sz_mb:.2f} MB\t{rel}")
+        if len(heavy_sorted) > 10:
+            excluded_lines.append(f"- ...他 {len(heavy_sorted) - 10} 件")
     bootstrap_prompt = f"""
 ---
 ## 5. 推奨ブートストラップ・プロンプト (AIへの最初の指示)
@@ -450,7 +467,15 @@ def create_report_md(items: List[FileItem], profile_name: str, total_predicted_z
 4.  **総合報告**: 上記を統合し、このプロジェクトが**何をするためのもので、どのような技術的特徴を持っているか**を簡潔に要約してください。
 """
     report_title = "プロジェクト情報" if "gemini" in profile_name else "マニフェストレポート"
-    return f"# 📦 {report_title}\n## 1. 概要\n- 総ファイル数: {stats['total']['files']:,}\n- 総コード行数: {stats['total']['lines']:,}\n## 2. 統計\n{stats_table}\n{''.join(report_lines)}{bootstrap_prompt}"
+    excluded_block = "\n".join(excluded_lines) if excluded_lines else ""
+    return (
+        f"# 📦 {report_title}\n"
+        f"## 1. 概要\n- 総ファイル数: {stats['total']['files']:,}\n- 総コード行数: {stats['total']['lines']:,}\n"
+        f"## 2. 統計\n{stats_table}\n"
+        f"{excluded_block}\n"
+        f"{'\n'.join(report_lines)}"
+        f"{bootstrap_prompt}"
+    )
 
 def create_combined_code(items: List[FileItem], log: LogSink) -> str:
     log.write_header("結合コードを生成中")
@@ -567,6 +592,14 @@ def export_main_generator(
         picked_items, heavy = select_files(items, profile, compression_ratios)
         
         total_raw_bytes = sum(item.size_bytes for item in picked_items)
+        predicted_zip_bytes_sum = 0.0
+        for item in picked_items:
+            base_ratio = compression_ratios[item.path.suffix.lower()]
+            entropy_factor = 1.0 - (abs(item.entropy - 4.5) / 8.0) * 0.4
+            final_ratio = max(0.05, min(0.95, base_ratio * entropy_factor))
+            predicted_zip_bytes = item.size_bytes * final_ratio
+            if isnan(predicted_zip_bytes): predicted_zip_bytes = item.size_bytes
+            predicted_zip_bytes_sum += predicted_zip_bytes
         
         log.write_header(f"ファイル選択結果: {len(picked_items)}件 / 生データ合計 {total_raw_bytes/1024**2:.2f} MB")
         for item in picked_items[:10]: log.write(f"  - (Top) {item.rel_path} (score: {item.score:.2f})")
@@ -619,7 +652,7 @@ def export_main_generator(
             if progress: progress(0.6, desc="コンポーネント生成...")
             chronicle_md = ChronicleGenerator(root).generate()
             combined_code_py = create_combined_code(picked_items, log); yield log.get_full_log()
-            report_md = create_report_md(picked_items, profile_name, 0, None) 
+            report_md = create_report_md(picked_items, profile_name, predicted_zip_bytes_sum, None, heavy) 
             
             if progress: progress(0.8, desc="単一ファイルに結合中...")
             final_md_content = "\n\n---\n\n".join([
@@ -649,9 +682,8 @@ def export_main_generator(
                 zf.writestr("PROJECT_CHRONICLE.md", chronicle_md)
                 zf.writestr("COMBINED_CODE.py", combined_code_py)
                 zf.writestr("README.md", readme_md)
-                zf.writestr("PROJECT_INFO.md", "dummy content")
             actual_zip_mb_pre = zip_path.stat().st_size / 1024**2
-            report_md = create_report_md(picked_items, profile_name, total_raw_bytes, actual_zip_mb_pre)
+            report_md = create_report_md(picked_items, profile_name, predicted_zip_bytes_sum, actual_zip_mb_pre, heavy)
             with zipfile.ZipFile(to_win_long(zip_path), "a", zipfile.ZIP_DEFLATED) as zf:
                 zf.writestr("PROJECT_INFO.md", report_md)
             summary = f"✅ 年代記パッケージのエクスポート完了: {zip_path}"
@@ -673,7 +705,7 @@ def export_main_generator(
                     target_dir.mkdir(parents=True, exist_ok=True)
                     for item in picked_items:
                         dest = target_dir / shorten_path(item.rel_path); dest.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(to_win_long(item.path), to_win_long(dest))
-                report_md = create_report_md(picked_items, profile_name, 0, None)
+                report_md = create_report_md(picked_items, profile_name, predicted_zip_bytes_sum, None, heavy)
                 (target_dir / "MANIFEST_REPORT.md").write_text(report_md, encoding="utf-8")
                 
                 if progress: progress(0.9, desc="ZIPアーカイブ作成中...")
@@ -684,16 +716,8 @@ def export_main_generator(
 
         if zip_path and zip_path.exists():
             actual_zip_mb = zip_path.stat().st_size / 1024**2
-            total_predicted_zip_bytes_final = 0
-            for item in picked_items:
-                base_ratio = compression_ratios[item.path.suffix.lower()]
-                entropy_factor = 1.0 - (abs(item.entropy - 4.5) / 8.0) * 0.4
-                final_ratio = max(0.05, min(0.95, base_ratio * entropy_factor))
-                predicted_zip_bytes = item.size_bytes * final_ratio
-                if isnan(predicted_zip_bytes): predicted_zip_bytes = item.size_bytes
-                total_predicted_zip_bytes_final += predicted_zip_bytes
-            pred_acc = (1 - abs(actual_zip_mb - total_predicted_zip_bytes_final / 1024**2) / (total_predicted_zip_bytes_final / 1024**2)) * 100 if total_predicted_zip_bytes_final > 0 else 100
-            summary += f"\n  - 予測ZIP: {total_predicted_zip_bytes_final/1024**2:.2f} MB / 実際ZIP: {actual_zip_mb:.2f} MB (予測精度: {pred_acc:.1f}%)"
+            pred_acc = (1 - abs(actual_zip_mb - predicted_zip_bytes_sum / 1024**2) / (predicted_zip_bytes_sum / 1024**2)) * 100 if predicted_zip_bytes_sum > 0 else 100
+            summary += f"\n  - 予測ZIP: {predicted_zip_bytes_sum/1024**2:.2f} MB / 実際ZIP: {actual_zip_mb:.2f} MB (予測精度: {pred_acc:.1f}%)"
             update_compression_stats(picked_items, actual_zip_mb, log)
         
         if progress: progress(1.0, desc="完了！")
@@ -829,4 +853,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
