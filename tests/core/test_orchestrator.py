@@ -7,8 +7,32 @@
 #      エージェント連携・エラー回復・設定管理・ワークフロー・統合テスト
 # ==============================================================================
 
+import tempfile
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
+
+
+def build_agent_dependency_mocks() -> dict[str, MagicMock]:
+    """
+    Orchestrator の依存エージェントおよびルーター／パッチ適用者をまとめて作成する。
+    """
+    return {
+        "requirement_agent": MagicMock(),
+        "architect_agent": MagicMock(),
+        "planner_agent": MagicMock(),
+        "coder_agent": MagicMock(),
+        "tester_agent": MagicMock(),
+        "debugger_agent": MagicMock(),
+        "guardian_agent": MagicMock(),
+        "policy_agent": MagicMock(),
+        "postmortem_agent": MagicMock(),
+        "knowledge_curator_agent": MagicMock(),
+        "patch_applier_agent": MagicMock(),
+        "llm_router": MagicMock(),
+    }
+
+
+TEST_PROJECT_PATH = tempfile.mkdtemp(prefix="nexuscore_test_project_")
 
 # インストールされたパッケージ名 'nexuscore' からOrchestratorをインポート
 from nexuscore.core.orchestrator import Orchestrator
@@ -25,109 +49,50 @@ class TestOrchestrator(unittest.TestCase):
         実際の@dataclass構造に対応した引数を提供します。
         """
         try:
-            # モックエージェントオブジェクトを作成
-            mock_architect = MagicMock()
-            mock_planner = MagicMock()
-            mock_coder = MagicMock()
-            mock_tester = MagicMock()
-            mock_debugger = MagicMock()
-            mock_guardian = MagicMock()
-            mock_policy_agent = MagicMock()
-            mock_postmortem_agent = MagicMock()
-            mock_knowledge_curator_agent = MagicMock()
-            
-            # 実際のOrchestratorクラスの@dataclass構造に対応した引数で初期化
+            mock_agents = build_agent_dependency_mocks()
+
             orchestrator = Orchestrator(
-                project_path="/test/project/path",
+                project_path=TEST_PROJECT_PATH,
                 constitution={"description": "Test constitution"},
-                architect=mock_architect,
-                planner=mock_planner,
-                coder=mock_coder,
-                tester=mock_tester,
-                debugger=mock_debugger,
-                guardian=mock_guardian,
-                policy_agent=mock_policy_agent,
-                postmortem_agent=mock_postmortem_agent,
-                knowledge_curator_agent=mock_knowledge_curator_agent
+                **mock_agents
             )
 
             # Orchestratorのインスタンスが正しく作成されたことを確認
             self.assertIsInstance(orchestrator, Orchestrator)
             
             # 引数が正しく設定されていることを確認
-            self.assertEqual(orchestrator.project_path, "/test/project/path")
+            self.assertEqual(orchestrator.project_path, TEST_PROJECT_PATH)
             self.assertEqual(orchestrator.constitution, {"description": "Test constitution"})
             self.assertEqual(orchestrator.max_retries, 5)  # デフォルト値
-            self.assertEqual(orchestrator.max_quality_retries, 3)  # デフォルト値
-            
-            # エージェントオブジェクトが正しく設定されていることを確認
-            self.assertEqual(orchestrator.architect, mock_architect)
-            self.assertEqual(orchestrator.planner, mock_planner)
-            self.assertEqual(orchestrator.coder, mock_coder)
-            self.assertEqual(orchestrator.tester, mock_tester)
-            self.assertEqual(orchestrator.debugger, mock_debugger)
-            self.assertEqual(orchestrator.guardian, mock_guardian)
-            self.assertEqual(orchestrator.policy_agent, mock_policy_agent)
-            self.assertEqual(orchestrator.postmortem_agent, mock_postmortem_agent)
-            self.assertEqual(orchestrator.knowledge_curator_agent, mock_knowledge_curator_agent)
+            self.assertIs(orchestrator.requirement_agent, mock_agents["requirement_agent"])
+            self.assertIs(orchestrator.architect_agent, mock_agents["architect_agent"])
+            self.assertIs(orchestrator.planner_agent, mock_agents["planner_agent"])
+            self.assertIs(orchestrator.coder_agent, mock_agents["coder_agent"])
+            self.assertIs(orchestrator.tester_agent, mock_agents["tester_agent"])
+            self.assertIs(orchestrator.debugger_agent, mock_agents["debugger_agent"])
+            self.assertIs(orchestrator.guardian_agent, mock_agents["guardian_agent"])
+            self.assertIs(orchestrator.policy_agent, mock_agents["policy_agent"])
+            self.assertIs(orchestrator.postmortem_agent, mock_agents["postmortem_agent"])
+            self.assertIs(orchestrator.knowledge_curator_agent, mock_agents["knowledge_curator_agent"])
+            self.assertIs(orchestrator.patch_applier_agent, mock_agents["patch_applier_agent"])
+            self.assertIs(orchestrator.llm_router, mock_agents["llm_router"])
 
         except Exception as e:
             # テスト中に予期せぬ例外が発生した場合は、テストを失敗させる
             self.fail(f"Orchestratorの初期化中に予期せぬ例外が発生しました: {e}")
 
-    @patch('nexuscore.core.orchestrator.GuardianAgent')
-    @patch('nexuscore.core.orchestrator.PostmortemAgent')
-    @patch('nexuscore.core.orchestrator.KnowledgeCuratorAgent')
-    @patch('nexuscore.core.orchestrator.PolicyAgent')
-    @patch('nexuscore.core.orchestrator.DebuggerAgent')
-    @patch('nexuscore.core.orchestrator.CoderAgent')
-    @patch('nexuscore.core.orchestrator.TesterAgent')
-    @patch('nexuscore.core.orchestrator.PlannerAgent')
-    @patch('nexuscore.core.orchestrator.ArchitectAgent')
-    def test_orchestrator_with_factory_pattern(self, mock_architect_class, mock_planner_class,
-                                              mock_tester_class, mock_coder_class, mock_debugger_class,
-                                              mock_policy_class, mock_knowledge_class,
-                                              mock_postmortem_class, mock_guardian_class):
+    def test_orchestrator_with_factory_pattern(self):
         """
         ファクトリーパターンでOrchestratorを作成する場合のテスト。
         エージェントクラスをモックして、実際のインスタンス化をテストします。
         """
-        # モックインスタンスを設定
-        mock_architect_instance = MagicMock()
-        mock_planner_instance = MagicMock()
-        mock_tester_instance = MagicMock()
-        mock_coder_instance = MagicMock()
-        mock_debugger_instance = MagicMock()
-        mock_guardian_instance = MagicMock()
-        mock_policy_instance = MagicMock()
-        mock_postmortem_instance = MagicMock()
-        mock_knowledge_instance = MagicMock()
-
-        # モククラスが適切なインスタンスを返すよう設定
-        mock_architect_class.return_value = mock_architect_instance
-        mock_planner_class.return_value = mock_planner_instance
-        mock_tester_class.return_value = mock_tester_instance
-        mock_coder_class.return_value = mock_coder_instance
-        mock_debugger_class.return_value = mock_debugger_instance
-        mock_guardian_class.return_value = mock_guardian_instance
-        mock_policy_class.return_value = mock_policy_instance
-        mock_postmortem_class.return_value = mock_postmortem_instance
-        mock_knowledge_class.return_value = mock_knowledge_instance
-
         try:
-            # モックされたエージェントクラスを使用してOrchestratorを初期化
+            mock_agents = build_agent_dependency_mocks()
+
             orchestrator = Orchestrator(
-                project_path="/test/project/path",
+                project_path=TEST_PROJECT_PATH,
                 constitution={"description": "Test constitution with mocks"},
-                architect=mock_architect_instance,
-                planner=mock_planner_instance,
-                coder=mock_coder_instance,
-                tester=mock_tester_instance,
-                debugger=mock_debugger_instance,
-                guardian=mock_guardian_instance,
-                policy_agent=mock_policy_instance,
-                postmortem_agent=mock_postmortem_instance,
-                knowledge_curator_agent=mock_knowledge_instance
+                **mock_agents
             )
 
             # Orchestratorのインスタンスが正しく作成されたことを確認
@@ -141,21 +106,10 @@ class TestOrchestrator(unittest.TestCase):
         エージェント間連携ワークフローのテスト（新規追加・カバレッジ向上）。
         """
         try:
-            # モックエージェントの作成
-            mock_agents = {
-                'architect': MagicMock(),
-                'planner': MagicMock(), 
-                'coder': MagicMock(),
-                'tester': MagicMock(),
-                'debugger': MagicMock(),
-                'guardian': MagicMock(),
-                'policy_agent': MagicMock(),
-                'postmortem_agent': MagicMock(),
-                'knowledge_curator_agent': MagicMock()
-            }
+            mock_agents = build_agent_dependency_mocks()
             
             orchestrator = Orchestrator(
-                project_path="/test/project",
+                project_path=TEST_PROJECT_PATH,
                 constitution={"workflow": "coordination_test"},
                 **mock_agents
             )
@@ -189,21 +143,11 @@ class TestOrchestrator(unittest.TestCase):
         """
         try:
             # エージェント失敗をシミュレーション
-            mock_agents = {
-                'architect': MagicMock(),
-                'planner': MagicMock(),
-                'coder': MagicMock(),
-                'tester': MagicMock(),
-                'debugger': MagicMock(),
-                'guardian': MagicMock(),
-                'policy_agent': MagicMock(),
-                'postmortem_agent': MagicMock(),
-                'knowledge_curator_agent': MagicMock()
-            }
+            mock_agents = build_agent_dependency_mocks()
             
             # エラー回復設定でOrchestrator作成
             orchestrator = Orchestrator(
-                project_path="/test/project",
+                project_path=TEST_PROJECT_PATH,
                 constitution={"error_handling": True, "auto_recovery": True},
                 **mock_agents
             )
@@ -242,20 +186,10 @@ class TestOrchestrator(unittest.TestCase):
         動的設定管理機能のテスト（新規追加・カバレッジ向上）。
         """
         try:
-            mock_agents = {
-                'architect': MagicMock(),
-                'planner': MagicMock(),
-                'coder': MagicMock(),
-                'tester': MagicMock(),
-                'debugger': MagicMock(),
-                'guardian': MagicMock(),
-                'policy_agent': MagicMock(),
-                'postmortem_agent': MagicMock(),
-                'knowledge_curator_agent': MagicMock()
-            }
+            mock_agents = build_agent_dependency_mocks()
             
             orchestrator = Orchestrator(
-                project_path="/test/project",
+                project_path=TEST_PROJECT_PATH,
                 constitution={"config_management": True},
                 **mock_agents
             )
@@ -298,20 +232,10 @@ class TestOrchestrator(unittest.TestCase):
         ワークフロー実行機能の詳細テスト（新規追加・カバレッジ向上）。
         """
         try:
-            mock_agents = {
-                'architect': MagicMock(),
-                'planner': MagicMock(),
-                'coder': MagicMock(),
-                'tester': MagicMock(),
-                'debugger': MagicMock(),
-                'guardian': MagicMock(),
-                'policy_agent': MagicMock(),
-                'postmortem_agent': MagicMock(),
-                'knowledge_curator_agent': MagicMock()
-            }
+            mock_agents = build_agent_dependency_mocks()
             
             orchestrator = Orchestrator(
-                project_path="/test/project",
+                project_path=TEST_PROJECT_PATH,
                 constitution={"workflow_enabled": True},
                 **mock_agents
             )
@@ -357,20 +281,10 @@ class TestOrchestrator(unittest.TestCase):
         統合機能のテスト（新規追加・カバレッジ向上）。
         """
         try:
-            mock_agents = {
-                'architect': MagicMock(),
-                'planner': MagicMock(),
-                'coder': MagicMock(),
-                'tester': MagicMock(),
-                'debugger': MagicMock(),
-                'guardian': MagicMock(),
-                'policy_agent': MagicMock(),
-                'postmortem_agent': MagicMock(),
-                'knowledge_curator_agent': MagicMock()
-            }
+            mock_agents = build_agent_dependency_mocks()
             
             orchestrator = Orchestrator(
-                project_path="/test/project",
+                project_path=TEST_PROJECT_PATH,
                 constitution={"integration_enabled": True},
                 **mock_agents
             )

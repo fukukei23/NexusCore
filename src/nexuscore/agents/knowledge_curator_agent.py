@@ -61,17 +61,36 @@ class KnowledgeCuratorAgent:
                 self.logger.debug("Created temporary FKB with new suggestion.")
 
                 # 3. サンドボックス内でDebuggerAgentを初期化
-                debugger = DebuggerAgent(self.api_key, self.model, knowledge_base_path=temp_fkb_path, project_path=sandbox_path)
+                debugger = DebuggerAgent(knowledge_base_path=temp_fkb_path)
                 patcher = PatchApplier()
 
-                # 4. 自己修復を試行
-                # ▼▼▼▼▼ 【最重要修正点】サンドボックス内でテストを再実行するのではなく、元のエラーログを使用 ▼▼▼▼▼
-                files_context = {
-                    "source_file": os.path.join(sandbox_path, os.path.relpath(related_source_path, original_project_path)),
-                    "test_file": os.path.join(sandbox_path, os.path.relpath(failed_test_path, original_project_path))
-                }
-                debug_result = debugger.debug(original_test_output, files_context)
-                # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+                # 4. 自己修復を試行（LLM診断で得たパッチを適用）
+                source_rel = os.path.relpath(related_source_path, original_project_path)
+                test_rel = os.path.relpath(failed_test_path, original_project_path)
+                sandbox_source_path = os.path.join(sandbox_path, source_rel)
+                sandbox_test_path = os.path.join(sandbox_path, test_rel)
+
+                files_content = {}
+                try:
+                    with open(sandbox_source_path, "r", encoding="utf-8") as src_file:
+                        files_content[sandbox_source_path] = src_file.read()
+                except FileNotFoundError:
+                    self.logger.warning("Source file missing in sandbox: %s", sandbox_source_path)
+                try:
+                    with open(sandbox_test_path, "r", encoding="utf-8") as test_file:
+                        files_content[sandbox_test_path] = test_file.read()
+                except FileNotFoundError:
+                    self.logger.warning("Test file missing in sandbox: %s", sandbox_test_path)
+
+                if not files_content:
+                    self.logger.error("No files available for debugging in sandbox. Aborting validation.")
+                    return False
+
+                debug_result = debugger.debug_and_patch(
+                    error_log=original_test_output,
+                    files_content=files_content,
+                    project_path=sandbox_path
+                )
 
                 if not (debug_result and debug_result.get("patch")):
                     self.logger.warning("Validation failed: Debugger did not generate a patch with the new knowledge.")
