@@ -66,44 +66,44 @@ class TestVoiceToTextDeep(unittest.TestCase):
                 # 音声ファイルが存在しない、または異なる仕様の場合は許容
                 pass
 
-    @patch('nexuscore.audio.voice_to_text.whisper')
-    def test_whisper_integration(self, mock_whisper):
+    def test_whisper_integration(self):
         """Whisper統合機能の詳細テスト"""
-        # Whisper モックの設定
-        mock_model = MagicMock()
-        mock_whisper.load_model.return_value = mock_model
-        mock_model.transcribe.return_value = {
-            "text": self.expected_text,
-            "segments": [{"text": self.expected_text, "start": 0.0, "end": 5.0}],
-            "language": "ja"
-        }
-        
-        # Whisper関連機能のテスト
-        whisper_functions = [
-            'whisper_transcribe', 'load_whisper_model', 'whisper_process',
-            'transcribe_with_whisper', 'initialize_whisper'
-        ]
-        
-        for func_name in whisper_functions:
-            if hasattr(voice_to_text, func_name):
-                with self.subTest(function=func_name):
-                    func = getattr(voice_to_text, func_name)
-                    try:
-                        if func_name.startswith('load') or func_name.startswith('initialize'):
-                            result = func()
-                        else:
-                            result = func("test_audio.wav")
-                            
-                        if result:
-                            self.assertTrue(
-                                isinstance(result, (str, dict)) or 
-                                (isinstance(result, dict) and "text" in result)
-                            )
-                            
-                    except Exception:
-                        # Whisper統合でのエラーは許容
-                        pass
+        with patch('nexuscore.audio.voice_to_text.openai') as mock_openai, patch(
+            'builtins.open', mock_open(read_data=b"fake audio data")
+        ):
+            mock_openai.audio.transcriptions.create.return_value = {
+                "text": self.expected_text,
+                "segments": [{"text": self.expected_text, "start": 0.0, "end": 5.0}],
+                "language": "ja",
+            }
 
+            whisper_functions = [
+                'whisper_transcribe',
+                'load_whisper_model',
+                'whisper_process',
+                'transcribe_with_whisper',
+                'initialize_whisper',
+            ]
+
+            for func_name in whisper_functions:
+                if hasattr(voice_to_text, func_name):
+                    with self.subTest(function=func_name):
+                        func = getattr(voice_to_text, func_name)
+                        try:
+                            if func_name.startswith('load') or func_name.startswith('initialize'):
+                                result = func()
+                            else:
+                                result = func("test_audio.wav")
+
+                            if result:
+                                self.assertTrue(
+                                    isinstance(result, (str, dict))
+                                    or (isinstance(result, dict) and "text" in result)
+                                )
+
+                        except Exception:
+                            pass
+        
     def test_audio_file_handling(self):
         """音声ファイル処理機能の完全テスト"""
         # 一時音声ファイルの作成
@@ -197,8 +197,7 @@ class TestVoiceToTextDeep(unittest.TestCase):
                         # モデル管理機能でのエラーは許容
                         pass
 
-    @patch('builtins.open', mock_open(read_data=b"fake audio stream data"))
-    def test_audio_stream_processing(self, mock_file):
+    def test_audio_stream_processing(self):
         """音声ストリーム処理機能のテスト"""
         stream_functions = [
             'process_audio_stream', 'stream_transcribe', 'real_time_transcribe',

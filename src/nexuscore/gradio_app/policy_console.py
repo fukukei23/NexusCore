@@ -113,6 +113,20 @@ TEMPLATES: Dict[str, Any] = {
 }
 
 
+def render_template_profile(name: str, template_key: str = "general") -> Tuple[str, str]:
+    """
+    Returns a tuple of (json_text, status_message) for the requested template.
+    Raises ValueError when name is empty so UI側で明示エラーにできる。
+    """
+    if not name:
+        raise ValueError("プロファイル名を入力してください")
+    tmpl_fn = TEMPLATES.get(template_key, template_general)
+    obj = tmpl_fn(name=name)
+    text = json.dumps(obj, ensure_ascii=False, indent=2)
+    msg = f"テンプレ '{template_key}' から作成。まだ保存していません。"
+    return text, msg
+
+
 # --- ストレージ操作 ---------------------------------------------------------
 def list_profiles() -> List[str]:
     return sorted([p.stem for p in POLICY_DIR.glob("*.json")])
@@ -240,11 +254,16 @@ def build_ui():
         def _new_from_template(name: str, template_key: str):
             if not name:
                 return gr.update(), gr.update(value="プロファイル名を入力してください")
-            tmpl_fn = TEMPLATES.get(template_key, template_general)
-            obj = tmpl_fn(name=name)
-            text = json.dumps(obj, ensure_ascii=False, indent=2)
-            msg = f"テンプレ '{template_key}' から作成。まだ保存していません。"
-            return gr.update(value=text), gr.update(value=msg), gr.update(choices=list_profiles()), gr.update(value=name)
+            try:
+                text, msg = render_template_profile(name, template_key)
+            except ValueError as exc:
+                return gr.update(), gr.update(value=str(exc)), gr.update(), gr.update()
+            return (
+                gr.update(value=text),
+                gr.update(value=msg),
+                gr.update(choices=list_profiles()),
+                gr.update(value=name),
+            )
 
         def _load(name: Optional[str]):
             if not name:

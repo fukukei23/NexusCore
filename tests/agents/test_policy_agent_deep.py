@@ -6,10 +6,10 @@
 # ==============================================================================
 
 import unittest
-import tempfile
 import json
 import os
-from unittest.mock import patch, MagicMock, mock_open
+import tempfile
+from unittest.mock import patch, mock_open
 from nexuscore.agents.policy_agent import PolicyAgent
 
 class TestPolicyAgentDeep(unittest.TestCase):
@@ -17,8 +17,6 @@ class TestPolicyAgentDeep(unittest.TestCase):
     
     def setUp(self):
         """テスト用PolicyAgentの初期設定（修正版）"""
-        self.agent = PolicyAgent(api_key="deep_test_key", model="dummy")
-
         self.test_rules = [
             {
                 "policy_id": "DEEP_TEST_POLICY_001", 
@@ -33,13 +31,19 @@ class TestPolicyAgentDeep(unittest.TestCase):
                 "description": "eval関数の使用禁止"
             }
         ]
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.policy_file = os.path.join(self.temp_dir.name, "rules.json")
+        with open(self.policy_file, "w", encoding="utf-8") as f:
+            json.dump(self.test_rules, f, ensure_ascii=False, indent=2)
+        self.agent = PolicyAgent(policy_rules_path=self.policy_file)
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
 
     def test_policy_agent_initialization(self):
         self.assertIsNotNone(self.agent)
         self.assertIsInstance(self.agent, PolicyAgent)
-        for attr in ['api_key', 'model', 'audit']:
-            self.assertTrue(hasattr(self.agent, attr))
-            self.assertTrue(hasattr(type(self.agent), '__init__'))
+        self.assertTrue(hasattr(self.agent, 'audit'))
 
 
     def test_audit_method_existence_and_structure(self):

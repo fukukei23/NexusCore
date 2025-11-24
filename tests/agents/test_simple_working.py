@@ -14,12 +14,9 @@ class TestSimpleWorking(unittest.TestCase):
     
     def test_config_functionality(self):
         """設定機能の実際のテスト"""
-        import nexuscore.utils.config as config
-        # 実際の関数があるかテスト
-        if hasattr(config, 'load_config'):
-            # スキップではなく実際に実行
-            result = True  # 何らかの実際のテスト
-            self.assertTrue(result)
+        from nexuscore.config.config import config as cfg
+        self.assertTrue(hasattr(cfg, "ROLE_MAX_AUTONOMY"))
+        self.assertIn("user", cfg.ROLE_MAX_AUTONOMY)
     
     def test_file_operations(self):
         """ファイル操作の実際のテスト"""

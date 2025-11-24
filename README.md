@@ -99,6 +99,7 @@ NexusCore/
 - `PYTHONPATH=src .venv/bin/pytest tests/core/test_orchestrator.py`
 - `PYTHONPATH=src .venv/bin/pytest tests/agents/test_policy_agent.py`
 - `PYTHONPATH=src .venv/bin/pytest tests/gradio_app/test_app_ui.py`
+- `rg --files tests/agents` や `coverage run -m pytest tests/agents` / `coverage html` でテストファイルやカバレッジ状況を定期的に可視化すると、どのエージェント層が未テストか把握しやすくなります。
 
 全体のテスト・CI は `PYTHONPATH=src` を忘れずに設定してください。
 
@@ -109,4 +110,10 @@ NexusCore/
 - `.env.template` をコピーして `.env` を作成し、API キーや最大予算などを記入してください。  
 - `output/` 以下にログや自動テスト結果がたまりますので、コミット不要のものは `.gitignore` に入れています。  
 - 大型変更を加えるときは `python -m tools.list_core_files --format json` などで影響範囲を確認しつつ、`tests/` の適切なユニットを更新してください。  
-- 新しい LLM プロバイダ追加時は `src/nexuscore/llm/llm_router.py` に設定を追加し、`src/nexuscore/npe` のポリシーや予算にも反映してください。
+- 新しい LLM プロバイダ追加時は下記フローに従ってください。
+  1. `src/nexuscore/llm/providers/` に `<vendor>_provider.py` を新規作成し、`BaseLLM` を継承したクラスで実装（API キーの `None` 判定と `HTTP_CLIENT_FACTORY` の Session 取得が必須）。
+  2. JSON 整形／スタブ応答には `src/nexuscore/llm/helpers.py` の `_strip_jsonish` / `_stub_response` / `DEFAULT_STUB_CONTENT` を利用し、例外は `self.logger` で `real`/`stub-fallback` のモードを分かるように記録する。
+  3. `src/nexuscore/llm/providers/__init__.py` に新クラスを export し、`src/nexuscore/llm/llm_router.py` の `_make_client()` へファミリ判定を追加する。
+  4. `LLMRouter` のタスクモデルマップ（`TASK_MODEL_MAP_DEFAULT` など）に新モデルを登録した上で、`nexuscore/npe` の budget/policy 設定にもモデル名を加える。
+  5. ランタイム状態の確認には `from nexuscore.llm.runtime import log_runtime_status` を使い、`pytest tests/llm` にプロバイダ用のスタブテスト（API キーなし時の挙動等）を追加する。
+- 2025-11-22 00:51 JST / Version 2.3.5-hotfix 時点で `src/nexuscore/llm/http_client.py` に `HttpClientFactory` を実装し、429/5xx リトライや `requests` 未導入時のスタブ降格処理を一元管理しています。LLM プロバイダを追加／拡張する際はこのモジュールから Session を取得してください。
