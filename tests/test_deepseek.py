@@ -22,7 +22,7 @@ except IndexError:
 
 # --- テスト対象のモジュールをインポート ---
 try:
-    from nexuscore.llm.llm_router import LLMRouter, DeepSeekLLM
+    from nexuscore.llm.llm_router import LLMRouter
 except ImportError as e:
     print(f"モジュールのインポートに失敗しました: {e}")
     print("`src` ディレクトリの構造が正しいか確認してください。")

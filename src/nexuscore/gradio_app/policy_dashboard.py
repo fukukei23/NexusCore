@@ -99,6 +99,90 @@ def _validate_policy(policy: dict) -> t.Tuple[bool, list[str]]:
         errors.append("出力言語 language は 'ja' か 'en' のみをサポートします。")
     return (len(errors) == 0), errors
 
+
+def _safe_int(value: t.Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float(value: t.Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def assemble_policy_payload(
+    org_name: str,
+    owner: str,
+    sector: str,
+    version: str,
+    redline_rows: t.Optional[t.Sequence[t.Sequence[t.Any]]],
+    pii_collect: bool,
+    pii_mask: bool,
+    mask_style: str,
+    storage: str,
+    retention_days: t.Any,
+    out_lang: str,
+    tone: str,
+    cite_req: bool,
+    disclaimer_on: bool,
+    disclaimer_text: str,
+    provider: str,
+    model_name: str,
+    temp: t.Any,
+    max_tokens: t.Any,
+) -> t.Tuple[dict, dict]:
+    redlines = [
+        {
+            "id": row[0],
+            "text": row[1],
+            "severity": row[2] if len(row) > 2 and row[2] else "high",
+        }
+        for row in (redline_rows or [])
+        if len(row) >= 2 and (row[0] or row[1])
+    ]
+    assembled = {
+        "meta": {
+            "org_name": org_name or "",
+            "owner": owner or "",
+            "sector": sector or "general",
+            "last_updated": None,
+            "version": version or "1.0",
+        },
+        "redlines": redlines,
+        "pii_policy": {
+            "collect": bool(pii_collect),
+            "masking": bool(pii_mask),
+            "mask_style": mask_style or "[REDACTED]",
+            "storage": storage or "forbidden",
+            "retention_days": _safe_int(retention_days, 0),
+        },
+        "output_rules": {
+            "language": out_lang or "ja",
+            "tone": tone or "professional",
+            "citations_required": bool(cite_req),
+            "include_disclaimer": bool(disclaimer_on),
+            "disclaimer_text": disclaimer_text or "",
+        },
+        "model_policy": {
+            "provider": provider or "openai",
+            "model": model_name or "gpt-4o-mini",
+            "temperature": _safe_float(temp, 0.2),
+            "max_tokens": _safe_int(max_tokens, 2000),
+        },
+    }
+    return assembled, assembled["meta"]
+
+
+def validation_summary(policy: dict) -> str:
+    ok, errs = _validate_policy(policy)
+    if ok:
+        return "✅ 検証OK（保存可能）"
+    return "⚠️ 検証NG:\n- " + "\n- ".join(errs)
+
 def build_ui():
     policy = _load_policy()
 
@@ -191,49 +275,7 @@ def build_ui():
         ]
 
         def _assemble(*vals):
-            (
-                _org_name, _owner, _sector, _version,
-                _rl_table,
-                _pii_collect, _pii_mask, _mask_style, _storage, _retention,
-                _out_lang, _tone, _cite_req, _disclaimer, _disclaimer_text,
-                _provider, _model, _temp, _max_tokens
-            ) = vals
-
-            assembled = {
-                "meta": {
-                    "org_name": _org_name or "",
-                    "owner": _owner or "",
-                    "sector": _sector or "general",
-                    "last_updated": None,
-                    "version": _version or "1.0",
-                },
-                "redlines": [
-                    {"id": r[0], "text": r[1], "severity": r[2] if len(r) > 2 and r[2] else "high"}
-                    for r in (_rl_table or [])
-                    if (len(r) >= 2 and (r[0] or r[1]))
-                ],
-                "pii_policy": {
-                    "collect": bool(_pii_collect),
-                    "masking": bool(_pii_mask),
-                    "mask_style": _mask_style or "[REDACTED]",
-                    "storage": _storage or "forbidden",
-                    "retention_days": int(_retention or 0)
-                },
-                "output_rules": {
-                    "language": _out_lang or "ja",
-                    "tone": _tone or "professional",
-                    "citations_required": bool(_cite_req),
-                    "include_disclaimer": bool(_disclaimer),
-                    "disclaimer_text": _disclaimer_text or ""
-                },
-                "model_policy": {
-                    "provider": _provider or "openai",
-                    "model": _model or "gpt-4o-mini",
-                    "temperature": float(_temp or 0.2),
-                    "max_tokens": int(_max_tokens or 2000)
-                }
-            }
-            return assembled, assembled["meta"]
+            return assemble_policy_payload(*vals)
 
         for comp in inputs_all:
             comp.change(_assemble, inputs=inputs_all, outputs=[preview_json, meta_preview])
@@ -241,15 +283,8 @@ def build_ui():
         # =====================================================================
         # ボタン動作
         # =====================================================================
-        def _on_validate(assembled: dict):
-            ok, errs = _validate_policy(assembled)
-            if ok:
-                return "✅ 検証OK（保存可能）"
-            else:
-                return "⚠️ 検証NG:\n- " + "\n- ".join(errs)
-
         validate_btn.click(
-            fn=lambda *vals: _on_validate(_assemble(*vals)[0]),
+            fn=lambda *vals: validation_summary(_assemble(*vals)[0]),
             inputs=inputs_all,
             outputs=status_md
         )

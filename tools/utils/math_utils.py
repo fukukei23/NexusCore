@@ -7,8 +7,7 @@
 
 def add(a: int, b: int) -> int:
     """二つの整数を足し合わせる関数。"""
-    # BUG: 本来は a + b であるべきところが a - b になっている
-    return a - b
+    return a + b
 
 def subtract(a: int, b: int) -> int:
     """二つの整数を引き算する関数。"""

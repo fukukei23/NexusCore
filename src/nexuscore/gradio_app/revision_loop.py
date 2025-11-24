@@ -79,7 +79,7 @@ def generate_prompt(main_file, related_files, version_summary, history_summary, 
 # === GPT呼び出しとコード抽出 ===
 def extract_code_and_reason(full_response):
     code_match = re.search(r"```(?:python)?\n(.*?)```", full_response, re.DOTALL)
-    reason_match = re.split(r"```.*?```", full_response, maxsplit=1)
+    reason_match = re.split(r"```.*?```", full_response, maxsplit=1, flags=re.DOTALL)
     code = code_match.group(1).strip() if code_match else ""
     reason = reason_match[1].strip() if len(reason_match) > 1 else ""
     return code, reason

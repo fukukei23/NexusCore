@@ -123,10 +123,7 @@ webapi = [
 ]
 
 # Jupyter 実行
-jupyter = [
-  "jupyter_client>=8.0.0",
-  "ipykernel>=6.0.0"
-]
+jupyter = []
 
 # 翻訳
 translate = [
@@ -135,9 +132,7 @@ translate = [
 
 # 追加 LLM/前処理（重いバックエンドは選択式）
 llm-extra = [
-  "transformers>=4.40.0"
-  # "torch"        # CUDA/ROCm/CPU は環境別 wheel のため任意導入を推奨
-  # "tensorflow"   # 同上（必要時のみ）
+  # 旧 code_interpreter 用の transformers 依存は archive へ移動しました。
 ]
 
 # --- 配布設定（src 配下をパッケージ化） ---
@@ -179,6 +174,19 @@ addopts = [
   "--tb=short",
   "--cov=src",
   "--cov-report=term-missing",
+]
+norecursedirs = [
+  ".git",
+  ".hg",
+  ".mypy_cache",
+  ".pytest_cache",
+  ".venv",
+  "output",
+  "logs",
+  "patch_history",
+  "exports",
+  "codex_history",
+  "sandbox_output",
 ]
 minversion = "7.0"
 
