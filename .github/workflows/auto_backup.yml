@@ -6,13 +6,16 @@ on:
     # 日本時間 2:00 は UTC 17:00
     - cron: "0 17 * * *"
 
+permissions:
+  contents: write
+
 jobs:
   backup:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Commit and push changes
         run: |
