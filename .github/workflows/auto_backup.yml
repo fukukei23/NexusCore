@@ -1,0 +1,24 @@
+name: Daily Backup
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 日本時間 2:00 は UTC 17:00
+    - cron: "0 17 * * *"
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "fukukei23"
+          git config user.email "fukukei4416@gmail.com"
+          git add -A
+          timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+          git commit -m "Auto-backup from GitHub Actions: $timestamp" || echo "No changes to commit"
+          git push
