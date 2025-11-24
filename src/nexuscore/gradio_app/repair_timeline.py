@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 import json
+import os
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 from datetime import datetime, timedelta, timezone
@@ -31,13 +32,16 @@ import gradio as gr
 # ---------- パス ----------
 HERE = Path(__file__).resolve()
 PROJECT_ROOT = HERE.parents[3]
+OUTPUT_ROOT = PROJECT_ROOT / "output"
+OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+PATCH_HISTORY_ROOT = Path(os.getenv("NEXUS_PATCH_HISTORY_ROOT", OUTPUT_ROOT / "patch_history"))
+PATCH_HISTORY_ROOT.mkdir(parents=True, exist_ok=True)
 PATCH_HISTORY_DIRS = [
+    PATCH_HISTORY_ROOT,
     PROJECT_ROOT / "patch_history",
     PROJECT_ROOT / "src" / "patch_history",
     PROJECT_ROOT / "src" / "src" / "nexuscore" / "gradio_app" / "patch_history",
 ]
-for d in PATCH_HISTORY_DIRS:
-    d.mkdir(parents=True, exist_ok=True)
 
 JST = timezone(timedelta(hours=9))
 

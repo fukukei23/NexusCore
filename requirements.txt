@@ -4,7 +4,6 @@
 
 # --- Core AI and Machine Learning ---
 openai
-transformers
 torch
 tensorflow
 google-generativeai  # For Gemini models, missing from previous version
@@ -33,9 +32,6 @@ standard-aifc; python_version < '3.13'
 google-cloud-translate
 
 # --- Code Interpretation & Jupyter ---
-jupyter_client
-ipykernel
-
 # --- Utilities ---
 httpx
 httpcore

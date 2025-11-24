@@ -27,33 +27,36 @@ class TestOrchestratorMega(unittest.TestCase):
         self.assertTrue(hasattr(Orchestrator, '__init__'))
         self.assertTrue(callable(Orchestrator))
     
-    @patch('nexuscore.core.orchestrator.BaseAgent')
-    def test_orchestrator_with_mocked_dependencies(self, mock_base_agent):
+    def test_orchestrator_with_mocked_dependencies(self):
         """モック依存関係でのオーケストレーターテスト"""
         if Orchestrator is None:
             self.skipTest("Orchestratorが利用できません")
-        
-        # 必要な引数をモックで提供
-        mock_args = {
-            'project_path': '/test/path',
-            'constitution': 'test_constitution',
-            'api_key': 'test_key',
-            'model': 'test_model',
-            'workflow': 'test_workflow',
-            'max_agents': 5,
-            'memory_limit': '1GB',
-            'timeout': 300,
-            'debug': False,
-            'verbose': True,
-            'config': {'test': True}
-        }
-        
-        try:
-            orch = Orchestrator(**mock_args)
+
+        from tempfile import TemporaryDirectory
+        from unittest.mock import MagicMock
+
+        with TemporaryDirectory() as tmp:
+            mock_agent = MagicMock()
+            router = MagicMock()
+            router.complete = MagicMock(return_value={"content": ""})
+            orch = Orchestrator(
+                project_path=tmp,
+                constitution={},
+                requirement_agent=mock_agent,
+                architect_agent=mock_agent,
+                planner_agent=mock_agent,
+                coder_agent=mock_agent,
+                tester_agent=mock_agent,
+                debugger_agent=mock_agent,
+                guardian_agent=mock_agent,
+                policy_agent=mock_agent,
+                postmortem_agent=mock_agent,
+                knowledge_curator_agent=mock_agent,
+                patch_applier_agent=mock_agent,
+                llm_router=router,
+            )
             self.assertIsInstance(orch, Orchestrator)
-        except Exception as e:
-            # 引数の問題は許容して、クラスの存在を確認
-            self.assertTrue(True)
+            self.assertTrue(hasattr(orch, "run_full_project"))
 
 if __name__ == '__main__':
     unittest.main()
