@@ -1,0 +1,132 @@
+from __future__ import annotations
+
+import json
+import os
+
+from nexuscore.llm.helpers import DEFAULT_STUB_CONTENT, _real_call_enabled, _strip_jsonish
+
+from .base import BaseLLM
+
+
+class GeminiLLM(BaseLLM):
+    """
+    gemini-2.5-flash / gemini-2.5-pro 等のGoogle/Geminiモデル想定
+    (v2.3.4: Hotfix 3 適用済)
+    """
+
+    def __init__(self, model_name: str):
+        super().__init__(model_name)
+        api_key = os.getenv("GEMINI_API_KEY")
+        self.real_calls = _real_call_enabled(api_key)
+        if self.real_calls:
+            try:
+                import google.generativeai as genai
+
+                genai.configure(api_key=api_key)
+                self.client = "ok"
+                self.logger.info("GeminiLLM initialized in REAL-CALL mode.")
+            except ImportError as e:
+                self.log_error(
+                    "REAL-CALL init failed: 'google-generativeai' not installed",
+                    e,
+                )
+                self.client = None
+                self.real_calls = False
+        else:
+            self.client = None
+            self.logger.info("GeminiLLM initialized in STUB mode (reason: missing key or dry-run).")
+
+    def execute(self, prompt: str, system_prompt: str, **kwargs) -> str:
+        temperature = kwargs.get("temperature", 0.3)
+        as_json = kwargs.get("as_json", False)
+
+        if self.real_calls and self.client:
+            try:
+                import google.generativeai as genai
+
+                model = genai.GenerativeModel(
+                    self.model_name,
+                    system_instruction=system_prompt,
+                )
+            except Exception as e:
+                self.log_error("init failed (system)", e)
+                self.last_call_mode = "stub-fallback"
+                fake = {
+                    "model": self.model_name,
+                    "mode": "gemini-stub-fallback",
+                    "preview": "Init failed. Fallback to stub.",
+                }
+                return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+
+            gen_cfg = {"temperature": float(temperature)}
+            max_out = os.getenv("NEXUS_DEFAULT_MAX_OUT_TOKENS")
+            if max_out:
+                try:
+                    gen_cfg["max_output_tokens"] = int(max_out)
+                except ValueError:
+                    pass
+            gen_cfg["response_mime_type"] = "application/json" if as_json else "text/plain"
+
+            try:
+                resp = model.generate_content(
+                    prompt,
+                    generation_config=gen_cfg,
+                )
+
+                text = ""
+                for cand in getattr(resp, "candidates", []) or []:
+                    parts = getattr(getattr(cand, "content", None), "parts", []) or []
+                    for part in parts:
+                        if hasattr(part, "text") and part.text:
+                            text += part.text
+                if not text:
+                    try:
+                        text = getattr(resp, "text", "") or ""
+                    except Exception:
+                        text = ""
+
+                if not text:
+                    finish_reason = None
+                    try:
+                        finish_reason = getattr(getattr(resp, "candidates", [None])[0], "finish_reason", None)
+                    except Exception:
+                        pass
+                    self.logger.warning(
+                        "Gemini returned no text (finish_reason=%s). Fallback to stub.",
+                        finish_reason,
+                    )
+                    self.last_call_mode = "stub-fallback"
+                    fake = {
+                        "model": self.model_name,
+                        "mode": "gemini-stub-fallback",
+                        "preview": "No text returned (possibly blocked).",
+                        "content": DEFAULT_STUB_CONTENT,
+                    }
+                    return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+
+                self.last_call_mode = "real"
+                return _strip_jsonish(text) if as_json else text
+
+            except Exception as e:
+                self.log_error("REAL-CALL failed", e)
+                self.last_call_mode = "stub-fallback"
+                fake = {
+                    "model": self.model_name,
+                    "mode": "gemini-stub-fallback",
+                    "preview": "Real call failed. Fallback to stub.",
+                    "content": DEFAULT_STUB_CONTENT,
+                }
+                return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+
+        self.last_call_mode = "stub"
+        fake = {
+            "model": self.model_name,
+            "mode": "gemini-stub",
+            "as_json": as_json,
+            "preview": "This is a stubbed Gemini model response.",
+            "content": DEFAULT_STUB_CONTENT,
+        }
+        return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+
+
+__all__ = ["GeminiLLM"]

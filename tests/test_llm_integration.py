@@ -24,9 +24,12 @@ if src_path not in sys.path:
     sys.path.insert(0, src_path)
 
 # --- テスト対象を読み込み ---
-from nexuscore.llm.llm_router import LLMRouter, GeminiLLM, OpenAILLM, LocalLLM, AnthropicLLM
+from nexuscore.llm.llm_router import LLMRouter, RoutedLLM
+from nexuscore.llm.providers.gemini_provider import GeminiLLM
+from nexuscore.llm.providers.openai_provider import OpenAILLM
+from nexuscore.llm.providers.local_provider import LocalLLM
+from nexuscore.llm.providers.anthropic_provider import AnthropicLLM
 from nexuscore.agents.base_agent import BaseAgent
-from nexuscore.llm.llm_router import RoutedLLM
 
 
 # --- テストで使うための仮のエージェント ---

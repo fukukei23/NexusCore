@@ -63,3 +63,20 @@ output/*
 # Log files
 logs/ # ← こちらの行を追加
 # ----------------------------------
+# coverage / テスト結果
+.coverage
+htmlcov/
+
+# ログ
+logs/
+nexus_api_server.log
+
+# バックアップ・エクスポート
+NexusCore_backup.zip
+exports/*.zip
+
+# 一時ファイル
+*.log
+*.tmp
+
+exports/*.json

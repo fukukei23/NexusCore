@@ -122,4 +122,41 @@ class DebuggerAgent(BaseAgent):
 # SOURCE CODE TO FIX: {source_path}
 ```python
 {source_code}
+```
 """
+        try:
+            response = self.execute_llm_task(prompt, as_json=False)
+        except Exception as e:
+            self.logger.error(f"execute_llm_task failed: {e}", exc_info=True)
+            return None
+
+        if not response:
+            return None
+
+        sanitized = response.strip()
+        if sanitized.startswith("```"):
+            sanitized = sanitized.strip("`")
+            if sanitized.lower().startswith("diff"):
+                sanitized = sanitized[4:].strip()
+            elif sanitized.lower().startswith("python"):
+                sanitized = sanitized[6:].strip()
+        return sanitized or None
+
+    def _create_diff(self, original: str, fixed: str, source_path: str, project_path: str) -> str:
+        """
+        Unified diff を生成。プロジェクトルートからの相対パスを利用する。
+        """
+        try:
+            rel_path = os.path.relpath(source_path, project_path)
+        except Exception:
+            rel_path = source_path
+
+        original_lines = original.splitlines(keepends=True)
+        fixed_lines = fixed.splitlines(keepends=True)
+        diff = difflib.unified_diff(
+            original_lines,
+            fixed_lines,
+            fromfile=f"a/{rel_path}",
+            tofile=f"b/{rel_path}",
+        )
+        return "".join(diff)
