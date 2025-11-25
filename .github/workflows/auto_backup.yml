@@ -12,16 +12,34 @@ permissions:
 jobs:
   backup:
     runs-on: ubuntu-latest
+    env:
+      BACKUP_BRANCH: main
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # push には履歴が必要になるケースがあるため
 
-      - name: Commit and push changes
+      - name: Configure git
         run: |
           git config user.name "fukukei23"
           git config user.email "fukukei4416@gmail.com"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+      - name: Detect changes
+        id: changes
+        run: |
           git add -A
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push changes
+        if: steps.changes.outputs.changed == 'true'
+        run: |
           timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-          git commit -m "Auto-backup from GitHub Actions: $timestamp" || echo "No changes to commit"
-          git push
+          git commit -m "Auto-backup from GitHub Actions: $timestamp"
+          git push origin HEAD:${BACKUP_BRANCH}
