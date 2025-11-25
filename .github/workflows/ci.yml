@@ -12,6 +12,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: dummy-key-for-tests  # avoid import-time errors when tests instantiate OpenAI clients
 
     strategy:
       matrix:
