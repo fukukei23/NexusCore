@@ -7,7 +7,7 @@
 # ==============================================================================
 
 from typing import Dict, List, Any
-from pathlib import Path
+import sys
 
 try:
     import networkx as nx
@@ -18,14 +18,12 @@ except ImportError:
 from nexuscore.analyzer.unified_analyzer import AnalysisResult
 
 class DependencyGraphBuilder:
-    """
-    複数のファイルの解析結果から、単一の依存関係グラフを構築するクラス。
-    """
+    """複数ファイルの解析結果から依存関係グラフを構築する。"""
     def __init__(self):
         if not nx:
             raise ImportError("networkx is required for graph building.")
         self.graph = nx.DiGraph()
-        self.definitions = {} # {symbol_name: full_node_id}
+        self.definitions: Dict[str, List[str]] = {}  # {symbol_name: full_node_id list}
 
     def build(self, results: List[AnalysisResult]) -> nx.DiGraph:
         """
@@ -39,12 +37,13 @@ class DependencyGraphBuilder:
         """
         # --- ステップ1: すべての定義をスキャンし、ノードとしてグラフに追加 ---
         for result in results:
-            if not result.success or 'semantic_info' not in result.data:
+            result_dict = result.to_dict()
+            if not result_dict.get("success") or 'semantic_info' not in result_dict:
                 continue
-            
-            file_path = result['file_path']
-            definitions = result['semantic_info'].get('definitions', [])
-            
+            file_path = result_dict.get('file_path')
+            semantic_info = result_dict.get('semantic_info', {}) or {}
+            definitions = semantic_info.get('definitions', [])
+
             for definition in definitions:
                 symbol_name = definition['name']
                 symbol_type = definition['type']
@@ -60,11 +59,13 @@ class DependencyGraphBuilder:
 
         # --- ステップ2: すべての呼び出しをスキャンし、エッジとしてグラフに追加 ---
         for result in results:
-            if not result.success or 'semantic_info' not in result.data:
+            result_dict = result.to_dict()
+            if not result_dict.get("success") or 'semantic_info' not in result_dict:
                 continue
 
-            file_path = result['file_path']
-            calls = result['semantic_info'].get('calls', [])
+            file_path = result_dict.get('file_path')
+            semantic_info = result_dict.get('semantic_info', {}) or {}
+            calls = semantic_info.get('calls', [])
 
             for call in calls:
                 caller_scope = call['scope']
