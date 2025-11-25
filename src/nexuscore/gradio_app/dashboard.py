@@ -46,6 +46,7 @@ OUTPUT_ROOT = PROJECT_ROOT / "output"
 OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 PATCH_HISTORY_ROOT = Path(os.getenv("NEXUS_PATCH_HISTORY_ROOT", OUTPUT_ROOT / "patch_history"))
 PATCH_HISTORY_ROOT.mkdir(parents=True, exist_ok=True)
+# Runner/repair_timeline と揃え、最初に見つかったディレクトリを優先的に集計する想定。
 PATCH_HISTORY_DIRS = [
     PATCH_HISTORY_ROOT,
     PROJECT_ROOT / "patch_history",
@@ -69,6 +70,7 @@ def _read_json(f: Path) -> Dict[str, Any]:
         return {}
 
 def _collect_files() -> List[Path]:
+    """patch_history ディレクトリを探索し、patch_*.json を新しい順に返す。"""
     files: List[Path] = []
     for d in PATCH_HISTORY_DIRS:
         if d.exists():
@@ -76,6 +78,7 @@ def _collect_files() -> List[Path]:
     return sorted(files, key=lambda p: p.stem, reverse=True)
 
 def _load_items(limit: int | None, date_filter: str) -> List[Dict[str, Any]]:
+    """ファイル群からフィルタを適用し、タイムラインエントリを返す。"""
     files = _collect_files()
     if limit:
         files = files[:limit]
@@ -119,6 +122,7 @@ def _categorize(text: str) -> str:
 
 # ====== 集計 ===================================================================
 def _metrics(items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """集計メトリクス。戻り値は dashboard/repair_timeline で共有する dict 構造。"""
     total = len(items)
     success = sum(1 for x in items if (x.get("status") or "").startswith("success"))
     attempts = sum(1 for x in items if (x.get("status") or "").startswith("attempt"))
@@ -289,8 +293,12 @@ def build_ui():
 
             return kpi_md, fig_cat, fig_day, rows, src_text
 
+        def _initial_load(range_sel_value: str):
+            """起動時の一度だけ呼ぶ初期ロードラッパ。挙動は従来と同じ。"""
+            return _load(range_sel_value)
+
         # 初回ロード
-        kpi_text, fc, fd, rows, src_text = _load(range_sel.value)
+        kpi_text, fc, fd, rows, src_text = _initial_load(range_sel.value)
         kpi.value = kpi_text
         cat_plot.value = fc
         day_plot.value = fd

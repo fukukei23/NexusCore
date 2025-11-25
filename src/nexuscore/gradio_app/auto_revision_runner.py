@@ -108,6 +108,7 @@ def _import_revision_tab():
     """
     既存の revision_tab.py / revision_loop.py / streamlit_migrated_tab.py 等から
     実在する関数を**可能な限り**拾って使う。
+    優先順を comments で残すことで、API 互換を守りやすくする。
     """
     candidates = [
         "src.nexuscore.gradio_app.revision_tab",
@@ -125,6 +126,15 @@ def _import_revision_tab():
 
 RT = _import_revision_tab()
 
+# ---------- ステータス定数（保存値の仕様を明示） ------------------------------
+STATUS_INITIAL = "initial_pass"
+STATUS_SUCCESS = "success"
+STATUS_ATTEMPT_ERROR = "attempt_error"
+
+def _status_attempt(i: int) -> str:
+    """attempt ステータスを一元生成（例: attempt_3/5）。"""
+    return f"attempt_{i}/5"
+
 def _coerce_bool_log(ret: Any) -> Tuple[bool, str]:
     """戻り値が (bool,str) でなくても無理なく解釈する小ヘルパ"""
     if isinstance(ret, tuple) and len(ret) >= 2 and isinstance(ret[0], bool):
@@ -136,6 +146,7 @@ def _coerce_bool_log(ret: Any) -> Tuple[bool, str]:
 def run_pytest_once() -> Tuple[bool, str]:
     """
     既存の API を最大限利用。見つからなければ subprocess で pytest を実行。
+    RT(run tab) 側の run_pytest/run_tests/run_test を優先的に呼び出す。
     """
     # 1) revision_tab に run_pytest/ run_tests 的なものがあるか探す
     if RT is not None:
@@ -287,90 +298,93 @@ def main():
     # 初期スナップショット
     snap_before = snapshot_sandbox_files()
 
-    # 1) 初回 pytest
-    ok, log = run_pytest_once()
-    ts = now_tag()
-    attempts = 0
+    def _run_initial_pytest(policy_ctx: Dict[str, str]) -> Tuple[bool, str]:
+        """初回 pytest を実行し、成功なら記録して終了フラグを返す。"""
+        ok, log = run_pytest_once()
+        ts = now_tag()
+        attempts = 0
 
-    if ok:
-        diff_text = build_unified_diff(snap_before, snapshot_sandbox_files())
-        write_patch_json(
-            timestamp=ts,
-            status="initial_pass",
-            reason="Initial tests passed",
-            test_log=log,
-            code_diff=diff_text,
-            policy=policy,
-            attempts=attempts,
-        )
-        write_legacy_log(ts, log)
-        append_legacy_history_line("initial_pass", "Initial tests passed")
-        print("[AutoRevision] ✅ Tests passed successfully. No repair needed.")
-        return
-
-    # 2) 自己修復ループ（最大5回）
-    prev_log = log
-    for i in range(1, 6):
-        attempts = i
-        print(f"[AutoRevision] --- Attempt {i}/5 ---")
-        try:
-            # 直前スナップショット
-            snap_mid = snapshot_sandbox_files()
-
-            ok2, log2, changes = attempt_auto_fix(prev_log)
-
-            # 変更が dict で返ってきた場合はファイルへ反映（diff生成のため）
-            if isinstance(changes, dict) and changes:
-                for rel, content in changes.items():
-                    # 最初に見つかった sandbox に書く（無ければ PROJECT_ROOT 側）
-                    target_dir = SANDBOX_DIRS[0]
-                    target_dir.mkdir(parents=True, exist_ok=True)
-                    (target_dir / rel).parent.mkdir(parents=True, exist_ok=True)
-                    (target_dir / rel).write_text(content, encoding="utf-8")
-
-            # diff は attempt 時点の差分を採取
-            snap_after = snapshot_sandbox_files()
-            diff_text = build_unified_diff(snap_mid, snap_after)
-
-            status = "success" if ok2 else f"attempt_{i}/5"
-            reason = "Auto-fix success" if ok2 else "Auto-fix attempt"
-            ts = now_tag()
-
+        if ok:
+            diff_text = build_unified_diff(snap_before, snapshot_sandbox_files())
             write_patch_json(
                 timestamp=ts,
-                status=status,
-                reason=reason,
-                test_log=log2,
+                status=STATUS_INITIAL,
+                reason="Initial tests passed",
+                test_log=log,
                 code_diff=diff_text,
-                policy=policy,
+                policy=policy_ctx,
                 attempts=attempts,
             )
-            write_legacy_log(ts, log2)
-            append_legacy_history_line(status, reason)
+            write_legacy_log(ts, log)
+            append_legacy_history_line(STATUS_INITIAL, "Initial tests passed")
+            print("[AutoRevision] ✅ Tests passed successfully. No repair needed.")
+            return True, log
+        return False, log
 
-            if ok2:
-                print("[AutoRevision] ✅ Repair complete.")
-                return
+    def _run_auto_fix_loop(policy_ctx: Dict[str, str], prev_log: str) -> None:
+        """自己修復ループ（最大5回）。挙動は従来通り。"""
+        for i in range(1, 6):
+            attempts = i
+            print(f"[AutoRevision] --- Attempt {i}/5 ---")
+            try:
+                snap_mid = snapshot_sandbox_files()
 
-            prev_log = log2
+                ok2, log2, changes = attempt_auto_fix(prev_log)
 
-        except Exception as e:
-            ts = now_tag()
-            tb = traceback.format_exc()
-            write_patch_json(
-                timestamp=ts,
-                status="attempt_error",
-                reason=f"Exception: {e}",
-                test_log=tb,
-                code_diff="",
-                policy=policy,
-                attempts=attempts,
-            )
-            write_legacy_log(ts, tb)
-            append_legacy_history_line("attempt_error", f"Exception: {e}")
-            print("[AutoRevision] ❌ Exception during attempt:", e)
+                if isinstance(changes, dict) and changes:
+                    for rel, content in changes.items():
+                        target_dir = SANDBOX_DIRS[0]
+                        target_dir.mkdir(parents=True, exist_ok=True)
+                        (target_dir / rel).parent.mkdir(parents=True, exist_ok=True)
+                        (target_dir / rel).write_text(content, encoding="utf-8")
 
-    print("[AutoRevision] done (max attempts reached)")
+                snap_after = snapshot_sandbox_files()
+                diff_text = build_unified_diff(snap_mid, snap_after)
+
+                status = STATUS_SUCCESS if ok2 else _status_attempt(i)
+                reason = "Auto-fix success" if ok2 else "Auto-fix attempt"
+                ts = now_tag()
+
+                write_patch_json(
+                    timestamp=ts,
+                    status=status,
+                    reason=reason,
+                    test_log=log2,
+                    code_diff=diff_text,
+                    policy=policy_ctx,
+                    attempts=attempts,
+                )
+                write_legacy_log(ts, log2)
+                append_legacy_history_line(status, reason)
+
+                if ok2:
+                    print("[AutoRevision] ✅ Repair complete.")
+                    return
+
+                prev_log = log2
+
+            except Exception as e:
+                ts = now_tag()
+                tb = traceback.format_exc()
+                write_patch_json(
+                    timestamp=ts,
+                    status=STATUS_ATTEMPT_ERROR,
+                    reason=f"Exception: {e}",
+                    test_log=tb,
+                    code_diff="",
+                    policy=policy_ctx,
+                    attempts=attempts,
+                )
+                write_legacy_log(ts, tb)
+                append_legacy_history_line(STATUS_ATTEMPT_ERROR, f"Exception: {e}")
+                print("[AutoRevision] ❌ Exception during attempt:", e)
+
+        print("[AutoRevision] done (max attempts reached)")
+
+    ok, log = _run_initial_pytest(policy)
+    if ok:
+        return
+    _run_auto_fix_loop(policy, log)
 
 if __name__ == "__main__":
     main()
