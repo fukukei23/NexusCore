@@ -22,16 +22,21 @@ import uuid
 from flask import Flask, request, jsonify
 
 # --- パス設定 ---
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-SRC_PATH = os.path.join(PROJECT_ROOT, "src")
+# WSL/Windows 混在環境で main_cli.py と同等の import パスを保証する暫定措置。
+try:
+    PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+    SRC_PATH = os.path.join(PROJECT_ROOT, "src")
 
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-if SRC_PATH not in sys.path:
-    sys.path.insert(0, SRC_PATH)
+    if PROJECT_ROOT not in sys.path:
+        sys.path.insert(0, PROJECT_ROOT)
+    if SRC_PATH not in sys.path:
+        sys.path.insert(0, SRC_PATH)
+except Exception as exc:
+    logging.warning("Failed to configure import paths for API server: %s", exc)
 
 # --- NexusCoreのコンポーネントをインポート ---
 from nexuscore.core.orchestrator import Orchestrator
+# 将来的には orchestrator.assemble_agent_team の利用も検討（挙動互換のため現状は個別生成）。
 from nexuscore.agents.architect_agent import ArchitectAgent
 from nexuscore.agents.planner_agent import PlannerAgent
 from nexuscore.agents.coder_agent import CoderAgent
@@ -70,7 +75,7 @@ def run_orchestrator_task(task_id: str, requirement: str, project_path: str, con
     """Orchestratorをバックグラウンドで実行するワーカー関数"""
     logger.info(f"Starting background task: {task_id}")
     tasks[task_id] = {"status": "running", "message": "Initializing agents..."}
-    
+
     try:
         # --- 1. 近代化されたエージェントの招集 (引数なし) ---
         architect_agent = ArchitectAgent()
@@ -130,13 +135,13 @@ def run_orchestrator_task(task_id: str, requirement: str, project_path: str, con
 
     except Exception as e:
         logger.critical(f"An error occurred in task {task_id}: {e}", exc_info=True)
-        tasks[task_id] = {"status": "error", "message": str(e)}
+        tasks[task_id] = {"status": "error", "message": f"orchestrator failed: {e}"}
 
 @app.route('/api/v1/execute', methods=['POST'])
 def execute_task():
     data = request.json
     if not data or 'requirement' not in data or 'project_path' not in data:
-        return jsonify({"error": "Missing 'requirement' or 'project_path' in request body"}), 400
+        return jsonify({"error": "Missing 'requirement' or 'project_path' in request body", "error_code": "MISSING_FIELD"}), 400
 
     task_id = str(uuid.uuid4())
     requirement = data['requirement']
@@ -169,4 +174,3 @@ def get_task_status(task_id):
 if __name__ == '__main__':
     logger.info("Starting NexusCore API Server...")
     app.run(host='0.0.0.0', port=5001, debug=True, use_reloader=False)
-

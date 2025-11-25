@@ -55,6 +55,7 @@ CONFIG = {
     'supported_languages': { '.py': 'python', '.js': 'javascript', }
 }
 def setup_logging(log_level=logging.INFO):
+    """CONFIG の log_level を用いたシンプルなロガー初期化ヘルパー。"""
     logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s', stream=sys.stdout)
     return logging.getLogger("NexusCoreAnalyzer")
 logger = setup_logging(CONFIG['log_level'])
@@ -110,7 +111,10 @@ class TreeSitterEngine:
             return AnalysisResult(success=False, error=str(e), file_path=file_path)
 
     def _extract_semantic_info(self, language: str, root_node: Node) -> Dict[str, Any]:
-        """マルチキャプチャ・クエリと手動探索フォールバックを組み合わせた最終版ロジック"""
+        """マルチキャプチャ・クエリと手動探索フォールバックを組み合わせた解析ロジック。
+
+        Query 失敗時（言語 pack 不整合やクエリ構文エラーなど）は manual パスにフォールバックする。
+        """
         info = defaultdict(list)
         
         query_string = """
@@ -150,7 +154,7 @@ class TreeSitterEngine:
                     scope_name = self._find_scope_name(call_node)
                     info['calls'].append({'name': call_name, 'type': 'call', 'line': call_node.start_point[0] + 1, 'scope': scope_name})
         except Exception as e:
-            # フォールバックパス: 堅牢な手動探索
+            # フォールバックパス: 堅牢な手動探索。言語 pack 不整合や Query 構文エラーに備える。
             logger.warning(f"Query failed in {language}: {e}. Falling back to manual extraction.")
             self._manual_extract(root_node, info)
             
@@ -178,7 +182,7 @@ class TreeSitterEngine:
         return "global"
 
     def _manual_extract(self, node: Node, info: defaultdict):
-        """手動での情報抽出（フォールバック用）"""
+        """手動での情報抽出（フォールバック用）。info は definitions/calls のリストを持つ dict。"""
         if node.type in ['function_definition', 'class_definition']:
             name_node = node.child_by_field_name('name')
             if name_node:
@@ -192,6 +196,7 @@ class TreeSitterEngine:
                     call_name = name_node.text.decode('utf8')
                     if call_name not in class_names:
                         info['calls'].append({'name': call_name, 'type': 'call', 'line': node.start_point[0] + 1, 'scope': self._find_scope_name(node)})
+        # TODO: 他の構文要素の抽出は必要に応じて拡張する
         for child in node.children:
             self._manual_extract(child, info)
 
@@ -222,5 +227,5 @@ def analyze_python_file(file_path):
         return {"error": f"Failed to read file: {e}", "success": False}
 
 if __name__ == '__main__':
-    # (CLI実行部分は省略し、テスト実行を推奨)
+    # このモジュールはライブラリ利用を想定。CLI は別エントリポイント推奨。
     print("This module is intended to be used as a library. For CLI, use the main entry point.")

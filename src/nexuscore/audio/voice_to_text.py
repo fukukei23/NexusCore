@@ -45,9 +45,33 @@ _DEFAULT_CONFIG: Dict[str, Union[str, int]] = {
 _AUDIO_CONFIG: Dict[str, Union[str, int]] = dict(_DEFAULT_CONFIG)
 _MODEL_STATE = {"initialized": False, "loaded": False}
 
+
+def _update_audio_config(config: Dict[str, Union[str, int]]) -> Dict[str, Union[str, int]]:
+    """内部設定を書き換えてコピーを返す（直接の外部参照を避ける）。"""
+    _AUDIO_CONFIG.update(config)
+    return dict(_AUDIO_CONFIG)
+
+
+def _reset_audio_config() -> Dict[str, Union[str, int]]:
+    """内部設定をデフォルトに戻す。"""
+    _AUDIO_CONFIG.update(_DEFAULT_CONFIG)
+    return dict(_AUDIO_CONFIG)
+
+
+def _set_model_state_flag(key: str, value: bool) -> None:
+    """モデル状態フラグの更新を一箇所にまとめる。"""
+    _MODEL_STATE[key] = value
+
+
+def _reset_model_state() -> None:
+    """モデル状態を初期状態に戻す。"""
+    _MODEL_STATE.update({"initialized": False, "loaded": False})
+
+
 _translate_client: Optional["google_translate.Client"] = None
 _whisper_client: Optional["WhisperClient"] = None
 
+# NOTE: 下記には内部ユーティリティも含まれるが、後方互換のため __all__ からは削除しない。
 __all__ = [
     "record_until_keypress",
     "transcribe",
@@ -106,6 +130,7 @@ class WhisperClient:
 
     @property
     def ready(self) -> bool:
+        """APIキーが設定されているかどうかを返す。"""
         return bool(self.api_key)
 
     def transcribe_file(self, audio_path: str, *, language: Optional[str] = None) -> Optional[str]:
@@ -122,12 +147,13 @@ class WhisperClient:
                     response_format="text",
                 )
         except Exception as exc:  # pragma: no cover - runtime failure path
-            logger.error("Whisper transcription に失敗しました: %s", exc)
+            logger.error("Whisper transcription に失敗しました: %s (%r)", exc, exc)
             return None
         return response
 
 
 def _get_whisper_client() -> WhisperClient:
+    """Whisper クライアントを遅延初期化し、設定が無ければデフォルトで返す。"""
     global _whisper_client
     if _whisper_client is None:
         _whisper_client = WhisperClient()
@@ -135,6 +161,7 @@ def _get_whisper_client() -> WhisperClient:
 
 
 def _get_translate_client() -> Optional["google_translate.Client"]:
+    """翻訳クライアントを遅延初期化し、失敗時はログを残して None を返す。"""
     global _translate_client
     if _translate_client is not None:
         return _translate_client
@@ -335,7 +362,7 @@ def cleanup() -> bool:
 
 
 def release_resources() -> bool:
-    _MODEL_STATE.update({"initialized": False, "loaded": False})
+    _reset_model_state()
     return True
 
 
@@ -356,17 +383,17 @@ def reset_session() -> bool:
 
 
 def initialize_model() -> bool:
-    _MODEL_STATE["initialized"] = True
+    _set_model_state_flag("initialized", True)
     return True
 
 
 def load_model() -> bool:
-    _MODEL_STATE["loaded"] = True
+    _set_model_state_flag("loaded", True)
     return True
 
 
 def unload_model() -> bool:
-    _MODEL_STATE["loaded"] = False
+    _set_model_state_flag("loaded", False)
     return True
 
 
@@ -377,12 +404,11 @@ def get_model_info() -> Dict[str, Union[str, int, bool]]:
 
 
 def set_model_config(config: Dict[str, Union[str, int]]) -> Dict[str, Union[str, int]]:
-    _AUDIO_CONFIG.update(config)
-    return dict(_AUDIO_CONFIG)
+    return _update_audio_config(config)
 
 
 def reset_model() -> bool:
-    _AUDIO_CONFIG.update(_DEFAULT_CONFIG)
+    _reset_audio_config()
     release_resources()
     return True
 
@@ -424,11 +450,11 @@ def update_settings(config: Dict[str, Union[str, int]]) -> Dict[str, Union[str, 
 
 
 def reset_config() -> Dict[str, Union[str, int]]:
-    _AUDIO_CONFIG.update(_DEFAULT_CONFIG)
-    return dict(_AUDIO_CONFIG)
+    return _reset_audio_config()
 
 
 def detect_language(text: Optional[str]) -> Optional[str]:
+    """Detect language using langdetect or google translate client."""
     if not text:
         return None
     if langdetect:
@@ -452,6 +478,7 @@ def detect_language(text: Optional[str]) -> Optional[str]:
 
 
 def translate_text(text: Optional[str], target_lang: Optional[str] = None) -> Optional[str]:
+    """Translate text to target language when client is available."""
     if not text:
         return text
     client = _get_translate_client()
@@ -469,6 +496,7 @@ def translate_text(text: Optional[str], target_lang: Optional[str] = None) -> Op
 
 
 def multi_language_support(text: str, target_lang: Optional[str] = None) -> Optional[str]:
+    """Detect and translate text when必要; 同一言語ならそのまま返す。"""
     detected = detect_language(text)
     target = target_lang or _AUDIO_CONFIG["language"]
     if detected and detected == target:

@@ -124,7 +124,7 @@ class Orchestrator:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.INFO)
 
-        # 重複ハンドラ防止
+        # 重複ハンドラ防止: 複数インスタンス生成時にもハンドラが多重登録されないようにする。
         if not self.logger.handlers:
             log_path = os.path.join(log_dir, f"orchestrator_{int(time.time())}.log")
             fh = logging.FileHandler(log_path, encoding="utf-8")
@@ -147,6 +147,9 @@ class Orchestrator:
         """
         最新 NPE 仕様に基づき、guarded_llm_call() 経由で LLMRouter を呼び出す。
         - 予算ガード / ログ / ポリシーは NPE 側の engine/budget/logger/policies に委譲。
+        - metadata['task_type'] に応じて llm_router.task_model_map を選択する。
+        - guarded_llm_call は dict を返す想定で、その content を抽出する（文字列の場合はそのまま）。
+        - metadata['as_json'] が True の場合はシステムプロンプトが JSON 指向になる前提で、将来拡張も想定。
         """
         task_type = metadata.get("task_type") or "generic"
         self.logger.info(f"[NPE] Delegating task '{task_type}' to guarded_llm_call().")
@@ -192,7 +195,7 @@ class Orchestrator:
         task_id = uuid.uuid4().hex
 
         # --------------------------------------------------------------
-        # Phase 1: Requirement Definition
+        # Phase 1: Requirement Definition (domain layer)
         # --------------------------------------------------------------
         self.logger.info(f"[{task_id}] Phase 1: Requirement Definition")
         specs: Dict[str, Any] = {}
@@ -215,7 +218,7 @@ class Orchestrator:
             return
 
         # --------------------------------------------------------------
-        # Phase 2: Planning / Coding / Testing (Fast-Lane 対応)
+        # Phase 2: Planning / Coding / Testing (application layer: plan + code + tests)
         # --------------------------------------------------------------
         self.logger.info(f"[{task_id}] Phase 2: Planning (fast_lane={fast_lane})")
         plan: Dict[str, Any] = {}
@@ -288,7 +291,7 @@ class Orchestrator:
             plan = {"error": str(e), "raw_specs": specs}
 
         # --------------------------------------------------------------
-        # Phase 3 以降は将来拡張用のフック
+        # Phase 3 以降は将来拡張用のフック (review/postmortem/integration)
         # --------------------------------------------------------------
         tasks = plan.get("functions_to_implement", []) if isinstance(plan, dict) else []
         self.logger.info(f"[{task_id}] Phase 3: Development Cycle (tasks={len(tasks)})")
@@ -369,6 +372,7 @@ class Orchestrator:
 def assemble_agent_team(project_path: str) -> Dict[str, Any]:
     """
     ハイブリッド・アーキテクチャに基づき、Orchestrator に渡すエージェント群と LLMRouter を生成する。
+    API サーバ等の外部エントリポイントからも再利用され得るデフォルトのチーム編成。
 
     戻り値:
         {
