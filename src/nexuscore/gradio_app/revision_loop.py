@@ -6,12 +6,30 @@ import json
 import re
 import subprocess
 from datetime import datetime
-from openai import OpenAI
+from typing import Optional
 from dotenv import load_dotenv
+
+try:
+    from openai import OpenAI
+except Exception:  # pragma: no cover - when openai is missing
+    OpenAI = None  # type: ignore
 
 # === 設定と初期化 ===
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+_client: Optional["OpenAI"] = None
+
+def get_client() -> "OpenAI":
+    """Lazy-load OpenAI client to avoid import時のAPIキー不足で落ちるのを防ぐ。"""
+    global _client
+    if _client is not None:
+        return _client
+    if OpenAI is None:
+        raise RuntimeError("openai SDK is not installed. Please install `openai`.")
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set. Provide it via env or .env file.")
+    _client = OpenAI(api_key=api_key)
+    return _client
 
 # === パス設定 ===
 SANDBOX_DIR = "../sandbox_output"
@@ -85,10 +103,9 @@ def extract_code_and_reason(full_response):
     return code, reason
 
 def call_gpt(prompt):
+    client = get_client()
     response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
+        model="gpt-4", messages=[{"role": "user", "content": prompt}], temperature=0
     )
     return response.choices[0].message.content.strip()
 
