@@ -23,12 +23,15 @@ fastapi
 uvicorn
 websockets
 streamlit
+Flask
+matplotlib
 
 # --- Audio Processing ---
 SpeechRecognition
 pydub
 sounddevice
 standard-aifc; python_version < '3.13'
+patch  # library used by patch_applier
 
 # --- Translation ---
 google-cloud-translate
