@@ -6,7 +6,7 @@
 openai
 # CPU-only PyTorch to avoid pulling large CUDA dependencies in CI
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.1.0+cpu
+torch==2.2.2+cpu
 tensorflow
 google-generativeai  # For Gemini models, missing from previous version
 scipy                # For audio processing, missing from previous version
