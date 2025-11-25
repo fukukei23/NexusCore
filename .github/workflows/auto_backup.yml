@@ -21,6 +21,9 @@ jobs:
         with:
           fetch-depth: 0  # push には履歴が必要になるケースがあるため
 
+      - name: Mark workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Configure git
         run: |
           git config user.name "fukukei23"
