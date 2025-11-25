@@ -13,7 +13,7 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     env:
-      BACKUP_BRANCH: main
+      BACKUP_BRANCH: backup
 
     steps:
       - name: Checkout repository
