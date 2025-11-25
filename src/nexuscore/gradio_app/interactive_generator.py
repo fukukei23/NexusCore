@@ -4,14 +4,26 @@ import os
 import re
 import difflib
 import subprocess
+from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple, List
 from dotenv import load_dotenv
 
 try:
     from openai import OpenAI
 except Exception:  # pragma: no cover - openai missing
     OpenAI = None  # type: ignore
+
+# パスはプロジェクトルート基準に統一（他UIと同様の sandbox/logs を想定）
+HERE = Path(__file__).resolve()
+PROJECT_ROOT = HERE.parents[3]
+SANDBOX_DIR = PROJECT_ROOT / "sandbox_output"
+LOG_DIR = PROJECT_ROOT / "logs"
+DEFAULT_OUTPUT_DIR = SANDBOX_DIR
+DEFAULT_FILENAME = "sample.py"
+LOG_FILE = LOG_DIR / "save_log.txt"
+SANDBOX_DIR.mkdir(parents=True, exist_ok=True)
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 load_dotenv()
 _client: Optional["OpenAI"] = None
@@ -31,14 +43,9 @@ def get_client() -> "OpenAI":
     _client = OpenAI(api_key=api_key)
     return _client
 
-DEFAULT_OUTPUT_DIR = "../sandbox_output"
-DEFAULT_FILENAME = "sample.py"
-LOG_FILE = "../logs/save_log.txt"
-os.makedirs(DEFAULT_OUTPUT_DIR, exist_ok=True)
-os.makedirs("../logs", exist_ok=True)
-
 # === GPT呼び出し ===
-def call_gpt(prompt):
+def call_gpt(prompt: str) -> str:
+    """Call OpenAI chat completions for a given prompt (model fixed to gpt-4)."""
     client = get_client()
     response = client.chat.completions.create(
         model="gpt-4", messages=[{"role": "user", "content": prompt}], temperature=0
@@ -46,7 +53,7 @@ def call_gpt(prompt):
     return response.choices[0].message.content.strip()
 
 # === コードと理由の抽出 ===
-def extract_code_and_reason(full_response):
+def extract_code_and_reason(full_response: str) -> Tuple[str, str]:
     code_match = re.search(r"```(?:python)?\n(.*?)```", full_response, re.DOTALL)
     reason_match = re.split(r"```.*?```", full_response, maxsplit=1)
     code = code_match.group(1).strip() if code_match else ""
@@ -54,7 +61,10 @@ def extract_code_and_reason(full_response):
     return code, reason
 
 # === ファイルパス抽出 ===
-def extract_file_path_from_code(code: str, default_path: str = os.path.join(DEFAULT_OUTPUT_DIR, DEFAULT_FILENAME)) -> str:
+def extract_file_path_from_code(
+    code: str, default_path: str = str(DEFAULT_OUTPUT_DIR / DEFAULT_FILENAME)
+) -> str:
+    """Extract filepath comment `# filepath: ...` if present."""
     match = re.search(r"#\s*filepath\s*:\s*(.+\.py)", code)
     if match:
         return match.group(1).strip()
@@ -78,7 +88,7 @@ def get_versioned_path(path):
 def save_code_with_backup_and_diff(code: str, user_path: str):
     try:
         save_path = extract_file_path_from_code(code, default_path=user_path)
-        full_path = os.path.join("..", save_path)
+        full_path = str(PROJECT_ROOT / save_path)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
 
         diff_html = ""
@@ -102,26 +112,27 @@ def save_code_with_backup_and_diff(code: str, user_path: str):
     except Exception as e:
         return f"❌ 保存失敗: {str(e)}", ""
 
-# === Gradio UI ===
-with gr.Blocks() as app:
-    gr.Markdown("### 🧐 自然文からAI補足付き 初期コード自動生成")
+def build_ui() -> gr.Blocks:
+    """Gradio Blocks factory for the interactive generator."""
+    with gr.Blocks() as app:
+        gr.Markdown("### 🧐 自然文からAI補足付き 初期コード自動生成")
 
-    initial_input = gr.Textbox(label="📝 やりたいこと（自然文）")
-    output_path_input = gr.Textbox(label="📂 保存先（例: src/utils/my_func.py）", value="src/generated/sample.py")
-    submit_btn = gr.Button("🔍 質問を開始")
-    gpt_question = gr.Textbox(label="🤠 GPTの補足質問", lines=2)
-    user_reply = gr.Textbox(label="✍️ 回答を記入")
-    loop_again_btn = gr.Button("🔁 さらに質問してほしい")
-    generate_code_btn = gr.Button("✅ これでコード生成してよい")
-    code_output = gr.Code(label="📄 GPTによる初期コード", language="python")
-    save_result = gr.Textbox(label="✅ 保存結果メッセージ", interactive=False)
-    file_list = gr.Dropdown(label="🗂 保存済みファイル一覧", choices=[])
-    open_in_vscode_btn = gr.Button("🖥 VSCodeで開く")
-    diff_output = gr.HTML(label="📌 差分表示（HTML強調）")
-    history = gr.State("")
+        initial_input = gr.Textbox(label="📝 やりたいこと（自然文）")
+        output_path_input = gr.Textbox(label="📂 保存先（例: src/utils/my_func.py）", value="src/generated/sample.py")
+        submit_btn = gr.Button("🔍 質問を開始")
+        gpt_question = gr.Textbox(label="🤠 GPTの補足質問", lines=2)
+        user_reply = gr.Textbox(label="✍️ 回答を記入")
+        loop_again_btn = gr.Button("🔁 さらに質問してほしい")
+        generate_code_btn = gr.Button("✅ これでコード生成してよい")
+        code_output = gr.Code(label="📄 GPTによる初期コード", language="python")
+        save_result = gr.Textbox(label="✅ 保存結果メッセージ", interactive=False)
+        file_list = gr.Dropdown(label="🗂 保存済みファイル一覧", choices=[])
+        open_in_vscode_btn = gr.Button("🖥 VSCodeで開く")
+        diff_output = gr.HTML(label="📌 差分表示（HTML強調）")
+        history = gr.State("")
 
-    def ask_gpt_question(user_goal, prev_answers):
-        prompt = f"""
+        def ask_gpt_question(user_goal, prev_answers):
+            prompt = f"""
 以下はユーザーの目的です。
 これに基づいて、実装前に補足確認すべき点を最大3点、質問形式で出力してください。
 すでに以下の回答が得られています：
@@ -130,18 +141,18 @@ with gr.Blocks() as app:
 【ユーザー目的】
 {user_goal}
 """
-        return call_gpt(prompt)
+            return call_gpt(prompt)
 
-    def update_history(history_text, question, answer):
-        return history_text + f"【GPTの質問】\n{question}\n【ユーザーの回答】\n{answer}\n\n"
+        def update_history(history_text, question, answer):
+            return history_text + f"【GPTの質問】\n{question}\n【ユーザーの回答】\n{answer}\n\n"
 
-    def ask_more_questions(user_goal, current_answer, prev_q, hist):
-        new_hist = update_history(hist, prev_q, current_answer)
-        next_q = ask_gpt_question(user_goal, new_hist)
-        return next_q, new_hist
+        def ask_more_questions(user_goal, current_answer, prev_q, hist):
+            new_hist = update_history(hist, prev_q, current_answer)
+            next_q = ask_gpt_question(user_goal, new_hist)
+            return next_q, new_hist
 
-    def generate_final_code(user_goal, hist, output_path):
-        final_prompt = f"""
+        def generate_final_code(user_goal, hist, output_path):
+            final_prompt = f"""
 以下はユーザーの実施目的と、事前の質問・回答のやりとり履歴です。
 この情報に基づき、docstring付きのPython関数を一つ作成してください。
 
@@ -151,29 +162,46 @@ with gr.Blocks() as app:
 【補足内容】
 {hist}
 """
-        response = call_gpt(final_prompt)
-        code, _ = extract_code_and_reason(response)
-        result, diff = save_code_with_backup_and_diff(code, output_path)
-        return code, result, diff
+            response = call_gpt(final_prompt)
+            code, _ = extract_code_and_reason(response)
+            result, diff = save_code_with_backup_and_diff(code, output_path)
+            return code, result, diff
 
-    def list_saved_files():
-        file_paths = []
-        for root, _, files in os.walk("../src"):
-            for f in files:
-                if f.endswith(".py"):
-                    rel_path = os.path.relpath(os.path.join(root, f), "../")
-                    file_paths.append(rel_path)
-        return sorted(file_paths)
+        def list_saved_files():
+            file_paths: List[str] = []
+            for root, _, files in os.walk(PROJECT_ROOT / "src"):
+                for f in files:
+                    if f.endswith(".py"):
+                        rel_path = os.path.relpath(os.path.join(root, f), PROJECT_ROOT)
+                        file_paths.append(rel_path)
+            return sorted(file_paths)
 
-    def open_file_in_vscode(file_path):
-        try:
-            subprocess.Popen(["code", os.path.join("..", file_path)])
-            return f"🖥 VSCodeで開きました: {file_path}"
-        except Exception as e:
-            return f"❌ VSCode起動失敗: {str(e)}"
+        def open_file_in_vscode(file_path):
+            try:
+                subprocess.Popen(["code", os.path.join(PROJECT_ROOT, file_path)])
+                return f"🖥 VSCodeで開きました: {file_path}"
+            except Exception as e:
+                return f"❌ VSCode起動失敗: {str(e)}"
 
-    submit_btn.click(fn=ask_gpt_question, inputs=[initial_input, history], outputs=[gpt_question])
-    loop_again_btn.click(fn=ask_more_questions, inputs=[initial_input, user_reply, gpt_question, history], outputs=[gpt_question, history])
-    generate_code_btn.click(fn=generate_final_code, inputs=[initial_input, history, output_path_input], outputs=[code_output, save_result, diff_output])
-    generate_code_btn.click(fn=list_saved_files, inputs=[], outputs=[file_list])
-    open_in_vscode_btn.click(fn=open_file_in_vscode, inputs=[file_list], outputs=[save_result])
+        submit_btn.click(fn=ask_gpt_question, inputs=[initial_input, history], outputs=[gpt_question])
+        loop_again_btn.click(fn=ask_more_questions, inputs=[initial_input, user_reply, gpt_question, history], outputs=[gpt_question, history])
+        generate_code_btn.click(fn=generate_final_code, inputs=[initial_input, history, output_path_input], outputs=[code_output, save_result, diff_output])
+        generate_code_btn.click(fn=list_saved_files, inputs=[], outputs=[file_list])
+        open_in_vscode_btn.click(fn=open_file_in_vscode, inputs=[file_list], outputs=[save_result])
+
+    return app
+
+
+def launch_ui(
+    server_name: str = "127.0.0.1",
+    server_port: int = 7860,
+    inbrowser: bool = False,
+    share: bool = False,
+):
+    """Launch interactive generator UI."""
+    demo = build_ui()
+    demo.launch(server_name=server_name, server_port=server_port, inbrowser=inbrowser, share=share, show_error=True)
+
+
+if __name__ == "__main__":
+    launch_ui()
