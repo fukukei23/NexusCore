@@ -1,12 +1,33 @@
 # modules/code_generator.py
 
-from openai import OpenAI
+from typing import Optional
 import os
 from dotenv import load_dotenv
 
-# .envからAPIキーを読み込む
+try:
+    from openai import OpenAI
+except Exception:  # pragma: no cover - fallback when openai is missing
+    OpenAI = None  # type: ignore
+
+# .env 読み込みのみ先に済ませ、クライアント生成は遅延させる
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+_client: Optional["OpenAI"] = None
+
+
+def get_client() -> "OpenAI":
+    """
+    Lazily create OpenAI client to avoid import-time API key errors.
+    """
+    global _client
+    if _client is not None:
+        return _client
+    if OpenAI is None:
+        raise RuntimeError("openai SDK is not installed. Please install `openai`.")
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set. Provide it via env or .env file.")
+    _client = OpenAI(api_key=api_key)
+    return _client
 
 def generate_code_from_text(natural_text: str) -> str:
     """
@@ -30,11 +51,10 @@ def generate_code_from_text(natural_text: str) -> str:
 
 """
     try:
+        client = get_client()
         response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2
+            model="gpt-4", messages=[{"role": "user", "content": prompt}], temperature=0.2
         )
         return response.choices[0].message.content.strip()
-    except Exception as e:
+    except Exception as e:  # pragma: no cover - error path for runtime failures
         return f"⚠️ GPT code generation failed: {e}"

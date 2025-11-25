@@ -12,12 +12,31 @@ from pathlib import Path
 
 import gradio as gr
 from dotenv import load_dotenv
-from openai import OpenAI
+
+try:
+    from openai import OpenAI
+except Exception:  # pragma: no cover - openai missing
+    OpenAI = None  # type: ignore
 
 # ====== 設定・クライアント =====================================================
 
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+_client = None
+
+def get_client():
+    """
+    Lazy-load OpenAI client so import時にAPIキーが無くても落ちない。
+    """
+    global _client
+    if _client is not None:
+        return _client
+    if OpenAI is None:
+        raise RuntimeError("openai SDK is not installed. Please install `openai`.")
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set. Provide it via env or .env file.")
+    _client = OpenAI(api_key=api_key)
+    return _client
 
 ROOT = Path(__file__).resolve().parents[2]  # リポジトリルート（src/ の2つ上）
 SANDBOX_DIR = ROOT / "sandbox_output"
@@ -52,10 +71,9 @@ def generate_unit_test(code: str) -> str:
 **`sample.py` から `is_prime` 関数をインポートする行を含めてください。**
 """.strip()
 
+    client = get_client()
     rsp = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0,
+        model="gpt-4", messages=[{"role": "user", "content": prompt}], temperature=0
     )
     return extract_code(rsp.choices[0].message.content.strip())
 
