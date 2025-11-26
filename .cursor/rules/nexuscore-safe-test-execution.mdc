@@ -1,0 +1,60 @@
+---
+alwaysApply: true
+---
+
+# NexusCore Safe Test Execution Rules
+
+## 1. 実行環境
+
+- すべての pytest / shell 実行は **WSL Ubuntu** が前提。
+- プロジェクトルートは `/home/yn441611/NexusCore`
+- WSL では Linux 形式の仮想環境 `myenv_linux` を使用：
+
+```bash
+# 仮想環境を有効化
+source myenv_linux/bin/activate
+
+# テスト実行
+python -m pytest tests/
+```
+
+初回セットアップが必要な場合：
+```bash
+bash dev_tools/setup_wsl_venv.sh
+```
+
+## 2. pytest の標準実行手順
+
+特に指定がなければ以下を使用：
+
+```bash
+cd /home/yn441611/NexusCore
+source myenv_linux/bin/activate
+python -m pytest tests/
+```
+
+- プロジェクトルートで pytest を使わない
+- `tests/` 以外を対象にしない
+- 特定モジュールが指示された場合はそちらを優先
+
+## 3. テスト前後の禁止事項
+
+- `git reset --hard`
+- `git clean -fdx`
+- `rm -rf`
+- 大量ファイル削除
+- 本番コードを広範囲で自動書き換え
+- 無限リトライ
+
+失敗時は必ず：
+
+1. 実行コマンド
+2. エラー要約
+3. 修正案
+
+を返す。
+
+## 4. ログ取り扱い
+
+- pytest の出力ログは要約のみ提示
+- ログファイル上書きは禁止

@@ -1,0 +1,39 @@
+---
+alwaysApply: true
+---
+
+# NexusCore Test Quality Guidelines
+
+## 1. 基本原則
+
+- 1テスト = 1責務
+- 公開APIに対するテスト
+- 内部実装に依存しない
+- LLM の実呼び出しは禁止（必ずモック）
+
+## 2. 禁止事項
+
+- `time.sleep`
+- 外部API依存
+- ランダム未固定
+- 実ファイル削除（tmp_path を使用）
+- 長時間テスト
+
+## 3. テストチェックリスト
+
+- [ ] `test_` で始まる
+- [ ] Arrange / Act / Assert が明確
+- [ ] assert が最低1つ
+- [ ] 成功ケース + エラーケース
+- [ ] LLM を呼んでいない
+- [ ] 実行時間が短い（〜500ms）
+
+## 4. 静的チェック必須
+
+pytest 実行前に必ず次を提案する：
+
+```bash
+python -m dev_tools.check_test_quality <テストファイル>
+```
+
+問題があれば修正案を提示してから pytest に進む。
