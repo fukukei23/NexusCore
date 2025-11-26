@@ -1,0 +1,27 @@
+---
+alwaysApply: true
+---
+
+# NexusCore Security & Safety Rules
+
+## 1. JSON ガード
+- LLM 出力は必ず as_json=True を付ける（BaseAgent にて）
+- JSON schema 準拠を enforce する
+
+## 2. NPE (予算ガード)
+- 全 LLM 呼び出しは guarded_llm_call() を通す
+- トークン見積もり → preflight_check → log_transaction の順序維持
+
+## 3. Logging
+必須項目：
+- model
+- provider
+- task
+- correlation_id
+- retry_count
+- cost (prompt/response/detail)
+
+## 4. 安全設計
+- import 時に UI 起動禁止
+- subprocess 使用時はログ＋エラー捕捉
+- diff パッチ適用は patch_applier を必ず使用

@@ -1,0 +1,71 @@
+---
+alwaysApply: true
+---
+
+# NexusCore Multi-LLM Routing Rules
+
+## 1. モデル分類（2025年11月版）
+Primary:
+- gpt-5.1
+- gpt-5.1-codex
+
+Secondary:
+- claude-4.5-sonnet
+- gemini-3.0-pro
+- deepseek-r1
+
+Fallback:
+- gpt-5.1-mini
+- gpt-5-nano
+
+## 2. タスク別マッピング
+code_generate:
+  - primary: gpt-5.1-codex
+  - secondary: deepseek-r1
+  - fallback: gpt-5.1-mini
+
+test_generate:
+  - primary: gpt-5.1-codex
+  - secondary: claude-4.5-sonnet
+  - fallback: gpt-5.1-mini
+
+code_review:
+  - primary: claude-4.5-sonnet
+  - secondary: gpt-5.1
+  - fallback: gpt-5.1-mini
+
+debug:
+  - primary: gpt-5.1-codex
+  - secondary: deepseek-r1
+  - fallback: gpt-5.1-mini
+
+self_heal:
+  - primary: gpt-5.1-codex
+  - secondary: deepseek-r1
+  - fallback: gpt-5.1-mini
+
+architect:
+  - primary: gpt-5.1
+  - secondary: gemini-3.0-pro
+  - fallback: gpt-5.1-mini
+
+plan_generate:
+  - primary: gemini-3.0-pro
+  - secondary: gpt-5.1
+  - fallback: gpt-5.1-mini
+
+requirement:
+  - primary: gpt-5.1
+  - secondary: claude-4.5-sonnet
+  - fallback: gpt-5.1-mini
+
+general:
+  - primary: gpt-5.1-mini
+  - secondary: claude-4.5-sonnet
+  - fallback: gpt-5-nano
+
+## 3. Consensus Algorithm
+- signature: normalized hash
+- weight: model trust score
+- vote: weighted majority
+- fallback: primary model output
