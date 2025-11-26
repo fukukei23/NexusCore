@@ -1,0 +1,69 @@
+---
+alwaysApply: true
+---
+
+# NexusCore Auto Test Rule
+
+## 1. トリガーとなるユーザー発話
+
+次の発話を検出したら「テスト実行モード」を開始する：
+
+- テストして
+- テスト回して
+- pytest 回して
+- テスト一通り流して
+- run tests
+- please run tests
+- test all
+
+表現が違っても「テスト実行依頼」と判断できる場合は同等と扱う。
+
+## 2. 実行対象（デフォルト）
+
+特に指定がなければ次を実行：
+
+**WSLコマンド経由で実行（Cursorから自動実行する場合）**
+```bash
+wsl bash -c "cd /home/yn441611/NexusCore && bash dev_tools/run_tests.sh tests/"
+```
+
+**WSLターミナルで直接実行（手動実行の場合）**
+```bash
+cd /home/yn441611/NexusCore
+bash dev_tools/run_tests.sh tests/
+```
+
+**または直接実行**
+```bash
+cd /home/yn441611/NexusCore
+source myenv_linux/bin/activate
+python -m pytest tests/
+```
+
+プロジェクトルート（`.`）全体を対象にした pytest は禁止。
+
+特定ファイル指定がある場合はそれを優先。
+
+例）
+「llm だけテストして」
+→ `bash dev_tools/run_tests.sh tests/llm/`
+
+## 3. 実行手順
+
+1. 実行コマンドを提示して確認を取る
+2. venv（myenv）を有効化
+3. pytest 実行
+4. 結果の要約：
+   - 合計テスト数
+   - 成功 / 失敗 / スキップ
+   - 失敗したテスト
+   - エラー要約
+   - 修正方針
+5. 無限リトライしない
+
+## 4. 禁止事項
+
+- `python -m pytest .`
+- `git reset --hard` / `git clean -fdx`
+- `rm -rf`
+- `/home/yn441611/NexusCore` 以外で実行しない
