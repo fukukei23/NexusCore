@@ -1,0 +1,54 @@
+name: NexusCore Safe Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  tests:
+    name: Run safe test suite
+    runs-on: ubuntu-latest
+    env:
+      # CI モードフラグ（コード側で参照して、実 LLM 呼び出しを禁止する想定）
+      NEXUSCORE_CI: "1"
+      NEXUSCORE_DISABLE_REAL_LLM: "1"
+      # OpenAI/Gemini などはダミー値。コード側で「CI では必ずスタブ」を前提にする。
+      OPENAI_API_KEY: "dummy-ci-key"
+      GEMINI_API_KEY: "dummy-ci-key"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          fi
+
+      - name: Run unit tests (safe subset)
+        run: |
+          cd /home/runner/work/${{ github.event.repository.name }}/${{ github.event.repository.name }}
+          # 危険なインテグレーションテストには pytest マーカーで `integration` を付け、
+          # CI では除外することを想定
+          python -m pytest tests -m "not integration" -q
+

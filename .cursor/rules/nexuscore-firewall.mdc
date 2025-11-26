@@ -1,0 +1,35 @@
+---
+alwaysApply: true
+---
+
+# NexusCore Project Firewall
+
+## 1. 許可された操作範囲
+
+AI が読み書き・編集できるパスは次のみ：
+
+- `/home/yn441611/NexusCore` 配下
+
+## 2. 禁止領域
+
+以下には触れてはならない：
+
+- `/home/yn441611/atelier-kyo-manager`
+- `/home/yn441611/*`（NexusCore 以外）
+- `/etc` / `/usr` / `/var` / `/root`
+- Windows 側の `C:\Users\...`
+
+## 3. 禁止操作
+
+- `rm -rf`
+- `sudo` を含むコマンド
+- `apt install/remove`
+- `systemctl` 操作
+- `git reset --hard`
+- `git clean -fdx`
+
+## 4. 変更の鉄則
+
+- 破壊操作禁止
+- 上書き前に必ず diff 提示
+- 大規模変更は必ずユーザー確認

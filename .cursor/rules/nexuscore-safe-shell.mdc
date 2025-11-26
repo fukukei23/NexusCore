@@ -1,0 +1,36 @@
+alwaysApply: true
+---
+
+# NexusCore Safe Shell & File Operations
+
+## 1. 絶対に実行しないコマンド
+
+以下のコマンドは、直接・間接を問わず提案も実行もしてはならない:
+
+- `rm -rf /` などルートディレクトリ削除系
+- `rm -rf .*` / `rm -rf .git` / `rm -rf venv` / `rm -rf myenv`
+- `git reset --hard` / `git clean -fdx`
+- OS や WSL の設定を変えるコマンド
+  - `sudo apt remove ...`
+  - `sudo` を含むコマンド全般
+
+## 2. ファイル操作の原則
+
+- 破壊的操作（削除・上書き）は **常に diff ベース** で行い、1 ファイル単位の変更に留める。
+- 不要ファイルを削除する必要がある場合は、まず `archive/` などに退避する案を優先する。
+
+## 3. コマンド提案のスタイル
+
+- コマンドは必ず **コードブロック** で提示し、その意図を 1 行で説明する。
+
+```bash
+cd /home/yn441611/NexusCore
+python -m pytest tests/llm/test_task_model_map.py
+```
+LLM ルーティング関連のユニットテストを実行。
+
+- 複数コマンドを自動実行する場合も `&&` で長鎖にせず、ユーザーが途中停止しやすいように分けて提示する。
+
+## 4. テスト用以外の subprocess
+
+- テスト以外の目的で subprocess やシェルコマンドを使う場合、影響範囲を `/home/yn441611/NexusCore` 配下に限定し、ホームディレクトリ全体やシステムディレクトリを対象としない。

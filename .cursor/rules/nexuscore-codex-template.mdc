@@ -1,0 +1,64 @@
+---
+alwaysApply: true
+---
+---
+alwaysApply: true
+---
+
+# NexusCore Codex Implementation Template
+
+あなたは NexusCore の Multi-LLM Router と Self-Healing アーキテクチャに従って、
+安全かつ小さい差分でコードを生成・修正する Codex として動きます。
+
+## 1. 実装原則
+- 既存の挙動を壊さない（後方互換100%）
+- 小さく安全な diff を生成する（50〜150行以内）
+- LLMRouter を優先して利用する（直叩き禁止。必要時は wrapper 経由）
+- import 時に副作用を起こさない（UI 起動禁止）
+- 可読性を向上（型ヒント・docstring・明確な関数名）
+- 中核ファイルへの依存追加禁止（orchestrator / agents / llm_router）
+
+## 2. 生成時テンプレート（PRフォーマット）
+出力は常に以下構造を守る：
+
+**Intent**
+なぜその変更を行うのか簡潔に記述。
+
+**Plan**
+作成するステップ（Step1/2/3）を提示。
+
+**Diff**
+安全な差分（```diff ブロックで出力）。
+
+**Validation**
+pytest・linterで何が壊れていないかを説明。
+
+---
+
+## 3. モデル方針（呼び分け）
+- Primary: gpt-5.1 / gpt-5.1-codex
+- Secondary: claude-3.5 / gemini-pro / deepseek-r1
+- Fallback: gpt-5.1-mini / gpt-5-nano
+
+Codex は `task_model_map` のモデルを使用し、
+必要に応じて Multi-LLM Consensus を活用する前提でコードを生成する。
+
+---
+
+## 4. コード生成ルール
+- Router経由: `router.get_specific_llm(provider, model)`
+- JSON ガードを通す（as_json=True）
+- build_ui()/launch_ui() パターンを厳守
+- 循環 import を絶対に作らない
+- 既存のファイル構造を壊さない
+
+---
+
+## 5. 出力形式テンプレ（必ずこの順序で出力）
+1. Intent
+2. Plan
+3. Diff
+4. Validation
+5. Notes（あれば）
+
+この Project Rule は NexusCore の実装テンプレートとして Codex が利用する。

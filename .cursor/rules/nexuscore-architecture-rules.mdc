@@ -1,0 +1,29 @@
+---
+alwaysApply: true
+---
+
+# NexusCore Architecture Rules (Clean Architecture)
+
+## 1. 禁止されている依存方向
+- agents → core は OK
+- core → agents は OK
+- UI (gradio_app) → agents/core は OK
+- agents/core → UI は NG
+- modules/utils → core/agents は NG（独立性維持）
+
+## 2. 中核ファイルへの変更禁止
+- core/orchestrator.py
+- llm/llm_router.py
+- npe/engine.py
+- api/server.py
+
+これらは小型PRで段階的に扱う。
+
+## 3. NexusCore 2.0 移行時のディレクトリ
+- domain/
+- application/
+- infrastructure/
+- interfaces/
+
+## 4. 自己修復ループの境界
+- test_generator, test_runner, patch_applier は core を跨いではならない。
