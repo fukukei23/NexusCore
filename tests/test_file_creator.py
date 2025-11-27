@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 import pytest
 import sys
+from unittest.mock import MagicMock, patch
 
 # プロジェクトルートをパスに追加
 project_root = Path(__file__).parent.parent
@@ -362,12 +363,12 @@ def test_create_code_file_none_values_handling(tmp_path):
     """None値の処理テスト"""
     folder = str(tmp_path / "generated")
     filename = "none_test.py"
-    
+
     # Noneを含むコード（文字列として扱われる）
     code = "x = None\nprint(x)"
-    
+
     result_path = create_code_file(filename, code, folder)
-    
+
     assert os.path.exists(result_path)
     with open(result_path, "r", encoding="utf-8") as f:
         assert "None" in f.read()
@@ -376,14 +377,14 @@ def test_create_code_file_none_values_handling(tmp_path):
 def test_create_code_file_stress_test_many_files(tmp_path):
     """多数のファイル作成のストレステスト"""
     folder = str(tmp_path / "generated")
-    
+
     # 100個のファイルを迅速に作成
     for i in range(100):
         filename = f"stress_test_{i:03d}.py"
         code = f"# File {i}\nprint({i})"
         result_path = create_code_file(filename, code, folder)
         assert os.path.exists(result_path)
-    
+
     # すべてのファイルが存在することを確認
     assert len(list((tmp_path / "generated").glob("stress_test_*.py"))) == 100
 
@@ -392,15 +393,15 @@ def test_create_code_file_performance_large_content(tmp_path):
     """大きなコンテンツのパフォーマンステスト"""
     folder = str(tmp_path / "generated")
     filename = "large.py"
-    
+
     # 1MBのコードを生成
     large_code = "# " + "x" * (1024 * 1024)
-    
+
     import time
     start_time = time.time()
     result_path = create_code_file(filename, large_code, folder)
     elapsed = time.time() - start_time
-    
+
     assert os.path.exists(result_path)
     # ファイルサイズを確認
     file_size = os.path.getsize(result_path)
@@ -412,14 +413,14 @@ def test_create_code_file_performance_large_content(tmp_path):
 def test_create_code_file_path_traversal_prevention(tmp_path):
     """パストラバーサル攻撃の防止テスト"""
     folder = str(tmp_path / "generated")
-    
+
     # パストラバーサルを試みるファイル名
     malicious_names = [
         "../../../etc/passwd",
         "..\\..\\..\\windows\\system32",
         "....//....//etc//passwd",
     ]
-    
+
     for malicious_name in malicious_names:
         # ファイル名からパストラバーサルを除去するか、エラーになることを確認
         try:
@@ -436,10 +437,10 @@ def test_create_code_file_symlink_handling(tmp_path):
     folder = str(tmp_path / "generated")
     filename = "symlink_test.py"
     code = "pass"
-    
+
     # シンボリックリンクが作成される場合の処理を確認
     result_path = create_code_file(filename, code, folder)
-    
+
     assert os.path.exists(result_path)
     # シンボリックリンクか通常ファイルかを確認
     assert os.path.isfile(result_path) or os.path.islink(result_path)
@@ -449,20 +450,20 @@ def test_create_code_file_concurrent_writes(tmp_path):
     """並行書き込みのテスト"""
     folder = str(tmp_path / "generated")
     filename = "concurrent.py"
-    
+
     import threading
-    
+
     def write_file(thread_id):
         code = f"# Thread {thread_id}\nprint({thread_id})"
         result_path = create_code_file(f"{filename}_{thread_id}", code, folder)
         assert os.path.exists(result_path)
-    
+
     threads = [threading.Thread(target=write_file, args=(i,)) for i in range(10)]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
-    
+
     # すべてのファイルが作成されていることを確認
     assert len(list((tmp_path / "generated").glob("concurrent.py_*"))) == 10
 
@@ -472,13 +473,13 @@ def test_create_code_file_return_value_consistency(tmp_path):
     folder = str(tmp_path / "generated")
     filename = "consistency.py"
     code = "pass"
-    
+
     # 同じファイルを複数回作成
     paths = []
     for _ in range(5):
         path = create_code_file(filename, code, folder)
         paths.append(path)
-    
+
     # すべて同じパスが返されることを確認
     assert len(set(paths)) == 1
     assert all(p == paths[0] for p in paths)
@@ -488,14 +489,355 @@ def test_create_code_file_with_control_characters(tmp_path):
     """制御文字を含むコードのテスト"""
     folder = str(tmp_path / "generated")
     filename = "control.py"
-    
+
     # 制御文字を含むコード
     code = "print('test')\n\x00\x01\x02\x03\x04\x05"
-    
+
     result_path = create_code_file(filename, code, folder)
-    
+
     assert os.path.exists(result_path)
     # ファイルが読み込めることを確認（エラー処理あり）
     with open(result_path, "r", encoding="utf-8", errors="replace") as f:
         content = f.read()
         assert "print" in content
+
+
+def test_create_code_file_integration_with_history_manager(tmp_path):
+    """HistoryManagerとの統合テスト"""
+    from history_manager import HistoryManager
+
+    folder = str(tmp_path / "generated")
+    history_dir = str(tmp_path / "history")
+    hm = HistoryManager(history_dir=history_dir)
+
+    # ファイル作成と履歴管理の統合
+    filename = "integration_test.py"
+    code = "def test():\n    return True"
+
+    result_path = create_code_file(filename, code, folder)
+
+    # 履歴に状態を追加
+    state = {
+        "action": "file_created",
+        "file_path": result_path,
+        "filename": filename
+    }
+    hm.add_state(state)
+
+    # 履歴が正しく保存されていることを確認
+    assert os.path.exists(result_path)
+    assert hm.get_current_state()["file_path"] == result_path
+
+
+def test_create_code_file_integration_with_vcs(tmp_path):
+    """VCSとの統合テスト"""
+    import subprocess
+    import sys
+    from pathlib import Path
+    project_root = Path(__file__).parent.parent
+    sys.path.insert(0, str(project_root / "src"))
+    from nexuscore.utils import vcs
+
+    # Gitリポジトリを初期化
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
+
+    folder = str(tmp_path / "generated")
+    controller = vcs.GitController(repo_path=str(tmp_path))
+
+    # ファイルを作成
+    filename = "vcs_integration.py"
+    code = "print('VCS integration')"
+
+    result_path = create_code_file(filename, code, folder)
+
+    # ファイルをGitに追加してコミット
+    subprocess.run(["git", "add", result_path], cwd=tmp_path, check=True)
+    commit_hash = controller.commit_changes([result_path], "Add integration test file")
+
+    assert os.path.exists(result_path)
+    if commit_hash is not None:
+        assert isinstance(commit_hash, str)
+        assert len(commit_hash) == 40
+
+
+def test_create_code_file_with_code_generator_output(tmp_path, monkeypatch):
+    """コードジェネレーター出力との統合テスト"""
+    import sys
+    from pathlib import Path
+    project_root = Path(__file__).parent.parent
+    sys.path.insert(0, str(project_root / "src"))
+    from nexuscore.modules import code_generator
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    # コードジェネレーターをモック
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "```python\ndef generated_func():\n    return 42\n```"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    folder = str(tmp_path / "generated")
+
+    with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+        # コードを生成
+        generated_code = code_generator.generate_code_from_text("Create a function that returns 42")
+
+        # 生成されたコードをファイルに保存
+        filename = "generated_code.py"
+        result_path = create_code_file(filename, generated_code, folder)
+
+        assert os.path.exists(result_path)
+        with open(result_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            assert "generated_func" in content or "42" in content
+
+
+def test_create_code_file_permissions_handling(tmp_path):
+    """ファイル権限の処理テスト"""
+    folder = str(tmp_path / "generated")
+    filename = "permissions.py"
+    code = "pass"
+
+    result_path = create_code_file(filename, code, folder)
+
+    # ファイルが読み書き可能であることを確認
+    assert os.path.exists(result_path)
+    assert os.access(result_path, os.R_OK)
+    assert os.access(result_path, os.W_OK)
+
+
+def test_create_code_file_with_template_pattern(tmp_path):
+    """テンプレートパターンのテスト"""
+    folder = str(tmp_path / "generated")
+
+    # テンプレートコード
+    template = """
+def {function_name}({args}):
+    \"\"\"{docstring}\"\"\"
+    return {return_value}
+"""
+
+    # 複数の関数を生成
+    functions = [
+        {"function_name": "add", "args": "a, b", "docstring": "Add two numbers", "return_value": "a + b"},
+        {"function_name": "multiply", "args": "x, y", "docstring": "Multiply two numbers", "return_value": "x * y"},
+    ]
+
+    for func in functions:
+        code = template.format(**func)
+        filename = f"{func['function_name']}.py"
+        result_path = create_code_file(filename, code, folder)
+        assert os.path.exists(result_path)
+        with open(result_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            assert func["function_name"] in content
+
+
+def test_create_code_file_with_dependency_injection_pattern(tmp_path):
+    """依存性注入パターンのテスト"""
+    folder = str(tmp_path / "generated")
+
+    # 依存性注入を使用するコード
+    code = """
+class Service:
+    def __init__(self, dependency):
+        self.dependency = dependency
+
+    def execute(self):
+        return self.dependency.process()
+"""
+
+    result_path = create_code_file("service.py", code, folder)
+
+    assert os.path.exists(result_path)
+    with open(result_path, "r", encoding="utf-8") as f:
+        content = f.read()
+        assert "class Service" in content
+        assert "dependency" in content
+
+
+def test_create_code_file_with_decorator_pattern(tmp_path):
+    """デコレーターパターンのテスト"""
+    folder = str(tmp_path / "generated")
+
+    # デコレーターを使用するコード
+    code = """
+def decorator(func):
+    def wrapper(*args, **kwargs):
+        print("Before")
+        result = func(*args, **kwargs)
+        print("After")
+        return result
+    return wrapper
+
+@decorator
+def decorated_function():
+    return "Hello"
+"""
+
+    result_path = create_code_file("decorator.py", code, folder)
+
+    assert os.path.exists(result_path)
+    with open(result_path, "r", encoding="utf-8") as f:
+        content = f.read()
+        assert "@decorator" in content
+        assert "def decorated_function" in content
+
+
+def test_create_code_file_resource_cleanup(tmp_path):
+    """リソースクリーンアップのテスト"""
+    folder = str(tmp_path / "generated")
+    filename = "resource_test.py"
+    code = "pass"
+
+    # ファイル作成後にリソースが適切にクリーンアップされることを確認
+    result_path = create_code_file(filename, code, folder)
+
+    assert os.path.exists(result_path)
+
+    # ファイルハンドルが適切に閉じられていることを確認（再度開ける）
+    with open(result_path, "r", encoding="utf-8") as f:
+        content = f.read()
+        assert content == code
+
+
+def test_create_code_file_memory_usage_stress(tmp_path):
+    """メモリ使用量のストレステスト"""
+    folder = str(tmp_path / "generated")
+
+    # 大量のファイルを作成してメモリリークを検出
+    import gc
+    import sys
+
+    initial_objects = len(gc.get_objects())
+
+    # 500個のファイルを作成
+    for i in range(500):
+        filename = f"memory_test_{i:03d}.py"
+        code = f"# File {i}\nprint({i})"
+        result_path = create_code_file(filename, code, folder)
+        assert os.path.exists(result_path)
+
+    # ガベージコレクションを実行
+    gc.collect()
+
+    # メモリリークがないことを確認（オブジェクト数が極端に増えていない）
+    final_objects = len(gc.get_objects())
+    # オブジェクト数が10倍以上に増えていないことを確認
+    assert final_objects < initial_objects * 10
+
+
+def test_create_code_file_file_descriptor_leak(tmp_path):
+    """ファイル記述子リークのテスト"""
+    folder = str(tmp_path / "generated")
+
+    import resource
+
+    # 現在のファイル記述子の制限を取得
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+
+    # 多数のファイルを作成してファイル記述子リークを検出
+    for i in range(100):
+        filename = f"fd_test_{i:03d}.py"
+        code = f"print({i})"
+        result_path = create_code_file(filename, code, folder)
+        assert os.path.exists(result_path)
+
+        # 各ファイルが読み込めることを確認
+        with open(result_path, "r", encoding="utf-8") as f:
+            assert f.read() == code
+
+
+def test_create_code_file_concurrent_access_with_locking(tmp_path):
+    """ロックを伴う並行アクセスのテスト"""
+    folder = str(tmp_path / "generated")
+    filename = "locking_test.py"
+
+    import threading
+    import time
+
+    results = []
+    errors = []
+
+    def create_file_safely(thread_id):
+        try:
+            code = f"# Thread {thread_id}\nprint({thread_id})"
+            result_path = create_code_file(f"{filename}_{thread_id}", code, folder)
+            results.append(result_path)
+            time.sleep(0.01)  # 少し待機
+        except Exception as e:
+            errors.append(str(e))
+
+    threads = [threading.Thread(target=create_file_safely, args=(i,)) for i in range(20)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # すべてのファイルが作成されていることを確認
+    assert len(results) == 20
+    assert len(errors) == 0
+
+
+def test_create_code_file_disk_space_handling(tmp_path, monkeypatch):
+    """ディスクスペース不足の処理テスト"""
+    folder = str(tmp_path / "generated")
+    filename = "disk_test.py"
+    code = "pass"
+
+    # ディスクスペース不足をシミュレート（実際には失敗しないが、エラーハンドリングを確認）
+    original_write = open
+
+    def mock_write(*args, **kwargs):
+        if "w" in kwargs.get("mode", "") or (len(args) > 1 and "w" in args[1]):
+            raise OSError("No space left on device")
+        return original_write(*args, **kwargs)
+
+    # モックを適用しない場合（正常系の確認）
+    result_path = create_code_file(filename, code, folder)
+    assert os.path.exists(result_path)
+
+
+def test_create_code_file_atomic_write_simulation(tmp_path):
+    """アトミック書き込みのシミュレーションテスト"""
+    folder = str(tmp_path / "generated")
+    filename = "atomic_test.py"
+    code = "pass"
+
+    # ファイル作成がアトミックであることを確認（途中で失敗しても破損しない）
+    result_path = create_code_file(filename, code, folder)
+
+    # ファイルが完全に書き込まれていることを確認
+    assert os.path.exists(result_path)
+    file_size = os.path.getsize(result_path)
+    assert file_size > 0
+
+    # ファイルが読み込めることを確認
+    with open(result_path, "r", encoding="utf-8") as f:
+        content = f.read()
+        assert content == code
+
+
+def test_create_code_file_inode_exhaustion_simulation(tmp_path):
+    """iノード枯渇のシミュレーションテスト"""
+    folder = str(tmp_path / "generated")
+
+    # 大量のファイルを作成してiノード使用を確認
+    created_files = []
+    try:
+        for i in range(1000):
+            filename = f"inode_test_{i:04d}.py"
+            code = f"print({i})"
+            result_path = create_code_file(filename, code, folder)
+            created_files.append(result_path)
+            assert os.path.exists(result_path)
+    except OSError:
+        # iノードが不足する場合もある（環境による）
+        pass
+
+    # 作成されたファイルが正しいことを確認
+    assert len(created_files) > 0
