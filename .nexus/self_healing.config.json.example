@@ -1,0 +1,8 @@
+{
+  "label": "self-healing",
+  "allowed_target_branches": ["main"],
+  "test_command": "pytest -q",
+  "allow_test_modification": false,
+  "allow_deletions": false
+}
+

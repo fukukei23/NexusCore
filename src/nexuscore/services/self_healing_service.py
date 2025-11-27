@@ -98,6 +98,12 @@ class SelfHealingService:
         """
         run_id = f"sh-{int(time.time())}-{pr_number}-{head_sha[:7]}"
         session_id = self.session_controller.session_id
+        # 実行時間の記録開始
+        import time
+        from datetime import datetime, timezone
+
+        started_ts = time.monotonic()
+        started_at_iso = datetime.now(timezone.utc).isoformat()
         started_at = time.time()
 
         repo_slug = repo_full_name.replace("/", "_")
@@ -145,6 +151,8 @@ class SelfHealingService:
                     summary=summary,
                     details=details,
                     started_at=started_at,
+                    started_at_iso=started_at_iso,
+                    started_ts=started_ts,
                 )
 
             # 3. 失敗ログから関連ファイル候補を抽出
@@ -181,6 +189,8 @@ class SelfHealingService:
                     summary=summary,
                     details=details,
                     started_at=started_at,
+                    started_at_iso=started_at_iso,
+                    started_ts=started_ts,
                 )
 
             # ★ project_path を渡すように変更
@@ -210,6 +220,8 @@ class SelfHealingService:
                     summary=summary,
                     details=details,
                     started_at=started_at,
+                    started_at_iso=started_at_iso,
+                    started_ts=started_ts,
                 )
 
             self._maybe_stop("after_patch_generated", {})
@@ -255,6 +267,8 @@ class SelfHealingService:
                     summary=summary,
                     details=details,
                     started_at=started_at,
+                    started_at_iso=started_at_iso,
+                    started_ts=started_ts,
                 )
 
             # ▼ 6-B. GuardianAgent による自動レビュー（パッチ生成後、適用前）
@@ -302,6 +316,8 @@ class SelfHealingService:
                     summary=summary,
                     details=details,
                     started_at=started_at,
+                    started_at_iso=started_at_iso,
+                    started_ts=started_ts,
                 )
 
             # ▼ 6-C. ここから従来の Dry-Run 安全性チェックに続く
@@ -340,6 +356,8 @@ class SelfHealingService:
                     summary=summary,
                     details=details,
                     started_at=started_at,
+                    started_at_iso=started_at_iso,
+                    started_ts=started_ts,
                 )
 
             # 7. 実際に Patch を適用
@@ -413,6 +431,8 @@ class SelfHealingService:
                     summary=summary,
                     details=details,
                     started_at=started_at,
+                    started_at_iso=started_at_iso,
+                    started_ts=started_ts,
                 )
             raise
 
@@ -696,11 +716,28 @@ class SelfHealingService:
         summary: str,
         details: Dict[str, Any],
         started_at: float,
+        started_at_iso: Optional[str] = None,
+        started_ts: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         RunHistoryLogger への記録と戻り値 dict の生成をまとめる。
         """
+        from datetime import datetime, timezone
+
         finished_at = time.time()
+        finished_at_iso = datetime.now(timezone.utc).isoformat()
+
+        # 所要時間の計算
+        if started_ts is not None:
+            finished_ts = time.monotonic()
+            duration_seconds = round(finished_ts - started_ts, 2)
+        else:
+            duration_seconds = round(finished_at - started_at, 2)
+
+        # ISO8601形式の開始時刻が未指定の場合は生成
+        if started_at_iso is None:
+            started_at_iso = datetime.fromtimestamp(started_at, tz=timezone.utc).isoformat()
+
         try:
             record = self.history_logger.new_self_healing_record(
                 run_id=run_id,
@@ -726,7 +763,10 @@ class SelfHealingService:
             "run_id": run_id,
             "session_id": session_id,
             "started_at": started_at,
+            "started_at_iso": started_at_iso,
             "finished_at": finished_at,
+            "finished_at_iso": finished_at_iso,
+            "duration_seconds": duration_seconds,
         }
 
 
