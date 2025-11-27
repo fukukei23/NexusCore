@@ -1,0 +1,40 @@
+# 仮想環境
+.venv/
+venv/
+
+# ビルド・配布物
+dist/
+build/
+
+# キャッシュ類
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+*.pyc
+
+# VCS
+.git/
+
+# データ・ログ類
+logs/
+data/
+tmp/
+*.log
+
+# AI / ベクターストア・モデルなど
+chroma_db/
+vector_store/
+models/
+
+# ドキュメント・出力アーカイブなど
+docs/_build/
+docs/.vitepress/
+site/
+*.zip
+*.tar
+*.tar.gz
+
+# NexusCore 固有
+.nexus/self_healing_sandbox/
+.nexus/history/*.log.jsonl
+

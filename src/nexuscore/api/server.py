@@ -100,10 +100,10 @@ def run_orchestrator_task(task_id: str, requirement: str, project_path: str, con
 
         guardian_agent = provision_agent(GuardianAgent, 'review')
         knowledge_curator_agent = provision_agent(KnowledgeCuratorAgent, 'general')
-        
+
         policy_rules_path = os.path.join(PROJECT_ROOT, "config", "policy_rules.json")
         policy_agent = provision_agent(PolicyAgent, 'policy', policy_rules_path=policy_rules_path)
-        
+
         # --- 3. ユーティリティと司令塔 (Orchestrator) の任命 ---
         patch_applier = PatchApplier()
 
@@ -120,16 +120,16 @@ def run_orchestrator_task(task_id: str, requirement: str, project_path: str, con
             policy_agent=policy_agent,
             postmortem_agent=postmortem_agent,
             knowledge_curator_agent=knowledge_curator_agent,
-            patch_applier=patch_applier 
+            patch_applier=patch_applier
         )
 
         # --- 4. 開発プロセスの開始 ---
         tasks[task_id]["message"] = "Design phase started."
         orchestrator.design_phase(requirement)
-        
+
         tasks[task_id]["message"] = "Development cycle started."
         orchestrator.development_cycle({"main_goal": requirement})
-        
+
         tasks[task_id] = {"status": "completed", "message": "Development process finished successfully."}
         logger.info(f"Task {task_id} completed successfully.")
 
@@ -146,7 +146,7 @@ def execute_task():
     task_id = str(uuid.uuid4())
     requirement = data['requirement']
     project_path = os.path.abspath(data['project_path'])
-    
+
     constitution = { "description": data.get("constitution_text", "Default constitution.") }
 
     thread = threading.Thread(
@@ -157,7 +157,7 @@ def execute_task():
     thread.start()
 
     logger.info(f"Task {task_id} created for requirement: '{requirement}'")
-    
+
     return jsonify({
         "message": "Task accepted and is running in the background.",
         "task_id": task_id,
@@ -170,6 +170,25 @@ def get_task_status(task_id):
     if not task:
         return jsonify({"error": "Task not found"}), 404
     return jsonify(task)
+
+@app.route('/api/github/webhook', methods=['POST'])
+def github_webhook_endpoint():
+    """GitHub Webhook エンドポイント"""
+    try:
+        from nexuscore.api.github_webhook_handler import handle_github_webhook
+        result = handle_github_webhook()
+
+        # タプルが返された場合は (body, status_code) 形式
+        if isinstance(result, tuple):
+            return jsonify(result[0]), result[1]
+
+        return jsonify(result)
+    except ImportError:
+        logger.error("github_webhook_handler is not available")
+        return jsonify({"error": "GitHub webhook handler not available"}), 500
+    except Exception as e:
+        logger.error(f"GitHub webhook endpoint error: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     logger.info("Starting NexusCore API Server...")
