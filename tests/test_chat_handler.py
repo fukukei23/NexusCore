@@ -563,3 +563,289 @@ def test_handle_chat_with_custom_messages_structure(monkeypatch):
         # カスタムフィールドが保持される可能性がある
         assert len(updated_history) >= 2
 
+
+def test_handle_chat_stress_test_many_messages(monkeypatch):
+    """多数のメッセージのストレステスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    mock_client = MagicMock()
+    responses = [f"Response {i}" for i in range(100)]
+
+    mock_client.chat.completions.create.side_effect = [
+        MagicMock(choices=[MagicMock(message=MagicMock(content=r))])
+        for r in responses
+    ]
+
+    with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
+        history = []
+
+        for i in range(100):
+            response, history = chat_handler.handle_chat(f"Message {i}", history)
+            assert response == responses[i]
+            assert len(history) == (i + 1) * 2
+
+
+def test_handle_chat_with_very_long_history(monkeypatch):
+    """非常に長い履歴のテスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "Response"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
+        # 非常に長い履歴を作成（1000件は多すぎる可能性があるため、100件に調整）
+        long_history = [
+            {"role": "user" if i % 2 == 0 else "assistant", "content": f"Message {i}"}
+            for i in range(100)
+        ]
+
+        # 履歴の長さを保存（handle_chatが履歴を変更するため）
+        original_length = len(long_history)
+
+        response, updated_history = chat_handler.handle_chat("New message", long_history)
+
+        assert response == "Response"
+        # 履歴が正しく追加されていることを確認（元の履歴 + 新しいメッセージ + レスポンス）
+        assert len(updated_history) >= original_length + 2
+
+
+def test_handle_chat_error_recovery_sequence(monkeypatch):
+    """エラー回復シーケンスのテスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    mock_client = MagicMock()
+    # エラー → 成功 → エラー → 成功のパターン
+    mock_client.chat.completions.create.side_effect = [
+        Exception("Error 1"),
+        MagicMock(choices=[MagicMock(message=MagicMock(content="Success 1"))]),
+        Exception("Error 2"),
+        MagicMock(choices=[MagicMock(message=MagicMock(content="Success 2"))]),
+    ]
+
+    with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
+        history = []
+
+        # エラー
+        response1, history1 = chat_handler.handle_chat("Message 1", history)
+        assert "❌ エラー:" in response1
+
+        # 成功
+        response2, history2 = chat_handler.handle_chat("Message 2", history1)
+        assert response2 == "Success 1"
+
+        # エラー
+        response3, history3 = chat_handler.handle_chat("Message 3", history2)
+        assert "❌ エラー:" in response3
+
+        # 成功
+        response4, history4 = chat_handler.handle_chat("Message 4", history3)
+        assert response4 == "Success 2"
+
+
+def test_handle_chat_message_ordering_preservation(monkeypatch):
+    """メッセージ順序の保持テスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    mock_client = MagicMock()
+    responses = ["A", "B", "C"]
+
+    mock_client.chat.completions.create.side_effect = [
+        MagicMock(choices=[MagicMock(message=MagicMock(content=r))])
+        for r in responses
+    ]
+
+    with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
+        history = []
+
+        for i, msg in enumerate(["1", "2", "3"]):
+            response, history = chat_handler.handle_chat(msg, history)
+            assert response == responses[i]
+            # 履歴の順序を確認
+            assert history[i * 2]["content"] == msg
+            assert history[i * 2 + 1]["content"] == responses[i]
+
+
+def test_get_client_thread_safety(monkeypatch):
+    """クライアント取得のスレッド安全性テスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+    chat_handler._client = None
+
+    import threading
+
+    clients = []
+
+    def get_client_thread():
+        with patch("nexuscore.modules.chat_handler.OpenAI") as mock_openai:
+            mock_client = MagicMock()
+            mock_openai.return_value = mock_client
+            client = chat_handler.get_client()
+            clients.append(client)
+
+    threads = [threading.Thread(target=get_client_thread) for _ in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # すべてのスレッドが同じクライアントを取得することを確認
+    # （または、少なくともエラーが発生しないことを確認）
+    assert len(clients) == 10
+
+
+def test_handle_chat_with_system_message_simulation(monkeypatch):
+    """システムメッセージのシミュレーションテスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "Response"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
+        # システムメッセージを含む履歴
+        history_with_system = [
+            {"role": "system", "content": "You are a helpful assistant"},
+            {"role": "user", "content": "Hello"}
+        ]
+
+        response, updated_history = chat_handler.handle_chat("New message", history_with_system)
+
+        assert response == "Response"
+        # システムメッセージが保持される可能性がある
+        assert len(updated_history) >= 3
+
+
+def test_handle_chat_integration_with_history_manager(monkeypatch):
+    """HistoryManagerとの統合テスト"""
+    from history_manager import HistoryManager
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    history_dir = "test_history"
+    hm = HistoryManager(history_dir=history_dir)
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "Integration response"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
+        history = []
+        response, updated_history = chat_handler.handle_chat("Test message", history)
+
+        # 履歴をHistoryManagerに保存
+        state = {
+            "conversation": updated_history,
+            "last_response": response
+        }
+        hm.add_state(state)
+
+        # 履歴が正しく保存されていることを確認
+        saved_state = hm.get_current_state()
+        assert saved_state["last_response"] == "Integration response"
+        assert len(saved_state["conversation"]) == 2
+
+
+def test_handle_chat_with_code_generation_integration(monkeypatch):
+    """コード生成との統合テスト"""
+    import sys
+    from pathlib import Path
+    project_root = Path(__file__).parent.parent
+    sys.path.insert(0, str(project_root / "src"))
+    from nexuscore.modules import code_generator
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    # チャットハンドラーとコードジェネレーターをモック
+    mock_chat_response = MagicMock()
+    mock_chat_response.choices = [MagicMock()]
+    mock_chat_response.choices[0].message.content = "I'll generate code for you"
+
+    mock_code_response = MagicMock()
+    mock_code_response.choices = [MagicMock()]
+    mock_code_response.choices[0].message.content = "```python\ndef func():\n    pass\n```"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.side_effect = [
+        mock_chat_response,
+        mock_code_response
+    ]
+
+    with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
+        with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+            # チャットでコード生成を依頼
+            history = []
+            response1, history1 = chat_handler.handle_chat("Generate a function", history)
+
+            # コードを生成
+            code = code_generator.generate_code_from_text("Create a function")
+
+            # コードが生成されたことを確認
+            assert "func" in code or "def" in code
+
+
+def test_handle_chat_message_content_validation(monkeypatch):
+    """メッセージコンテンツの検証テスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "Valid response"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
+        # 様々な形式のメッセージをテスト
+        test_messages = [
+            "Simple message",
+            "Message with\nnewlines",
+            "Message with\t tabs",
+            "Message with  multiple   spaces",
+            "Message with special chars: @#$%^&*()",
+        ]
+
+        for msg in test_messages:
+            history = []
+            response, updated_history = chat_handler.handle_chat(msg, history)
+
+            assert response == "Valid response"
+            assert len(updated_history) == 2
+            assert updated_history[0]["content"] == msg
+
+
+def test_handle_chat_response_content_validation(monkeypatch):
+    """レスポンスコンテンツの検証テスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    test_responses = [
+        "Simple response",
+        "Response with\nnewlines",
+        "Response with code:\n```python\nprint('test')\n```",
+        "Response with unicode: 日本語🎉",
+        "Response with " + "x" * 1000,  # 長いレスポンス
+    ]
+
+    for test_response in test_responses:
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = test_response
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
+            history = []
+            response, updated_history = chat_handler.handle_chat("Test", history)
+
+            assert response == test_response
+            assert updated_history[1]["content"] == test_response
+
