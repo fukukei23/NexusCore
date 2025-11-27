@@ -14,9 +14,9 @@ alwaysApply: true
 - 既存の挙動を壊さない（後方互換100%）
 - 小さく安全な diff を生成する（50〜150行以内）
 - LLMRouter を優先して利用する（直叩き禁止。必要時は wrapper 経由）
-- import 時に副作用を起こさない（UI 起動禁止）
+- import 時に副作用を起こさない（UI 起動禁止。詳細は `nexuscore-safety.mdc` を参照）
 - 可読性を向上（型ヒント・docstring・明確な関数名）
-- 中核ファイルへの依存追加禁止（orchestrator / agents / llm_router）
+- 中核ファイルへの依存追加禁止（詳細は `nexuscore-architecture-rules.mdc` を参照）
 
 ## 2. 生成時テンプレート（PRフォーマット）
 出力は常に以下構造を守る：
@@ -36,9 +36,8 @@ pytest・linterで何が壊れていないかを説明。
 ---
 
 ## 3. モデル方針（呼び分け）
-- Primary: gpt-5.1 / gpt-5.1-codex
-- Secondary: claude-3.5 / gemini-pro / deepseek-r1
-- Fallback: gpt-5.1-mini / gpt-5-nano
+
+詳細は `nexuscore-llm-routing.mdc` を参照。
 
 Codex は `task_model_map` のモデルを使用し、
 必要に応じて Multi-LLM Consensus を活用する前提でコードを生成する。

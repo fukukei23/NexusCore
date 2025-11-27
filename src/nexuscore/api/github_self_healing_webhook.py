@@ -98,62 +98,82 @@ def parse_pull_request_event(
     return str(repo_full_name), int(pr_number), str(head_sha)
 
 
-def format_pr_comment(result: Dict[str, Any]) -> str:
+def format_pr_comment(result: Dict[str, Any], project_root: Optional[str] = None) -> str:
     """
     Self-Healing の実行結果を GitHub PR コメント形式の Markdown に整形する。
+
+    新しいメタ情報付きフォーマットを使用する。
     """
+    from nexuscore.utils.pr_comments import build_self_healing_pr_comment
+    from nexuscore.core.run_history import RunHistoryLogger
+
     status = result.get("status", "unknown")
     summary = result.get("summary", "")
     details = result.get("details", {})
+    run_id = result.get("run_id", "N/A")
 
-    # ステータスに応じた絵文字
-    status_emoji = {
-        "fixed": "✅",
-        "not_fixed": "⚠️",
-        "no_issues": "ℹ️",
-        "error": "❌",
-    }
-    emoji = status_emoji.get(status, "❓")
+    # 実行時間情報
+    started_at_iso = result.get("started_at_iso", "")
+    finished_at_iso = result.get("finished_at_iso", "")
+    duration_seconds = result.get("duration_seconds", 0.0)
 
-    lines = [
-        f"## {emoji} Self-Healing Result",
-        "",
-        f"**Status**: `{status}`",
-        f"**Summary**: {summary}",
-        "",
-    ]
+    # モデル名の取得（details から、またはデフォルト）
+    model_name = details.get("model_name", "NexusCore Auto-Reviewer")
 
-    # Guardian のレビューがあれば追加
-    guardian_status = details.get("guardian_status")
-    guardian_comment = details.get("guardian_comment")
-    if guardian_status or guardian_comment:
-        lines.append("### 🔍 Guardian Review")
-        if guardian_status:
-            lines.append(f"**Status**: `{guardian_status}`")
-        if guardian_comment:
-            lines.append(f"**Comment**: {guardian_comment}")
-        lines.append("")
-
-    # パッチプレビューがあれば追加
-    patch_preview = details.get("patch_preview")
+    # パッチ文字列の取得
+    patch_str = ""
+    patch_preview = details.get("patch_preview", "")
     if patch_preview:
-        lines.append("### 📝 Patch Preview")
-        lines.append(patch_preview)
-        lines.append("")
+        # Markdown ラッパーを除去
+        if patch_preview.startswith("```diff"):
+            patch_str = patch_preview[7:]  # "```diff\n" を除去
+            if patch_str.endswith("```"):
+                patch_str = patch_str[:-3]  # "\n```" を除去
+            patch_str = patch_str.strip()
+        else:
+            patch_str = patch_preview
 
-    # ブロックされたテストパスがあれば追加
-    blocked_test_paths = details.get("blocked_test_paths")
-    if blocked_test_paths:
-        lines.append("### 🚫 Blocked Test Files")
-        lines.append("The following test files were blocked from modification:")
-        for path in blocked_test_paths:
-            lines.append(f"- `{path}`")
-        lines.append("")
+    # 過去30回の成功率を計算
+    success_rate_30 = 0.0
+    success_count_30 = 0
+    total_count_30 = 0
+    if project_root:
+        try:
+            history_logger = RunHistoryLogger(project_root=project_root)
+            success_rate_30, success_count_30, total_count_30 = history_logger.calculate_success_rate(limit=30)
+        except Exception:
+            # 履歴取得失敗は致命的ではない
+            pass
 
-    lines.append(f"**Run ID**: `{result.get('run_id', 'N/A')}`")
-    lines.append(f"**Session ID**: `{result.get('session_id', 'N/A')}`")
+    # Guardian 情報
+    guardian_status = details.get("guardian_status", "")
+    guardian_comment = details.get("guardian_comment", "")
+    if not guardian_status and guardian_review:
+        guardian_status = guardian_review.get("decision", "")
+        auto_review = guardian_review.get("auto_review", {})
+        if auto_review:
+            guardian_comment = auto_review.get("summary", "")
 
-    return "\n".join(lines)
+    # ブロックされたテストファイル
+    blocked_test_paths = details.get("blocked_test_paths", [])
+
+    # 新しいフォーマットでコメントを組み立て
+    return build_self_healing_pr_comment(
+        run_id=run_id,
+        result_status=status,
+        started_at=started_at_iso,
+        finished_at=finished_at_iso,
+        duration_seconds=duration_seconds,
+        model_name=model_name,
+        patch_str=patch_str,
+        success_rate_30=success_rate_30,
+        success_count_30=success_count_30,
+        total_count_30=total_count_30,
+        summary=summary,
+        guardian_status=guardian_status,
+        guardian_comment=guardian_comment,
+        blocked_test_paths=blocked_test_paths,
+    )
 
 
 def _init_self_healing_service(
@@ -292,6 +312,13 @@ def github_webhook(
 
             except Exception as e:  # noqa: BLE001
                 logger.error(f"GuardianAgent review failed: {e}", exc_info=True)
+
+        # モデル名を result に追加（PRコメント用）
+        if guardian_agent is not None and hasattr(guardian_agent, "model"):
+            model_name = guardian_agent.model or "NexusCore Auto-Reviewer"
+            details = result.get("details") or {}
+            details["model_name"] = model_name
+            result["details"] = details
 
         return result
 
