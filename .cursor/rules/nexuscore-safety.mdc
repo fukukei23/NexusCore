@@ -1,0 +1,137 @@
+---
+alwaysApply: true
+---
+
+# NexusCore Safety & Security Rules
+
+## 1. 許可された操作範囲
+
+AI が読み書き・編集できるパスは次のみ：
+- `/home/yn441611/NexusCore` 配下
+
+## 2. 禁止領域
+
+以下には触れてはならない：
+- `/home/yn441611/atelier-kyo-manager`
+- `/home/yn441611/*`（NexusCore 以外）
+- `/etc` / `/usr` / `/var` / `/root`
+- Windows 側の `C:\Users\...`
+
+## 3. 絶対に実行しないコマンド
+
+以下のコマンドは、直接・間接を問わず提案も実行もしてはならない：
+- `rm -rf /` などルートディレクトリ削除系
+- `rm -rf .*` / `rm -rf .git` / `rm -rf venv` / `rm -rf myenv`
+- `git reset --hard` / `git clean -fdx`
+- `sudo` を含むコマンド全般
+- `apt install/remove`
+- `systemctl` 操作
+
+## 4. ファイル操作の原則
+
+- 破壊的操作（削除・上書き）は **常に diff ベース** で行い、1 ファイル単位の変更に留める
+- 不要ファイルを削除する必要がある場合は、まず `archive/` などに退避する案を優先する
+- 上書き前に必ず diff 提示
+- 大規模変更は必ずユーザー確認
+
+## 5. コマンド提案のスタイル
+
+- コマンドは必ず **コードブロック** で提示し、その意図を 1 行で説明する
+
+```bash
+cd /home/yn441611/NexusCore
+python -m pytest tests/llm/test_task_model_map.py
+```
+LLM ルーティング関連のユニットテストを実行。
+
+- 複数コマンドを自動実行する場合も `&&` で長鎖にせず、ユーザーが途中停止しやすいように分けて提示する
+
+## 6. テスト用以外の subprocess
+
+- テスト以外の目的で subprocess やシェルコマンドを使う場合、影響範囲を `/home/yn441611/NexusCore` 配下に限定し、ホームディレクトリ全体やシステムディレクトリを対象としない
+
+## 7. テスト実行環境
+
+- すべての pytest / shell 実行は **WSL Ubuntu** が前提
+- プロジェクトルートは `/home/yn441611/NexusCore`
+- WSL では Linux 形式の仮想環境 `myenv_linux` を使用
+
+```bash
+# 仮想環境を有効化
+source myenv_linux/bin/activate
+
+# テスト実行（推奨）
+bash dev_tools/run_tests.sh tests/
+
+# または直接実行
+python -m pytest tests/
+```
+
+初回セットアップが必要な場合：
+```bash
+bash dev_tools/setup_wsl_venv.sh
+```
+
+## 8. pytest の標準実行手順
+
+特に指定がなければ以下を使用：
+
+```bash
+cd /home/yn441611/NexusCore
+bash dev_tools/run_tests.sh tests/
+```
+
+- プロジェクトルート（`.`）全体を対象にした pytest は禁止
+- `tests/` 以外を対象にしない
+- 特定モジュールが指示された場合はそちらを優先
+
+例：
+「llm だけテストして」
+→ `bash dev_tools/run_tests.sh tests/llm/`
+
+## 9. テスト前後の禁止事項
+
+- `python -m pytest .`
+- `git reset --hard` / `git clean -fdx`
+- `rm -rf`
+- 大量ファイル削除
+- 本番コードを広範囲で自動書き換え
+- 無限リトライ
+
+失敗時は必ず：
+1. 実行コマンド
+2. エラー要約
+3. 修正案
+
+を返す。
+
+## 10. ログ取り扱い
+
+- pytest の出力ログは要約のみ提示
+- ログファイル上書きは禁止
+
+## 11. JSON ガード
+
+- LLM 出力は必ず as_json=True を付ける（BaseAgent にて）
+- JSON schema 準拠を enforce する
+
+## 12. NPE (予算ガード)
+
+- 全 LLM 呼び出しは guarded_llm_call() を通す
+- トークン見積もり → preflight_check → log_transaction の順序維持
+
+## 13. Logging
+
+必須項目：
+- model
+- provider
+- task
+- correlation_id
+- retry_count
+- cost (prompt/response/detail)
+
+## 14. 安全設計
+
+- import 時に UI 起動禁止
+- subprocess 使用時はログ＋エラー捕捉
+- diff パッチ適用は patch_applier を必ず使用

@@ -1,0 +1,167 @@
+# NexusCore テスト戦略設定ファイル
+#
+# 各モジュールのリスクランクとテスト生成戦略を定義します。
+#
+# リスクランク:
+#   S: クリティカル（人間主導 + AI補助）
+#   A: 重要（AI主導 + 人レビュー）
+#   B: 非クリティカル（AIほぼ任せ）
+#
+# 戦略:
+#   human_design + ai_augment: テストケース設計は人、AIはコード化と補強
+#   ai_first + human_review: AIが先に生成、人間がレビュー
+#   ai_first_only: AI生成のみ、重大バグだけ拾えればOK
+
+modules:
+  # ランクS: クリティカル（人間主導 + AI補助）
+  sandbox_runner:
+    risk: S
+    strategy: "human_design + ai_augment"
+    description: "サンドボックス実行の安全性が最重要"
+    min_coverage: 90
+
+  sandbox_executor:
+    risk: S
+    strategy: "human_design + ai_augment"
+    description: "コード実行の安全性が最重要"
+    min_coverage: 90
+
+  policy_agent:
+    risk: S
+    strategy: "human_design + ai_augment"
+    description: "プロジェクト憲法の解釈が最重要"
+    min_coverage: 85
+
+  guardian_agent:
+    risk: S
+    strategy: "human_design + ai_augment"
+    description: "コード承認の判断が最重要"
+    min_coverage: 85
+
+  vcs:
+    risk: S
+    strategy: "human_design + ai_augment"
+    description: "Git操作の安全性が最重要"
+    min_coverage: 85
+
+  patch_applier:
+    risk: S
+    strategy: "human_design + ai_augment"
+    description: "パッチ適用の安全性が最重要"
+    min_coverage: 90
+
+  # ランクA: 重要（AI主導 + 人レビュー）
+  test_generator:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "テスト生成ロジックの品質が重要"
+    min_coverage: 80
+
+  graph_builder:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "依存グラフ構築の正確性が重要"
+    min_coverage: 80
+
+  project_structure_and_code_export:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "プロジェクト構造の出力が重要"
+    min_coverage: 80
+
+  context_bundle_prime:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "コンテキストバンドルの生成が重要"
+    min_coverage: 75
+
+  orchestrator:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "オーケストレーションの流れが重要"
+    min_coverage: 75
+
+  self_healing_service:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "自己修復のロジックが重要"
+    min_coverage: 75
+
+  debugger_agent:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "デバッグロジックの品質が重要"
+    min_coverage: 75
+
+  # ランクB: 非クリティカル（AIほぼ任せ）
+  log_monitor:
+    risk: B
+    strategy: "ai_first_only"
+    description: "ログ監視は周辺機能"
+    min_coverage: 60
+
+  file_utils:
+    risk: B
+    strategy: "ai_first_only"
+    description: "ファイル操作ユーティリティ"
+    min_coverage: 70
+
+  json_sanitizer:
+    risk: B
+    strategy: "ai_first_only"
+    description: "JSON処理ユーティリティ"
+    min_coverage: 70
+
+  zip_output:
+    risk: B
+    strategy: "ai_first_only"
+    description: "ZIP出力ユーティリティ"
+    min_coverage: 60
+
+  diff_tools:
+    risk: B
+    strategy: "ai_first_only"
+    description: "diff処理ユーティリティ"
+    min_coverage: 70
+
+  # エージェント（個別設定）
+  coder_agent:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "コード生成エージェント"
+    min_coverage: 75
+
+  tester_agent:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "テスト生成エージェント"
+    min_coverage: 75
+
+  requirement_agent:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "要件分析エージェント"
+    min_coverage: 70
+
+  planner_agent:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "計画生成エージェント"
+    min_coverage: 70
+
+  architect_agent:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "アーキテクチャ設計エージェント"
+    min_coverage: 70
+
+# グローバル設定
+global:
+  default_risk: B
+  default_strategy: "ai_first_only"
+  default_min_coverage: 60
+  critical_test_markers:
+    - "critical"
+    - "safety"
+    - "security"
+

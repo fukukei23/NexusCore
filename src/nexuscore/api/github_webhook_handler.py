@@ -78,17 +78,20 @@ def _post_pr_comment_if_configured(result: Dict[str, Any], payload: Dict[str, An
         logger.debug("GITHUB_SELF_HEALING_TOKEN not set. Skipping PR comment.")
         return
 
-    try:
-        from nexuscore.api.github_self_healing_webhook import format_pr_comment
+        try:
+            import os
+            from nexuscore.api.github_self_healing_webhook import format_pr_comment
 
-        repo_full_name = payload.get("repository", {}).get("full_name")
-        pr_number = payload.get("pull_request", {}).get("number")
+            repo_full_name = payload.get("repository", {}).get("full_name")
+            pr_number = payload.get("pull_request", {}).get("number")
 
-        if not repo_full_name or not pr_number:
-            logger.warning("Cannot post PR comment: missing repo_full_name or pr_number")
-            return
+            if not repo_full_name or not pr_number:
+                logger.warning("Cannot post PR comment: missing repo_full_name or pr_number")
+                return
 
-        comment_body = format_pr_comment(result)
+            # プロジェクトルートを取得（環境変数から）
+            project_root = os.getenv("NEXUS_PROJECT_ROOT", os.getcwd())
+            comment_body = format_pr_comment(result, project_root=project_root)
 
         # GitHub API で PR コメントを投稿
         import requests

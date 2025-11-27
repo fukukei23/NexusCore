@@ -14,7 +14,7 @@ import json
 import time
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Tuple
 
 
 @dataclass
@@ -127,6 +127,48 @@ class RunHistoryLogger:
                     # 1行壊れていても全体は読み出せるようにする
                     continue
         return records
+
+    def get_last_self_healing_runs(self, limit: int = 30) -> List[Dict[str, Any]]:
+        """
+        Self-Healing 実行履歴のうち、直近 limit 件を返す。
+
+        Args:
+            limit: 取得する件数（デフォルト: 30）
+
+        Returns:
+            直近の実行履歴のリスト（新しい順）
+        """
+        all_runs = self.load_runs("self_healing")
+        # finished_at でソート（新しい順）
+        sorted_runs = sorted(
+            all_runs,
+            key=lambda r: r.get("finished_at", 0),
+            reverse=True,
+        )
+        return sorted_runs[:limit]
+
+    def calculate_success_rate(self, limit: int = 30) -> Tuple[float, int, int]:
+        """
+        過去 limit 回の Self-Healing 実行の成功率を計算する。
+
+        Args:
+            limit: 対象とする実行回数（デフォルト: 30）
+
+        Returns:
+            (success_rate, success_count, total_count)
+            - success_rate: 成功率（%）
+            - success_count: 成功回数（status == "fixed"）
+            - total_count: 総実行回数
+        """
+        runs = self.get_last_self_healing_runs(limit=limit)
+        total = len(runs)
+        if total == 0:
+            return 0.0, 0, 0
+
+        success = sum(1 for r in runs if r.get("status") == "fixed")
+        success_rate = round(success / total * 100, 1) if total > 0 else 0.0
+
+        return success_rate, success, total
 
     def _send_notification(self, record: RunRecord) -> None:
         """
