@@ -1,0 +1,87 @@
+---
+alwaysApply: true
+---
+
+# NexusCore Project Rules
+
+基本方針
+
+NexusCore は AIオーケストレーション・自己修復開発システムです。
+コア構造を壊さず、エージェント連携を維持するために、本ルールを必ず遵守します。
+
+> **注意**: このファイルは `nexuscore-starter-rules.mdc` と統合を検討中です。
+> 基本的な開発方針は `nexuscore-starter-rules.mdc` を参照してください。
+
+1. ディレクトリ構造の原則
+
+触ってよい領域：
+
+src/nexuscore/core/
+
+src/nexuscore/agents/
+
+src/nexuscore/llm/
+
+src/nexuscore/modules/
+
+src/nexuscore/gradio_app/
+
+tests/
+
+logs/, tmp/
+
+触ってはいけない or 要注意：
+
+.git/, .venv/（共通ルール）
+
+fkb_local.json の削除・初期化禁止
+
+nexus_core_run.log の破壊的変更禁止
+
+2. NexusCore 固有の安全ルール
+2-1. Orchestrator
+
+Requirement → Plan → Architecture → Coding → Testing → Review
+の フェーズ構造を変更してはならない。
+
+Orchestrator の public メソッドのシグネチャ変更は禁止。
+
+2-2. Agents
+
+各 Agent の責務（RequirementAgent, PlannerAgent, ArchitectAgent, CoderAgent, TesterAgent, GuardianAgent）を混ぜない。
+
+Agent が別 Agent の仕事を勝手にやる実装は禁止。
+
+Agent の入出力形式は変更不可（要議論）
+
+2-3. LLMRouter
+
+モデル選択/ログ/予算管理のルールを変えない。
+
+Provider の追加のみ許可、削除は禁止。
+
+2-4. PatchApplier / Diff / Self-Healing
+
+diff 適用ロジックは壊してはいけない最重要領域。
+
+例外握りつぶし禁止。
+
+副作用削除禁止（パッチ結果はログ化必須）。
+
+3. NexusCore 専用 Testing Rules
+
+Orchestrator のクリティカルパスに統合テストを必須化
+
+LLMRouter の model map の整合性テスト
+
+PatchApplier の差分生成テスト（回帰含む）
+
+Self-Healing（失敗 → 修復 → 再実行）のE2Eテスト
+
+4. NexusCore で禁止される操作
+
+context_bundle や genesis_analyzer の形式変更（互換性破壊）
+
+project_structure_and_code_export の出力形式変更
+
+fkb の初期化・削除

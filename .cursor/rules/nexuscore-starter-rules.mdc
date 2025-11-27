@@ -28,25 +28,21 @@ Orchestrator / Agents の負荷分散設計を行う
 です。
 
 1. モデル方針（超重要）
-▼ GPT-5 系が “司令塔（primary）”
 
-gpt-5.1（中核・推論）
+詳細は `nexuscore-llm-routing.mdc` を参照。
 
-gpt-5.1-codex（コード最適化・エージェントタスク）
+▼ GPT-5 系が "司令塔（primary）"
+- gpt-5.1（中核・推論）
+- gpt-5.1-codex（コード最適化・エージェントタスク）
 
-gpt-5.1-mini（高速ユーティリティ）
+▼ Secondary
+- claude-4.5-sonnet（構造化・レビュー・品質保証が強み）
+- gemini-3.0-pro（高速推論と読み込み量）
+- deepseek-r1（推論深度・リズム）
 
-gpt-5-pro / gpt-5-nano
-
-▼ Claude / Gemini / DeepSeek / Llama / Qwen も“積極活用”
-
-Claude は構造化・レビュー・品質保証が強み
-
-Gemini は高速推論と読み込み量
-
-DeepSeek は推論深度・リズム
-
-Qwen / Yi / Llama は速度・ローカル性
+▼ Fallback
+- gpt-5.1-mini（高速ユーティリティ）
+- gpt-5-nano
 
 → 単一LLMへの依存禁止
 → 複数LLMによる相互レビュー・合議・比較を推奨
@@ -64,27 +60,17 @@ Gradio UI のボタン動作も変更しない
 
 ③ 新規依存（import）は最小限に抑える
 
-高凝集領域への依存追加は避ける：
+高凝集領域への依存追加は避ける（詳細は `nexuscore-architecture-rules.mdc` を参照）：
 
-agents/
-
-core/orchestrator.py
-
-llm_router.py
-
-api/server.py
-
-npe/engine.py
+- agents/
+- core/orchestrator.py
+- llm/llm_router.py
+- api/server.py
+- npe/engine.py
 
 ④ マルチLLMを前提に設計する
 
-primary（GPT-5）
-
-secondary（Claude/Gemini/DeepSeek）
-
-consensus（多系統合議）
-
-fallback（gpt-5.1-mini / gpt-5-nano）
+詳細は `nexuscore-llm-routing.mdc` を参照。
 
 3. コード生成の原則
 🔹 Router 経由で LLM を呼ぶことを最優先

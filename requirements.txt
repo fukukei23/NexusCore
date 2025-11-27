@@ -43,3 +43,4 @@ httpcore
 requests  # For Slack notifications
 python-dotenv
 termcolor
+pyyaml  # For test strategy config

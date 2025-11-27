@@ -63,6 +63,8 @@ python -m pytest tests/
 
 ## 4. 禁止事項
 
+詳細は `nexuscore-safety.mdc` を参照。
+
 - `python -m pytest .`
 - `git reset --hard` / `git clean -fdx`
 - `rm -rf`
