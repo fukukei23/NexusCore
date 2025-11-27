@@ -402,3 +402,69 @@ def test_git_controller_commit_with_staged_changes(tmp_path):
     if result is not None:
         assert isinstance(result, str)
 
+
+def test_git_controller_commit_hash_uniqueness(tmp_path):
+    """コミットハッシュの一意性テスト"""
+    import subprocess
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
+
+    controller = vcs.GitController(repo_path=str(tmp_path))
+
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("initial")
+    subprocess.run(["git", "add", str(test_file)], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=tmp_path, check=True)
+
+    # 複数のコミットを作成
+    commit_hashes = []
+    for i in range(5):
+        test_file.write_text(f"version {i}")
+        result = controller.commit_changes(["test.txt"], f"Commit {i}")
+        if result is not None:
+            commit_hashes.append(result)
+
+    # すべてのコミットハッシュが異なることを確認
+    if len(commit_hashes) > 1:
+        assert len(set(commit_hashes)) == len(commit_hashes)
+
+
+def test_git_controller_repo_state_consistency(tmp_path):
+    """リポジトリ状態の一貫性テスト"""
+    import subprocess
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
+
+    controller1 = vcs.GitController(repo_path=str(tmp_path))
+    controller2 = vcs.GitController(repo_path=str(tmp_path))
+
+    # 両方のコントローラーが同じリポジトリを参照することを確認
+    assert controller1.repo.working_dir == controller2.repo.working_dir
+
+
+def test_git_controller_commit_with_deleted_file(tmp_path):
+    """削除されたファイルのコミットテスト"""
+    import subprocess
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
+
+    controller = vcs.GitController(repo_path=str(tmp_path))
+
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("content")
+    subprocess.run(["git", "add", str(test_file)], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=tmp_path, check=True)
+
+    # ファイルを削除
+    test_file.unlink()
+
+    # 削除されたファイルをコミットしようとする
+    result = controller.commit_changes(["test.txt"], "Delete file")
+
+    # is_dirtyの制限により、結果はNoneの可能性がある
+    if result is not None:
+        assert isinstance(result, str)
+

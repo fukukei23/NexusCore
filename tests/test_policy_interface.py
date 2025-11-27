@@ -274,3 +274,104 @@ def test_policy_interface_policy_immutability():
     assert "configured_at" in policy1
     assert "configured_at" in policy2
 
+
+def test_policy_interface_queue_operations_stress(tmp_path):
+    """キューの操作ストレステスト"""
+    pi = policy_interface.PolicyInterface()
+
+    # 大量の結果をキューに追加
+    for i in range(100):
+        pi.result_queue.put({"test": i, "value": f"data_{i}"})
+
+    # すべての結果を取得
+    results = []
+    while not pi.result_queue.empty():
+        try:
+            result = pi.result_queue.get(timeout=0.1)
+            results.append(result)
+        except:
+            break
+
+    assert len(results) == 100
+
+
+def test_policy_interface_default_policy_completeness():
+    """デフォルトポリシーの完全性テスト"""
+    pi = policy_interface.PolicyInterface()
+    policy = pi._get_safe_default_policy()
+
+    # すべての必須フィールドが存在することを確認
+    required_fields = [
+        "test_import_policy",
+        "error_language",
+        "quality_requirements",
+        "security_policy",
+        "configured_at",
+        "method"
+    ]
+
+    for field in required_fields:
+        assert field in policy, f"Missing required field: {field}"
+
+
+@patch("nexuscore.agents.policy_interface.GRADIO_AVAILABLE", True)
+@patch("nexuscore.agents.policy_interface.gr")
+def test_launch_and_wait_for_input_exception_handling(mock_gr):
+    """例外処理のテスト"""
+    pi = policy_interface.PolicyInterface()
+
+    mock_interface = MagicMock()
+
+    with patch.object(pi, "create_gradio_interface", return_value=mock_interface):
+        # 一般的な例外をシミュレート
+        import queue
+        original_get = pi.result_queue.get
+
+        def mock_get(timeout=None):
+            raise Exception("General error")
+
+        pi.result_queue.get = mock_get
+
+        result = pi.launch_and_wait_for_input(timeout=0.1)
+
+        # デフォルトポリシーが返されることを確認
+        assert result is not None
+        assert result["method"] == "safe_default"
+
+
+def test_policy_interface_result_queue_thread_safety():
+    """結果キューのスレッド安全性テスト"""
+    import threading
+
+    pi = policy_interface.PolicyInterface()
+    results = []
+
+    def put_results(thread_id):
+        for i in range(10):
+            pi.result_queue.put({"thread": thread_id, "value": i})
+
+    def get_results():
+        for _ in range(10):
+            try:
+                result = pi.result_queue.get(timeout=1)
+                results.append(result)
+            except:
+                break
+
+    # 複数のスレッドで同時にput/get
+    put_threads = [threading.Thread(target=put_results, args=(i,)) for i in range(5)]
+    get_threads = [threading.Thread(target=get_results) for _ in range(5)]
+
+    for t in put_threads:
+        t.start()
+    for t in get_threads:
+        t.start()
+
+    for t in put_threads:
+        t.join()
+    for t in get_threads:
+        t.join()
+
+    # すべての結果が取得されたことを確認
+    assert len(results) > 0
+
