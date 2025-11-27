@@ -10,8 +10,9 @@ class DummyPatchSet:
     def __init__(self, should_apply=True):
         self.should_apply = should_apply
 
-    def apply(self, root):
+    def apply(self, root, strip=0):
         self.root = root
+        self.strip = strip
         return self.should_apply
 
 

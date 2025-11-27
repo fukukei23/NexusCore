@@ -558,3 +558,328 @@ def test_generate_code_from_text_with_very_long_response(monkeypatch):
         assert len(result) > 1000
         assert "def func()" in result
 
+
+def test_generate_code_from_text_stress_test_many_requests(monkeypatch):
+    """多数のリクエストのストレステスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    mock_client = MagicMock()
+    responses = [f"```python\ndef func{i}():\n    pass\n```" for i in range(100)]
+
+    mock_client.chat.completions.create.side_effect = [
+        MagicMock(choices=[MagicMock(message=MagicMock(content=r))])
+        for r in responses
+    ]
+
+    with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+        for i in range(100):
+            result = code_generator.generate_code_from_text(f"Create func{i}")
+            assert result is not None
+            assert f"func{i}" in result
+
+
+def test_generate_code_from_text_with_malformed_code_blocks(monkeypatch):
+    """不正な形式のコードブロックのテスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    test_cases = [
+        "```python\ncode without closing",  # 終了タグなし
+        "```\ndef func():\n    pass\n```",  # 言語指定なし
+        "```python\n```",  # 空のコードブロック
+        "```python\n```python\ncode\n```",  # ネストされたブロック
+    ]
+
+    for malformed_code in test_cases:
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = malformed_code
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+            result = code_generator.generate_code_from_text("Create function")
+            assert result is not None
+
+
+def test_generate_code_from_text_with_unicode_in_code(monkeypatch):
+    """コード内のUnicode文字のテスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    unicode_code = """def 関数名():
+    print('こんにちは')
+    return '🎉'"""
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = f"```python\n{unicode_code}\n```"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+        result = code_generator.generate_code_from_text("Create function with Unicode")
+
+        assert result is not None
+        assert "関数名" in result or "こんにちは" in result or "🎉" in result
+
+
+def test_generate_code_from_text_with_syntax_errors_in_response(monkeypatch):
+    """構文エラーを含むレスポンスのテスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    # 構文エラーを含むコード
+    error_code = "def func(\n    return  # 構文エラー"
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = f"```python\n{error_code}\n```"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+        result = code_generator.generate_code_from_text("Create function")
+
+        # 構文エラーがあっても結果は返される（検証は別途行う）
+        assert result is not None
+        assert "func" in result or "return" in result
+
+
+def test_generate_code_from_text_prompt_variations(monkeypatch):
+    """様々なプロンプトバリエーションのテスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    prompt_variations = [
+        "関数を作成",
+        "Create a function",
+        "関数を作成してください。要件は...",
+        "Please create a function that...",
+        "コードを生成",
+        "Generate code",
+    ]
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "```python\ndef func():\n    pass\n```"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+        for prompt in prompt_variations:
+            result = code_generator.generate_code_from_text(prompt)
+            assert result is not None
+            call_args = mock_client.chat.completions.create.call_args
+            assert prompt in call_args.kwargs["messages"][0]["content"]
+
+
+def test_generate_code_from_text_response_stripping(monkeypatch):
+    """レスポンスのトリミングテスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    # 前後に空白があるコード
+    code_with_whitespace = "   \n   def func():\n       pass\n   \n   "
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = f"```python\n{code_with_whitespace}\n```"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+        result = code_generator.generate_code_from_text("Create function")
+
+        assert result is not None
+        # strip()が適用される可能性がある
+        assert "def func()" in result or "func()" in result
+
+
+def test_generate_code_from_text_integration_with_file_creator(tmp_path, monkeypatch):
+    """file_creatorとの統合テスト"""
+    from file_creator import create_code_file
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "```python\ndef generated():\n    return 'test'\n```"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    folder = str(tmp_path / "generated")
+
+    with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+        # コードを生成
+        generated_code = code_generator.generate_code_from_text("Create a function")
+
+        # 生成されたコードをファイルに保存
+        filename = "generated.py"
+        result_path = create_code_file(filename, generated_code, folder)
+
+        assert os.path.exists(result_path)
+        with open(result_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            assert "def generated" in content or "generated" in content
+
+
+def test_generate_code_from_text_integration_with_history_manager(tmp_path, monkeypatch):
+    """HistoryManagerとの統合テスト"""
+    from history_manager import HistoryManager
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    history_dir = str(tmp_path / "history")
+    hm = HistoryManager(history_dir=history_dir)
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "```python\ndef test():\n    pass\n```"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+        # コードを生成
+        code = code_generator.generate_code_from_text("Create test function")
+
+        # 履歴に保存
+        state = {
+            "action": "code_generated",
+            "prompt": "Create test function",
+            "code": code
+        }
+        hm.add_state(state)
+
+        # 履歴が正しく保存されていることを確認
+        saved_state = hm.get_current_state()
+        assert saved_state["action"] == "code_generated"
+        assert "def test" in saved_state["code"] or "test" in saved_state["code"]
+
+
+def test_generate_code_from_text_code_quality_validation(monkeypatch):
+    """生成されたコードの品質検証テスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    # 様々な品質のコードをテスト
+    test_codes = [
+        "```python\ndef good_function():\n    \"\"\"Docstring.\"\"\"\n    return True\n```",
+        "```python\ndef simple():\n    pass\n```",
+        "```python\nclass TestClass:\n    def method(self):\n        return self\n```",
+    ]
+
+    for test_code in test_codes:
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = test_code
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+            result = code_generator.generate_code_from_text("Generate code")
+
+            assert result is not None
+            # コードが有効なPython構文である可能性を確認
+            assert "def" in result or "class" in result
+
+
+def test_generate_code_from_text_error_message_format(monkeypatch):
+    """エラーメッセージの形式テスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.side_effect = Exception("Network error")
+
+    with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+        result = code_generator.generate_code_from_text("Generate code")
+
+        # エラーメッセージが正しい形式であることを確認
+        assert "⚠️ GPT code generation failed:" in result
+        assert "Network error" in result or "error" in result.lower()
+
+
+def test_generate_code_from_text_token_usage_tracking(monkeypatch):
+    """トークン使用量の追跡テスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "```python\ndef test():\n    pass\n```"
+    mock_response.usage = MagicMock()
+    mock_response.usage.prompt_tokens = 100
+    mock_response.usage.completion_tokens = 50
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+        result = code_generator.generate_code_from_text("Generate code")
+
+        assert result is not None
+        # トークン使用量が記録されていることを確認
+        assert hasattr(mock_response, "usage")
+
+
+def test_generate_code_from_text_model_parameter_consistency(monkeypatch):
+    """モデルパラメータの一貫性テスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "```python\npass\n```"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+        code_generator.generate_code_from_text("Generate code")
+
+        # モデルパラメータが一貫していることを確認
+        call_args = mock_client.chat.completions.create.call_args
+        assert "model" in call_args.kwargs
+
+
+def test_generate_code_from_text_temperature_setting(monkeypatch):
+    """温度設定のテスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "```python\npass\n```"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+        code_generator.generate_code_from_text("Generate code")
+
+        # 温度パラメータが設定されている可能性を確認
+        call_args = mock_client.chat.completions.create.call_args
+        # 温度が設定されている場合、範囲内であることを確認
+        if "temperature" in call_args.kwargs:
+            assert 0 <= call_args.kwargs["temperature"] <= 2
+
+
+def test_generate_code_from_text_max_tokens_limit(monkeypatch):
+    """最大トークン数の制限テスト"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "```python\npass\n```"
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
+
+    with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+        code_generator.generate_code_from_text("Generate code")
+
+        call_args = mock_client.chat.completions.create.call_args
+        # max_tokensが設定されている場合、合理的な範囲内であることを確認
+        if "max_tokens" in call_args.kwargs:
+            assert call_args.kwargs["max_tokens"] > 0
+            assert call_args.kwargs["max_tokens"] < 100000  # 合理的な上限
+

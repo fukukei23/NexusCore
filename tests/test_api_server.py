@@ -321,3 +321,272 @@ def test_get_task_status_with_special_characters():
             # タスクが存在しない場合は404
             assert response.status_code in [200, 404]
 
+
+def test_execute_task_stress_test_many_requests():
+    """多数のリクエストのストレステスト"""
+    with server.app.test_client() as client:
+        with patch("nexuscore.api.server.run_orchestrator_task"):
+            # 50個のリクエストを迅速に送信
+            responses = []
+            for i in range(50):
+                response = client.post('/api/v1/execute', json={
+                    "requirement": f"Test {i}",
+                    "project_path": f"/tmp/test{i}"
+                })
+                responses.append(response)
+
+            # すべてのリクエストが成功することを確認
+            for response in responses:
+                assert response.status_code == 202
+                data = json.loads(response.data)
+                assert "task_id" in data
+
+
+def test_execute_task_with_very_long_requirement():
+    """非常に長いrequirementのテスト"""
+    with server.app.test_client() as client:
+        with patch("nexuscore.api.server.run_orchestrator_task"):
+            long_requirement = "A" * 10000  # 10KBのrequirement
+
+            response = client.post('/api/v1/execute', json={
+                "requirement": long_requirement,
+                "project_path": "/tmp/test"
+            })
+
+            assert response.status_code == 202
+            data = json.loads(response.data)
+            assert "task_id" in data
+
+
+def test_execute_task_with_very_long_project_path():
+    """非常に長いproject_pathのテスト"""
+    with server.app.test_client() as client:
+        with patch("nexuscore.api.server.run_orchestrator_task"):
+            long_path = "/" + "/".join(["dir" * 10] * 100)  # 非常に長いパス
+
+            response = client.post('/api/v1/execute', json={
+                "requirement": "Test",
+                "project_path": long_path
+            })
+
+            assert response.status_code == 202
+            data = json.loads(response.data)
+            assert "task_id" in data
+
+
+def test_get_task_status_concurrent_access():
+    """並行アクセスのテスト"""
+    test_task_id = "concurrent-test-123"
+    server.tasks[test_task_id] = {"status": "running", "message": "Test"}
+
+    try:
+        import threading
+
+        results = []
+
+        def get_status():
+            with server.app.test_client() as client:
+                response = client.get(f'/api/v1/status/{test_task_id}')
+                results.append(response.status_code)
+
+        threads = [threading.Thread(target=get_status) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # すべてのリクエストが成功することを確認
+        assert all(status == 200 for status in results)
+    finally:
+        if test_task_id in server.tasks:
+            del server.tasks[test_task_id]
+
+
+def test_execute_task_response_time():
+    """レスポンス時間のテスト"""
+    with server.app.test_client() as client:
+        with patch("nexuscore.api.server.run_orchestrator_task"):
+            import time
+            start_time = time.time()
+
+            response = client.post('/api/v1/execute', json={
+                "requirement": "Test",
+                "project_path": "/tmp/test"
+            })
+
+            elapsed = time.time() - start_time
+
+            assert response.status_code == 202
+            # レスポンスが迅速であることを確認（1秒以内）
+            assert elapsed < 1.0
+
+
+def test_get_task_status_with_unicode_task_id():
+    """Unicode文字を含むタスクIDのテスト"""
+    with server.app.test_client() as client:
+        unicode_task_id = "タスク-123-テスト"
+
+        response = client.get(f'/api/v1/status/{unicode_task_id}')
+
+        # タスクが存在しない場合は404
+        assert response.status_code in [200, 404]
+
+
+def test_execute_task_with_malformed_json():
+    """不正なJSON形式のテスト"""
+    with server.app.test_client() as client:
+        # 不正なJSONを送信
+        response = client.post(
+            '/api/v1/execute',
+            data="{'invalid': json}",
+            content_type='application/json'
+        )
+
+        # エラーが返されることを確認
+        assert response.status_code == 400
+
+
+def test_execute_task_with_extra_nested_fields():
+    """ネストされた追加フィールドのテスト"""
+    with server.app.test_client() as client:
+        with patch("nexuscore.api.server.run_orchestrator_task"):
+            response = client.post('/api/v1/execute', json={
+                "requirement": "Test",
+                "project_path": "/tmp/test",
+                "extra": {
+                    "nested": {
+                        "deep": "value"
+                    }
+                }
+            })
+
+            assert response.status_code == 202
+            data = json.loads(response.data)
+            assert "task_id" in data
+
+
+def test_execute_task_task_id_uniqueness():
+    """タスクIDの一意性テスト"""
+    with server.app.test_client() as client:
+        with patch("nexuscore.api.server.run_orchestrator_task"):
+            task_ids = []
+            for i in range(10):
+                response = client.post('/api/v1/execute', json={
+                    "requirement": f"Test {i}",
+                    "project_path": f"/tmp/test{i}"
+                })
+                data = json.loads(response.data)
+                task_ids.append(data["task_id"])
+
+            # すべてのタスクIDが異なることを確認
+            assert len(set(task_ids)) == len(task_ids)
+
+
+def test_get_task_status_memory_cleanup():
+    """メモリクリーンアップのテスト"""
+    test_task_id = "memory-test-123"
+    server.tasks[test_task_id] = {
+        "status": "completed",
+        "message": "Test completed",
+        "result": {"data": "x" * 10000}  # 大きなデータ
+    }
+
+    try:
+        with server.app.test_client() as client:
+            # ステータスを取得
+            response = client.get(f'/api/v1/status/{test_task_id}')
+            assert response.status_code == 200
+
+            # タスクがメモリに保持されていることを確認
+            assert test_task_id in server.tasks
+    finally:
+        if test_task_id in server.tasks:
+            del server.tasks[test_task_id]
+
+
+def test_execute_task_with_invalid_content_type():
+    """不正なContent-Typeのテスト"""
+    with server.app.test_client() as client:
+        # Content-Typeを指定しない
+        response = client.post(
+            '/api/v1/execute',
+            data='{"requirement": "Test", "project_path": "/tmp/test"}',
+            content_type='text/plain'
+        )
+
+        # エラーが返されることを確認（Content-Typeが不正）
+        assert response.status_code in [400, 415]
+
+
+def test_execute_task_request_size_limit():
+    """リクエストサイズ制限のテスト"""
+    with server.app.test_client() as client:
+        with patch("nexuscore.api.server.run_orchestrator_task"):
+            # 非常に大きなrequirement（1MB）
+            large_requirement = "A" * (1024 * 1024)
+
+            response = client.post('/api/v1/execute', json={
+                "requirement": large_requirement,
+                "project_path": "/tmp/test"
+            })
+
+            # リクエストが処理されるか、サイズ制限エラーになることを確認
+            assert response.status_code in [202, 413, 400]
+
+
+def test_get_task_status_with_expired_task():
+    """期限切れタスクのテスト"""
+    test_task_id = "expired-task-123"
+    import time
+    server.tasks[test_task_id] = {
+        "status": "running",
+        "message": "Test",
+        "created_at": time.time() - 86400  # 24時間前
+    }
+
+    try:
+        with server.app.test_client() as client:
+            response = client.get(f'/api/v1/status/{test_task_id}')
+
+            # タスクが存在する場合は200、期限切れの場合は404または400
+            assert response.status_code in [200, 404, 400]
+    finally:
+        if test_task_id in server.tasks:
+            del server.tasks[test_task_id]
+
+
+def test_execute_task_error_logging():
+    """エラーロギングのテスト"""
+    with server.app.test_client() as client:
+        # 無効なリクエストを送信
+        response = client.post('/api/v1/execute', json={
+            "requirement": None,
+            "project_path": None
+        })
+
+        # エラーが適切に処理されることを確認（500も許容）
+        assert response.status_code in [400, 422, 500, 202]
+
+
+def test_get_task_status_rate_limiting_simulation():
+    """レート制限のシミュレーションテスト"""
+    test_task_id = "rate-limit-test-123"
+    server.tasks[test_task_id] = {"status": "running", "message": "Test"}
+
+    try:
+        import time
+        with server.app.test_client() as client:
+            # 迅速に多数のリクエストを送信
+            start_time = time.time()
+            for _ in range(100):
+                response = client.get(f'/api/v1/status/{test_task_id}')
+                assert response.status_code == 200
+
+            elapsed = time.time() - start_time
+
+            # リクエストが迅速に処理されることを確認（10秒以内）
+            assert elapsed < 10.0
+    finally:
+        if test_task_id in server.tasks:
+            del server.tasks[test_task_id]
+

@@ -25,7 +25,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 # ------------------------------------------------------------------------------
 # パス設定 (自己完結性を高めるため: src/ を sys.path に追加)
@@ -60,6 +60,9 @@ from nexuscore.npe.engine import guarded_llm_call
 
 # LLM ルーター
 from nexuscore.llm.llm_router import LLMRouter
+
+# セッション制御
+from nexuscore.core.session_control import SessionController
 
 # ユーティリティ (必要に応じて使用)
 try:
@@ -103,6 +106,9 @@ class Orchestrator:
     llm_router: LLMRouter
     max_retries: int = 5
 
+    # 新規: セッション制御オブジェクト（省略可能）
+    session_controller: Optional[SessionController] = None
+
     # --- 内部状態 ---
     logger: logging.Logger = field(init=False)
 
@@ -139,6 +145,38 @@ class Orchestrator:
 
             self.logger.addHandler(fh)
             self.logger.addHandler(ch)
+
+    def _maybe_stop(self, phase: str, extra: Optional[Dict[str, Any]] = None) -> None:
+        """
+        フェーズの境目で呼び出される中断判定ヘルパー。
+
+        - `checkpoint` を更新して、どこまで進んだか state.json に保存。
+        - `control.json` に stop/pause 指示があれば RuntimeError("SessionStopped")
+          を投げて処理全体を安全に中断する。
+        """
+        if not self.session_controller:
+            return
+
+        # まずチェックポイントを保存（「ここまでで一旦保存して」に相当）
+        try:
+            self.session_controller.checkpoint(phase, extra or {})
+        except Exception:
+            # チェックポイント保存に失敗してもメイン処理は継続させる
+            self.logger.exception(f"Failed to checkpoint session at phase '{phase}'")
+
+        # 中断指示が出ているか確認
+        try:
+            if self.session_controller.should_stop():
+                self.logger.warning(
+                    f"Session stop requested at phase '{phase}'. Aborting gracefully."
+                )
+                raise RuntimeError("SessionStopped")
+        except RuntimeError:
+            # そのまま上位に投げる
+            raise
+        except Exception:
+            # 予期せぬエラーはログだけ出して継続
+            self.logger.exception("Error while checking session stop request.")
 
     # ------------------------------------------------------------------
     # NPE 経由で LLM を叩くヘルパー
@@ -194,98 +232,122 @@ class Orchestrator:
         self.logger.info(f"=== Full Project Run Start === requirement='{user_requirement}'")
         task_id = uuid.uuid4().hex
 
-        # --------------------------------------------------------------
-        # Phase 1: Requirement Definition (domain layer)
-        # --------------------------------------------------------------
-        self.logger.info(f"[{task_id}] Phase 1: Requirement Definition")
-        specs: Dict[str, Any] = {}
-
         try:
-            use_ui = bool(getattr(self.requirement_agent, "use_ui", False))
-            if use_ui and hasattr(self.requirement_agent, "launch_gradio_ui"):
-                specs = self.requirement_agent.launch_gradio_ui(share=False)
-            elif hasattr(self.requirement_agent, "analyze_requirement"):
-                specs = self.requirement_agent.analyze_requirement(user_requirement)
-            else:
-                # 最低限、テキストとして持っておく
-                specs = {"raw_requirement": user_requirement}
-        except Exception as e:
-            self.logger.error(f"[{task_id}] Requirement phase failed: {e}", exc_info=True)
-            return
+            # Phase 0: 開始直後のチェックポイント
+            self._maybe_stop("start", {"task_id": task_id, "requirement": user_requirement})
 
-        if not specs:
-            self.logger.error(f"[{task_id}] Requirement definition returned empty specs. Aborting.")
-            return
+            # --------------------------------------------------------------
+            # Phase 1: Requirement Definition (domain layer)
+            # --------------------------------------------------------------
+            self.logger.info(f"[{task_id}] Phase 1: Requirement Definition")
+            self._maybe_stop("before_requirement", {"task_id": task_id})
 
-        # --------------------------------------------------------------
-        # Phase 2: Planning / Coding / Testing (application layer: plan + code + tests)
-        # --------------------------------------------------------------
-        self.logger.info(f"[{task_id}] Phase 2: Planning (fast_lane={fast_lane})")
-        plan: Dict[str, Any] = {}
-
-        def _run_plan():
-            if hasattr(self.planner_agent, "generate_plan"):
-                req_json = json.dumps(specs, ensure_ascii=False, indent=2)
-                return self.planner_agent.generate_plan(req_json)
-            plan_prompt = (
-                "以下の要件仕様に基づき、実装タスクの計画を立ててください。\n"
-                "可能であれば JSON 形式で 'functions_to_implement' 配列を含めてください。\n\n"
-                f"{json.dumps(specs, ensure_ascii=False, indent=2)}"
-            )
-            return self._execute_task_via_npe(
-                prompt=plan_prompt,
-                metadata={"task_type": "planning", "as_json": False},
-            )
-
-        def _run_code():
-            if hasattr(self.coder_agent, "implement_code"):
-                return self.coder_agent.implement_code(
-                    task_description=user_requirement,
-                    existing_code="",
-                    code_language=os.getenv("NEXUS_CODE_LANG", "python"),
-                )
-            return ""
-
-        def _run_test():
-            if hasattr(self.tester_agent, "generate_tests"):
-                return self.tester_agent.generate_tests(user_requirement)
-            return ""
-
-        try:
-            if fast_lane:
-                from concurrent.futures import ThreadPoolExecutor
-                with ThreadPoolExecutor(max_workers=3) as ex:
-                    future_plan = ex.submit(_run_plan)
-                    future_code = ex.submit(_run_code)
-                    future_test = ex.submit(_run_test)
-                    plan_text = future_plan.result()
-                    code_result = future_code.result()
-                    test_result = future_test.result()
-                test_result = self._ensure_fastlane_tests(
-                    initial_result=test_result,
-                    plan_text=plan_text,
-                    code_result=code_result,
-                    requirement=user_requirement,
-                )
-                self.logger.info(
-                    "[FastLane] coder output length=%s, tester output length=%s",
-                    len(code_result) if code_result else 0,
-                    len(test_result) if test_result else 0,
-                )
-                self.last_fastlane_outputs = {
-                    "code": code_result,
-                    "tests": test_result,
-                    "plan": plan_text,
-                }
-            else:
-                plan_text = _run_plan()
-                code_result = _run_code()
-                test_result = _run_test()
+            specs: Dict[str, Any] = {}
 
             try:
-                plan = json.loads(plan_text)
-            except Exception:
-                plan = {"raw_plan": plan_text}
+                use_ui = bool(getattr(self.requirement_agent, "use_ui", False))
+                if use_ui and hasattr(self.requirement_agent, "launch_gradio_ui"):
+                    specs = self.requirement_agent.launch_gradio_ui(share=False)
+                elif hasattr(self.requirement_agent, "analyze_requirement"):
+                    specs = self.requirement_agent.analyze_requirement(user_requirement)
+                else:
+                    # 最低限、テキストとして持っておく
+                    specs = {"raw_requirement": user_requirement}
+            except Exception as e:
+                self.logger.error(f"[{task_id}] Requirement phase failed: {e}", exc_info=True)
+                return
+
+            if not specs:
+                self.logger.error(f"[{task_id}] Requirement definition returned empty specs. Aborting.")
+                return
+
+            self._maybe_stop("after_requirement", {"specs_summary": str(specs)[:500] if specs else ""})
+
+            # --------------------------------------------------------------
+            # Phase 2: Planning / Coding / Testing (application layer: plan + code + tests)
+            # --------------------------------------------------------------
+            self.logger.info(f"[{task_id}] Phase 2: Planning (fast_lane={fast_lane})")
+            self._maybe_stop("before_planning", {})
+            plan: Dict[str, Any] = {}
+
+            def _run_plan():
+                if hasattr(self.planner_agent, "generate_plan"):
+                    req_json = json.dumps(specs, ensure_ascii=False, indent=2)
+                    return self.planner_agent.generate_plan(req_json)
+                plan_prompt = (
+                    "以下の要件仕様に基づき、実装タスクの計画を立ててください。\n"
+                    "可能であれば JSON 形式で 'functions_to_implement' 配列を含めてください。\n\n"
+                    f"{json.dumps(specs, ensure_ascii=False, indent=2)}"
+                )
+                return self._execute_task_via_npe(
+                    prompt=plan_prompt,
+                    metadata={"task_type": "planning", "as_json": False},
+                )
+
+            def _run_code():
+                if hasattr(self.coder_agent, "implement_code"):
+                    return self.coder_agent.implement_code(
+                        task_description=user_requirement,
+                        existing_code="",
+                        code_language=os.getenv("NEXUS_CODE_LANG", "python"),
+                    )
+                return ""
+
+            def _run_test():
+                if hasattr(self.tester_agent, "generate_tests"):
+                    return self.tester_agent.generate_tests(user_requirement)
+                return ""
+
+            try:
+                if fast_lane:
+                    from concurrent.futures import ThreadPoolExecutor
+                    with ThreadPoolExecutor(max_workers=3) as ex:
+                        future_plan = ex.submit(_run_plan)
+                        future_code = ex.submit(_run_code)
+                        future_test = ex.submit(_run_test)
+                        plan_text = future_plan.result()
+                        code_result = future_code.result()
+                        test_result = future_test.result()
+                    test_result = self._ensure_fastlane_tests(
+                        initial_result=test_result,
+                        plan_text=plan_text,
+                        code_result=code_result,
+                        requirement=user_requirement,
+                    )
+                    self.logger.info(
+                        "[FastLane] coder output length=%s, tester output length=%s",
+                        len(code_result) if code_result else 0,
+                        len(test_result) if test_result else 0,
+                    )
+                    self.last_fastlane_outputs = {
+                        "code": code_result,
+                        "tests": test_result,
+                        "plan": plan_text,
+                    }
+                else:
+                    plan_text = _run_plan()
+                    code_result = _run_code()
+                    test_result = _run_test()
+
+                try:
+                    plan = json.loads(plan_text)
+                except Exception:
+                    plan = {"raw_plan": plan_text}
+
+                self._maybe_stop("after_planning", {"plan_preview": str(plan_text)[:500] if plan_text else ""})
+            except Exception as e:
+                self.logger.error(f"[{task_id}] Planning/Coding/Testing phase failed: {e}", exc_info=True)
+                plan = {"error": str(e), "raw_specs": specs}
+
+        except RuntimeError as e:
+            if str(e) == "SessionStopped":
+                self.logger.info(
+                    f"Project run stopped by user request. "
+                    f"All generated files remain on disk for session resume."
+                )
+                return
+            # それ以外の RuntimeError は従来通り上位に投げる
+            raise
         except Exception as e:
             self.logger.error(f"[{task_id}] Planning/Coding/Testing phase failed: {e}", exc_info=True)
             plan = {"error": str(e), "raw_specs": specs}
@@ -464,6 +526,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Planner/Coder/Tester を並列で走らせる高速モードを有効化",
     )
+    # 新規: セッションID（省略時は自動生成）
+    parser.add_argument(
+        "--session-id",
+        type=str,
+        help="セッションID（省略時は UUID で自動生成されます）",
+    )
     return parser
 
 
@@ -486,16 +554,32 @@ def main() -> None:
         }
     }
 
+    # セッションIDの決定（指定がなければ UUID を採用）
+    session_id = args.session_id or uuid.uuid4().hex
+    logger.info(f"Using session_id={session_id} for this run.")
+
+    # SessionController を初期化
+    session_controller = SessionController(
+        session_id=session_id,
+        root_dir=os.path.join(args.project, ".nexus", "sessions")
+    )
+
     try:
         agent_team = assemble_agent_team(project_path=args.project)
         orch = Orchestrator(
             project_path=args.project,
             constitution=constitution,
+            session_controller=session_controller,
             **agent_team,
         )
         logger.info("Orchestrator instance created. Starting full project run.")
         orch.run_full_project(args.requirement, fast_lane=args.fast_lane)
         logger.info("Orchestrator process finished successfully.")
+    except RuntimeError as e:
+        if str(e) == "SessionStopped":
+            logger.info("Orchestrator stopped by user request (SessionStopped).")
+            sys.exit(0)  # 正常終了として扱う
+        raise
     except Exception as e:
         logger.critical(f"A critical error occurred in Orchestrator: {e}", exc_info=True)
         sys.exit(1)
