@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# activate
+#
+# 仮想環境を簡単に有効化するスクリプト
+# 使い方: source activate または . activate
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# 仮想環境を探す
+if [ -d "$SCRIPT_DIR/myenv_linux" ]; then
+    source "$SCRIPT_DIR/myenv_linux/bin/activate"
+    echo "✅ 仮想環境を有効化しました: myenv_linux"
+elif [ -d "$SCRIPT_DIR/.venv" ]; then
+    source "$SCRIPT_DIR/.venv/bin/activate"
+    echo "✅ 仮想環境を有効化しました: .venv"
+elif [ -d "$SCRIPT_DIR/venv" ]; then
+    source "$SCRIPT_DIR/venv/bin/activate"
+    echo "✅ 仮想環境を有効化しました: venv"
+else
+    echo "❌ 仮想環境が見つかりません"
+    echo "   以下のコマンドで作成してください:"
+    echo "   python3 -m venv .venv"
+    return 1 2>/dev/null || exit 1
+fi
+

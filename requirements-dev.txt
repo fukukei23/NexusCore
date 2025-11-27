@@ -1,0 +1,17 @@
+# Development dependencies for NexusCore
+# 開発ツールのみをまとめたファイル（ランタイム依存は requirements.txt に）
+
+# フォーマッタ / Linter
+black
+ruff
+
+# 型チェック
+mypy
+
+# テスト
+pytest
+pytest-cov
+
+# 型付きスタブ（よく使うライブラリ向け）
+types-requests
+types-PyYAML
