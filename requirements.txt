@@ -40,5 +40,6 @@ google-cloud-translate
 # --- Utilities ---
 httpx
 httpcore
+requests  # For Slack notifications
 python-dotenv
 termcolor
