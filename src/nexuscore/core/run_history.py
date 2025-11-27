@@ -66,6 +66,9 @@ class RunHistoryLogger:
             # （必要ならここで logging.error を出してもよい）
             pass
 
+        # 通知を送信（オプション）
+        self._send_notification(record)
+
     # ------------------------------------------------------------------
     # Self-Healing 用のヘルパー
     # ------------------------------------------------------------------
@@ -124,4 +127,30 @@ class RunHistoryLogger:
                     # 1行壊れていても全体は読み出せるようにする
                     continue
         return records
+
+    def _send_notification(self, record: RunRecord) -> None:
+        """
+        実行完了時に通知を送信する（オプション）。
+        """
+        try:
+            from nexuscore.core.notifier import get_notifier
+
+            notifier = get_notifier()
+            if not notifier:
+                return
+
+            # Self-Healing の場合
+            if record.kind == "self_healing":
+                notifier.notify_self_healing_complete(
+                    repo_full_name=record.repo_full_name or "unknown",
+                    pr_number=record.pr_number or 0,
+                    status=record.status,
+                    summary=record.summary or "",
+                    run_id=record.run_id,
+                    details=record.details,
+                )
+            # その他の種類の通知は必要に応じて追加
+        except Exception:
+            # 通知失敗は致命的ではないので握りつぶす
+            pass
 
