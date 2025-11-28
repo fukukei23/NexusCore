@@ -52,3 +52,7 @@ jobs:
           # CI では除外することを想定
           python -m pytest tests -m "not integration" -q
 
+      - name: Run webapp UI smoke tests
+        run: |
+          pytest -q tests/webapp/
+

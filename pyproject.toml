@@ -1,8 +1,9 @@
 [tool.black]
-include = "\.pyi?$"exclude = """
+include = "\\.pyi?$"
+exclude = """
 /(
-    \.git
-  | \.venv
+    \\.git
+  | \\.venv
   | venv
   | dist
   | build
@@ -15,7 +16,8 @@ include = "\.pyi?$"exclude = """
   | logs
   | tmp
 )/
-"""line-length = 100
+"""
+line-length = 100
 target-version = ["py312"]
 
 [tool.ruff]

@@ -1,6 +1,7 @@
 # ==============================================================================
 # PatchApplier: 安全な unified diff 適用ユーティリティ（dry-run / Danger Guard 対応版）
 # ==============================================================================
+import difflib
 import logging
 import os
 from typing import Dict, Any
@@ -182,3 +183,32 @@ class PatchApplier:
         apply_patch_bool() のエイリアス。
         """
         return self.apply_patch_bool(patch_str, project_path)
+
+    # ------------------------------------------------------------------ #
+    # E-4: Before/After 差分抽出
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def get_text_diff(before: str, after: str) -> str:
+        """
+        Before/After の差分を unified diff 形式の文字列で返す。
+
+        Args:
+            before: 変更前のコード
+            after: 変更後のコード
+
+        Returns:
+            unified diff 形式の文字列
+        """
+        before_lines = before.splitlines(keepends=True)
+        after_lines = after.splitlines(keepends=True)
+
+        # difflib.unified_diff を使用
+        diff_lines = difflib.unified_diff(
+            before_lines,
+            after_lines,
+            fromfile="before",
+            tofile="after",
+            lineterm="",
+        )
+
+        return "".join(diff_lines)

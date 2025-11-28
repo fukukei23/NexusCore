@@ -151,6 +151,9 @@ class SlackNotifier:
         summary: str,
         run_id: str,
         details: Optional[Dict[str, Any]] = None,
+        metrics: Optional[Dict[str, Any]] = None,
+        pr_url: Optional[str] = None,
+        run_logs_url: Optional[str] = None,
     ) -> bool:
         """
         Self-Healing実行完了通知を送信する。
@@ -161,6 +164,9 @@ class SlackNotifier:
         :param summary: サマリー
         :param run_id: 実行ID
         :param details: 追加の詳細情報
+        :param metrics: メトリクス情報（duration, patches, models, cost, success_rate など）
+        :param pr_url: PR URL（例: https://github.com/owner/repo/pull/123）
+        :param run_logs_url: Run ログ URL（例: https://your-nexuscore-host/logs/runs/abcd1234）
         :return: 送信成功時True
         """
         # ステータスに応じたタイトルとメッセージ
@@ -182,7 +188,47 @@ class SlackNotifier:
         status_text = status_jp.get(status, status)
 
         title = f"{emoji} Self-Healing 完了: {repo_full_name} PR #{pr_number}"
-        message = f"実行ID: `{run_id}`\nステータス: {status_text}\n\n{summary}"
+
+        # メッセージ本文を構築（メトリクスを含む）
+        message_parts = [
+            f"実行ID: `{run_id}`",
+            f"ステータス: {status_text}",
+        ]
+
+        if metrics:
+            if metrics.get("duration_str"):
+                message_parts.append(f"実行時間: {metrics['duration_str']}")
+            if metrics.get("patch_files_count", 0) > 0:
+                message_parts.append(
+                    f"パッチ: {metrics.get('patch_lines', 0)} lines / {metrics.get('patch_files_count', 0)} files"
+                )
+            if metrics.get("model_call_counts"):
+                models_list = []
+                for model, count in metrics["model_call_counts"].items():
+                    models_list.append(f"{model} ({count} calls)")
+                message_parts.append(f"使用モデル: {', '.join(models_list[:3])}")
+            if metrics.get("estimated_cost_jpy", 0) > 0:
+                message_parts.append(f"推定コスト: ~{metrics['estimated_cost_jpy']:.2f} JPY")
+            if metrics.get("success_rate") is not None:
+                success_rate_pct = metrics["success_rate"] * 100
+                message_parts.append(f"最近の成功率 (last 30): {success_rate_pct:.1f}%")
+
+        message_parts.append("")
+        message_parts.append(summary)
+
+        # PR URL と Run ログ URL を details セクションとして追加
+        detail_lines: list[str] = []
+        if pr_url:
+            detail_lines.append(f"- PR: {pr_url}")
+        if run_logs_url:
+            detail_lines.append(f"- Run logs: {run_logs_url}")
+
+        if detail_lines:
+            message_parts.append("")
+            message_parts.append("詳細:")
+            message_parts.extend(detail_lines)
+
+        message = "\n".join(message_parts)
 
         # ステータスに応じた通知ステータス
         notify_status = "success" if status == "fixed" else ("error" if status == "error" else "warning")

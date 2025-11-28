@@ -18,7 +18,7 @@ endif
 SRC := src
 TESTS := tests
 
-.PHONY: help venv install-dev format lint typecheck test test-fast test-coverage qa clean
+.PHONY: help venv install-dev format lint typecheck test test-fast test-coverage test-phase3 qa clean
 
 help:
 	@echo "Available targets:"
@@ -30,6 +30,7 @@ help:
 	@echo "  make test         - run pytest (fast, no coverage)"
 	@echo "  make test-fast    - run pytest with parallel execution"
 	@echo "  make test-coverage - run pytest with coverage"
+	@echo "  make test-phase3  - run Phase3 analyzer tests with coverage"
 	@echo "  make qa           - format + lint + typecheck + test"
 	@echo "  make clean        - clean cache files"
 	@echo ""
@@ -89,6 +90,10 @@ test-coverage:
 	$(PYTHON) -m pytest $(TESTS) -v --tb=short --cov=$(SRC) --cov-report=term-missing --cov-report=html
 	@echo "✅ Tests with coverage complete"
 	@echo "📊 Coverage report: htmlcov/index.html"
+
+test-phase3:
+	$(PYTHON) -m pytest tests/analyzer/ --cov=src/nexuscore/analyzer --cov-report=term-missing
+	@echo "✅ Phase3 analyzer tests with coverage complete"
 
 # ==== 一括品質チェック ====
 qa: format lint-fix typecheck test
