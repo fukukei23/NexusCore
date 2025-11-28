@@ -223,14 +223,45 @@ class Orchestrator:
     # ------------------------------------------------------------------
     # メインフロー (必要に応じて段階的に強化していく)
     # ------------------------------------------------------------------
-    def run_full_project(self, user_requirement: str, language: str = "ja", fast_lane: bool = False) -> None:
+    def run_full_project(
+        self,
+        user_requirement: str,
+        language: str = "ja",
+        fast_lane: bool = False,
+        run_db_id: Optional[int] = None,
+    ) -> None:
         """
         高レベルな「フルプロジェクト」実行フロー。
         - 現時点では Requirement → Planning までを安全に通すことを優先。
         - 以降のフェーズ（Architecture / Coding / Testing ...）は今後拡張。
+
+        Args:
+            user_requirement: ユーザー要件
+            language: 言語（デフォルト: "ja"）
+            fast_lane: 高速レーン実行フラグ
+            run_db_id: Run.id（Webapp側でRunレコードを作成したときのID、CLI実行時はNone）
         """
         self.logger.info(f"=== Full Project Run Start === requirement='{user_requirement}'")
         task_id = uuid.uuid4().hex
+
+        # Orchestrator ログフック（開始時）
+        try:
+            from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
+
+            log_orchestrator_event(
+                run_db_id=run_db_id,
+                phase="startup",
+                status="STARTED",
+                message="Orchestrator run started",
+                extra={
+                    "task_id": task_id,
+                    "requirement": user_requirement[:200],
+                    "autonomy_level": self.constitution.get("automation_policy", {}).get("autonomy_level"),
+                },
+            )
+        except Exception:
+            # ログ失敗は既存の処理を止めない
+            pass
 
         try:
             # Phase 0: 開始直後のチェックポイント
@@ -259,9 +290,33 @@ class Orchestrator:
 
             if not specs:
                 self.logger.error(f"[{task_id}] Requirement definition returned empty specs. Aborting.")
+                try:
+                    from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
+
+                    log_orchestrator_event(
+                        run_db_id=run_db_id,
+                        phase="requirement",
+                        status="FAILED",
+                        message="Requirement definition returned empty specs",
+                    )
+                except Exception:
+                    pass
                 return
 
             self._maybe_stop("after_requirement", {"specs_summary": str(specs)[:500] if specs else ""})
+
+            # Orchestrator ログフック（Requirement完了）
+            try:
+                from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
+
+                log_orchestrator_event(
+                    run_db_id=run_db_id,
+                    phase="requirement",
+                    status="SUCCESS",
+                    message="Requirement phase completed",
+                )
+            except Exception:
+                pass
 
             # --------------------------------------------------------------
             # Phase 2: Planning / Coding / Testing (application layer: plan + code + tests)
@@ -335,9 +390,35 @@ class Orchestrator:
                     plan = {"raw_plan": plan_text}
 
                 self._maybe_stop("after_planning", {"plan_preview": str(plan_text)[:500] if plan_text else ""})
+
+                # Orchestrator ログフック（Planning完了）
+                try:
+                    from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
+
+                    log_orchestrator_event(
+                        run_db_id=run_db_id,
+                        phase="planning",
+                        status="SUCCESS",
+                        message="Planning phase completed",
+                        extra={"fast_lane": fast_lane},
+                    )
+                except Exception:
+                    pass
             except Exception as e:
                 self.logger.error(f"[{task_id}] Planning/Coding/Testing phase failed: {e}", exc_info=True)
                 plan = {"error": str(e), "raw_specs": specs}
+                # Orchestrator ログフック（Planning失敗）
+                try:
+                    from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
+
+                    log_orchestrator_event(
+                        run_db_id=run_db_id,
+                        phase="planning",
+                        status="FAILED",
+                        message=f"Planning phase failed: {str(e)[:200]}",
+                    )
+                except Exception:
+                    pass
 
         except RuntimeError as e:
             if str(e) == "SessionStopped":
@@ -345,12 +426,36 @@ class Orchestrator:
                     f"Project run stopped by user request. "
                     f"All generated files remain on disk for session resume."
                 )
+                # Orchestrator ログフック（中断）
+                try:
+                    from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
+
+                    log_orchestrator_event(
+                        run_db_id=run_db_id,
+                        phase="shutdown",
+                        status="INTERRUPTED",
+                        message="Orchestrator run stopped by user request",
+                    )
+                except Exception:
+                    pass
                 return
             # それ以外の RuntimeError は従来通り上位に投げる
             raise
         except Exception as e:
             self.logger.error(f"[{task_id}] Planning/Coding/Testing phase failed: {e}", exc_info=True)
             plan = {"error": str(e), "raw_specs": specs}
+            # Orchestrator ログフック（例外）
+            try:
+                from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
+
+                log_orchestrator_event(
+                    run_db_id=run_db_id,
+                    phase="orchestrator",
+                    status="FAILED",
+                    message=f"Orchestrator run failed: {str(e)[:200]}",
+                )
+            except Exception:
+                pass
 
         # --------------------------------------------------------------
         # Phase 3 以降は将来拡張用のフック (review/postmortem/integration)
@@ -359,6 +464,19 @@ class Orchestrator:
         self.logger.info(f"[{task_id}] Phase 3: Development Cycle (tasks={len(tasks)})")
 
         self.logger.info(f"=== Full Project Run Finished === requirement='{user_requirement}'")
+
+        # Orchestrator ログフック（完了）
+        try:
+            from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
+
+            log_orchestrator_event(
+                run_db_id=run_db_id,
+                phase="shutdown",
+                status="FINISHED",
+                message="Orchestrator run finished",
+            )
+        except Exception:
+            pass
 
     def _ensure_fastlane_tests(
         self,

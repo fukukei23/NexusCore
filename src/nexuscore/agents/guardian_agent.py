@@ -18,7 +18,7 @@ from __future__ import annotations
 import os
 import json
 import git
-from typing import Any, Dict, Optional, Callable, List
+from typing import Any, Dict, Optional, Callable, List, Union
 
 from .base_agent import BaseAgent
 from nexuscore.utils.vcs import GitController
@@ -326,3 +326,128 @@ Diff プレビュー:
         except Exception as e:
             self.logger.error(f"LLM review failed: {e}", exc_info=True)
             return {"decision": "MANUAL_REVIEW", "reason": f"LLM レビューエラー: {e}"}
+
+    # ------------------------------------------------------------------ #
+    # E-4/E-5: Before/After 差分サマリー生成（複数ファイル対応）
+    # ------------------------------------------------------------------ #
+    def generate_diff_summary(
+        self,
+        before_code: Optional[str] = None,
+        after_code: Optional[str] = None,
+        file_diffs: Optional[Dict[str, Dict[str, str]]] = None,
+        model: str = "gpt-4.1",
+    ) -> Union[str, Dict[str, str]]:
+        """
+        パッチ適用前後のコードを LLM に渡し、改善点を要約する。
+
+        Args:
+            before_code: 変更前のコード（単一ファイル用、後方互換性のため）
+            after_code: 変更後のコード（単一ファイル用、後方互換性のため）
+            file_diffs: 複数ファイルの差分（E-5 新機能）
+                {
+                    "a.py": {"before": "...", "after": "..."},
+                    "b.py": {"before": "...", "after": "..."},
+                }
+            model: 使用する LLM モデル（デフォルト: "gpt-4.1"）
+
+        Returns:
+            単一ファイルの場合: 5行以内の改善点要約（Markdown 形式）
+            複数ファイルの場合: {"a.py": "要約...", "b.py": "要約..."} の辞書
+        """
+        self._budget("guardian:diff_summary")
+
+        # E-5: 複数ファイル対応
+        if file_diffs:
+            return self._generate_multi_file_diff_summary(file_diffs, model)
+
+        # E-4: 単一ファイル対応（後方互換性）
+        if before_code is None or after_code is None:
+            return "差分サマリーの生成に失敗しました: before_code または after_code が指定されていません"
+
+        prompt = f"""
+以下のコード変更をレビューし、改善点を5行以内で要約してください。
+
+## 変更前のコード
+```python
+{before_code}
+```
+
+## 変更後のコード
+```python
+{after_code}
+```
+
+## 出力要件
+- 改善点を5行以内で要約してください
+- 各項目は箇条書き（- で始まる）で記述してください
+- 技術的な改善点（簡潔化、複雑度低減、バグ修正など）を明確に示してください
+- Markdown 形式で出力してください
+
+出力例:
+- XXX が簡潔化され、可読性が向上
+- 複雑度が低減され、保守性が改善
+- エラーハンドリングが追加され、堅牢性が向上
+"""
+
+        try:
+            # 一時的に model を変更（指定されたモデルを使用）
+            original_model = self.model
+            self.model = model
+
+            summary = self.execute_llm_task(prompt, as_json=False)
+
+            # model を元に戻す
+            self.model = original_model
+
+            # 5行以内に制限（行数チェック）
+            lines = summary.strip().split("\n")
+            if len(lines) > 5:
+                # 最初の5行だけを取得
+                summary = "\n".join(lines[:5])
+                summary += "\n_(要約が長いため、最初の5行のみ表示)_"
+
+            return summary.strip()
+
+        except Exception as e:
+            self.logger.error(f"Failed to generate diff summary: {e}", exc_info=True)
+            return f"差分サマリーの生成に失敗しました: {e}"
+
+    def _generate_multi_file_diff_summary(
+        self,
+        file_diffs: Dict[str, Dict[str, str]],
+        model: str = "gpt-4.1",
+    ) -> Dict[str, str]:
+        """
+        複数ファイルの差分サマリーを生成する（E-5）。
+
+        Args:
+            file_diffs: ファイル名をキー、{"before": "...", "after": "..."} を値とする辞書
+            model: 使用する LLM モデル
+
+        Returns:
+            {"a.py": "要約...", "b.py": "要約..."} の辞書
+        """
+        result: Dict[str, str] = {}
+
+        # 各ファイルに対して個別に要約を生成
+        for file_path, diff_pair in file_diffs.items():
+            before_code = diff_pair.get("before", "")
+            after_code = diff_pair.get("after", "")
+
+            if not before_code or not after_code:
+                result[file_path] = "差分サマリーの生成に失敗しました: before/after が空です"
+                continue
+
+            try:
+                # 単一ファイル用の要約生成を再利用
+                summary = self.generate_diff_summary(
+                    before_code=before_code,
+                    after_code=after_code,
+                    model=model,
+                )
+                result[file_path] = summary if isinstance(summary, str) else "要約生成に失敗しました"
+            except Exception as e:
+                self.logger.warning(f"Failed to generate diff summary for {file_path}: {e}", exc_info=True)
+                result[file_path] = f"差分サマリーの生成に失敗しました: {e}"
+
+        return result

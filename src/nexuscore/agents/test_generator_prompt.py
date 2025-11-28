@@ -21,6 +21,8 @@ def build_test_generation_prompt(
     strategy: str = "ai_first_only",
     requirements: Optional[List[str]] = None,
     min_coverage: int = 60,
+    module_name: Optional[str] = None,
+    additional_requirements: Optional[str] = None,
 ) -> str:
     """
     テスト生成用のプロンプトを組み立てる。
@@ -34,6 +36,8 @@ def build_test_generation_prompt(
         strategy: テスト生成戦略
         requirements: 追加の要件・懸念事項（自然文のリスト）
         min_coverage: 目標カバレッジ（%）
+        module_name: モジュール名（webapp. で始まる場合はHTTP/Flask向けの指示を追加）
+        additional_requirements: 追加の要件（文字列）
 
     Returns:
         LLM に送るプロンプト文字列
@@ -134,7 +138,31 @@ def build_test_generation_prompt(
     lines.append(risk_instructions.get(risk_level, risk_instructions["B"]))
     lines.append("")
 
+    # Web/API モジュール向けの特別な指示
+    is_webapp_module = module_name is not None and module_name.startswith("webapp.")
+    webapp_instructions = ""
+    if is_webapp_module:
+        webapp_instructions = """
+## Web/API テストの特別な要件
+
+このモジュールは Flask アプリケーションの Web/API レイヤーです。以下の点を特に注意してください：
+
+- Flask アプリケーションのテストであることを想定してください
+- HTTP エンドポイントに対するテストクライアント（Flaskの `test_client()` または既存のテストユーティリティ）を利用してください
+- 認証が必要なエンドポイントについては、認証済み / 非認証の両方のパターンをテストしてください
+- ステータスコード（200, 401, 403, 404, 500 など）、レスポンスボディ、権限エラー（401/403）も検証してください
+- 異常系（存在しないリソースID、権限のないユーザーによるアクセス、不正なリクエストボディなど）も最低1ケース以上含めてください
+- セッション管理やクッキーのテストも必要に応じて含めてください
+"""
+        lines.append(webapp_instructions)
+        lines.append("")
+
     # 追加要件があれば追加
+    if additional_requirements:
+        lines.append("## 追加要件")
+        lines.append(additional_requirements)
+        lines.append("")
+
     if requirements:
         lines.append("## 追加要件・懸念事項")
         for i, req in enumerate(requirements, 1):

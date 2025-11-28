@@ -27,8 +27,21 @@ class AppConfig:
     # ---- 既存（デフォルトは従来値。環境変数で上書き可能） -------------------
     FLASK_SECRET_KEY: str = os.getenv("FLASK_SECRET_KEY", "a-very-secret-key-for-dev")
     DATABASE_URI: str = os.getenv("DATABASE_URI", "sqlite:///db.sqlite3")
-    CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
-    CELERY_RESULT_BACKEND: str = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+
+    # Celery 設定（開発/本番で切り替え可能）
+    # 開発環境: redis://localhost:6379/0
+    # 本番環境: redis://redis:6379/0 (Docker) または redis://redis.example.com:6379/0
+    CELERY_BROKER_URL: str = os.getenv(
+        "CELERY_BROKER_URL",
+        os.getenv("REDIS_URL", "redis://localhost:6379/0")  # REDIS_URL もサポート
+    )
+    CELERY_RESULT_BACKEND: str = os.getenv(
+        "CELERY_RESULT_BACKEND",
+        os.getenv("REDIS_URL", "redis://localhost:6379/1")  # REDIS_URL もサポート（別DB番号）
+    )
+
+    # Webapp ベースURL（PRコメントのリンク生成用）
+    WEBAPP_BASE_URL: str = os.getenv("WEBAPP_BASE_URL", "http://localhost:5000")
 
     # ---- ロール別 自律度のサーバ上限（L0..L3） -------------------------------
     # 例) user<=1, admin<=2, system<=3

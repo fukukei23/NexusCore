@@ -1,0 +1,45 @@
+# sandbox_policy.yml
+# サンドボックス実行に関するポリシー定義
+
+resource_limits:
+  cpu_time_seconds: 30          # 1実行あたりの最大CPU時間
+  wall_time_seconds: 60         # 実時間のタイムアウト
+  memory_mb: 1024               # 最大メモリ使用量
+  disk_write_mb: 100            # 一時ディスク書き込み上限
+
+network:
+  enabled: false                # ネットワークを完全に禁止する場合
+  allowlist: []                 # enabled=true の場合のみ有効。許可ドメインのリスト。
+  denylist: []                  # 禁止ドメインのリスト（将来用）
+
+filesystem:
+  allowed_paths:
+    - "/tmp/nexuscore_sandbox"
+  read_only_paths:
+    - "/usr/lib"
+  forbidden_paths:
+    - "/"
+    - "/etc"
+    - "/var"
+    - "/home"
+
+python_runtime:
+  forbidden_modules:
+    - "os"
+    - "subprocess"
+    - "socket"
+    - "shutil"
+  allowed_modules_extra: []     # 追加で許可したいモジュールをここに列挙
+
+retry_policy:
+  max_retries: 1
+  retryable_errors:
+    - "TimeoutError"
+    - "TransientSandboxError"
+
+logging:
+  level: "INFO"
+  redact_env_vars:
+    - "OPENAI_API_KEY"
+    - "GITHUB_TOKEN"
+

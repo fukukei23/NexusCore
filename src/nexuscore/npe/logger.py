@@ -40,6 +40,8 @@ def _rotate_if_needed(path: Path) -> None:
 def log_transaction(log_data: dict, log_file: str | Path = DEFAULT_LOG):
     """
     監査証跡をJSONLで追記。排他＋簡易ローテーション＋フォールバック出力。
+
+    既存の動作を維持しつつ、Flaskアプリコンテキストが存在する場合はDBにも書き込む。
     """
     if isinstance(log_file, str):
         log_file = Path(log_file)
@@ -63,6 +65,17 @@ def log_transaction(log_data: dict, log_file: str | Path = DEFAULT_LOG):
             with log_file.open("a", encoding="utf-8") as f:
                 f.write(entry_compact + "\n")
         except Exception as e:
-            # ファイルに書けない状況でも“監査の消失”を避ける
+            # ファイルに書けない状況でも"監査の消失"を避ける
             print(f"[NPE-Logger] CRITICAL: failed to write audit file '{log_file}': {e}")
             print(entry_compact)
+
+    # DBにも書き込む（Flaskアプリコンテキストが存在する場合のみ）
+    try:
+        from nexuscore.webapp.db_logger import enhance_log_transaction
+        enhance_log_transaction(log_data, log_file)
+    except ImportError:
+        # webapp がインストールされていない場合はスキップ（CLI実行時など）
+        pass
+    except Exception:
+        # DB書き込み失敗は既存の処理を止めない
+        pass
