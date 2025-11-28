@@ -155,6 +155,55 @@ modules:
     description: "アーキテクチャ設計エージェント"
     min_coverage: 70
 
+  # Web/SaaS レイヤー
+  webapp.auth:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "GitHub OAuth認証（セキュリティ重要）"
+    min_coverage: 70
+    enable_auto_generation: true
+    requires_human_review: true
+    test_level: "component"
+
+  webapp.projects:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "プロジェクト管理API（重要機能）"
+    min_coverage: 70
+    enable_auto_generation: true
+    requires_human_review: true
+    test_level: "component"
+
+  webapp.logs:
+    risk: B
+    strategy: "ai_first_only"
+    description: "ログビューア（周辺機能）"
+    min_coverage: 60
+    enable_auto_generation: true
+    requires_human_review: false
+    test_level: "component"
+
+  webapp.api_keys:
+    risk: A
+    strategy: "ai_first + human_review"
+    description: "APIキー管理（セキュリティ重要）"
+    min_coverage: 70
+    enable_auto_generation: true
+    requires_human_review: true
+    test_level: "component"
+
+  webapp.dashboard:
+    risk: B
+    strategy: "ai_first_only"
+    description: "ダッシュボード（UI表示）"
+    min_coverage: 60
+    enable_auto_generation: true
+    requires_human_review: false
+    test_level: "component"
+
+  # サンドボックス実行基盤（既存エントリを確認）
+  # sandbox_executor は既に定義されているが、念のため確認
+
 # グローバル設定
 global:
   default_risk: B

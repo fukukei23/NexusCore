@@ -1,0 +1,106 @@
+---
+alwaysApply: true
+---
+
+# NexusCore テスト結果レポート自動生成ルール
+
+## 基本方針
+
+テスト実行完了時には、必ず結果ファイルを作成し、内容を確認して報告すること。
+
+## 1. テスト結果レポートの自動生成
+
+テスト実行が完了したら、以下の手順を必ず実行する：
+
+1. **レポートファイルの生成**
+   - `dev_tools/test_result_generator.py` を使用してテスト結果を解析
+   - Markdown形式のレポート（`test_results/TEST_RESULT_YYYYMMDD_HHMMSS.md`）を生成
+   - JSON形式のレポート（`test_results/TEST_RESULT_YYYYMMDD_HHMMSS.json`）を生成
+
+2. **レポートファイルの確認**
+   - 生成されたレポートファイルのパスを表示
+   - レポートのサマリー部分を読み取って確認
+   - 成功/失敗/スキップ数、成功率、実行時間を確認
+   - 失敗したテストやエラーテストが存在する場合は一覧を確認
+
+3. **結果の報告**
+   - テスト実行結果のサマリーをユーザーに報告
+   - レポートファイルの場所を明示
+   - 必要に応じてレポートファイルの内容を引用して説明
+
+## 2. 実装方法
+
+### テスト実行スクリプトの使用
+
+`dev_tools/run_tests.sh` を使用する場合、レポートは自動生成される：
+
+```bash
+bash dev_tools/run_tests.sh [テストターゲット]
+```
+
+### 手動でレポート生成
+
+テスト実行後に手動でレポートを生成する場合：
+
+```bash
+python -m dev_tools.test_result_generator <pytest_output_file> <test_target> [output_dir]
+```
+
+### レポートの確認
+
+生成されたレポートファイルを読み取って確認：
+
+```bash
+cat test_results/TEST_RESULT_YYYYMMDD_HHMMSS.md
+```
+
+または、Pythonスクリプトから直接読み取る：
+
+```python
+report_path = Path("test_results/TEST_RESULT_YYYYMMDD_HHMMSS.md")
+report_content = report_path.read_text(encoding="utf-8")
+# サマリー部分を抽出して確認
+```
+
+## 3. 報告フォーマット
+
+テスト実行完了時には、以下の形式で報告する：
+
+```
+📊 テスト実行完了
+
+✅ テスト結果レポートを生成しました:
+   - Markdown: test_results/TEST_RESULT_20251128_123456.md
+   - JSON: test_results/TEST_RESULT_20251128_123456.json
+
+📊 テスト結果サマリー:
+   合計: 100 / 成功: 95 / 失敗: 3 / スキップ: 2 / エラー: 0
+   成功率: 95.0%
+   実行時間: 45.32秒
+
+[失敗したテストがあれば詳細を記載]
+```
+
+## 4. 確認項目
+
+レポート確認時には、以下を必ずチェックする：
+
+- ✅ 合計テスト数が正しく記録されているか
+- ✅ 成功/失敗/スキップ数が正確か
+- ✅ 失敗したテストの一覧が含まれているか
+- ✅ エラーテストの一覧が含まれているか
+- ✅ 実行時間が記録されているか
+- ✅ レポートファイルが正常に生成されているか
+
+## 5. 禁止事項
+
+- テスト実行後にレポートを生成せずに終了することは禁止
+- レポートファイルを確認せずに「完了しました」と報告することは禁止
+- レポート生成に失敗しても、その旨を必ず報告すること
+
+## 6. 関連ファイル
+
+- `dev_tools/test_result_generator.py` - レポート生成ツール
+- `dev_tools/run_tests.sh` - テスト実行スクリプト（レポート生成統合済み）
+- `test_results/README.md` - テスト結果ディレクトリの説明
+- `docs/test_result_reporting.md` - 詳細な使用方法

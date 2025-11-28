@@ -1,7 +1,16 @@
 # NexusCore
 
-**NexusCore** は自律型 AI エージェント群を組み合わせてソフトウェア開発支援を行うフレームワークです。  
+**NexusCore** は自律型 AI エージェント群を組み合わせてソフトウェア開発支援を行うフレームワークです。
 道具立て（エージェント／Orchestrator／LLM ルーター）を分離しつつ、必要なツール・UI・テストを同一リポジトリ内で管理する設計になっています。
+
+---
+
+**Self-Healing Status (NexusCore SaaS MVP)**
+
+<!-- NOTE: {PROJECT_ID} は実際の Project.id に置き換えてください（例: 1）。your-nexuscore-host は運用環境のホスト名に置き換えてください。 -->
+
+[![Self-Healing Success Rate](https://your-nexuscore-host/api/projects/1/badge/success_rate)](https://your-nexuscore-host/dashboard/projects/1)
+[![Self-Healing Last Run](https://your-nexuscore-host/api/projects/1/badge/last_run)](https://your-nexuscore-host/dashboard/projects/1)
 
 - 🧠 **AIコード修復／開発支援**：Requirement→Planning→Coding→Testing まで各フェーズを担当するエージェント。
 - ☁️ **SaaS展開を意識した分離設計**：LLM/エージェント/オーケストレータを独立レイヤーで構築。
@@ -41,15 +50,23 @@ NexusCore/
 
 ---
 
+## 🔌 External Integrations
+
+NexusCore can be triggered from VSCode extensions, Chrome extensions, or other tools via a simple REST API.
+
+- See `docs/external_run_api_examples.md` for concrete examples (TypeScript / JavaScript / Python / curl).
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. WSL (Ubuntu) 環境での基本手順
 
-1. `\\wsl.localhost\Ubuntu\home\yn441611\NexusCore`（Linux シェルでは `/home/yn441611/NexusCore`）に移動し、これを作業ルートにします。  
-2. システム Python には `pip` が入っていないため、`python -m venv .venv` で仮想環境を作成します。  
-3. `.venv/bin/python -m pip install -r requirements.txt` で依存をインストール。  
-4. 実行時は `.venv/bin/python main_cli.py …` や `PYTHONPATH=src .venv/bin/pytest …` を使う、または `.venv/bin/activate` してから `python` / `pip` を呼び出してください。  
-5. ネイティブなログ・出力先は `/home/yn441611/NexusCore/...` に向け、権限エラーを回避します。  
+1. `\\wsl.localhost\Ubuntu\home\yn441611\NexusCore`（Linux シェルでは `/home/yn441611/NexusCore`）に移動し、これを作業ルートにします。
+2. システム Python には `pip` が入っていないため、`python -m venv .venv` で仮想環境を作成します。
+3. `.venv/bin/python -m pip install -r requirements.txt` で依存をインストール。
+4. 実行時は `.venv/bin/python main_cli.py …` や `PYTHONPATH=src .venv/bin/pytest …` を使う、または `.venv/bin/activate` してから `python` / `pip` を呼び出してください。
+5. ネイティブなログ・出力先は `/home/yn441611/NexusCore/...` に向け、権限エラーを回避します。
 6. 依存を追加したら `pip freeze > requirements.lock.txt` などでロックファイルを更新して共有してください。
 
 ### 2. 依存要件
@@ -61,7 +78,7 @@ NexusCore/
 
 ### 3. ローカルで試すコマンド
 
-- **Fast lane regression gate**  
+- **Fast lane regression gate**
   リポジトリの差分検査には `dev_tools.fast_lane_check` を使います。
 
   ```bash
@@ -72,7 +89,7 @@ NexusCore/
   - `--max-files` / `--max-lines-total` / `--max-lines-per-file` … 切り分けパラメータ
   - `FAST_LANE_FORCE=1` を使うとしきい値を無視
 
-- **重要ファイル一覧の取得**  
+- **重要ファイル一覧の取得**
 
   ```bash
   .venv/bin/python -m tools.list_core_files --format text
@@ -107,9 +124,9 @@ NexusCore/
 
 ## 🧰 補足メモ
 
-- `.env.template` をコピーして `.env` を作成し、API キーや最大予算などを記入してください。  
-- `output/` 以下にログや自動テスト結果がたまりますので、コミット不要のものは `.gitignore` に入れています。  
-- 大型変更を加えるときは `python -m tools.list_core_files --format json` などで影響範囲を確認しつつ、`tests/` の適切なユニットを更新してください。  
+- `.env.template` をコピーして `.env` を作成し、API キーや最大予算などを記入してください。
+- `output/` 以下にログや自動テスト結果がたまりますので、コミット不要のものは `.gitignore` に入れています。
+- 大型変更を加えるときは `python -m tools.list_core_files --format json` などで影響範囲を確認しつつ、`tests/` の適切なユニットを更新してください。
 - 新しい LLM プロバイダ追加時は下記フローに従ってください。
   1. `src/nexuscore/llm/providers/` に `<vendor>_provider.py` を新規作成し、`BaseLLM` を継承したクラスで実装（API キーの `None` 判定と `HTTP_CLIENT_FACTORY` の Session 取得が必須）。
   2. JSON 整形／スタブ応答には `src/nexuscore/llm/helpers.py` の `_strip_jsonish` / `_stub_response` / `DEFAULT_STUB_CONTENT` を利用し、例外は `self.logger` で `real`/`stub-fallback` のモードを分かるように記録する。

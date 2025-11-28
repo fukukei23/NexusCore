@@ -98,82 +98,100 @@ def parse_pull_request_event(
     return str(repo_full_name), int(pr_number), str(head_sha)
 
 
-def format_pr_comment(result: Dict[str, Any], project_root: Optional[str] = None) -> str:
+def format_pr_comment(
+    result: Dict[str, Any],
+    project_root: Optional[str] = None,
+    repo_full_name: Optional[str] = None,
+    pr_number: Optional[int] = None,
+) -> str:
     """
     Self-Healing の実行結果を GitHub PR コメント形式の Markdown に整形する。
 
-    新しいメタ情報付きフォーマットを使用する。
+    新しいメタ情報付きフォーマット（Self-Healing Summary + Guardian Review + Change Summary + Links）を使用する。
     """
-    from nexuscore.utils.pr_comments import build_self_healing_pr_comment
-    from nexuscore.core.run_history import RunHistoryLogger
+    from nexuscore.integration.github_pr_comment import PRCommentContext, build_pr_comment
+    from nexuscore.integration.github_pr_summary import generate_pr_change_summary
+
+    # Webapp モデルが利用可能か確認
+    try:
+        from nexuscore.webapp.models import Run, Project
+        from nexuscore.webapp import db
+        HAS_WEBAPP = True
+    except ImportError:
+        HAS_WEBAPP = False
+        Run = None  # type: ignore
+        Project = None  # type: ignore
+        db = None  # type: ignore
 
     status = result.get("status", "unknown")
     summary = result.get("summary", "")
     details = result.get("details", {})
     run_id = result.get("run_id", "N/A")
 
-    # 実行時間情報
-    started_at_iso = result.get("started_at_iso", "")
-    finished_at_iso = result.get("finished_at_iso", "")
-    duration_seconds = result.get("duration_seconds", 0.0)
-
-    # モデル名の取得（details から、またはデフォルト）
-    model_name = details.get("model_name", "NexusCore Auto-Reviewer")
-
-    # パッチ文字列の取得
-    patch_str = ""
-    patch_preview = details.get("patch_preview", "")
-    if patch_preview:
-        # Markdown ラッパーを除去
-        if patch_preview.startswith("```diff"):
-            patch_str = patch_preview[7:]  # "```diff\n" を除去
-            if patch_str.endswith("```"):
-                patch_str = patch_str[:-3]  # "\n```" を除去
-            patch_str = patch_str.strip()
-        else:
-            patch_str = patch_preview
-
-    # 過去30回の成功率を計算
-    success_rate_30 = 0.0
-    success_count_30 = 0
-    total_count_30 = 0
-    if project_root:
+    # Run と Project を取得（webapp が利用可能な場合）
+    run = None
+    project = None
+    if HAS_WEBAPP and Run and db:
         try:
-            history_logger = RunHistoryLogger(project_root=project_root)
-            success_rate_30, success_count_30, total_count_30 = history_logger.calculate_success_rate(limit=30)
-        except Exception:
-            # 履歴取得失敗は致命的ではない
-            pass
+            # run_id で Run を検索
+            run = Run.query.filter_by(run_id=run_id).first()  # type: ignore
+            if run and hasattr(run, "project_id"):
+                project = Project.query.filter_by(id=run.project_id).first()  # type: ignore
+        except Exception as e:
+            logger.warning(f"Failed to load Run/Project from DB: {e}", exc_info=True)
 
-    # Guardian 情報
+    # Guardian 情報を取得
     guardian_status = details.get("guardian_status", "")
     guardian_comment = details.get("guardian_comment", "")
-    if not guardian_status and guardian_review:
-        guardian_status = guardian_review.get("decision", "")
-        auto_review = guardian_review.get("auto_review", {})
-        if auto_review:
-            guardian_comment = auto_review.get("summary", "")
 
-    # ブロックされたテストファイル
-    blocked_test_paths = details.get("blocked_test_paths", [])
+    # Guardian レビューを Markdown 形式に整形
+    guardian_review_markdown = ""
+    if guardian_status:
+        guardian_review_markdown += f"**Status**: `{guardian_status}`\n\n"
+    if guardian_comment:
+        guardian_review_markdown += f"**Comment**:\n\n{guardian_comment}\n"
+    if not guardian_review_markdown:
+        guardian_review_markdown = "_(no review content)_\n"
 
-    # 新しいフォーマットでコメントを組み立て
-    return build_self_healing_pr_comment(
-        run_id=run_id,
-        result_status=status,
-        started_at=started_at_iso,
-        finished_at=finished_at_iso,
-        duration_seconds=duration_seconds,
-        model_name=model_name,
-        patch_str=patch_str,
-        success_rate_30=success_rate_30,
-        success_count_30=success_count_30,
-        total_count_30=total_count_30,
-        summary=summary,
-        guardian_status=guardian_status,
-        guardian_comment=guardian_comment,
-        blocked_test_paths=blocked_test_paths,
+    # AI による修正要約を生成（webapp が利用可能で run が存在する場合）
+    change_summary = None
+    if HAS_WEBAPP and run:
+        try:
+            change_summary = generate_pr_change_summary(
+                run=run,
+                guardian_review_markdown=guardian_review_markdown,
+                max_tokens=512,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to generate change summary: {e}", exc_info=True)
+
+    # E-4: Before/After 差分サマリーを取得
+    diff_summary = details.get("diff_summary")
+
+    # E-3: Run Markdown レポートを取得
+    markdown_report = details.get("markdown_report")
+    if not markdown_report and run_id != "N/A":
+        try:
+            from nexuscore.integration.github_pr_comment import load_run_markdown
+            markdown_report = load_run_markdown(run_id)
+        except Exception as e:
+            logger.warning(f"Failed to load run markdown: {e}", exc_info=True)
+
+    # PRCommentContext を作成
+    ctx = PRCommentContext(
+        project=project,
+        run=run,
+        guardian_review_markdown=guardian_review_markdown,
+        repo_full_name=repo_full_name,
+        pr_number=pr_number,
+        change_summary=change_summary,
+        diff_summary=diff_summary,
+        markdown_report=markdown_report,
+        details=details,  # E-5: メトリクス統合用
     )
+
+    # PR コメントを組み立て
+    return build_pr_comment(ctx)
 
 
 def _init_self_healing_service(

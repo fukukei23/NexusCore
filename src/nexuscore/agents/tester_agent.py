@@ -231,6 +231,7 @@ class TesterAgent(BaseAgent):
             risk_level=strategy.risk,
             strategy=strategy.strategy,
             min_coverage=strategy.min_coverage,
+            module_name=module_name,
         )
 
         # LLM によるテストコード生成
