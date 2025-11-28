@@ -24,6 +24,12 @@ uvicorn
 websockets
 streamlit
 Flask
+Flask-SQLAlchemy
+Flask-Migrate
+Flask-CORS  # CORS support for external API
+authlib
+celery
+redis  # Celery broker/backend
 matplotlib
 
 # --- Audio Processing ---

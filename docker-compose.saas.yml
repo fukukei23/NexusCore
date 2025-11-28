@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # Redis (Celery ブローカー/バックエンド)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Flask Web アプリケーション
+  webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile.webapp  # 将来的に作成
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_APP=nexuscore.webapp:create_app
+      - FLASK_ENV=production
+      - DATABASE_URI=postgresql://nexuscore:nexuscore@db:5432/nexuscore
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - NEXUS_USE_CELERY=1
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - GITHUB_REDIRECT_URI=${GITHUB_REDIRECT_URI}
+    depends_on:
+      - redis
+      - db
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+    command: gunicorn -w 4 -b 0.0.0.0:5000 "nexuscore.webapp:create_app()"
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.webapp
+    environment:
+      - FLASK_APP=nexuscore.webapp:create_app
+      - DATABASE_URI=postgresql://nexuscore:nexuscore@db:5432/nexuscore
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - NEXUS_USE_CELERY=1
+    depends_on:
+      - redis
+      - db
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+    command: celery -A nexuscore.webapp.celery_app.celery worker --loglevel=INFO --concurrency=4
+
+  # PostgreSQL (本番環境用、開発環境では SQLite でも可)
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=nexuscore
+      - POSTGRES_PASSWORD=nexuscore
+      - POSTGRES_DB=nexuscore
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  redis_data:
+  postgres_data:
+

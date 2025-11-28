@@ -35,6 +35,23 @@ from nexuscore.core.stacktrace_mapper import extract_candidate_files
 from nexuscore.agents.patch_applier import PatchApplier
 from nexuscore.config.self_healing_config import SelfHealingConfig
 
+# 4.4: Retry と例外分類
+try:
+    from nexuscore.core.retry_utils import RetryContext
+    from nexuscore.core.errors import (
+        SandboxExecutionError,
+        convert_http_error_to_nexus_error,
+    )
+    from nexuscore.core.sandbox_executor import run_in_sandbox, SandboxResult
+    HAS_RETRY = True
+except ImportError:
+    HAS_RETRY = False
+    RetryContext = None  # type: ignore
+    SandboxExecutionError = Exception  # type: ignore
+    convert_http_error_to_nexus_error = None  # type: ignore
+    run_in_sandbox = None  # type: ignore
+    SandboxResult = None  # type: ignore
+
 
 logger = logging.getLogger(__name__)
 
@@ -96,15 +113,26 @@ class SelfHealingService:
                 "finished_at": float,
             }
         """
-        run_id = f"sh-{int(time.time())}-{pr_number}-{head_sha[:7]}"
-        session_id = self.session_controller.session_id
         # 実行時間の記録開始
         import time
         from datetime import datetime, timezone
 
+        run_id = f"sh-{int(time.time())}-{pr_number}-{head_sha[:7]}"
+        session_id = self.session_controller.session_id
+
         started_ts = time.monotonic()
         started_at_iso = datetime.now(timezone.utc).isoformat()
         started_at = time.time()
+
+        # 4.4: Retry コンテキストを初期化（全ステップで共有）
+        retry_context = RetryContext() if HAS_RETRY and RetryContext else None
+
+        # 4.4: エージェントに retry_context を設定
+        if retry_context:
+            if self.debugger_agent and hasattr(self.debugger_agent, "retry_context"):
+                self.debugger_agent.retry_context = retry_context
+            if hasattr(self, "_guardian_agent") and self._guardian_agent and hasattr(self._guardian_agent, "retry_context"):
+                self._guardian_agent.retry_context = retry_context
 
         repo_slug = repo_full_name.replace("/", "_")
         sandbox_root = self.project_root / ".nexus" / "self_healing_sandbox"
@@ -131,15 +159,24 @@ class SelfHealingService:
             )
             self._maybe_stop("after_clone", {"project_path": str(project_path)})
 
-            # 2. 既存テスト実行
-            ok, output = self._run_tests(project_path)
+            # 2. 既存テスト実行（4.4: Retry 対応）
+            ok, output = self._run_tests(project_path, retry_context=retry_context)
             self._maybe_stop("after_initial_tests", {"test_ok": ok})
 
             if ok:
                 status = "no_issues"
                 summary = "Tests already passing. No self-healing needed."
+                # 4.4: RetryContext から情報を取得
+                retry_count = 0
+                last_error_class = None
+                if retry_context:
+                    retry_info = retry_context.to_dict()
+                    retry_count = retry_info.get("retry_count", 0)
+                    last_error_class = retry_info.get("last_error_class")
                 details = {
                     "initial_test_output": output,
+                    "retry_count": retry_count,
+                    "last_error_class": last_error_class,
                 }
                 return self._finalize(
                     run_id=run_id,
@@ -174,10 +211,19 @@ class SelfHealingService:
                 self.logger.warning("DebuggerAgent is not provided. Skipping patch generation.")
                 status = "not_fixed"
                 summary = "DebuggerAgent not configured. Could not generate patch."
+                # 4.4: RetryContext から情報を取得
+                retry_count = 0
+                last_error_class = None
+                if retry_context:
+                    retry_info = retry_context.to_dict()
+                    retry_count = retry_info.get("retry_count", 0)
+                    last_error_class = retry_info.get("last_error_class")
                 details = {
                     "initial_test_output": output,
                     "stacktrace_files": stack_files,
                     "changed_files": changed_files,
+                    "retry_count": retry_count,
+                    "last_error_class": last_error_class,
                 }
                 return self._finalize(
                     run_id=run_id,
@@ -204,11 +250,20 @@ class SelfHealingService:
             if not patch_text.strip():
                 status = "not_fixed"
                 summary = "DebuggerAgent did not produce a patch."
+                # 4.4: RetryContext から情報を取得
+                retry_count = 0
+                last_error_class = None
+                if retry_context:
+                    retry_info = retry_context.to_dict()
+                    retry_count = retry_info.get("retry_count", 0)
+                    last_error_class = retry_info.get("last_error_class")
                 details = {
                     "initial_test_output": output,
                     "stacktrace_files": stack_files,
                     "changed_files": changed_files,
                     "debug_result": debug_result,
+                    "retry_count": retry_count,
+                    "last_error_class": last_error_class,
                 }
                 return self._finalize(
                     run_id=run_id,
@@ -361,6 +416,17 @@ class SelfHealingService:
                 )
 
             # 7. 実際に Patch を適用
+            # E-5: パッチ適用前に、変更されるすべてのファイルの before を取得
+            before_code_by_file: Dict[str, str] = {}
+            patch_changed_files = summarize_diff_files(patch_text)
+            for file_path in patch_changed_files:  # E-5: すべてのファイルを取得
+                full_path = project_path / file_path
+                if full_path.exists():
+                    try:
+                        before_code_by_file[file_path] = full_path.read_text(encoding="utf-8")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to read before code for {file_path}: {e}")
+
             apply_result = self.patch_applier.apply_patch(
                 patch_text=patch_text,
                 project_path=str(project_path),
@@ -369,8 +435,33 @@ class SelfHealingService:
             )
             self._maybe_stop("after_patch_apply", {"apply_result": apply_result})
 
-            # 8. 再テスト
-            ok2, output2 = self._run_tests(project_path)
+            # E-5: パッチ適用後に、変更されたすべてのファイルの after を取得し、差分サマリーを生成
+            diff_summary = None
+            if before_code_by_file and hasattr(self, "_guardian_agent") and self._guardian_agent is not None:
+                try:
+                    # すべてのファイルの before/after を dict に格納
+                    file_diffs: Dict[str, Dict[str, str]] = {}
+                    for file_path, before_code in before_code_by_file.items():
+                        full_path = project_path / file_path
+                        if full_path.exists():
+                            after_code = full_path.read_text(encoding="utf-8")
+                            file_diffs[file_path] = {
+                                "before": before_code,
+                                "after": after_code,
+                            }
+
+                    # GuardianAgent で複数ファイルの差分サマリーを生成
+                    if file_diffs:
+                        diff_summary = self._guardian_agent.generate_diff_summary(
+                            file_diffs=file_diffs,
+                            model="gpt-4.1",
+                        )
+                        self.logger.info(f"Generated diff summary for {len(file_diffs)} files via GuardianAgent")
+                except Exception as e:
+                    self.logger.warning(f"Failed to generate diff summary: {e}", exc_info=True)
+
+            # 8. 再テスト（4.4: Retry 対応）
+            ok2, output2 = self._run_tests(project_path, retry_context=retry_context)
             self._maybe_stop("after_rerun_tests", {"test_ok_after": ok2})
 
             if ok2:
@@ -379,6 +470,24 @@ class SelfHealingService:
             else:
                 status = "not_fixed"
                 summary = "Patch applied but tests are still failing."
+
+            # E-5: 実行時間を計算（_finalize() の前に計算）
+            finished_ts = time.monotonic()
+            duration_seconds = round(finished_ts - started_ts, 2) if started_ts else None
+            execution_ms = int(duration_seconds * 1000) if duration_seconds else None
+
+            patch_changed_files = summarize_diff_files(patch_text)
+            files_changed = len(patch_changed_files)
+
+            # 4.4: RetryContext から retry_count と error_class を取得
+            retry_count = 0
+            last_error_class = None
+            error_summary = None
+            if retry_context:
+                retry_info = retry_context.to_dict()
+                retry_count = retry_info.get("retry_count", 0)
+                last_error_class = retry_info.get("last_error_class")
+                error_summary = retry_info.get("error_summary")
 
             details = {
                 "initial_test_output": output,
@@ -389,8 +498,24 @@ class SelfHealingService:
                 "dry_run_result": dry_result,
                 "apply_result": apply_result,
                 "patch_preview": wrap_diff_as_markdown(patch_text),
-                "patch_changed_files": summarize_diff_files(patch_text),
+                "patch_changed_files": patch_changed_files,
+                # E-5: 実行メトリクス
+                "execution_ms": execution_ms,
+                "retry_count": retry_count,  # 4.4: 実際の retry_count
+                "files_changed": files_changed,
+                # 4.4: エラー分類
+                "last_error_class": last_error_class,
+                "error_summary": error_summary,
             }
+
+            # E-4/E-5: 差分サマリーを追加
+            if diff_summary:
+                details["diff_summary"] = diff_summary
+
+            # E-5: モデル名とコスト情報を追加（guardian_agent から取得可能な場合）
+            if hasattr(self, "_guardian_agent") and self._guardian_agent is not None:
+                if hasattr(self._guardian_agent, "model") and self._guardian_agent.model:
+                    details["model"] = self._guardian_agent.model
 
             # Guardian レビュー結果があれば追加
             if guardian_review_result:
@@ -529,30 +654,78 @@ class SelfHealingService:
             self.logger.error(f"git checkout {head_sha} failed: {e.stdout}", exc_info=True)
             raise
 
-    def _run_tests(self, project_path: Path) -> Tuple[bool, str]:
+    def _run_tests(self, project_path: Path, retry_context: Optional[RetryContext] = None) -> Tuple[bool, str]:
         """
         プロジェクト配下でテストコマンドを実行する。
         デフォルトは pytest。環境変数 NEXUS_SELF_HEALING_TEST_CMD で上書き可能。
-        """
-        cmd = os.getenv("NEXUS_SELF_HEALING_TEST_CMD", "pytest -q")
-        self.logger.info(f"Running tests with command: {cmd} (cwd={project_path})")
 
-        try:
-            proc = subprocess.run(
-                cmd,
-                cwd=str(project_path),
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-            )
-            output = proc.stdout
-            success = proc.returncode == 0
-            return success, output
-        except Exception as e:
-            msg = f"Exception while running tests: {e}"
-            self.logger.error(msg, exc_info=True)
-            return False, msg
+        Args:
+            project_path: プロジェクトパス
+            retry_context: RetryContext インスタンス（retry_count と error_class を記録）
+
+        Returns:
+            (成功フラグ, 出力文字列)
+        """
+        cmd_str = os.getenv("NEXUS_SELF_HEALING_TEST_CMD", "pytest -q")
+        self.logger.info(f"Running tests with command: {cmd_str} (cwd={project_path})")
+
+        # 4.4: sandbox_executor を使用（Retry 対応）
+        if HAS_RETRY and run_in_sandbox:
+            try:
+                # コマンドをリストに変換
+                cmd_list = cmd_str.split()
+                if not cmd_list:
+                    cmd_list = ["pytest", "-q"]
+
+                # タイムアウト設定（環境変数から取得、デフォルト 300秒）
+                timeout_sec = int(os.getenv("NEXUS_SANDBOX_TIMEOUT_SEC", "300"))
+
+                # sandbox_executor で実行
+                result: SandboxResult = run_in_sandbox(
+                    cmd=cmd_list,
+                    timeout_sec=timeout_sec,
+                    cwd=str(project_path),
+                    retry_on_errors=True,
+                )
+
+                # RetryContext に記録
+                if retry_context and result.exception_type:
+                    from nexuscore.core.errors import SandboxExecutionError, classify_error
+                    error = SandboxExecutionError(f"Sandbox execution failed: {result.stderr}")
+                    retry_context.record_attempt(
+                        attempt=0,  # sandbox_executor 内部で retry 済み
+                        error=error if result.returncode != 0 else None,
+                    )
+
+                success = result.returncode == 0 and not result.timed_out
+                output = result.stdout + result.stderr if result.stderr else result.stdout
+                return success, output
+
+            except Exception as e:
+                msg = f"Exception while running tests: {e}"
+                self.logger.error(msg, exc_info=True)
+                # RetryContext に記録
+                if retry_context:
+                    retry_context.record_attempt(attempt=0, error=e)
+                return False, msg
+        else:
+            # フォールバック: 従来の subprocess.run
+            try:
+                proc = subprocess.run(
+                    cmd_str,
+                    cwd=str(project_path),
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                )
+                output = proc.stdout
+                success = proc.returncode == 0
+                return success, output
+            except Exception as e:
+                msg = f"Exception while running tests: {e}"
+                self.logger.error(msg, exc_info=True)
+                return False, msg
 
     def _get_changed_files(
         self,
@@ -755,6 +928,24 @@ class SelfHealingService:
         except Exception:
             # ログ書き込み失敗は致命的ではない
             self.logger.exception("Failed to log self-healing run history.")
+
+        # E-5: Run レポートの自動生成（webapp が利用可能な場合）
+        try:
+            from nexuscore.integration.run_report_generator import write_run_report_file
+            from nexuscore.webapp.models import Run
+            from nexuscore.webapp import db
+
+            # run_id で Run を検索
+            run = Run.query.filter_by(run_id=run_id).first()  # type: ignore
+            if run and hasattr(run, "id"):
+                report_path = write_run_report_file(run.id, base_dir=self.project_root)
+                self.logger.info(f"Run report generated: {report_path}")
+        except ImportError:
+            # webapp が利用できない場合はスキップ
+            pass
+        except Exception as e:
+            # レポート生成失敗は致命的ではない
+            self.logger.warning(f"Failed to generate run report: {e}", exc_info=True)
 
         return {
             "status": status,

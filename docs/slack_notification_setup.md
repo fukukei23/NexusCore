@@ -164,22 +164,99 @@ if notifier:
 
 ### 通知が送信されない
 
-1. **環境変数の確認**
-   ```bash
-   echo $NEXUS_SLACK_WEBHOOK_URL
-   ```
+#### 1. テスト通知を送信して確認
 
-2. **Webhook URLの確認**
-   - URLが正しいか確認
-   - Webhookが有効になっているか確認
+まず、テスト通知スクリプトを実行して、通知機能が正常に動作するか確認します：
 
-3. **依存関係の確認**
-   ```bash
-   pip list | grep requests
-   ```
+```bash
+cd /home/yn441611/NexusCore
+source myenv_linux/bin/activate
+python tools/test_slack_notification.py
+```
 
-4. **ログの確認**
-   - NexusCoreのログに「Failed to send Slack notification」が表示されていないか確認
+このスクリプトは以下のテストを実行します：
+- 基本通知（info）
+- 成功通知
+- エラー通知
+- Orchestrator 完了通知
+- プロジェクト完了通知
+
+#### 2. 環境変数の確認
+
+```bash
+# 環境変数が設定されているか確認
+echo $NEXUS_SLACK_WEBHOOK_URL
+
+# .env ファイルを確認
+cat .env | grep SLACK
+```
+
+環境変数が設定されていない場合：
+```bash
+# .env ファイルに追加
+echo "NEXUS_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL" >> .env
+
+# または直接設定
+export NEXUS_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+```
+
+#### 3. Webhook URLの確認
+
+- URLが正しいか確認（`https://hooks.slack.com/services/...` の形式）
+- Webhookが有効になっているか確認（Slack API の設定画面で確認）
+- Webhook URLが期限切れでないか確認
+
+#### 4. 依存関係の確認
+
+```bash
+# requests ライブラリがインストールされているか確認
+pip list | grep requests
+
+# インストールされていない場合
+pip install requests
+```
+
+#### 5. ログの確認
+
+NexusCoreのログに以下のメッセージが表示されていないか確認：
+
+```bash
+# ログファイルを確認
+grep -i "slack" logs/*.log
+
+# または実行時のログを確認
+# "Failed to send Slack notification" が表示されていないか
+# "Slack通知を送信しました" が表示されているか
+```
+
+#### 6. 手動で通知を送信してテスト
+
+```bash
+# 簡単なテスト通知を送信
+python tools/notify_slack.py \
+  --project "NexusCore" \
+  --task "テスト通知" \
+  --status "info"
+```
+
+#### 7. よくある問題と解決方法
+
+**問題: 環境変数が設定されているのに通知が来ない**
+
+- Flask アプリケーションや Celery Worker を再起動してください
+- 環境変数はプロセス起動時に読み込まれるため、設定後に再起動が必要です
+
+**問題: 通知は送信されているが Slack で表示されない**
+
+- Slack の通知設定を確認してください
+- チャンネルに Webhook が正しく設定されているか確認してください
+- Slack アプリの通知権限を確認してください
+
+**問題: Android スマホで通知が来ない**
+
+- Slack アプリがインストールされているか確認
+- プッシュ通知が有効になっているか確認
+- チャンネルをフォローしているか確認
 
 ### Androidスマホで通知を受信する
 
