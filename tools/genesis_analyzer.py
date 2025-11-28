@@ -32,7 +32,7 @@ from typing import Dict, List, Any, Optional, Iterable, Tuple, Set
 
 # ========= ログ設定 =========
 def _setup_logger(project_root: Path) -> logging.Logger:
-    log_dir = project_root / ".logs"
+    log_dir = project_root / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "genesis_analyzer.log"
     logging.basicConfig(
@@ -263,7 +263,15 @@ def build_integrated_summary(project_root: Path, cfg: AnalyzerConfig, logger: lo
 
 # ========= Chronicle 追記 =========
 def append_chronicle(project_root: Path, cfg: AnalyzerConfig, payload: Dict[str, Any]) -> None:
-    path = project_root / cfg.chronicle_path
+    # chronicle_path が相対パスの場合、logs/ ディレクトリに配置
+    if not Path(cfg.chronicle_path).is_absolute():
+        # logs/ ディレクトリを確実に作成
+        logs_dir = project_root / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        path = logs_dir / Path(cfg.chronicle_path).name
+    else:
+        path = Path(cfg.chronicle_path)
+
     line = json.dumps(payload, ensure_ascii=False)
     with open(path, "a", encoding="utf-8") as f:
         f.write(line + "\n")

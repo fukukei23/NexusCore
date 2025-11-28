@@ -36,7 +36,7 @@
   ],
   "max_file_size_mb": 2,
   "use_git_if_available": true,
-  "chronicle_path": "project_chronicle.jsonl",
+  "chronicle_path": "logs/project_chronicle.jsonl",
   "state_path": ".nexus_state.json",
   "try_integrated_summary": true,
   "default_mode": "auto",

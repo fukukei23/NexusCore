@@ -53,16 +53,22 @@ CODEX_HISTORY_DIR = os.path.join(project_root, "codex_history")
 
 def setup_logging(verbose: bool):
     """ロギングの基本設定（旧コードの優れた実装を維持）"""
+    from nexuscore.utils.log_config import get_logs_dir
+
     log_level = logging.DEBUG if verbose else logging.INFO
+    logs_dir = get_logs_dir()
+    log_path = logs_dir / "nexus_core_run.log"
+
     logging.basicConfig(
         level=log_level,
         format="%(asctime)s - %(levelname)-8s - %(name)-20s - %(message)s",
         handlers=[
             logging.StreamHandler(),
-            logging.FileHandler("nexus_core_run.log", mode='w', encoding='utf-8')
+            logging.FileHandler(log_path, mode='a', encoding='utf-8')
         ]
     )
     logging.info(f"Log level set to {logging.getLevelName(log_level)}")
+    logging.info(f"Log file: {log_path}")
 
 def _prepare_local_knowledge_base(project_path: str) -> str | None:
     """
@@ -146,7 +152,7 @@ def main():
         description="NexusCore - AI Multi-Agent Development System",
         formatter_class=argparse.RawTextHelpFormatter
     )
-    
+
     parser.add_argument(
         "requirement",
         type=str,
@@ -188,7 +194,7 @@ def main():
 
     # --- 2. ロギングと設定の初期化 ---
     setup_logging(args.verbose)
-    
+
     project_path = os.path.abspath(args.project_path)
     os.makedirs(project_path, exist_ok=True)
 
@@ -211,9 +217,9 @@ def main():
     try:
         # --- 3. AI開発チーム（エージェント群）の招集 ---
         logging.info("Initializing AI agent team...")
-        
+
         # BaseAgentとLLMRouterにより、APIキーやモデル名は自動で管理される
-        
+
         # ▼▼▼▼▼ 統合点 (3/4): RequirementAgentをチームに追加 ▼▼▼▼▼
         requirement_agent = RequirementAgent(language=args.language, use_ui=args.requirement_ui)
         if hasattr(requirement_agent, "set_initial_requirement"):
