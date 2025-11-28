@@ -108,21 +108,28 @@ def main() -> int:
     command = sys.argv[1:]
 
     # ログファイル名を生成（オプション）
+    # logs/ ディレクトリに配置
+    logs_dir = Path(__file__).parent / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+
     log_file = None
     if "--log" in sys.argv:
         idx = sys.argv.index("--log")
         if idx + 1 < len(sys.argv):
             log_file = sys.argv[idx + 1]
-            command = [c for c in command if c != "--log" and c != log_file]
+            # 絶対パスでない場合は logs/ に配置
+            if not Path(log_file).is_absolute():
+                log_file = str(logs_dir / Path(log_file).name)
+            command = [c for c in command if c != "--log" and c != sys.argv[idx + 1]]
         else:
             # デフォルトのログファイル名
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            log_file = f"output_{timestamp}.log"
+            log_file = str(logs_dir / f"output_{timestamp}.log")
             command = [c for c in command if c != "--log"]
     elif os.getenv("AUTO_LOG", "0") == "1":
         # 環境変数で自動ログを有効化
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = f"output_{timestamp}.log"
+        log_file = str(logs_dir / f"output_{timestamp}.log")
 
     # コマンドを実行
     print(f"🚀 実行中: {' '.join(command)}", flush=True)

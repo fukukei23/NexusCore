@@ -24,8 +24,11 @@ def log_manual_event(project_path: str, summary: str):
         logging.error("記録する内容が指定されていません。")
         return
 
-    chronicle_path = os.path.join(project_path, "project_chronicle.jsonl")
-    
+    # logs/ ディレクトリに配置
+    logs_dir = os.path.join(project_path, "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    chronicle_path = os.path.join(logs_dir, "project_chronicle.jsonl")
+
     log_entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "event": "MANUAL_DEV_LOG",
@@ -52,11 +55,11 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python tools/scribe.py \"<記録したい開発内容の要約>\"")
         sys.exit(1)
-    
+
     # プロジェクトのルートパスをスクリプトからの相対パスで解決
     # このスクリプトが tools/ にあることを想定
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(current_dir)
-    
+
     log_summary = sys.argv[1]
     log_manual_event(project_root, log_summary)
