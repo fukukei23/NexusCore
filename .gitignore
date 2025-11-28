@@ -37,6 +37,7 @@ MANIFEST
 # --- venv ---
 .venv/
 venv/
+myenv_linux/
 ENV/
 env/
 env.bak/
@@ -60,23 +61,29 @@ output/*
 # ----------------------------------
 # Git LFSで管理しない場合は以下の行を残す
 # **/combined_code.txt
-# Log files
-logs/ # ← こちらの行を追加
 # ----------------------------------
+
 # coverage / テスト結果
 .coverage
+coverage.xml
 htmlcov/
+.pytest_cache/
+.mypy_cache/
 
-# ログ
-logs/
+# ログ（logs/ ディレクトリ内のファイルは追跡しないが、ディレクトリ自体は保持）
+logs/*
+!logs/.gitkeep
+# 後方互換性のため、ルートのログファイルも除外
 nexus_api_server.log
+nexus_core_run.log
+project_chronicle.jsonl
+*.log
 
 # バックアップ・エクスポート
 NexusCore_backup.zip
 exports/*.zip
 
 # 一時ファイル
-*.log
 *.tmp
 
 exports/*.json
