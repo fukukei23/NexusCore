@@ -180,6 +180,42 @@ def render_markdown(results: List[Tuple[str, int, int, float]]) -> str:
     return header + table_header + "\n".join(rows) + "\n"
 
 
+def render_markdown_ci(results: List[Tuple[str, int, int, float]]) -> str:
+    """
+    CI の PR コメント用の簡易 Markdown レポートを生成する。
+    ヘッダーとテーブルのみ（余計な説明を省略）。
+
+    Args:
+        results: collect_phase3_metrics の戻り値
+
+    Returns:
+        Markdown 文字列（CI コメント用）
+    """
+    lines = []
+    lines.append("## Phase3 Coverage (graph_builder / unified_analyzer / test_generator / tree_sitter_checker)")
+    lines.append("")
+
+    if not results:
+        lines.append("_No coverage data available._")
+        return "\n".join(lines) + "\n"
+
+    lines.append("| Module | Stmts | Miss | Coverage |")
+    lines.append("|--------|-------|------|----------|")
+
+    for module, stmts, missed, percent in results:
+        lines.append(f"| `{module}` | {stmts} | {missed} | {percent:.1f}% |")
+
+    # 合計行を追加
+    total_stmts = sum(r[1] for r in results)
+    total_missed = sum(r[2] for r in results)
+    total_covered = total_stmts - total_missed
+    total_percent = 0.0 if total_stmts == 0 else (total_covered / total_stmts) * 100.0
+    lines.append(f"| **TOTAL** | {total_stmts} | {total_missed} | **{total_percent:.1f}%** |")
+    lines.append("")
+
+    return "\n".join(lines) + "\n"
+
+
 def write_markdown_report(md_text: str) -> Path:
     """
     docs/coverage_phase3_summary.md を上書き生成する。
@@ -203,6 +239,29 @@ def write_markdown_report(md_text: str) -> Path:
     return out_path
 
 
+def write_ci_report(md_text: str) -> Path:
+    """
+    docs/coverage_phase3_summary_ci.md を上書き生成する（CI 用の短いレポート）。
+
+    Args:
+        md_text: Markdown 文字列（CI 用）
+
+    Returns:
+        生成されたファイルのパス
+    """
+    docs_dir = ROOT / "docs"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+
+    out_path = docs_dir / "coverage_phase3_summary_ci.md"
+    tmp_path = out_path.with_suffix(".tmp")
+
+    # tmp に書いてから replace で atomic-ish に更新
+    tmp_path.write_text(md_text, encoding="utf-8")
+    tmp_path.replace(out_path)
+
+    return out_path
+
+
 def main() -> None:
     """メイン処理"""
     print("[coverage-phase3] Starting Phase3 coverage measurement...")
@@ -217,7 +276,13 @@ def main() -> None:
 
     out_path = write_markdown_report(md)
 
+    # CI 用の短いレポートも生成
+    print("[coverage-phase3] Generating CI Markdown report...")
+    ci_md = render_markdown_ci(results)
+    ci_path = write_ci_report(ci_md)
+
     print(f"[coverage-phase3] Report written to {out_path}")
+    print(f"[coverage-phase3] CI report written to {ci_path}")
     print(f"[coverage-phase3] Coverage data saved to {ROOT / '.coverage-phase3'}")
 
     if exit_code != 0:
