@@ -55,6 +55,7 @@ class PRCommentContext(BaseModel):
     diff_summary: Optional[Union[str, Dict[str, str]]] = None  # E-4/E-5: Before/After 差分サマリー（単一ファイル: str, 複数ファイル: dict）
     markdown_report: Optional[str] = None  # E-3: Run Markdown レポート全文
     details: Optional[Dict[str, Any]] = None  # E-5: Self-Healing 実行結果の details（メトリクス統合用）
+    semantic_diffs: Optional[Dict[str, Dict[str, Any]]] = None  # Semantic Diff 情報
 
 
 def _format_duration(run: object) -> str:
@@ -394,6 +395,80 @@ def render_summary_card(
 """
 
 
+def format_semantic_diff_block(
+    semantic_diffs: Optional[Dict[str, Dict[str, Any]]],
+) -> str:
+    """
+    semantic_diffs を Markdown (<details>) でレンダリングする。
+
+    Args:
+        semantic_diffs: Semantic Diff 情報
+            {
+                "file.py": {
+                    "functions": [...],
+                    "behavior_hints": [...],
+                }
+            }
+
+    Returns:
+        Markdown 形式の <details> ブロック
+    """
+    if not semantic_diffs:
+        return ""
+
+    blocks: List[str] = []
+
+    for rel_path, data in semantic_diffs.items():
+        functions = data.get("functions") or []
+        behavior_hints = data.get("behavior_hints") or []
+
+        # 関数の追加/削除/変更のテーブル
+        table_lines = [
+            "| Function | Kind | Before | After |",
+            "|----------|------|--------|-------|",
+        ]
+
+        for f in functions:
+            name = f.get("name", "")
+            kind = f.get("kind", "")
+            sig_before = f.get("signature_before") or ""
+            sig_after = f.get("signature_after") or ""
+
+            # シグネチャが長すぎる場合は省略
+            if len(sig_before) > 50:
+                sig_before = sig_before[:47] + "..."
+            if len(sig_after) > 50:
+                sig_after = sig_after[:47] + "..."
+
+            table_lines.append(
+                f"| `{name}` | {kind} | `{sig_before}` | `{sig_after}` |"
+            )
+
+        behavior_lines = []
+        for hint in behavior_hints:
+            desc = hint.get("description") or ""
+            risk = hint.get("risk_level") or "medium"
+            risk_emoji = {"low": "🟢", "medium": "🟡", "high": "🔴"}.get(risk, "🟡")
+            behavior_lines.append(f"- {risk_emoji} ({risk}) {desc}")
+
+        block = f"""<details>
+
+<summary>🧠 Semantic Diff: `{rel_path}`</summary>
+
+### Functions
+
+{chr(10).join(table_lines) if len(table_lines) > 2 else "_(no function changes)_"}
+
+### Behavior Hints
+
+{chr(10).join(behavior_lines) if behavior_lines else "_(no behavior hints)_"}
+
+</details>"""
+        blocks.append(block)
+
+    return "\n\n".join(blocks)
+
+
 def build_pr_comment(ctx: PRCommentContext) -> str:
     """
     PR コメント本文を組み立てる
@@ -470,6 +545,13 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
             parts.append(format_diff_summary_block(file_summaries=ctx.diff_summary))
         else:
             parts.append(format_diff_summary_block(summary_text=ctx.diff_summary))
+        parts.append("\n")
+
+    # === Semantic Diff ===
+    if ctx.semantic_diffs:
+        parts.append("\n---\n\n")
+        parts.append("## 🧠 Semantic Diff\n\n")
+        parts.append(format_semantic_diff_block(ctx.semantic_diffs))
         parts.append("\n")
 
     # === E-3: Run Markdown Report ===

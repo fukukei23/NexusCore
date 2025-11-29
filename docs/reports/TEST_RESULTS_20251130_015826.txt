@@ -1,0 +1,36 @@
+================================================================================
+NexusCore Test Results
+Generated: 2025-11-30 01:58:26
+================================================================================
+
+Total tests: 1
+Passed: 0
+Failed: 1
+Skipped: 0
+
+================================================================================
+
+❌ tests/diff/test_semantic_diff_basic.py::test_semantic_diff_detects_added_function (failed)
+   Duration: 0.001s
+   Error details:
+   tmp_path = PosixPath('/tmp/pytest-of-yn441611/pytest-6/test_semantic_diff_detects_add0')
+   
+       @pytest.mark.skipif(not HAS_SEMANTIC_DIFF, reason="semantic_diff module not available")
+       def test_semantic_diff_detects_added_function(tmp_path: Path) -> None:
+           """追加された関数を検出できることを確認"""
+           before = "def foo(x):\n    return x\n"
+           after = before + "\n\ndef bar(y):\n    return y * 2\n"
+           file_path = tmp_path / "sample.py"
+       
+           result = compute_semantic_diff(file_path, before, after, language="python")
+       
+           assert isinstance(result, SemanticDiffResult)
+           assert result.file_path == file_path
+       
+           # 関数の変更を確認
+           names_kinds = {(f.name, f.kind) for f in result.functions}
+           assert ("bar", "added") in names_kinds
+   >       assert ("foo", "added") in names_kinds or ("foo", "modified") in names_kinds
+   E       AssertionError: assert (('foo', 'added') in {('bar', 'added')} or ('foo', 'modified') in {('bar', 'added')})
+   
+   tests/diff/test_semantic_diff_basic.py:42: AssertionError
