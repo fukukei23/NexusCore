@@ -335,6 +335,7 @@ Diff プレビュー:
         before_code: Optional[str] = None,
         after_code: Optional[str] = None,
         file_diffs: Optional[Dict[str, Dict[str, str]]] = None,
+        semantic_diffs: Optional[Dict[str, Dict[str, Any]]] = None,
         model: str = "gpt-4.1",
     ) -> Union[str, Dict[str, str]]:
         """
@@ -348,6 +349,13 @@ Diff プレビュー:
                     "a.py": {"before": "...", "after": "..."},
                     "b.py": {"before": "...", "after": "..."},
                 }
+            semantic_diffs: 意味的差分情報（Semantic Diff）
+                {
+                    "a.py": {
+                        "functions": [...],
+                        "behavior_hints": [...],
+                    }
+                }
             model: 使用する LLM モデル（デフォルト: "gpt-4.1"）
 
         Returns:
@@ -358,7 +366,7 @@ Diff プレビュー:
 
         # E-5: 複数ファイル対応
         if file_diffs:
-            return self._generate_multi_file_diff_summary(file_diffs, model)
+            return self._generate_multi_file_diff_summary(file_diffs, semantic_diffs, model)
 
         # E-4: 単一ファイル対応（後方互換性）
         if before_code is None or after_code is None:
@@ -415,6 +423,7 @@ Diff プレビュー:
     def _generate_multi_file_diff_summary(
         self,
         file_diffs: Dict[str, Dict[str, str]],
+        semantic_diffs: Optional[Dict[str, Dict[str, Any]]] = None,
         model: str = "gpt-4.1",
     ) -> Dict[str, str]:
         """
@@ -439,10 +448,16 @@ Diff プレビュー:
                 continue
 
             try:
-                # 単一ファイル用の要約生成を再利用
+                # semantic_diffs があれば、プロンプトに追加情報を含める
+                semantic_info = None
+                if semantic_diffs and file_path in semantic_diffs:
+                    semantic_info = semantic_diffs[file_path]
+
+                # 単一ファイル用の要約生成を再利用（semantic_diffs は現状は使わないが、将来の拡張用）
                 summary = self.generate_diff_summary(
                     before_code=before_code,
                     after_code=after_code,
+                    semantic_diffs={file_path: semantic_info} if semantic_info else None,
                     model=model,
                 )
                 result[file_path] = summary if isinstance(summary, str) else "要約生成に失敗しました"

@@ -18,7 +18,7 @@ endif
 SRC := src
 TESTS := tests
 
-.PHONY: help venv install-dev format lint typecheck test test-fast test-coverage test-phase3 qa clean
+.PHONY: help venv install-dev format lint typecheck test test-fast test-coverage test-phase3 coverage-phase3 qa clean
 
 help:
 	@echo "Available targets:"
@@ -31,6 +31,7 @@ help:
 	@echo "  make test-fast    - run pytest with parallel execution"
 	@echo "  make test-coverage - run pytest with coverage"
 	@echo "  make test-phase3  - run Phase3 analyzer tests with coverage"
+	@echo "  make coverage-phase3 - generate Phase3 coverage report (Markdown)"
 	@echo "  make qa           - format + lint + typecheck + test"
 	@echo "  make clean        - clean cache files"
 	@echo ""
@@ -87,13 +88,22 @@ test-fast:
 	@echo "✅ Fast tests complete (parallel, no coverage)"
 
 test-coverage:
-	$(PYTHON) -m pytest $(TESTS) -v --tb=short --cov=$(SRC) --cov-report=term-missing --cov-report=html
+	$(PYTHON) -m pytest $(TESTS) -v --tb=short --cov=$(SRC) --cov-report=term-missing --cov-report=html --cov-report=xml
 	@echo "✅ Tests with coverage complete"
 	@echo "📊 Coverage report: htmlcov/index.html"
+	@echo "📊 Coverage XML: coverage.xml"
+
+test-cov:
+	$(PYTHON) -m pytest $(TESTS) -v --tb=short --cov=$(SRC) --cov-report=term --cov-report=xml
+	@echo "✅ Tests with coverage complete (XML output)"
 
 test-phase3:
 	$(PYTHON) -m pytest tests/analyzer/ --cov=src/nexuscore/analyzer --cov-report=term-missing
 	@echo "✅ Phase3 analyzer tests with coverage complete"
+
+coverage-phase3:
+	$(PYTHON) -m tools.coverage_phase3_report
+	@echo "✅ Phase3 coverage report generated: docs/coverage_phase3_summary.md"
 
 # ==== 一括品質チェック ====
 qa: format lint-fix typecheck test

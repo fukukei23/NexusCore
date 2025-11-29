@@ -72,7 +72,7 @@ def test_unified_analyzer_with_cache_first_run(sample_project_dir):
     assert "cache_info" in result
 
     # キャッシュファイルが生成されることを確認
-    cache_file = sample_project_dir / ".nexuscache" / "analyzer_cache.json"
+    cache_file = sample_project_dir / ".nexuscache" / "unified_analyzer.json"
     assert cache_file.exists(), f"Cache file should be created at {cache_file}"
 
     # 統計情報を確認
