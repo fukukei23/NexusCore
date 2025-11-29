@@ -54,8 +54,12 @@ CONFIG = {
     'cache_dir': Path.home() / ".nexuscore" / "cache",
     'log_level': logging.INFO,
     'supported_languages': { '.py': 'python', '.js': 'javascript', },
-    'cache_version': 1,  # キャッシュフォーマットのバージョン
-    'enable_cache': os.getenv('NEXUS_ANALYZER_ENABLE_CACHE', '1').lower() in ('1', 'true', 'yes'),
+    'cache_version': 1,  # キャッシュフォーマットのバージョン（schema_version として使用）
+    'analyzer_version': "0.1.0",  # アナライザーのバージョン
+    # 環境変数によるキャッシュ制御
+    'enable_cache': os.getenv('NEXUS_UNIFIED_ANALYZER_ENABLE_CACHE', os.getenv('NEXUS_ANALYZER_ENABLE_CACHE', '1')).lower() not in ('0', 'false', 'no'),
+    'cache_dir_env': os.getenv('NEXUS_UNIFIED_ANALYZER_CACHE_DIR', os.getenv('NEXUS_ANALYZER_CACHE_DIR')),
+    'reset_cache': os.getenv('NEXUS_UNIFIED_ANALYZER_RESET_CACHE', '').lower() in ('1', 'true', 'yes'),
 }
 def setup_logging(log_level=logging.INFO):
     """CONFIG の log_level を用いたシンプルなロガー初期化ヘルパー。"""
@@ -222,17 +226,23 @@ class AnalyzerCache:
             cache_dir: キャッシュディレクトリ（None の場合は project_root/.nexuscache）
         """
         self.project_root = Path(project_root).resolve()
+
+        # 環境変数からキャッシュディレクトリを取得（優先順位: 引数 > 環境変数 > デフォルト）
+        if cache_dir is None and CONFIG.get('cache_dir_env'):
+            cache_dir = Path(CONFIG['cache_dir_env'])
+
         self.cache_dir = cache_dir or (self.project_root / ".nexuscache")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.cache_file = self.cache_dir / "analyzer_cache.json"
+        self.cache_file = self.cache_dir / "unified_analyzer.json"  # 要件に合わせて unified_analyzer.json に変更
         self.cache_data: Dict[str, Any] = {}
         self.cache_version = CONFIG['cache_version']
 
     def _compute_file_hash(self, file_path: Path) -> str:
-        """ファイル内容のハッシュを計算"""
+        """ファイル内容のハッシュを計算（sha256: プレフィックス付き）"""
         try:
             content = file_path.read_bytes()
-            return hashlib.sha256(content).hexdigest()
+            hash_hex = hashlib.sha256(content).hexdigest()
+            return f"sha256:{hash_hex}"  # 要件に合わせて sha256: プレフィックスを付与
         except Exception as e:
             logger.warning(f"Failed to compute hash for {file_path}: {e}")
             return ""
@@ -252,9 +262,17 @@ class AnalyzerCache:
             with open(self.cache_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            # バージョンチェック
-            if data.get('version') != self.cache_version:
-                logger.info(f"Cache version mismatch (expected {self.cache_version}, got {data.get('version')}). Rebuilding cache.")
+            # バージョンチェック（schema_version または version をチェック）
+            schema_version = data.get('schema_version') or data.get('version')
+            if schema_version != self.cache_version:
+                logger.info(f"Cache version mismatch (expected {self.cache_version}, got {schema_version}). Rebuilding cache.")
+                return False
+
+            # analyzer_version のチェック（オプション）
+            analyzer_version = data.get('analyzer_version')
+            expected_version = CONFIG.get('analyzer_version', '0.1.0')
+            if analyzer_version and analyzer_version != expected_version:
+                logger.info(f"Analyzer version mismatch (expected {expected_version}, got {analyzer_version}). Rebuilding cache.")
                 return False
 
             self.cache_data = data
@@ -266,21 +284,37 @@ class AnalyzerCache:
 
     def save_cache(self, file_results: Dict[str, Dict[str, Any]]):
         """
-        キャッシュファイルに保存
+        キャッシュファイルに保存（atomic rename を使用）
 
         Args:
             file_results: {file_path: {hash, result, ...}} の形式
         """
         try:
+            # 既存のキャッシュデータから created_at を取得（存在する場合）
+            created_at = self.cache_data.get('created_at') or datetime.now().isoformat()
+            updated_at = datetime.now().isoformat()
+
             cache_data = {
-                'version': self.cache_version,
-                'generated_at': datetime.now().isoformat(),
+                'schema_version': self.cache_version,  # 要件に合わせて schema_version に変更
+                'analyzer_version': CONFIG.get('analyzer_version', '0.1.0'),
+                'created_at': created_at,
+                'updated_at': updated_at,
                 'project_root': str(self.project_root),
                 'files': file_results
             }
 
-            with open(self.cache_file, 'w', encoding='utf-8') as f:
+            # atomic rename を使用して保存
+            import tempfile
+            temp_file = self.cache_file.with_suffix('.tmp')
+
+            with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(cache_data, f, indent=2, ensure_ascii=False)
+
+            # atomic rename で上書き
+            temp_file.replace(self.cache_file)
+
+            # キャッシュデータも更新
+            self.cache_data = cache_data
 
             logger.debug(f"Saved cache to {self.cache_file} ({len(file_results)} files)")
         except Exception as e:
@@ -311,8 +345,13 @@ class AnalyzerCache:
         if not cached_file:
             return None
 
-        # ハッシュが一致するか確認
-        if cached_file.get('hash') == current_hash:
+        # ハッシュが一致するか確認（sha256: プレフィックスを考慮）
+        cached_hash = cached_file.get('hash', '')
+        # 両方のハッシュからプレフィックスを正規化
+        cached_hash_normalized = cached_hash.replace('sha256:', '') if cached_hash else ''
+        current_hash_normalized = current_hash.replace('sha256:', '') if current_hash else ''
+
+        if cached_hash_normalized and current_hash_normalized and cached_hash_normalized == current_hash_normalized:
             return cached_file.get('result')
 
         return None
@@ -358,9 +397,9 @@ class AnalyzerCache:
             self.cache_data['files'] = {}
 
         self.cache_data['files'][rel_path] = {
-            'hash': file_hash,
+            'hash': f"sha256:{file_hash}" if not file_hash.startswith('sha256:') else file_hash,
             'result': result,
-            'cached_at': datetime.now().isoformat()
+            'last_analyzed': datetime.now().isoformat()  # 要件に合わせて last_analyzed に変更
         }
 
     def clear_cache(self):
@@ -393,7 +432,18 @@ class UnifiedAnalyzer:
         self.use_cache = use_cache if use_cache is not None else self.config['enable_cache']
 
         self.engine = TreeSitterEngine(self.config)
-        self.cache = AnalyzerCache(self.project_root, self.config.get('cache_dir')) if self.use_cache else None
+
+        # キャッシュディレクトリの決定（環境変数または config から取得）
+        cache_dir = None
+        if self.use_cache:
+            # 環境変数から取得（優先）
+            if CONFIG.get('cache_dir_env'):
+                cache_dir = Path(CONFIG['cache_dir_env'])
+            # config から取得
+            elif self.config.get('cache_dir'):
+                cache_dir = Path(self.config['cache_dir'])
+
+        self.cache = AnalyzerCache(self.project_root, cache_dir) if self.use_cache else None
 
         # 統計情報
         self.stats = {
@@ -449,6 +499,11 @@ class UnifiedAnalyzer:
         # キャッシュを読み込み
         if self.cache:
             self.cache.load_cache()
+
+            # RESET_CACHE 環境変数が設定されている場合はキャッシュをクリア
+            if CONFIG.get('reset_cache', False):
+                logger.info("RESET_CACHE environment variable is set. Clearing cache.")
+                self.cache.clear_cache()
 
         # 対象ファイルを取得
         target_files = self._get_target_files(exclude_patterns)

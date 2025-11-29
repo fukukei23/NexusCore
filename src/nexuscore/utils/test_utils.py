@@ -15,14 +15,14 @@ from typing import Tuple, Optional, List
 def project_path_to_module_path(project_root: Path, file_path: Path) -> str:
     """
     プロジェクトルートからの相対パスを Python モジュールパスに変換する。
-    
+
     Args:
         project_root: プロジェクトのルートディレクトリ
         file_path: 対象ファイルのパス
-    
+
     Returns:
         Python モジュールパス（例: "foo.bar"）
-    
+
     Examples:
         >>> project_path_to_module_path(Path("/project"), Path("/project/src/foo/bar.py"))
         "src.foo.bar"
@@ -42,10 +42,10 @@ def project_path_to_module_path(project_root: Path, file_path: Path) -> str:
 def validate_test_code(test_code: str) -> Tuple[bool, Optional[str], List[str]]:
     """
     生成されたテストコードを検証する。
-    
+
     Args:
         test_code: 検証するテストコード
-    
+
     Returns:
         (is_valid, error_message, warnings) のタプル
         - is_valid: 構文的に有効か
@@ -53,13 +53,13 @@ def validate_test_code(test_code: str) -> Tuple[bool, Optional[str], List[str]]:
         - warnings: 警告メッセージのリスト
     """
     warnings: List[str] = []
-    
+
     # 1. AST パースで構文チェック
     try:
         ast.parse(test_code)
     except SyntaxError as e:
         return False, f"Syntax error: {e}", warnings
-    
+
     # 2. 危険な文字列のチェック
     dangerous_patterns = [
         (r'\bos\.system\s*\(', 'os.system() calls are not allowed'),
@@ -70,45 +70,45 @@ def validate_test_code(test_code: str) -> Tuple[bool, Optional[str], List[str]]:
         (r'eval\s*\(', 'eval() calls are not allowed'),
         (r'exec\s*\(', 'exec() calls are not allowed'),
     ]
-    
+
     for pattern, message in dangerous_patterns:
         if re.search(pattern, test_code):
             warnings.append(message)
-    
+
     # 3. if __name__ == "__main__": のチェック
     if re.search(r'if\s+__name__\s*==\s*["\']__main__["\']', test_code):
         warnings.append('if __name__ == "__main__": should not be included in test files')
-    
+
     # 4. pytest 関数名のチェック
     test_functions = re.findall(r'def\s+(test_\w+)', test_code)
     if not test_functions:
         warnings.append('No test functions found (functions should start with "test_")')
-    
+
     # 5. import pytest のチェック
     if 'import pytest' not in test_code and 'from pytest import' not in test_code:
         warnings.append('pytest is not imported')
-    
+
     return True, None, warnings
 
 
 def extract_code_from_markdown(text: str) -> str:
     """
     Markdown コードブロックから Python コードを抽出する。
-    
+
     Args:
         text: Markdown 形式のテキスト（コードブロックを含む可能性がある）
-    
+
     Returns:
         抽出された Python コード
     """
     # ```python または ``` で囲まれたコードブロックを探す
     pattern = r'```(?:python)?\s*\n(.*?)```'
     matches = re.findall(pattern, text, re.DOTALL)
-    
+
     if matches:
         # 最初のコードブロックを返す
         return matches[0].strip()
-    
+
     # コードブロックが見つからない場合はそのまま返す
     return text.strip()
 
@@ -116,11 +116,11 @@ def extract_code_from_markdown(text: str) -> str:
 def create_fallback_test_file(file_path: Path, error_message: str) -> str:
     """
     エラー時のフォールバックテストファイルを生成する。
-    
+
     Args:
         file_path: テストファイルのパス
         error_message: エラーメッセージ
-    
+
     Returns:
         フォールバックテストコード
     """
@@ -137,7 +137,7 @@ import pytest
 def test_auto_generated_test_scaffold_invalid():
     """
     Auto-generated test scaffold is invalid.
-    
+
     This test intentionally fails to indicate that the test generation
     process encountered an error and could not produce valid test code.
     """
