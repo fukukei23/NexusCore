@@ -34,6 +34,7 @@ from nexuscore.core.diff_preview import wrap_diff_as_markdown, summarize_diff_fi
 from nexuscore.core.stacktrace_mapper import extract_candidate_files
 from nexuscore.agents.patch_applier import PatchApplier
 from nexuscore.config.self_healing_config import SelfHealingConfig
+from nexuscore.diff.semantic_diff import compute_semantic_diff
 
 # 4.4: Retry と例外分類
 try:
@@ -450,10 +451,30 @@ class SelfHealingService:
                                 "after": after_code,
                             }
 
+                    # Semantic Diff を生成して details に積む
+                    semantic_diffs: Dict[str, Dict[str, object]] = {}
+                    for rel_path, contents in file_diffs.items():
+                        before = contents.get("before") or ""
+                        after = contents.get("after") or ""
+                        try:
+                            result = compute_semantic_diff(
+                                file_path=project_path / rel_path,
+                                before_code=before,
+                                after_code=after,
+                                language="python",  # TODO: 拡張余地あり
+                            )
+                            semantic_diffs[rel_path] = result.to_dict()
+                        except Exception as exc:  # フェイルセーフ
+                            self.logger.warning(
+                                f"Failed to compute semantic diff for {rel_path}: {exc}",
+                                exc_info=True,
+                            )
+
                     # GuardianAgent で複数ファイルの差分サマリーを生成
                     if file_diffs:
                         diff_summary = self._guardian_agent.generate_diff_summary(
                             file_diffs=file_diffs,
+                            semantic_diffs=semantic_diffs if semantic_diffs else None,
                             model="gpt-4.1",
                         )
                         self.logger.info(f"Generated diff summary for {len(file_diffs)} files via GuardianAgent")
@@ -511,6 +532,10 @@ class SelfHealingService:
             # E-4/E-5: 差分サマリーを追加
             if diff_summary:
                 details["diff_summary"] = diff_summary
+
+            # Semantic Diff を追加
+            if "semantic_diffs" in locals() and semantic_diffs:
+                details["semantic_diffs"] = semantic_diffs
 
             # E-5: モデル名とコスト情報を追加（guardian_agent から取得可能な場合）
             if hasattr(self, "_guardian_agent") and self._guardian_agent is not None:
@@ -928,6 +953,21 @@ class SelfHealingService:
         except Exception:
             # ログ書き込み失敗は致命的ではない
             self.logger.exception("Failed to log self-healing run history.")
+
+        # TODO: Coverage 統合
+        # Self-Healing Run 実行後に coverage 測定を行い、
+        # Run.details["coverage_pct"] などに保存できるようにする構想。
+        #
+        # 実装案:
+        # 1. テスト実行後に coverage run -m pytest を実行
+        # 2. coverage report --format=json で JSON を取得
+        # 3. カバレッジ率を計算して details["coverage_pct"] に保存
+        # 4. PR コメントや Web UI に表示
+        #
+        # 注意: テスト実行が失敗した場合でも coverage は測定可能（失敗したテストのカバレッジも意味がある）
+        # coverage_pct = self._measure_coverage(project_path) if project_path else None
+        # if coverage_pct is not None:
+        #     details["coverage_pct"] = coverage_pct
 
         # E-5: Run レポートの自動生成（webapp が利用可能な場合）
         try:

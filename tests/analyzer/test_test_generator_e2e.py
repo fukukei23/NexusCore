@@ -88,11 +88,11 @@ def test_test_generator_creates_runnable_pytest_file(sample_project_dir, tmp_pat
     # 生成されたコードを検証
     test_code = test_file.read_text(encoding="utf-8")
     is_valid, error_message, warnings = validate_test_code(test_code)
-    
+
     # 構文エラーがある場合は失敗
     if not is_valid:
         pytest.fail(f"Generated test code has syntax errors: {error_message}")
-    
+
     # 警告があればログに記録
     if warnings:
         for warning in warnings:
@@ -112,7 +112,7 @@ def test_test_generator_creates_runnable_pytest_file(sample_project_dir, tmp_pat
     # 環境変数でスキップ可能にする
     if os.getenv("SKIP_PYTEST_EXECUTION", "0") == "1":
         pytest.skip("Pytest execution skipped (SKIP_PYTEST_EXECUTION=1)")
-    
+
     try:
         cmd = [sys.executable, "-m", "pytest", "-q", str(out_dir), "--tb=short"]
         result = subprocess.run(
@@ -148,9 +148,9 @@ def test_test_generator_validation(sample_project_dir, tmp_path):
     module_b_path = sample_project_dir / "module_b.py"
     if not module_b_path.exists():
         pytest.skip("module_b.py not found in sample project")
-    
+
     code = module_b_path.read_text(encoding="utf-8")
-    
+
     # 検証付きでテストコードを生成
     try:
         test_code, is_valid, error_message, warnings = generate_and_validate_test_code(
@@ -160,10 +160,10 @@ def test_test_generator_validation(sample_project_dir, tmp_path):
         )
     except Exception as e:
         pytest.skip(f"Test generation failed (likely LLM API issue): {e}")
-    
+
     # 検証結果を確認
     assert is_valid, f"Generated test code should be valid: {error_message}"
-    
+
     # 警告があれば確認
     if warnings:
         print(f"Validation warnings: {warnings}")
@@ -173,13 +173,13 @@ def test_test_generator_validation(sample_project_dir, tmp_path):
 def test_project_path_to_module_path():
     """project_path_to_module_path ユーティリティが正しく動作することを確認"""
     from nexuscore.utils.test_utils import project_path_to_module_path
-    
+
     project_root = Path("/project")
     file_path = Path("/project/src/foo/bar.py")
-    
+
     module_path = project_path_to_module_path(project_root, file_path)
     assert module_path == "src.foo.bar"
-    
+
     # プロジェクト外のファイル
     external_path = Path("/other/project/file.py")
     module_path = project_path_to_module_path(project_root, external_path)

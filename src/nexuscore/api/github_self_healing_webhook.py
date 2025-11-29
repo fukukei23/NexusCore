@@ -168,6 +168,9 @@ def format_pr_comment(
     # E-4: Before/After 差分サマリーを取得
     diff_summary = details.get("diff_summary")
 
+    # Semantic Diff を取得
+    semantic_diffs = details.get("semantic_diffs") if details else None
+
     # E-3: Run Markdown レポートを取得
     markdown_report = details.get("markdown_report")
     if not markdown_report and run_id != "N/A":
@@ -188,6 +191,7 @@ def format_pr_comment(
         diff_summary=diff_summary,
         markdown_report=markdown_report,
         details=details,  # E-5: メトリクス統合用
+        semantic_diffs=semantic_diffs,
     )
 
     # PR コメントを組み立て

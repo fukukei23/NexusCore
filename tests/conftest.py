@@ -2,6 +2,7 @@
 Pytest 共通フィクスチャ
 
 Flask SaaS UI のスモークテストで使用する共通フィクスチャを集約。
+テスト結果自動保存機能も含む。
 """
 
 from __future__ import annotations
@@ -9,6 +10,9 @@ from __future__ import annotations
 import pytest
 from datetime import datetime, timedelta
 import json
+import os
+from pathlib import Path
+from typing import List, Dict, Any
 
 # webapp 関連のインポートは条件付き（Gradio/analyzer テストでは不要）
 try:
@@ -217,4 +221,155 @@ def test_api_key(app, test_user):
         db.session.add(api_key)
         db.session.commit()
         return raw_token, api_key
+
+
+# ==============================================================================
+# テスト結果自動保存機能
+# ==============================================================================
+
+# テスト結果を保存するためのグローバル変数
+_test_results: List[Dict[str, Any]] = []
+_result_file_path: Path | None = None
+
+
+def pytest_configure(config):
+    """
+    テスト開始時に結果ファイルのパスを設定
+    """
+    global _result_file_path
+
+    # プロジェクトルートを取得
+    project_root = Path(__file__).resolve().parents[1]
+
+    # docs/reports/ ディレクトリを作成
+    reports_dir = project_root / "docs" / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    # タイムスタンプ付きファイル名を生成
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    _result_file_path = reports_dir / f"TEST_RESULTS_{timestamp}.txt"
+
+
+def pytest_runtest_logreport(report):
+    """
+    各テストの結果を収集
+    """
+    global _test_results
+
+    # テスト実行時のみ記録（setup, call, teardown のうち call のみ）
+    if report.when == "call":
+        test_result = {
+            "nodeid": report.nodeid,
+            "outcome": report.outcome,  # "passed", "failed", "skipped"
+            "duration": getattr(report, "duration", 0.0),
+            "longrepr": str(report.longrepr) if hasattr(report, "longrepr") and report.longrepr else None,
+        }
+        _test_results.append(test_result)
+
+
+def pytest_collectreport(report):
+    """
+    テスト収集時のエラーも記録
+    """
+    global _test_results
+
+    # 収集エラーを記録
+    if report.failed:
+        test_result = {
+            "nodeid": report.nodeid or "collection",
+            "outcome": "error",
+            "duration": 0.0,
+            "longrepr": str(report.longrepr) if hasattr(report, "longrepr") and report.longrepr else None,
+        }
+        _test_results.append(test_result)
+
+
+def pytest_collectreport(report):
+    """
+    テスト収集時のエラーも記録
+    """
+    global _test_results
+
+    # 収集エラーを記録
+    if report.failed:
+        test_result = {
+            "nodeid": report.nodeid or "collection",
+            "outcome": "error",
+            "duration": 0.0,
+            "longrepr": str(report.longrepr) if hasattr(report, "longrepr") and report.longrepr else None,
+        }
+        _test_results.append(test_result)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """
+    テスト終了時に結果ファイルに書き込み
+    """
+    global _test_results, _result_file_path
+
+    if _result_file_path is None:
+        return
+
+    try:
+        # テスト結果をテキスト形式で整形
+        lines: List[str] = []
+        lines.append("=" * 80)
+        lines.append("NexusCore Test Results")
+        lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append("=" * 80)
+        lines.append("")
+
+        # 統計情報
+        total = len(_test_results)
+        passed = sum(1 for r in _test_results if r["outcome"] == "passed")
+        failed = sum(1 for r in _test_results if r["outcome"] == "failed")
+        skipped = sum(1 for r in _test_results if r["outcome"] == "skipped")
+        error = sum(1 for r in _test_results if r["outcome"] == "error")
+
+        lines.append(f"Total tests: {total}")
+        lines.append(f"Passed: {passed}")
+        lines.append(f"Failed: {failed}")
+        lines.append(f"Skipped: {skipped}")
+        if error > 0:
+            lines.append(f"Error: {error}")
+        lines.append("")
+        lines.append("=" * 80)
+        lines.append("")
+
+        # 各テストの詳細
+        for result in _test_results:
+            outcome_emoji = {
+                "passed": "✅",
+                "failed": "❌",
+                "skipped": "⏭️",
+                "error": "⚠️",
+            }.get(result["outcome"], "❓")
+
+            lines.append(f"{outcome_emoji} {result['nodeid']} ({result['outcome']})")
+            if result["duration"]:
+                lines.append(f"   Duration: {result['duration']:.3f}s")
+
+            # 失敗したテストの詳細
+            if result["outcome"] == "failed" and result["longrepr"]:
+                lines.append("   Error details:")
+                for line in result["longrepr"].split("\n"):
+                    lines.append(f"   {line}")
+
+            lines.append("")
+
+        # ファイルに書き込み
+        _result_file_path.write_text("\n".join(lines), encoding="utf-8")
+
+        # ターミナルにメッセージを表示（1回のみ）
+        import sys
+        message = f"\n✅ テスト結果を保存しました: {_result_file_path}\n"
+        # stderr に出力（pytest の出力と混ざらないように）
+        sys.stderr.write(message)
+        sys.stderr.flush()
+
+    except Exception as e:
+        import sys
+        error_message = f"⚠️ テスト結果の保存に失敗しました: {e}\n"
+        sys.stderr.write(error_message)
+        sys.stderr.flush()
 
