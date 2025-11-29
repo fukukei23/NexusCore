@@ -49,6 +49,19 @@ jobs:
         run: |
           pytest -q tests/webapp/
 
+      # === Phase3 coverage (graph_builder / unified_analyzer / test_generator / tree_sitter_checker) ===
+      - name: Run Phase3 coverage report
+        run: |
+          make coverage-phase3
+
+      # === Comment Phase3 coverage summary on PR ===
+      - name: Comment Phase3 coverage summary on PR
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: phase3-coverage
+          path: docs/coverage_phase3_summary_ci.md
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
