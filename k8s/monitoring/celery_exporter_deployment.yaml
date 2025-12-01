@@ -1,0 +1,73 @@
+# ==============================================================================
+# Celery Exporter Deployment
+# ==============================================================================
+# 用途: Celery のキュー長、成功/失敗タスク数、処理時間を Prometheus で取得
+#
+# 使用方法:
+#   kubectl apply -f k8s/monitoring/celery_exporter_deployment.yaml
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-exporter
+  namespace: nexuscore
+  labels:
+    app: celery-exporter
+    component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: celery-exporter
+  template:
+    metadata:
+      labels:
+        app: celery-exporter
+        component: monitoring
+    spec:
+      containers:
+      - name: celery-exporter
+        image: danihodovic/celery-exporter:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: metrics
+          containerPort: 9540
+          protocol: TCP
+        env:
+        # Celery Broker URL (Redis)
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: nexuscore-config
+              key: celery_broker_url
+        # Celery Result Backend (Redis)
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: nexuscore-config
+              key: celery_result_backend
+        # Exporter の設定
+        - name: LISTEN_ADDRESS
+          value: "0.0.0.0:9540"
+        - name: METRICS_PATH
+          value: "/metrics"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 10
+          periodSeconds: 5

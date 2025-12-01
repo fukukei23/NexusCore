@@ -1,0 +1,31 @@
+# ==============================================================================
+# Celery Exporter Service
+# ==============================================================================
+# 用途: Celery Exporter の /metrics エンドポイントを Service 経由で公開
+#
+# 使用方法:
+#   kubectl apply -f k8s/monitoring/celery_exporter_service.yaml
+# ==============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: celery-exporter
+  namespace: nexuscore
+  labels:
+    app: celery-exporter
+    component: monitoring
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9540"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: metrics
+    port: 9540
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: celery-exporter
+

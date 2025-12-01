@@ -73,6 +73,7 @@ htmlcov/
 
 # テスト結果ファイル（自動生成）
 docs/reports/TEST_RESULTS_*.txt
+docs/reports/TEST_ERRORS_*.txt
 
 # ログ（logs/ ディレクトリ内のファイルは追跡しないが、ディレクトリ自体は保持）
 logs/*
@@ -91,3 +92,10 @@ exports/*.zip
 *.tmp
 
 exports/*.json
+
+# Kubernetes バイナリ（サイズが大きいため）
+kubectl
+minikube-linux-amd64
+
+# ローカルデータベース
+nexus_local.db

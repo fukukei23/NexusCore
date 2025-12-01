@@ -1,0 +1,30 @@
+# ==============================================================================
+# ServiceMonitor for Celery Exporter
+# ==============================================================================
+# 用途: Prometheus Operator を使用して Celery Exporter を自動的に Prometheus に登録
+#
+# 前提条件:
+#   - Prometheus Operator がインストールされていること
+#   - CRD: servicemonitors.monitoring.coreos.com が利用可能であること
+#
+# 使用方法:
+#   kubectl apply -f k8s/monitoring/service_monitor_celery.yaml
+# ==============================================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: celery-exporter
+  namespace: nexuscore
+  labels:
+    app: celery-exporter
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: celery-exporter
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
