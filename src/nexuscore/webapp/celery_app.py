@@ -84,6 +84,9 @@ from typing import Optional
 from nexuscore.webapp.models import Run, Project
 from nexuscore.webapp import db
 from nexuscore.webapp.orchestrator_helper import run_orchestrator_sync
+from nexuscore.core.job_state_machine import JobStateMachine
+from nexuscore.core.session_control import SessionController
+from nexuscore.core.run_history import RunHistoryLogger
 
 
 def _register_tasks(celery_instance: Celery) -> None:
@@ -93,48 +96,62 @@ def _register_tasks(celery_instance: Celery) -> None:
     @celery_instance.task(name="nexuscore.run_orchestrator")
     def _run_orchestrator_task_internal(run_db_id: int) -> None:
         """
-        単一 Run を対象に Orchestrator を非同期実行する Celery タスク。
+        単一 Run を対象に Orchestrator を非同期実行する Celery タスク（JobStateMachine統合版）。
 
         Args:
             run_db_id: Run.id（Webapp側でRunレコードを作成したときのID）
 
         このタスクは:
+        - JobStateMachine を使用して状態遷移を管理
         - Run テーブルの status/started_at/finished_at を更新
         - run_full_project(..., run_db_id=run.id) を呼び出す
         """
+        import logging
+        logger = logging.getLogger(__name__)
+
         run: Optional[Run] = Run.query.get(run_db_id)
         if run is None:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Run not found: run_db_id={run_db_id}")
             return
 
         project: Project = run.project
+        job_id = run.run_id or str(run.id)
 
         # requirement が保存されていない場合はエラー
         if not run.requirement:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Run.requirement is empty for run_id={run.id}")
             run.status = "FAILED"
             run.finished_at = datetime.utcnow()
             db.session.commit()
             return
 
-        # 実行開始
+        # SessionController と RunHistoryLogger を初期化
+        import os
+        from pathlib import Path
+        session_dir = os.path.join(project.local_path, ".nexus", "sessions")
+        session_controller = SessionController(
+            session_id=job_id,
+            root_dir=session_dir,
+        )
+        history_logger = RunHistoryLogger(project_root=project.local_path)
+
+        # JobStateMachine を初期化
+        state_machine = JobStateMachine(
+            job_id=job_id,
+            session_controller=session_controller,
+            history_logger=history_logger,
+            job_type="orchestrator",
+        )
+
         try:
+            # ジョブを開始（Pending → Running）
+            state_machine.start()
+
+            # Run テーブルを更新
             run.status = "RUNNING"
             run.started_at = datetime.utcnow()
             db.session.commit()
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to update Run status to RUNNING: {e}", exc_info=True)
-            db.session.rollback()
-            return
 
-        status = "SUCCESS"
-        try:
             # Orchestrator を実行
             run_orchestrator_sync(
                 project_path=project.local_path,
@@ -144,23 +161,37 @@ def _register_tasks(celery_instance: Celery) -> None:
                 language="ja",
                 fast_lane=False,
             )
+
+            # ジョブを完了（Running → Completed）
+            state_machine.complete(details={
+                "run_db_id": run.id,
+                "project_name": project.name,
+            })
             run.status = "SUCCESS"
             status = "success"
+
         except Exception as exc:
             # エラーハンドリング
-            import logging
-            logger = logging.getLogger(__name__)
+            error_message = str(exc)
             logger.error(f"Orchestrator execution failed for run_id={run.id}: {exc}", exc_info=True)
+
+            # ジョブを失敗として記録（Running → Failed）
+            state_machine.fail(
+                error_message=error_message,
+                details={
+                    "run_db_id": run.id,
+                    "project_name": project.name,
+                    "exception_type": type(exc).__name__,
+                }
+            )
             run.status = "FAILED"
             status = "error"
-            # ログ自体は orchestrator_db_hook / logging_service 経由で ExecutionLog に入る
+
         finally:
             run.finished_at = datetime.utcnow()
             try:
                 db.session.commit()
             except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.error(f"Failed to update Run status in finally block: {e}", exc_info=True)
                 db.session.rollback()
 
@@ -185,8 +216,6 @@ def _register_tasks(celery_instance: Celery) -> None:
                 except Exception as log_exc:
                     logger.warning(f"Failed to log report generation: {log_exc}", exc_info=True)
             except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.warning(f"Failed to generate run report: {e}", exc_info=True)
                 # レポート生成失敗は本処理を壊さない
 
@@ -209,8 +238,6 @@ def _register_tasks(celery_instance: Celery) -> None:
                         },
                     )
             except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.warning(f"Failed to send Slack notification: {e}", exc_info=True)
 
     # タスクをグローバルに公開（views_projects.py から参照できるように）
@@ -222,5 +249,11 @@ def _register_tasks(celery_instance: Celery) -> None:
 # その時点で init_celery() を呼び出して初期化する
 
 # Celery worker 起動時に自動的に初期化されるようにする
-if celery is None:
-    celery = init_celery()
+# テスト時や環境変数で無効化された場合は初期化をスキップ
+if celery is None and os.getenv("SKIP_CELERY_AUTO_INIT") != "1":
+    try:
+        celery = init_celery()
+    except (ImportError, ModuleNotFoundError) as e:
+        # テスト時や依存関係が不足している場合は初期化をスキップ
+        # Celery worker 起動時には依存関係が揃っている前提
+        pass

@@ -230,13 +230,14 @@ def test_api_key(app, test_user):
 # テスト結果を保存するためのグローバル変数
 _test_results: List[Dict[str, Any]] = []
 _result_file_path: Path | None = None
+_error_log_file_path: Path | None = None
 
 
 def pytest_configure(config):
     """
     テスト開始時に結果ファイルのパスを設定
     """
-    global _result_file_path
+    global _result_file_path, _error_log_file_path
 
     # プロジェクトルートを取得
     project_root = Path(__file__).resolve().parents[1]
@@ -248,9 +249,11 @@ def pytest_configure(config):
     # タイムスタンプ付きファイル名を生成
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     _result_file_path = reports_dir / f"TEST_RESULTS_{timestamp}.txt"
+    _error_log_file_path = reports_dir / f"TEST_ERRORS_{timestamp}.txt"
 
 
 def pytest_runtest_logreport(report):
+    """テスト結果を自動保存（エラーログも含む）"""
     """
     各テストの結果を収集
     """
@@ -284,28 +287,11 @@ def pytest_collectreport(report):
         _test_results.append(test_result)
 
 
-def pytest_collectreport(report):
-    """
-    テスト収集時のエラーも記録
-    """
-    global _test_results
-
-    # 収集エラーを記録
-    if report.failed:
-        test_result = {
-            "nodeid": report.nodeid or "collection",
-            "outcome": "error",
-            "duration": 0.0,
-            "longrepr": str(report.longrepr) if hasattr(report, "longrepr") and report.longrepr else None,
-        }
-        _test_results.append(test_result)
-
-
 def pytest_sessionfinish(session, exitstatus):
     """
-    テスト終了時に結果ファイルに書き込み
+    テスト終了時に結果ファイルに書き込み（エラーログも別ファイルに保存）
     """
-    global _test_results, _result_file_path
+    global _test_results, _result_file_path, _error_log_file_path
 
     if _result_file_path is None:
         return
@@ -336,6 +322,14 @@ def pytest_sessionfinish(session, exitstatus):
         lines.append("=" * 80)
         lines.append("")
 
+        # エラーログ用のリスト
+        error_lines: List[str] = []
+        error_lines.append("=" * 80)
+        error_lines.append("NexusCore Test Error Logs")
+        error_lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        error_lines.append("=" * 80)
+        error_lines.append("")
+
         # 各テストの詳細
         for result in _test_results:
             outcome_emoji = {
@@ -350,19 +344,40 @@ def pytest_sessionfinish(session, exitstatus):
                 lines.append(f"   Duration: {result['duration']:.3f}s")
 
             # 失敗したテストの詳細
-            if result["outcome"] == "failed" and result["longrepr"]:
+            if result["outcome"] in ("failed", "error") and result["longrepr"]:
                 lines.append("   Error details:")
                 for line in result["longrepr"].split("\n"):
                     lines.append(f"   {line}")
 
+                # エラーログファイルにも詳細を保存
+                error_lines.append("=" * 80)
+                error_lines.append(f"Test: {result['nodeid']}")
+                error_lines.append(f"Outcome: {result['outcome']}")
+                error_lines.append(f"Duration: {result['duration']:.3f}s")
+                error_lines.append("=" * 80)
+                error_lines.append("")
+                error_lines.append("Error Details:")
+                error_lines.append("-" * 80)
+                for line in result["longrepr"].split("\n"):
+                    error_lines.append(line)
+                error_lines.append("")
+                error_lines.append("")
+
             lines.append("")
 
-        # ファイルに書き込み
+        # 結果ファイルに書き込み
         _result_file_path.write_text("\n".join(lines), encoding="utf-8")
+
+        # エラーログファイルに書き込み（エラーがある場合のみ）
+        if error_lines and len(error_lines) > 5:  # ヘッダー以外に内容がある場合
+            if _error_log_file_path:
+                _error_log_file_path.write_text("\n".join(error_lines), encoding="utf-8")
 
         # ターミナルにメッセージを表示（1回のみ）
         import sys
         message = f"\n✅ テスト結果を保存しました: {_result_file_path}\n"
+        if _error_log_file_path and len(error_lines) > 5:
+            message += f"✅ エラーログを保存しました: {_error_log_file_path}\n"
         # stderr に出力（pytest の出力と混ざらないように）
         sys.stderr.write(message)
         sys.stderr.flush()
