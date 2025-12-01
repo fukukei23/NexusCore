@@ -1,0 +1,77 @@
+# ==============================================================================
+# Kubernetes Horizontal Pod Autoscaler (HPA) for NexusCore Orchestrator Workers
+# ==============================================================================
+# 用途: システムの負荷に応じて、ワーカーの数を動的に増減させる
+#
+# 設定内容:
+#   - CPU使用率が70%を超えた場合にスケールアウト
+#   - メモリ使用率が80%を超えた場合にスケールアウト
+#   - 最小ワーカー数: 2
+#   - 最大ワーカー数: 10
+#   - スケールアップ: 最大100%増加または2ポッド追加（30秒ごと）
+#   - スケールダウン: 最大50%減少（60秒ごと、5分間の安定化期間）
+#
+# 使用方法:
+#   kubectl apply -f k8s/orchestrator-worker-hpa.yaml
+#
+# 手動スケーリング:
+#   kubectl scale deployment orchestrator-worker --replicas=5
+#
+# HPAの状態確認:
+#   kubectl get hpa orchestrator-worker-hpa
+#   kubectl describe hpa orchestrator-worker-hpa
+# ==============================================================================
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: orchestrator-worker-hpa
+  labels:
+    app: orchestrator-worker
+    component: autoscaler
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: orchestrator-worker
+  minReplicas: 2  # 最小ワーカー数
+  maxReplicas: 10  # 最大ワーカー数
+  metrics:
+  # CPU使用率ベースのスケーリング
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70  # CPU使用率が70%を超えた場合にスケールアウト
+  # メモリ使用率ベースのスケーリング
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80  # メモリ使用率が80%を超えた場合にスケールアウト
+  behavior:
+    # スケールダウンの動作（負荷が軽減されたとき）
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5分間の安定化期間（急激なスケールダウンを防ぐ）
+      policies:
+      - type: Percent
+        value: 50  # 最大50%減少
+        periodSeconds: 60  # 60秒ごと
+      - type: Pods
+        value: 1  # または1ポッドずつ減少
+        periodSeconds: 60
+      selectPolicy: Min  # より保守的な方（少ない減少）を選択
+    # スケールアップの動作（負荷が増加したとき）
+    scaleUp:
+      stabilizationWindowSeconds: 0  # 即座にスケールアップ
+      policies:
+      - type: Percent
+        value: 100  # 最大100%増加
+        periodSeconds: 30  # 30秒ごと
+      - type: Pods
+        value: 2  # または2ポッドずつ追加
+        periodSeconds: 30
+      selectPolicy: Max  # より積極的な方（多い増加）を選択
+
