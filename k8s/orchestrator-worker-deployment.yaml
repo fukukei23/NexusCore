@@ -1,0 +1,139 @@
+# ==============================================================================
+# Kubernetes Deployment for NexusCore Orchestrator Workers
+# ==============================================================================
+# 用途: Celery ワーカーの水平スケーリング
+# 使用方法:
+#   kubectl apply -f k8s/orchestrator-worker-deployment.yaml
+#   kubectl autoscale deployment orchestrator-worker --cpu-percent=70 --min=2 --max=10
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestrator-worker
+  labels:
+    app: orchestrator-worker
+    component: worker
+spec:
+  replicas: 3  # 初期ワーカー数
+  selector:
+    matchLabels:
+      app: orchestrator-worker
+  template:
+    metadata:
+      labels:
+        app: orchestrator-worker
+        component: worker
+    spec:
+      containers:
+      - name: orchestrator-worker
+        image: nexuscore/orchestrator:latest  # 実際のイメージ名に置き換え
+        imagePullPolicy: Always
+        command:
+          - celery
+          - -A
+          - nexuscore.webapp.celery_app
+          - worker
+          - --loglevel=info
+          - --concurrency=4
+          - --max-tasks-per-child=100  # メモリリーク対策
+        env:
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: nexuscore-config
+              key: celery_broker_url
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: nexuscore-config
+              key: celery_result_backend
+        - name: DATABASE_URI
+          valueFrom:
+            configMapKeyRef:
+              name: nexuscore-config
+              key: database_uri
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: nexuscore-config
+              key: redis_url
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        volumeMounts:
+        - name: project-storage
+          mountPath: /workspace
+        - name: session-storage
+          mountPath: /workspace/.nexus/sessions
+      volumes:
+      - name: project-storage
+        persistentVolumeClaim:
+          claimName: nexuscore-projects-pvc
+      - name: session-storage
+        emptyDir: {}  # セッションは一時的なものなので emptyDir で十分
+
+---
+# ==============================================================================
+# HorizontalPodAutoscaler (HPA)
+# ==============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: orchestrator-worker-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: orchestrator-worker
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5分間の安定化期間
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+      selectPolicy: Max
+
+---
+# ==============================================================================
+# ConfigMap (設定例)
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nexuscore-config
+data:
+  celery_broker_url: "redis://redis-service:6379/0"
+  celery_result_backend: "redis://redis-service:6379/1"
+  database_uri: "postgresql://user:password@postgres-service:5432/nexuscore"
+  redis_url: "redis://redis-service:6379/0"
+

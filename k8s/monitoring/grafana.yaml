@@ -1,0 +1,274 @@
+# ==============================================================================
+# Grafana Deployment, Service, and ConfigMap
+# ==============================================================================
+# 用途: 監視の可視化。Celery のスループット・キュー長・失敗率を Dashboard 化
+#
+# 使用方法:
+#   kubectl apply -f k8s/monitoring/grafana.yaml
+#
+# アクセス方法:
+#   Ingress 経由: https://your-domain/grafana
+#   または port-forward: kubectl port-forward -n nexuscore svc/grafana 3000:3000
+# ==============================================================================
+
+---
+# Grafana ConfigMap (Datasource と Dashboard の設定)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: nexuscore
+  labels:
+    app: grafana
+    component: monitoring
+data:
+  # Prometheus Datasource の自動設定
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+        editable: true
+
+  # Celery Dashboard の設定（OSS ダッシュボードをインポート）
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 'Celery'
+        orgId: 1
+        folder: 'Celery'
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /etc/grafana/provisioning/dashboards/celery
+
+  # Celery Dashboard JSON (簡易版)
+  # Grafana の provisioning 機能で使用するため、ダッシュボードオブジェクトを直接配置
+  celery-dashboard.json: |
+    {
+      "title": "Celery Monitoring",
+      "tags": ["celery", "nexuscore"],
+      "timezone": "browser",
+      "panels": [
+        {
+          "id": 1,
+          "title": "Queue Length",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "celery_queue_length",
+              "legendFormat": "{{queue}}",
+              "refId": "A"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+        },
+        {
+          "id": 2,
+          "title": "Task Failures",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "rate(celery_task_failures_total[5m])",
+              "legendFormat": "{{task_name}}",
+              "refId": "A"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+        },
+        {
+          "id": 3,
+          "title": "Task Duration",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "celery_task_duration_seconds",
+              "legendFormat": "{{task_name}}",
+              "refId": "A"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+        },
+        {
+          "id": 4,
+          "title": "Worker CPU Usage",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "rate(container_cpu_usage_seconds_total{pod=~\"orchestrator-worker-.*\"}[5m])",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+        },
+        {
+          "id": 5,
+          "title": "Worker Memory Usage",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "container_memory_usage_bytes{pod=~\"orchestrator-worker-.*\"}",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "version": 1,
+      "uid": "celery-monitoring"
+    }
+
+---
+# Grafana Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: nexuscore
+  labels:
+    app: grafana
+    component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+        component: monitoring
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          value: "admin"
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-secret
+              key: admin-password
+        - name: GF_SERVER_ROOT_URL
+          value: "%(protocol)s://%(domain)s:%(http_port)s/grafana/"
+        - name: GF_SERVER_SERVE_FROM_SUB_PATH
+          value: "true"
+        volumeMounts:
+        - name: grafana-config
+          mountPath: /etc/grafana/provisioning/datasources
+        - name: grafana-dashboards
+          mountPath: /etc/grafana/provisioning/dashboards
+        - name: grafana-storage
+          mountPath: /var/lib/grafana
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: grafana-config
+        configMap:
+          name: grafana-config
+          items:
+            - key: datasources.yaml
+              path: datasources.yaml
+      - name: grafana-dashboards
+        configMap:
+          name: grafana-config
+          items:
+            - key: dashboards.yaml
+              path: dashboards.yaml
+            - key: celery-dashboard.json
+              path: celery/celery-dashboard.json
+      - name: grafana-storage
+        emptyDir: {}  # 本番環境では PersistentVolume を使用することを推奨
+
+---
+# Grafana Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: nexuscore
+  labels:
+    app: grafana
+    component: monitoring
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 3000
+    targetPort: http
+    protocol: TCP
+  selector:
+    app: grafana
+
+---
+# Grafana Secret (admin パスワード)
+# 注意: 本番環境では適切なパスワードに変更してください
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-secret
+  namespace: nexuscore
+  labels:
+    app: grafana
+    component: monitoring
+type: Opaque
+stringData:
+  admin-password: "admin"  # 本番環境では強力なパスワードに変更
+
+---
+# Grafana Ingress (Ingress が利用可能な場合)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: nexuscore
+  labels:
+    app: grafana
+    component: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx  # クラスターの Ingress Controller に合わせて変更
+  rules:
+  - host: your-domain.com  # 実際のドメインに変更
+    http:
+      paths:
+      - path: /grafana(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
