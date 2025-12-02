@@ -185,6 +185,7 @@ def run_orchestrator_task(task_id: str, requirement: str, project_path: str, con
         logger.critical(f"An error occurred in task {task_id}: {e}", exc_info=True)
         tasks[task_id] = {"status": "error", "message": f"orchestrator failed: {e}"}
 
+# LEGACY: will be removed after FastAPI migration is completed
 @app.route('/api/v1/execute', methods=['POST'])
 @require_auth
 def execute_task():
