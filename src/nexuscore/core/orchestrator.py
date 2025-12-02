@@ -24,8 +24,9 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass, field
+from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 # ------------------------------------------------------------------------------
 # パス設定 (自己完結性を高めるため: src/ を sys.path に追加)
@@ -76,6 +77,47 @@ except Exception:
 # ==============================================================================
 # Orchestrator 本体
 # ==============================================================================
+
+
+class OrchestratorPhase(Enum):
+    """
+    開発フローのフェーズを表現する Enum。
+
+    Requirement → Plan → Architecture → Implementation → Testing → Review
+    の順序で実行される。
+    """
+    REQUIREMENTS = auto()
+    PLAN = auto()
+    ARCHITECTURE = auto()
+    IMPLEMENTATION = auto()
+    TESTING = auto()
+    REVIEW = auto()
+
+
+@dataclass
+class OrchestratorContext:
+    """
+    Orchestrator の実行コンテキストを保持するデータクラス。
+
+    各フェーズ間で状態を引き継ぐために使用される。
+    """
+    task_id: str
+    user_requirement: str
+    language: str = "ja"
+    fast_lane: bool = False
+    run_db_id: Optional[int] = None
+
+    # フェーズごとの出力
+    specs: Dict[str, Any] = field(default_factory=dict)
+    plan: Dict[str, Any] = field(default_factory=dict)
+    architecture: Dict[str, Any] = field(default_factory=dict)
+    implementation: Dict[str, Any] = field(default_factory=dict)
+    testing: Dict[str, Any] = field(default_factory=dict)
+    review: Dict[str, Any] = field(default_factory=dict)
+
+    # フェーズ実行ログ（テスト用）
+    phase_log: List[str] = field(default_factory=list)
+
 
 @dataclass
 class Orchestrator:
@@ -221,7 +263,271 @@ class Orchestrator:
         return clean_output(content)
 
     # ------------------------------------------------------------------
-    # メインフロー (必要に応じて段階的に強化していく)
+    # フェーズ別メソッド（各フェーズの責務を明確化）
+    # ------------------------------------------------------------------
+    def run_requirements_phase(self, context: OrchestratorContext) -> OrchestratorContext:
+        """
+        Phase 1: Requirement Definition
+
+        Args:
+            context: OrchestratorContext
+
+        Returns:
+            更新された OrchestratorContext
+        """
+        self.logger.info(f"[{context.task_id}] Phase 1: Requirement Definition")
+        self._maybe_stop("before_requirement", {"task_id": context.task_id})
+        context.phase_log.append("REQUIREMENTS")
+
+        specs: Dict[str, Any] = {}
+
+        try:
+            use_ui = bool(getattr(self.requirement_agent, "use_ui", False))
+            if use_ui and hasattr(self.requirement_agent, "launch_gradio_ui"):
+                specs = self.requirement_agent.launch_gradio_ui(share=False)
+            elif hasattr(self.requirement_agent, "analyze_requirement"):
+                specs = self.requirement_agent.analyze_requirement(context.user_requirement)
+            else:
+                # 最低限、テキストとして持っておく
+                specs = {"raw_requirement": context.user_requirement}
+        except Exception as e:
+            self.logger.error(f"[{context.task_id}] Requirement phase failed: {e}", exc_info=True)
+            raise
+
+        if not specs:
+            self.logger.error(f"[{context.task_id}] Requirement definition returned empty specs. Aborting.")
+            raise ValueError("Requirement definition returned empty specs")
+
+        context.specs = specs
+        self._maybe_stop("after_requirement", {"specs_summary": str(specs)[:500] if specs else ""})
+
+        # Orchestrator ログフック（Requirement完了）
+        try:
+            from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
+
+            log_orchestrator_event(
+                run_db_id=context.run_db_id,
+                phase="requirement",
+                status="SUCCESS",
+                message="Requirement phase completed",
+            )
+        except Exception:
+            pass
+
+        return context
+
+    def run_planning_phase(self, context: OrchestratorContext) -> OrchestratorContext:
+        """
+        Phase 2: Planning
+
+        FastLane モードの場合は、Planning / Coding / Testing を並列実行する。
+
+        Args:
+            context: OrchestratorContext
+
+        Returns:
+            更新された OrchestratorContext
+        """
+        self.logger.info(f"[{context.task_id}] Phase 2: Planning (fast_lane={context.fast_lane})")
+        self._maybe_stop("before_planning", {})
+        context.phase_log.append("PLAN")
+
+        def _run_plan():
+            if hasattr(self.planner_agent, "generate_plan"):
+                req_json = json.dumps(context.specs, ensure_ascii=False, indent=2)
+                return self.planner_agent.generate_plan(req_json)
+            plan_prompt = (
+                "以下の要件仕様に基づき、実装タスクの計画を立ててください。\n"
+                "可能であれば JSON 形式で 'functions_to_implement' 配列を含めてください。\n\n"
+                f"{json.dumps(context.specs, ensure_ascii=False, indent=2)}"
+            )
+            return self._execute_task_via_npe(
+                prompt=plan_prompt,
+                metadata={"task_type": "planning", "as_json": False},
+            )
+
+        def _run_code():
+            if hasattr(self.coder_agent, "implement_code"):
+                return self.coder_agent.implement_code(
+                    task_description=context.user_requirement,
+                    existing_code="",
+                    code_language=os.getenv("NEXUS_CODE_LANG", "python"),
+                )
+            return ""
+
+        def _run_test():
+            if hasattr(self.tester_agent, "generate_tests"):
+                return self.tester_agent.generate_tests(context.user_requirement)
+            return ""
+
+        try:
+            if context.fast_lane:
+                # FastLane: Planning / Coding / Testing を並列実行
+                from concurrent.futures import ThreadPoolExecutor
+                with ThreadPoolExecutor(max_workers=3) as ex:
+                    future_plan = ex.submit(_run_plan)
+                    future_code = ex.submit(_run_code)
+                    future_test = ex.submit(_run_test)
+                    plan_text = future_plan.result()
+                    code_result = future_code.result()
+                    test_result = future_test.result()
+
+                # FastLane のテスト結果を補完
+                test_result = self._ensure_fastlane_tests(
+                    initial_result=test_result,
+                    plan_text=plan_text,
+                    code_result=code_result,
+                    requirement=context.user_requirement,
+                )
+
+                # 結果をコンテキストに保存（Implementation と Testing フェーズで使用）
+                context.implementation = {"code": code_result}
+                context.testing = {"tests": test_result}
+            else:
+                # 通常モード: Planning のみ実行
+                plan_text = _run_plan()
+
+            try:
+                plan = json.loads(plan_text)
+            except Exception:
+                plan = {"raw_plan": plan_text}
+
+            context.plan = plan
+            self._maybe_stop("after_planning", {"plan_preview": str(plan_text)[:500] if plan_text else ""})
+
+            # Orchestrator ログフック（Planning完了）
+            try:
+                from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
+
+                log_orchestrator_event(
+                    run_db_id=context.run_db_id,
+                    phase="planning",
+                    status="SUCCESS",
+                    message="Planning phase completed",
+                    extra={"fast_lane": context.fast_lane},
+                )
+            except Exception:
+                pass
+
+        except Exception as e:
+            self.logger.error(f"[{context.task_id}] Planning phase failed: {e}", exc_info=True)
+            context.plan = {"error": str(e), "raw_specs": context.specs}
+            # Orchestrator ログフック（Planning失敗）
+            try:
+                from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
+
+                log_orchestrator_event(
+                    run_db_id=context.run_db_id,
+                    phase="planning",
+                    status="FAILED",
+                    message=f"Planning phase failed: {str(e)[:200]}",
+                )
+            except Exception:
+                pass
+            raise
+
+        return context
+
+    def run_architecture_phase(self, context: OrchestratorContext) -> OrchestratorContext:
+        """
+        Phase 3: Architecture
+
+        Args:
+            context: OrchestratorContext
+
+        Returns:
+            更新された OrchestratorContext
+        """
+        self.logger.info(f"[{context.task_id}] Phase 3: Architecture")
+        context.phase_log.append("ARCHITECTURE")
+
+        # 将来拡張用: 現在は空の実装
+        context.architecture = {}
+
+        return context
+
+    def run_implementation_phase(self, context: OrchestratorContext) -> OrchestratorContext:
+        """
+        Phase 4: Implementation (Coding)
+
+        FastLane モードの場合は、Planning フェーズで既に実行済みのためスキップ。
+
+        Args:
+            context: OrchestratorContext
+
+        Returns:
+            更新された OrchestratorContext
+        """
+        self.logger.info(f"[{context.task_id}] Phase 4: Implementation")
+        context.phase_log.append("IMPLEMENTATION")
+
+        # FastLane の場合は既に実行済み
+        if context.fast_lane and context.implementation:
+            return context
+
+        def _run_code():
+            if hasattr(self.coder_agent, "implement_code"):
+                return self.coder_agent.implement_code(
+                    task_description=context.user_requirement,
+                    existing_code="",
+                    code_language=os.getenv("NEXUS_CODE_LANG", "python"),
+                )
+            return ""
+
+        code_result = _run_code()
+        context.implementation = {"code": code_result}
+
+        return context
+
+    def run_testing_phase(self, context: OrchestratorContext) -> OrchestratorContext:
+        """
+        Phase 5: Testing
+
+        FastLane モードの場合は、Planning フェーズで既に実行済みのためスキップ。
+
+        Args:
+            context: OrchestratorContext
+
+        Returns:
+            更新された OrchestratorContext
+        """
+        self.logger.info(f"[{context.task_id}] Phase 5: Testing")
+        context.phase_log.append("TESTING")
+
+        # FastLane の場合は既に実行済み
+        if context.fast_lane and context.testing:
+            return context
+
+        def _run_test():
+            if hasattr(self.tester_agent, "generate_tests"):
+                return self.tester_agent.generate_tests(context.user_requirement)
+            return ""
+
+        test_result = _run_test()
+        context.testing = {"tests": test_result}
+
+        return context
+
+    def run_review_phase(self, context: OrchestratorContext) -> OrchestratorContext:
+        """
+        Phase 6: Review
+
+        Args:
+            context: OrchestratorContext
+
+        Returns:
+            更新された OrchestratorContext
+        """
+        self.logger.info(f"[{context.task_id}] Phase 6: Review")
+        context.phase_log.append("REVIEW")
+
+        # 将来拡張用: 現在は空の実装
+        context.review = {}
+
+        return context
+
+    # ------------------------------------------------------------------
+    # メインフロー (フェーズ分割後の簡素化版)
     # ------------------------------------------------------------------
     def run_full_project(
         self,
@@ -232,8 +538,8 @@ class Orchestrator:
     ) -> None:
         """
         高レベルな「フルプロジェクト」実行フロー。
-        - 現時点では Requirement → Planning までを安全に通すことを優先。
-        - 以降のフェーズ（Architecture / Coding / Testing ...）は今後拡張。
+
+        フェーズ分割後の簡素化版: 各フェーズメソッドを順番に呼び出すだけの構造。
 
         Args:
             user_requirement: ユーザー要件
@@ -263,162 +569,63 @@ class Orchestrator:
             # ログ失敗は既存の処理を止めない
             pass
 
+        # 初期コンテキストの作成
+        context = OrchestratorContext(
+            task_id=task_id,
+            user_requirement=user_requirement,
+            language=language,
+            fast_lane=fast_lane,
+            run_db_id=run_db_id,
+        )
+
         try:
             # Phase 0: 開始直後のチェックポイント
             self._maybe_stop("start", {"task_id": task_id, "requirement": user_requirement})
 
-            # --------------------------------------------------------------
-            # Phase 1: Requirement Definition (domain layer)
-            # --------------------------------------------------------------
-            self.logger.info(f"[{task_id}] Phase 1: Requirement Definition")
-            self._maybe_stop("before_requirement", {"task_id": task_id})
+            # フェーズを順番に実行
+            context = self.run_requirements_phase(context)
+            context = self.run_planning_phase(context)
+            context = self.run_architecture_phase(context)
+            context = self.run_implementation_phase(context)
+            context = self.run_testing_phase(context)
+            context = self.run_review_phase(context)
 
-            specs: Dict[str, Any] = {}
+            # FastLane の場合の後処理（ログ出力）
+            if fast_lane:
+                code_result = context.implementation.get("code", "")
+                test_result = context.testing.get("tests", "")
+                plan_text = json.dumps(context.plan, ensure_ascii=False, indent=2)
+                self.logger.info(
+                    "[FastLane] coder output length=%s, tester output length=%s",
+                    len(code_result) if code_result else 0,
+                    len(test_result) if test_result else 0,
+                )
+                if not hasattr(self, "last_fastlane_outputs"):
+                    self.last_fastlane_outputs = {}
+                self.last_fastlane_outputs = {
+                    "code": code_result,
+                    "tests": test_result,
+                    "plan": plan_text,
+                }
 
-            try:
-                use_ui = bool(getattr(self.requirement_agent, "use_ui", False))
-                if use_ui and hasattr(self.requirement_agent, "launch_gradio_ui"):
-                    specs = self.requirement_agent.launch_gradio_ui(share=False)
-                elif hasattr(self.requirement_agent, "analyze_requirement"):
-                    specs = self.requirement_agent.analyze_requirement(user_requirement)
-                else:
-                    # 最低限、テキストとして持っておく
-                    specs = {"raw_requirement": user_requirement}
-            except Exception as e:
-                self.logger.error(f"[{task_id}] Requirement phase failed: {e}", exc_info=True)
-                return
+            # Phase 3 以降の開発サイクル（将来拡張用）
+            tasks = context.plan.get("functions_to_implement", []) if isinstance(context.plan, dict) else []
+            self.logger.info(f"[{task_id}] Phase 3: Development Cycle (tasks={len(tasks)})")
 
-            if not specs:
-                self.logger.error(f"[{task_id}] Requirement definition returned empty specs. Aborting.")
-                try:
-                    from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
+            self.logger.info(f"=== Full Project Run Finished === requirement='{user_requirement}'")
 
-                    log_orchestrator_event(
-                        run_db_id=run_db_id,
-                        phase="requirement",
-                        status="FAILED",
-                        message="Requirement definition returned empty specs",
-                    )
-                except Exception:
-                    pass
-                return
-
-            self._maybe_stop("after_requirement", {"specs_summary": str(specs)[:500] if specs else ""})
-
-            # Orchestrator ログフック（Requirement完了）
+            # Orchestrator ログフック（完了）
             try:
                 from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
                 log_orchestrator_event(
                     run_db_id=run_db_id,
-                    phase="requirement",
-                    status="SUCCESS",
-                    message="Requirement phase completed",
+                    phase="shutdown",
+                    status="FINISHED",
+                    message="Orchestrator run finished",
                 )
             except Exception:
                 pass
-
-            # --------------------------------------------------------------
-            # Phase 2: Planning / Coding / Testing (application layer: plan + code + tests)
-            # --------------------------------------------------------------
-            self.logger.info(f"[{task_id}] Phase 2: Planning (fast_lane={fast_lane})")
-            self._maybe_stop("before_planning", {})
-            plan: Dict[str, Any] = {}
-
-            def _run_plan():
-                if hasattr(self.planner_agent, "generate_plan"):
-                    req_json = json.dumps(specs, ensure_ascii=False, indent=2)
-                    return self.planner_agent.generate_plan(req_json)
-                plan_prompt = (
-                    "以下の要件仕様に基づき、実装タスクの計画を立ててください。\n"
-                    "可能であれば JSON 形式で 'functions_to_implement' 配列を含めてください。\n\n"
-                    f"{json.dumps(specs, ensure_ascii=False, indent=2)}"
-                )
-                return self._execute_task_via_npe(
-                    prompt=plan_prompt,
-                    metadata={"task_type": "planning", "as_json": False},
-                )
-
-            def _run_code():
-                if hasattr(self.coder_agent, "implement_code"):
-                    return self.coder_agent.implement_code(
-                        task_description=user_requirement,
-                        existing_code="",
-                        code_language=os.getenv("NEXUS_CODE_LANG", "python"),
-                    )
-                return ""
-
-            def _run_test():
-                if hasattr(self.tester_agent, "generate_tests"):
-                    return self.tester_agent.generate_tests(user_requirement)
-                return ""
-
-            try:
-                if fast_lane:
-                    from concurrent.futures import ThreadPoolExecutor
-                    with ThreadPoolExecutor(max_workers=3) as ex:
-                        future_plan = ex.submit(_run_plan)
-                        future_code = ex.submit(_run_code)
-                        future_test = ex.submit(_run_test)
-                        plan_text = future_plan.result()
-                        code_result = future_code.result()
-                        test_result = future_test.result()
-                    test_result = self._ensure_fastlane_tests(
-                        initial_result=test_result,
-                        plan_text=plan_text,
-                        code_result=code_result,
-                        requirement=user_requirement,
-                    )
-                    self.logger.info(
-                        "[FastLane] coder output length=%s, tester output length=%s",
-                        len(code_result) if code_result else 0,
-                        len(test_result) if test_result else 0,
-                    )
-                    self.last_fastlane_outputs = {
-                        "code": code_result,
-                        "tests": test_result,
-                        "plan": plan_text,
-                    }
-                else:
-                    plan_text = _run_plan()
-                    code_result = _run_code()
-                    test_result = _run_test()
-
-                try:
-                    plan = json.loads(plan_text)
-                except Exception:
-                    plan = {"raw_plan": plan_text}
-
-                self._maybe_stop("after_planning", {"plan_preview": str(plan_text)[:500] if plan_text else ""})
-
-                # Orchestrator ログフック（Planning完了）
-                try:
-                    from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
-
-                    log_orchestrator_event(
-                        run_db_id=run_db_id,
-                        phase="planning",
-                        status="SUCCESS",
-                        message="Planning phase completed",
-                        extra={"fast_lane": fast_lane},
-                    )
-                except Exception:
-                    pass
-            except Exception as e:
-                self.logger.error(f"[{task_id}] Planning/Coding/Testing phase failed: {e}", exc_info=True)
-                plan = {"error": str(e), "raw_specs": specs}
-                # Orchestrator ログフック（Planning失敗）
-                try:
-                    from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
-
-                    log_orchestrator_event(
-                        run_db_id=run_db_id,
-                        phase="planning",
-                        status="FAILED",
-                        message=f"Planning phase failed: {str(e)[:200]}",
-                    )
-                except Exception:
-                    pass
 
         except RuntimeError as e:
             if str(e) == "SessionStopped":
@@ -442,8 +649,7 @@ class Orchestrator:
             # それ以外の RuntimeError は従来通り上位に投げる
             raise
         except Exception as e:
-            self.logger.error(f"[{task_id}] Planning/Coding/Testing phase failed: {e}", exc_info=True)
-            plan = {"error": str(e), "raw_specs": specs}
+            self.logger.error(f"[{task_id}] Orchestrator run failed: {e}", exc_info=True)
             # Orchestrator ログフック（例外）
             try:
                 from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
@@ -456,27 +662,7 @@ class Orchestrator:
                 )
             except Exception:
                 pass
-
-        # --------------------------------------------------------------
-        # Phase 3 以降は将来拡張用のフック (review/postmortem/integration)
-        # --------------------------------------------------------------
-        tasks = plan.get("functions_to_implement", []) if isinstance(plan, dict) else []
-        self.logger.info(f"[{task_id}] Phase 3: Development Cycle (tasks={len(tasks)})")
-
-        self.logger.info(f"=== Full Project Run Finished === requirement='{user_requirement}'")
-
-        # Orchestrator ログフック（完了）
-        try:
-            from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
-
-            log_orchestrator_event(
-                run_db_id=run_db_id,
-                phase="shutdown",
-                status="FINISHED",
-                message="Orchestrator run finished",
-            )
-        except Exception:
-            pass
+            raise
 
     def _ensure_fastlane_tests(
         self,

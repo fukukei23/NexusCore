@@ -12,10 +12,16 @@ import enum
 import logging
 import os
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, List, Dict, Any
+
+try:
+    import resource
+except ImportError:
+    resource = None  # type: ignore
 
 try:
     import yaml
@@ -23,6 +29,81 @@ except ImportError:
     yaml = None  # type: ignore
 
 logger = logging.getLogger(__name__)
+
+# リソース制限の定数
+_MEMORY_LIMIT_MB = 512
+_CPU_TIME_LIMIT_SEC = 30
+
+# 危険モジュールのブロックリスト
+_FORBIDDEN_MODULE_NAMES = {"os", "subprocess", "shutil", "socket", "pathlib"}
+
+
+def _apply_resource_limits() -> None:
+    """
+    サンドボックス実行時のリソース制限を適用する。
+
+    Linux / POSIX 環境でのみ resource.setrlimit を使用して、
+    メモリ上限とCPU時間上限を設定する。
+
+    非POSIX環境やresourceモジュールが使用できない場合は、
+    例外を投げずに静かに何もしない（サーバー全体が落ちないことを優先）。
+    """
+    if os.name != "posix":
+        return
+
+    if resource is None:
+        logger.debug("resource module is not available. Skipping resource limits.")
+        return
+
+    try:
+        # メモリ上限（仮想メモリ）: 512MB
+        memory_limit_bytes = _MEMORY_LIMIT_MB * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_AS, (memory_limit_bytes, memory_limit_bytes))
+
+        # CPU時間上限: 30秒
+        resource.setrlimit(resource.RLIMIT_CPU, (_CPU_TIME_LIMIT_SEC, _CPU_TIME_LIMIT_SEC))
+
+        logger.debug(
+            f"Applied resource limits: memory={_MEMORY_LIMIT_MB}MB, cpu_time={_CPU_TIME_LIMIT_SEC}s"
+        )
+    except (OSError, ValueError) as e:
+        # リソース制限の設定に失敗しても、実行を続行する
+        logger.warning(f"Failed to apply resource limits: {e}")
+
+
+def _check_forbidden_modules(code: str) -> None:
+    """
+    コード文字列内に危険なモジュールのインポートが含まれていないか検査する。
+
+    Args:
+        code: 検査対象のコード文字列
+
+    Raises:
+        SandboxSecurityError: 禁止モジュールが検出された場合
+    """
+    from nexuscore.core.errors import SandboxSecurityError
+
+    code_lower = code.lower()
+    detected_modules = []
+
+    for module_name in _FORBIDDEN_MODULE_NAMES:
+        # import os, from os import, import os as などのパターンを検出
+        patterns = [
+            f"import {module_name}",
+            f"from {module_name} import",
+            f"import {module_name} as",
+        ]
+        for pattern in patterns:
+            if pattern in code_lower:
+                detected_modules.append(module_name)
+                break
+
+    if detected_modules:
+        module_list = ", ".join(sorted(set(detected_modules)))
+        logger.warning(f"Forbidden module usage detected: {module_list}")
+        raise SandboxSecurityError(
+            f"Forbidden module(s) detected in code: {module_list}"
+        )
 
 
 def load_sandbox_policy(policy_path: str | None = None) -> Dict[str, Any]:
@@ -173,6 +254,12 @@ class SandboxExecutor:
 
         Returns:
             SandboxResult
+
+        Note:
+            現在の実装はコマンド実行（subprocess.run）のため、
+            Pythonコード文字列を直接受け取る構造ではない。
+            危険モジュールの検出は、将来Pythonコード文字列を直接実行する機能が追加された場合に実装する。
+            現時点では、リソース制限（メモリ・CPU時間）のみが適用される。
         """
         timeout = timeout_sec or self.default_timeout_sec
         last_exception: Optional[Exception] = None
@@ -207,6 +294,24 @@ class SandboxExecutor:
             except Exception as e:
                 last_exception = e
                 exception_type = self._classify_exception(e)
+
+                # セキュリティエラーの場合は特別に処理
+                from nexuscore.core.errors import SandboxSecurityError
+
+                if isinstance(e, SandboxSecurityError):
+                    # セキュリティエラーはリトライしない
+                    self._log_sandbox_error(
+                        None,
+                        SandboxExceptionType.EXECUTION_ERROR,
+                        f"Sandbox security violation: {str(e)[:200]}",
+                        {"cmd": cmd},
+                    )
+                    return SandboxResult(
+                        stdout="",
+                        stderr=str(e),
+                        returncode=-1,
+                        exception_type=SandboxExceptionType.EXECUTION_ERROR,
+                    )
 
                 # サンドボックスログ（エラー）
                 self._log_sandbox_error(None, exception_type, f"Sandbox execution error: {str(e)[:200]}", {"cmd": cmd})
@@ -259,6 +364,11 @@ class SandboxExecutor:
         start_time = time.time()
 
         try:
+            # POSIX環境では、子プロセス開始前にリソース制限を適用
+            preexec_fn = None
+            if os.name == "posix":
+                preexec_fn = _apply_resource_limits
+
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -266,6 +376,7 @@ class SandboxExecutor:
                 timeout=timeout_sec,
                 cwd=cwd,
                 env=env,
+                preexec_fn=preexec_fn,
             )
 
             execution_time = time.time() - start_time

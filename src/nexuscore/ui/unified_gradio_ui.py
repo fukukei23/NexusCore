@@ -309,39 +309,6 @@ def build_test_runner_tab(state: gr.State) -> None:
 
                 test_status = gr.Markdown("**ステータス:** 未実行")
 
-    def run_test_handler(command: str, test_file: str, current_state: AppState) -> Tuple[str, str, AppState]:
-        """テストを実行"""
-        try:
-            # テストコマンドを構築
-            if test_file.strip():
-                cmd = f"{command} {test_file}"
-            else:
-                cmd = command
-
-            # テスト実行
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                capture_output=True,
-                text=True,
-                cwd=Path.cwd(),
-            )
-
-            output = result.stdout + result.stderr if result.stderr else result.stdout
-            success = result.returncode == 0
-
-            # State を更新
-            current_state.latest_test_result = output
-
-            # ステータス表示
-            status_md = f"**ステータス:** {'✅ 成功' if success else '❌ 失敗'}\n\n**Return Code:** {result.returncode}"
-
-            return output, status_md, current_state
-        except Exception as e:
-            logger.error(f"Test execution failed: {e}", exc_info=True)
-            error_msg = f"❌ エラー: {e}"
-            return error_msg, f"**ステータス:** ❌ エラー", current_state
-
     run_test_button.click(
         fn=run_test_handler,
         inputs=[test_command_input, test_file_input, state],
@@ -511,6 +478,45 @@ Duration: {result.get('duration_seconds', 0):.2f}s
 # ============================================================================
 # メイン UI 構築
 # ============================================================================
+
+def run_test_handler(command: str, test_file: str, current_state: AppState) -> Tuple[str, str, AppState]:
+    """
+    テストを実行するハンドラー関数
+
+    コマンドインジェクション対策のため、shell=False と引数リスト形式を使用。
+    """
+    try:
+        # テストコマンドを構築（コマンドインジェクション対策: 引数リスト形式を使用）
+        cmd: List[str]
+        if test_file and test_file.strip():
+            cmd = [command, test_file]
+        else:
+            cmd = [command]
+
+        # テスト実行（shell=False で安全に実行）
+        result = subprocess.run(
+            cmd,
+            shell=False,
+            capture_output=True,
+            text=True,
+            cwd=Path.cwd(),
+        )
+
+        output = result.stdout + result.stderr if result.stderr else result.stdout
+        success = result.returncode == 0
+
+        # State を更新
+        current_state.latest_test_result = output
+
+        # ステータス表示
+        status_md = f"**ステータス:** {'✅ 成功' if success else '❌ 失敗'}\n\n**Return Code:** {result.returncode}"
+
+        return output, status_md, current_state
+    except Exception as e:
+        logger.error(f"Test execution failed: {e}", exc_info=True)
+        error_msg = f"❌ エラー: {e}"
+        return error_msg, f"**ステータス:** ❌ エラー", current_state
+
 
 def build_unified_ui() -> gr.Blocks:
     """
