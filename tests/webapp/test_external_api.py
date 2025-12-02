@@ -83,7 +83,7 @@ def test_list_projects_without_api_key(client):
     assert response.status_code == 401
     data = response.get_json()
     assert "error" in data
-    assert "API key" in data["error"].lower()
+    assert "api key" in data["error"].lower()
 
 
 def test_list_projects_with_valid_api_key(client, test_user, test_api_key, test_project):

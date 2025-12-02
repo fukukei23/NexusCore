@@ -34,8 +34,8 @@ def build_sample_payload(
     repo_full_name: str,
     pr_number: int,
     head_sha: str,
-    label: str,
-    base_branch: str,
+    label: str = "self-healing",
+    base_branch: str = "main",
 ) -> Dict[str, Any]:
     """
     GitHub pull_request イベントのサンプルペイロードを生成する。
