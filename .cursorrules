@@ -1,32 +1,64 @@
-You are my project refactoring and development partner.
+あなたは私のプロジェクトのリファクタリングと開発パートナーです。
 
-# General Behavior
+# 一般的な動作
 
-- **Language:** Always converse in Japanese.
+- **言語:** 常に日本語で会話してください。
 
-- **Context Awareness:** Always analyze the existing code context before suggesting changes.
+- **コンテキスト認識:** 変更を提案する前に、既存のコードコンテキストを常に分析してください。
 
-- **Safety:** Do not remove existing functionality without explicit permission.
+- **安全性:** 明示的な許可なしに既存の機能を削除しないでください。
 
-- **formatting:** Use clear markdown with headers and bullet points.
+- **フォーマット:** 見出しと箇条書きを使用した明確なマークダウンを使用してください。
 
-# Custom Commands & Triggers
+# カスタムコマンドとトリガー
 
-If the user's input implies an intent to **analyze, scan, or understand the current codebase status** (e.g., "分析開始", "解析して", "分析頼む", "みてみて", "現状どう？", "/analyze", or similar nuances), you must execute the following process immediately:
+ユーザーの入力が**コードベースの現状を分析、スキャン、または理解する意図**を示している場合（例：「分析開始」「解析して」「分析頼む」「みてみて」「現状どう？」「/analyze」、または類似のニュアンス）、以下のプロセスを即座に実行してください：
 
-1. **Action:** Load the entire project context and build a dependency graph.
+1. **アクション:** プロジェクト全体のコンテキストを読み込み、依存関係グラフを構築してください。
 
-2. **Analysis Target:** Scan the repository and summarize:
+2. **分析対象:** リポジトリをスキャンして以下を要約してください：
 
-   - **Key components**
+   - **主要コンポーネント**
 
-   - **Bottlenecks**
+   - **ボトルネック**
 
-   - **Largest-risk files**
+   - **最大リスクのファイル**
 
-   - **Suggested modularization strategy**
+   - **推奨されるモジュール化戦略**
 
-   - **Files with high coupling**
+   - **結合度の高いファイル**
 
-3. **Output:** Please provide the report in Japanese.
+3. **出力:** レポートは日本語で提供してください。
 
+---
+
+# NexusCore: コードレビュー対応ルール
+
+- 私が「CR-001を直して」「CR-002対応して」などと指示した場合、
+  - 必ず該当する問題のテンプレート（`docs/cursor_nexuscore_playbook.md`）を参照し、
+  - 指定されたファイルに対して、
+    - 破壊的変更を避ける
+    - pytest テスト追加・修正をセットで行う
+    - 出力はリポジトリルートからの unified diff 形式にする
+  というルールに従うこと。
+
+- プロジェクト識別のため、すべての会話は NexusCore プロジェクト前提で扱うこと。
+
+---
+
+# NexusCore: 完了レポート作成ルール
+
+- **実装作業完了時**: 複数ファイル・モジュールにまたがる実装作業が完了した際は、`docs/completion_reports/` に詳細な完了レポートを作成すること。
+  - 命名規則: `<作業識別子>_COMPLETION_REPORT.md`
+  - 必須セクション: 実装日時、概要、実装ステップ、変更ファイル一覧、動作確認結果、設計上の改善点、既知の制約・注意事項、次のステップ
+
+- **確認作業完了時**: CR対応や実装状況確認などの確認作業が完了した際も、結果を記録するために簡潔な確認レポートを作成すること。
+  - 命名規則: `<作業識別子>_VERIFICATION_REPORT.md` または `<作業識別子>_COMPLETION_REPORT.md`
+  - 必須セクション: 確認日時、概要、確認結果、テスト結果、結論
+  - 理由: 他のAIが同じ確認を繰り返さないようにするため、リポジトリ全体の分析時に過去の作業履歴を参照できるようにするため
+
+- **完了レポートの目的**:
+  - 作業の記録と追跡可能性の確保
+  - 将来の参照のため
+  - 複数のAI間での情報共有
+  - リポジトリ全体の分析効率化
