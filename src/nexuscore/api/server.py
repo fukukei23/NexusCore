@@ -19,6 +19,7 @@ import sys
 import logging
 import threading
 import uuid
+from functools import wraps
 from flask import Flask, request, jsonify
 
 # --- パス設定 ---
@@ -76,6 +77,47 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 logger.info(f"API server log file: {log_path}")
+
+def require_auth(f):
+    """
+    認証デコレータ: Authorization: Bearer <TOKEN> ヘッダを検証する。
+
+    環境変数 NEXUSCORE_API_TOKEN から有効なトークンを取得し、
+    リクエストの Authorization ヘッダと照合する。
+
+    認証失敗時は 401 Unauthorized を返す。
+    環境変数が未設定の場合は 500 Internal Server Error を返す。
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 環境変数の確認
+        expected_token = os.getenv("NEXUSCORE_API_TOKEN")
+        if not expected_token:
+            logger.error("NEXUSCORE_API_TOKEN is not set. Server misconfiguration.")
+            return jsonify({"error": "Server misconfigured: NEXUSCORE_API_TOKEN is not set"}), 500
+
+        # Authorization ヘッダの取得
+        auth_header = request.headers.get("Authorization")
+        if not auth_header:
+            logger.warning("Authorization header missing")
+            return jsonify({"error": "Authorization required"}), 401
+
+        # Bearer トークンの抽出
+        if not auth_header.startswith("Bearer "):
+            logger.warning("Invalid Authorization header format")
+            return jsonify({"error": "Authorization required"}), 401
+
+        token = auth_header[7:].strip()  # "Bearer " の後の部分を取得
+
+        # トークンの検証
+        if token != expected_token:
+            logger.warning("Invalid token provided")
+            return jsonify({"error": "Authorization required"}), 401
+
+        # 認証成功
+        return f(*args, **kwargs)
+
+    return decorated_function
 
 def run_orchestrator_task(task_id: str, requirement: str, project_path: str, constitution: dict):
     """Orchestratorをバックグラウンドで実行するワーカー関数"""
@@ -144,6 +186,7 @@ def run_orchestrator_task(task_id: str, requirement: str, project_path: str, con
         tasks[task_id] = {"status": "error", "message": f"orchestrator failed: {e}"}
 
 @app.route('/api/v1/execute', methods=['POST'])
+@require_auth
 def execute_task():
     data = request.json
     if not data or 'requirement' not in data or 'project_path' not in data:

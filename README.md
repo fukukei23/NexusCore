@@ -65,6 +65,8 @@ NexusCore can be triggered from VSCode extensions, Chrome extensions, or other t
 1. `\\wsl.localhost\Ubuntu\home\yn441611\NexusCore`（Linux シェルでは `/home/yn441611/NexusCore`）に移動し、これを作業ルートにします。
 2. システム Python には `pip` が入っていないため、`python -m venv .venv` で仮想環境を作成します。
 3. `.venv/bin/python -m pip install -r requirements.txt` で依存をインストール。
+   - 開発ツールも含める場合: `.venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt`
+   - 主要な依存関係はバージョンレンジで固定されています（例: `openai>=1.30.0,<2.0.0`）。詳細は `requirements.txt` を参照してください。
 4. 実行時は `.venv/bin/python main_cli.py …` や `PYTHONPATH=src .venv/bin/pytest …` を使う、または `.venv/bin/activate` してから `python` / `pip` を呼び出してください。
 5. ネイティブなログ・出力先は `/home/yn441611/NexusCore/...` に向け、権限エラーを回避します。
 6. 依存を追加したら `pip freeze > requirements.lock.txt` などでロックファイルを更新して共有してください。
@@ -119,6 +121,20 @@ NexusCore can be triggered from VSCode extensions, Chrome extensions, or other t
 - `rg --files tests/agents` や `coverage run -m pytest tests/agents` / `coverage html` でテストファイルやカバレッジ状況を定期的に可視化すると、どのエージェント層が未テストか把握しやすくなります。
 
 全体のテスト・CI は `PYTHONPATH=src` を忘れずに設定してください。
+
+---
+
+## 📚 ドキュメント構成
+
+NexusCore プロジェクトの詳細ドキュメントは `docs/` ディレクトリに整理されています。
+
+- **[ドキュメント全体インデックス](docs/DOCS_INDEX.md)** - すべてのドキュメントへのナビゲーション
+- **[仮想環境の使い方](README_VENV.md)** - 仮想環境の簡単な使い方
+
+**役割別の導線:**
+- **新規開発者向け**: [開発環境セットアップ](docs/development_setup.md) → [README_VENV.md](README_VENV.md) → [Makefile ガイド](docs/makefile_guide.md)
+- **運用担当者向け**: [Kubernetes クイックスタート](docs/k8s_quick_start_guide.md) → [SaaS アーキテクチャ](docs/saas_architecture.md)
+- **AI / Cursor 向け**: [コードレビュー対応 Playbook](docs/cursor_nexuscore_playbook.md) → [Codex 指示マニフェスト](docs/codex_instruction_manifest.md)
 
 ---
 
