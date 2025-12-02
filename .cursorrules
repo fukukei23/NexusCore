@@ -1,64 +1,39 @@
-あなたは私のプロジェクトのリファクタリングと開発パートナーです。
+# NexusCore API Implementation Rules (FastAPI Migration Phase)
 
-# 一般的な動作
+## 1. Framework Rules
+- API は必ず FastAPI を使用すること。
+- Flask / Streamlit / Django / Tornado など他の Web Framework を新規追加してはならない。
+- 既存の Flask コードを編集する場合、FastAPI 移植を優先し、Flask を残さない。
 
-- **言語:** 常に日本語で会話してください。
+## 2. API Structure Rules
+- すべての public API は /api/v1/ 配下に置くこと。
+- internal API は /internal/ または /system/ に置き、外部公開しない。
+- Request/Response は必ず Pydantic BaseModel を使って型定義すること。
+- スキーマファイルは src/nexuscore/api/schemas/ に集約すること。
+- FastAPI の APIRouter を用い、router 単位で分割すること。
 
-- **コンテキスト認識:** 変更を提案する前に、既存のコードコンテキストを常に分析してください。
+## 3. Authentication Rules
+- 認証が必要な API は必ず Depends(get_current_user) を通すこと。
+- get_current_user は src/nexuscore/api/dependencies/auth.py に集約する。
+- 認証不要なエンドポイントは allow_unauthenticated=True を明示し、例外的扱いにする。
 
-- **安全性:** 明示的な許可なしに既存の機能を削除しないでください。
+## 4. OpenAPI / Spec Rules
+- OpenAPI に反映されない暗黙仕様の追加は禁止。
+- ResponseModel / RequestModel を宣言せず dict を返してはならない。
+- error レスポンスは ErrorResponse(BaseModel) に統一する。
+- OpenAPI の description / tags を適宜追加する。
 
-- **フォーマット:** 見出しと箇条書きを使用した明確なマークダウンを使用してください。
+## 5. Separation Rules
+- Gradio UI と API ロジックを混在させてはならない。
+- UI コードは src/nexuscore/ui/ に限定し、API は src/nexuscore/api/ に限定する。
+- ビジネスロジックは services/ または core/ に切り出し、API ハンドラに直接書かない。
 
-# カスタムコマンドとトリガー
+## 6. Output Rules
+- Cursor が出力するコード変更はすべて unified diff のみとする。
+- diff 以外の説明文・要約・コメントを含めない。
+- 関連ファイルが複数ある場合は1つの diff でまとめてよい。
 
-ユーザーの入力が**コードベースの現状を分析、スキャン、または理解する意図**を示している場合（例：「分析開始」「解析して」「分析頼む」「みてみて」「現状どう？」「/analyze」、または類似のニュアンス）、以下のプロセスを即座に実行してください：
-
-1. **アクション:** プロジェクト全体のコンテキストを読み込み、依存関係グラフを構築してください。
-
-2. **分析対象:** リポジトリをスキャンして以下を要約してください：
-
-   - **主要コンポーネント**
-
-   - **ボトルネック**
-
-   - **最大リスクのファイル**
-
-   - **推奨されるモジュール化戦略**
-
-   - **結合度の高いファイル**
-
-3. **出力:** レポートは日本語で提供してください。
-
----
-
-# NexusCore: コードレビュー対応ルール
-
-- 私が「CR-001を直して」「CR-002対応して」などと指示した場合、
-  - 必ず該当する問題のテンプレート（`docs/cursor_nexuscore_playbook.md`）を参照し、
-  - 指定されたファイルに対して、
-    - 破壊的変更を避ける
-    - pytest テスト追加・修正をセットで行う
-    - 出力はリポジトリルートからの unified diff 形式にする
-  というルールに従うこと。
-
-- プロジェクト識別のため、すべての会話は NexusCore プロジェクト前提で扱うこと。
-
----
-
-# NexusCore: 完了レポート作成ルール
-
-- **実装作業完了時**: 複数ファイル・モジュールにまたがる実装作業が完了した際は、`docs/completion_reports/` に詳細な完了レポートを作成すること。
-  - 命名規則: `<作業識別子>_COMPLETION_REPORT.md`
-  - 必須セクション: 実装日時、概要、実装ステップ、変更ファイル一覧、動作確認結果、設計上の改善点、既知の制約・注意事項、次のステップ
-
-- **確認作業完了時**: CR対応や実装状況確認などの確認作業が完了した際も、結果を記録するために簡潔な確認レポートを作成すること。
-  - 命名規則: `<作業識別子>_VERIFICATION_REPORT.md` または `<作業識別子>_COMPLETION_REPORT.md`
-  - 必須セクション: 確認日時、概要、確認結果、テスト結果、結論
-  - 理由: 他のAIが同じ確認を繰り返さないようにするため、リポジトリ全体の分析時に過去の作業履歴を参照できるようにするため
-
-- **完了レポートの目的**:
-  - 作業の記録と追跡可能性の確保
-  - 将来の参照のため
-  - 複数のAI間での情報共有
-  - リポジトリ全体の分析効率化
+## 7. Additional Constraints
+- 型安全性を維持すること。暗黙の dict/tuple は禁止。
+- 例外処理は FastAPI の HTTPException を使用し、独自形式で例外を握り潰さない。
+- API バージョニング（/api/v1/）を厳守し、互換性を壊す場合は /api/v2/ を作る。

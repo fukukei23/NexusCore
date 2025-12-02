@@ -6,6 +6,14 @@ import pytest
 from nexuscore.modules import chat_handler, code_generator, diff_viewer, history_viewer, tester, whisper_handler
 
 
+# whisper がインストールされていない環境では、
+# このモジュール全体をスキップする
+pytestmark = pytest.mark.skipif(
+    getattr(whisper_handler, "WHISPER_AVAILABLE", False) is False,
+    reason="whisper is not installed; skipping whisper-dependent module tests",
+)
+
+
 def test_chat_handler_returns_error_on_exception(monkeypatch):
     class FakeClient:
         class chat:
@@ -69,6 +77,7 @@ def test_whisper_handler_transcribe_error(monkeypatch):
         def transcribe(self, audio_path):
             raise RuntimeError("no audio")
 
-    monkeypatch.setattr(whisper_handler, "model", FakeModel())
+    # _get_model() をモックして FakeModel を返すようにする
+    monkeypatch.setattr(whisper_handler, "_get_model", lambda: FakeModel())
     text = whisper_handler.transcribe_audio("none.wav")
     assert "エラー" in text or "error" in text.lower()
