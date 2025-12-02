@@ -1,39 +1,185 @@
-# NexusCore API Implementation Rules (FastAPI Migration Phase)
+# =========================
+# Project & Context Rules
+# =========================
 
-## 1. Framework Rules
-- API は必ず FastAPI を使用すること。
-- Flask / Streamlit / Django / Tornado など他の Web Framework を新規追加してはならない。
-- 既存の Flask コードを編集する場合、FastAPI 移植を優先し、Flask を残さない。
+# Rule: Require explicit project tag for all AI messages
+Any message in Cursor MUST begin with a project tag:
 
-## 2. API Structure Rules
-- すべての public API は /api/v1/ 配下に置くこと。
-- internal API は /internal/ または /system/ に置き、外部公開しない。
-- Request/Response は必ず Pydantic BaseModel を使って型定義すること。
-- スキーマファイルは src/nexuscore/api/schemas/ に集約すること。
-- FastAPI の APIRouter を用い、router 単位で分割すること。
+- "#project: NexusCore" for this repository.
+- If the tag is missing or not "NexusCore", the AI MUST refuse the operation and ask the user to fix the tag.
 
-## 3. Authentication Rules
-- 認証が必要な API は必ず Depends(get_current_user) を通すこと。
-- get_current_user は src/nexuscore/api/dependencies/auth.py に集約する。
-- 認証不要なエンドポイントは allow_unauthenticated=True を明示し、例外的扱いにする。
+# Rule: Repository layout assumptions
+The AI MUST assume the following structure:
 
-## 4. OpenAPI / Spec Rules
-- OpenAPI に反映されない暗黙仕様の追加は禁止。
-- ResponseModel / RequestModel を宣言せず dict を返してはならない。
-- error レスポンスは ErrorResponse(BaseModel) に統一する。
-- OpenAPI の description / tags を適宜追加する。
+- Application code:            src/nexuscore/
+- FastAPI application:         src/nexuscore/api/
+- Gradio / UI components:      src/nexuscore/ui/ and src/nexuscore/gradio_app/
+- Services / domain logic:     src/nexuscore/services/ and src/nexuscore/core/
+- Tests:                       tests/
 
-## 5. Separation Rules
-- Gradio UI と API ロジックを混在させてはならない。
-- UI コードは src/nexuscore/ui/ に限定し、API は src/nexuscore/api/ に限定する。
-- ビジネスロジックは services/ または core/ に切り出し、API ハンドラに直接書かない。
+The AI MUST NOT move files outside this convention without explicit user instruction.
 
-## 6. Output Rules
-- Cursor が出力するコード変更はすべて unified diff のみとする。
-- diff 以外の説明文・要約・コメントを含めない。
-- 関連ファイルが複数ある場合は1つの diff でまとめてよい。
+# =========================
+# API Architecture Rules
+# =========================
 
-## 7. Additional Constraints
-- 型安全性を維持すること。暗黙の dict/tuple は禁止。
-- 例外処理は FastAPI の HTTPException を使用し、独自形式で例外を握り潰さない。
-- API バージョニング（/api/v1/）を厳守し、互換性を壊す場合は /api/v2/ を作る。
+# Rule: All new external APIs MUST use FastAPI
+- All new HTTP APIs MUST be implemented with FastAPI.
+- Creating new Flask-based APIs is FORBIDDEN.
+- Legacy Flask endpoints MAY only be touched for:
+  - Bug fixes, or
+  - Migration to FastAPI.
+
+# Rule: FastAPI app location
+- The primary FastAPI application MUST live under:
+  - src/nexuscore/api/fastapi_app.py  (or equivalent module explicitly agreed upon)
+- Routers MUST be split by domain, e.g.:
+  - src/nexuscore/api/routes/projects.py
+  - src/nexuscore/api/routes/runs.py
+  - src/nexuscore/api/routes/health.py
+  - src/nexuscore/api/routes/external.py
+
+# Rule: Public API base path and versioning
+- All PUBLIC APIs MUST be exposed under the prefix: "/api/v1".
+  - Example: "/api/v1/projects", "/api/v1/runs/{run_id}", "/api/v1/execute".
+- Internal / admin / experimental endpoints MUST NOT be exposed under "/api/v1".
+  - Use "/internal/*" or clearly marked non-public paths, or keep them non-routed utilities.
+
+# Rule: Request / Response typing via Pydantic
+- Every FastAPI endpoint MUST use Pydantic BaseModel for:
+  - Request body
+  - Response body
+- No "bare dict" or "Any" for external/public APIs.
+- The AI MUST define explicit models in "schemas" modules, e.g.:
+  - src/nexuscore/api/schemas/projects.py
+  - src/nexuscore/api/schemas/runs.py
+- Reuse existing models when possible instead of redefining similar ones.
+
+# Rule: OpenAPI as single source of truth
+- All PUBLIC API behaviors MUST be expressible via OpenAPI:
+  - Request/response schemas
+  - Status codes
+  - Path and query parameters
+- The AI MUST NOT introduce "invisible" behaviors that are not reflected in:
+  - The FastAPI route signature, or
+  - Pydantic models, or
+  - Documented response types.
+- Do NOT rely on comments-only specifications for external APIs.
+
+# =========================
+# Authentication & Security
+# =========================
+
+# Rule: Authentication via Depends()
+- All PUBLIC API endpoints that require authentication MUST use FastAPI's dependency injection:
+  - e.g. Depends(get_current_user) or Depends(get_api_key)
+- The AI MUST NOT access auth globals directly inside route functions.
+- The authentication helpers MUST live in:
+  - src/nexuscore/api/dependencies/auth.py  (or equivalent agreed module)
+
+# Rule: API key / JWT consistency
+- The authentication mechanism (API key or JWT) MUST be consistent across /api/v1/*.
+- Mixed ad-hoc authentication patterns are FORBIDDEN.
+- If the existing codebase is inconsistent, the AI MUST:
+  - Propose a single standard approach, and
+  - Migrate touched endpoints to that standard.
+
+# Rule: No secrets in code
+- The AI MUST NOT hard-code secrets, API keys, or tokens.
+- All secrets MUST be read via environment variables or config modules.
+
+# =========================
+# UI vs API Separation
+# =========================
+
+# Rule: Do NOT mix Gradio UI and FastAPI
+- FastAPI routes MUST NOT import or depend on Gradio UI modules.
+- Gradio UI code MUST call FastAPI or service layer, NOT the other way around.
+- UI-related modules SHOULD reside under:
+  - src/nexuscore/ui/
+  - src/nexuscore/gradio_app/
+- API-related modules MUST reside under:
+  - src/nexuscore/api/
+
+# Rule: Clear separation of concerns
+- Route handlers SHOULD be thin:
+  - Parse & validate input (Pydantic)
+  - Call service layer
+  - Map service results to response models
+- Business logic MUST live in:
+  - src/nexuscore/services/ or src/nexuscore/core/
+
+# =========================
+# Testing & Migration Rules
+# =========================
+
+# Rule: FastAPI TestClient for API tests
+- New API tests MUST use FastAPI's TestClient.
+- Existing Flask-based tests MAY be temporarily skipped during migration, but:
+  - Any newly migrated FastAPI endpoint MUST have at least minimal tests.
+
+# Rule: Migration strategy for legacy Flask APIs
+When touching legacy Flask APIs, the AI MUST:
+
+1. Identify the existing Flask route(s) and their behavior.
+2. Design equivalent FastAPI route(s) under /api/v1.
+3. Introduce Pydantic schemas for request/response.
+4. Add or adapt tests using FastAPI TestClient.
+5. Mark legacy endpoints as deprecated or remove them once the migration is validated.
+
+# Rule: Backward-compatible changes by default
+- For PUBLIC APIs, breaking changes (path/method/schema) MUST NOT be introduced automatically.
+- If a breaking change is necessary, the AI MUST:
+  - Keep the old behavior behind a compatibility layer, or
+  - Introduce a new versioned endpoint (e.g. /api/v2) after explicit user approval.
+
+# =========================
+# Diff & Editing Rules
+# =========================
+
+# Rule: Unified diff only
+- When showing code changes, the AI MUST use unified diff format only.
+- Example:
+
+  ```diff
+  --- a/src/nexuscore/api/fastapi_app.py
+  +++ b/src/nexuscore/api/fastapi_app.py
+  @@ -1,4 +1,8 @@
+  -old line
+  +new line
+  ```
+
+# Rule: Small, focused changes
+- Prefer small, focused edits instead of large refactors in one step.
+- When multiple files need updates, the AI SHOULD:
+  - Clearly separate diffs per file, and
+  - Keep each change set logically cohesive (e.g., "add health endpoint", "add Pydantic models").
+
+# =========================
+# Error Handling & Logging
+# =========================
+
+# Rule: Standardized error responses
+- PUBLIC APIs MUST return structured error responses with a consistent schema, e.g.:
+
+  {
+    "error": {
+      "code": "SOME_CODE",
+      "message": "Human-readable message"
+    }
+  }
+
+- The AI MUST NOT return raw exceptions or stack traces to public clients.
+
+# Rule: Logging
+- Logging MUST be done via the existing logging utilities (if present).
+- Do NOT print() for production paths; use logger.
+
+# =========================
+# Non-goals / Forbidden Patterns
+# =========================
+
+- Do NOT introduce new Flask blueprints for external APIs.
+- Do NOT couple FastAPI routes directly to UI frameworks.
+- Do NOT create behavior that depends on undocumented magic query params or headers.
+- Do NOT add non-deterministic behavior that cannot be represented in OpenAPI.

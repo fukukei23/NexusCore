@@ -20,6 +20,8 @@ def create_app() -> FastAPI:
         title="NexusCore API",
         version="1.0.0",
         description="NexusCore API - FastAPI implementation",
+        docs_url="/api/docs",
+        openapi_url="/api/openapi.json",
     )
 
     # Health check router をマウント
@@ -31,10 +33,15 @@ def create_app() -> FastAPI:
     # 将来、以下のような router を追加予定:
     # app.include_router(auth.router, prefix="/api/v1")
     # app.include_router(admin.router, prefix="/api/v1")
+    # app.include_router(projects.router, prefix="/api/v1")
+    # app.include_router(runs.router, prefix="/api/v1")
 
     return app
 
 
 # FastAPI アプリケーションインスタンス
 app = create_app()
+
+# ローカル実行用コマンド例:
+# uvicorn nexuscore.api.fastapi_app:app --reload
 
