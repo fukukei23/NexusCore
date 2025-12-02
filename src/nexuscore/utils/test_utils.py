@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import ast
 import re
+import subprocess
+import sys
+import locale
 from pathlib import Path
 from typing import Tuple, Optional, List
 
@@ -146,3 +149,43 @@ def test_auto_generated_test_scaffold_invalid():
         f"Test generation failed with error: {error_message}"
     )
 '''
+
+
+def run_tests(project_path: str) -> Tuple[bool, str]:
+    """
+    指定されたプロジェクトパスでpytestを実行し、成功したかどうかと、
+    その出力結果を返します。
+
+    Args:
+        project_path: テストを実行するプロジェクトパス
+
+    Returns:
+        (成功したかどうか, 出力結果) のタプル
+    """
+    try:
+        python_executable = sys.executable
+
+        # OSが使用しているデフォルトの文字コードを取得
+        preferred_encoding = locale.getpreferredencoding(False)
+
+        result = subprocess.run(
+            [python_executable, "-m", "pytest"],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            encoding=preferred_encoding,
+            errors='replace',
+            check=False
+        )
+
+        # UnicodeDecodeErrorで結果がNoneになる可能性を考慮し、安全に結合します。
+        stdout = result.stdout if result.stdout is not None else ""
+        stderr = result.stderr if result.stderr is not None else ""
+        output = stdout + "\n" + stderr
+
+        return result.returncode == 0, output
+
+    except FileNotFoundError:
+        return False, "pytestコマンドが見つかりませんでした。仮想環境が有効で、pytestがインストールされているか確認してください。"
+    except Exception as e:
+        return False, f"テスト実行中に予期せぬエラーが発生しました: {e}"

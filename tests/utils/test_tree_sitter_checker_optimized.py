@@ -12,11 +12,16 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 try:
-    from nexuscore.utils.tree_sitter_checker import SemanticAnalyzer, AnalysisResult, CONFIG
-    TREE_SITTER_AVAILABLE = True
+    from nexuscore.utils.tree_sitter_checker import SemanticAnalyzer, AnalysisResult, CONFIG, TREE_SITTER_AVAILABLE
 except ImportError:
     TREE_SITTER_AVAILABLE = False
-    pytestmark = pytest.mark.skip("tree_sitter_checker not available")
+    SemanticAnalyzer = AnalysisResult = CONFIG = None  # type: ignore[assignment]
+
+# Tree-sitter 本体が入っていない環境では、このモジュール全体を skip
+pytestmark = pytest.mark.skipif(
+    not TREE_SITTER_AVAILABLE,
+    reason="Tree-sitter not available: Missing: pip install tree-sitter tree-sitter-language-pack",
+)
 
 
 @pytest.fixture
