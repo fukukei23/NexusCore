@@ -56,6 +56,24 @@ NexusCore can be triggered from VSCode extensions, Chrome extensions, or other t
 
 - See `docs/external_run_api_examples.md` for concrete examples (TypeScript / JavaScript / Python / curl).
 
+### API 構成
+
+NexusCore の API は以下のように構成されています：
+
+- **FastAPI**: 公開 API 層（`/api/v1/*`）- 正式版
+  - 外部統合向けの REST API は FastAPI ベースで実装されています
+  - 統一された認証（API Key）、エラーハンドリング、OpenAPI スキーマを提供
+  - 詳細は `docs/api/README.md` を参照してください
+
+- **Flask**: Web UI 層（`/projects/*`, `/dashboard/*` など）- 当面存続
+  - HTML テンプレート・ビューを提供する Web UI は Flask ベースで実装されています
+  - Flask 内部 REST API (`/api/v1/execute`, `/api/v1/status`) は **CR-FASTAPI-008 で物理削除済み**です
+  - 残りの Flask API（外部公開用の Webapp blueprints、バッジ API 等）は、別 CR（CR-FASTAPI-009 以降）で FastAPI 移行 → 削除する予定です
+  - すべてのクライアントは FastAPI エンドポイント（`/api/v1/*`）を使用する必要があります
+  - 詳細は `docs/api/FASTAPI_MIGRATION_STATUS.md` を参照してください
+
+**重要**: The legacy Flask internal REST API (`/api/v1/execute`, `/api/v1/status`) has been removed in CR-FASTAPI-008. All clients must use the FastAPI endpoints under `/api/v1`.
+
 ---
 
 ## 🚀 Quick Start
