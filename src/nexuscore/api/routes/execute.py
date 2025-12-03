@@ -2,7 +2,7 @@
 Execute エンドポイント
 
 Self-healing ジョブ実行をトリガーするエンドポイント。
-認証は CR-FASTAPI-003 で追加予定。
+既存の Flask 実装 (`src/nexuscore/api/server.py`) と互換性を保つ。
 """
 import os
 import sys
@@ -11,9 +11,12 @@ import threading
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
-from ..schemas.execute import ExecuteRequest, ExecuteResponse
+from ..schemas.execute import ExecuteRequest, ExecuteResponse, ExecuteStatusResponse
+from ..schemas.error import ErrorResponse
+from ..dependencies.auth import get_current_user, AuthenticatedUser
+from ..utils.errors import make_not_found_error
 
 router = APIRouter(tags=["execute"])
 
@@ -48,8 +51,17 @@ from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
 from nexuscore.agents.patch_applier import PatchApplier
 from nexuscore.llm.llm_router import LLMRouter
 
-# --- グローバル変数（既存の Flask 実装と同様の構造） ---
-tasks = {}
+# --- グローバル変数（既存の Flask 実装と共有） ---
+# 既存の Flask 実装 (`server.py`) の `tasks` 辞書を共有するため、
+# モジュールから直接インポートする
+try:
+    from nexuscore.api import server
+    tasks = server.tasks  # 既存のFlask実装と共有
+except ImportError:
+    # フォールバック: モジュールが見つからない場合は新規作成
+    tasks = {}
+    logging.warning("Could not import server.tasks, using local tasks dict")
+
 llm_router = LLMRouter()
 
 # --- ロギング設定 ---
@@ -137,10 +149,15 @@ def run_orchestrator_task(task_id: str, requirement: str, project_path: str, con
     response_model=ExecuteResponse,
     summary="Run self-healing job",
     status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        401: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
 )
 async def execute_endpoint(
     payload: ExecuteRequest,
-    # current_user: AuthenticatedUser = Depends(get_current_user),  # CR-FASTAPI-003 で有効化
+    current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> ExecuteResponse:
     """
     Execute エンドポイント
@@ -180,4 +197,43 @@ async def execute_endpoint(
         task_id=task_id,
         status_url=f"/api/v1/status/{task_id}"
     )
+
+
+@router.get(
+    "/status/{task_id}",
+    response_model=ExecuteStatusResponse,
+    summary="Get task status",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
+async def get_task_status(
+    task_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+) -> ExecuteStatusResponse:
+    """
+    Get Task Status エンドポイント
+
+    指定されたタスクIDの現在の状態を返します。
+    既存の Flask 実装 (`get_task_status`) と互換性を保つ。
+
+    Args:
+        task_id: タスクID（UUID形式）
+
+    Returns:
+        ExecuteStatusResponse: タスクの状態情報
+
+    Raises:
+        HTTPException: タスクが見つからない場合（404）
+    """
+    task = tasks.get(task_id)
+    if not task:
+        raise make_not_found_error("Task", task_id)
+
+    # 既存のFlask実装では、tasks辞書の値がそのまま返される
+    # FastAPI版でも同様に、柔軟な構造を許容する
+    return ExecuteStatusResponse(**task)
 

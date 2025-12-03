@@ -21,11 +21,15 @@ from nexuscore.webapp.celery_app import run_orchestrator_task
 external_api_bp = Blueprint("external_api", __name__, url_prefix="/api/v1")
 
 
+# DEPRECATED: This endpoint is deprecated and will be removed in CR-FASTAPI-009.
+# FastAPI equivalent: GET /api/v1/projects (see src/nexuscore/api/routes/projects.py)
+# This Flask endpoint is kept only for backward compatibility during migration.
+# All new clients MUST use the FastAPI endpoint.
 @external_api_bp.get("/projects")
 @api_key_required
 def list_projects():
     """
-    プロジェクト一覧を取得する
+    プロジェクト一覧を取得する（非推奨）
 
     GET /api/v1/projects
 
@@ -43,7 +47,16 @@ def list_projects():
                 }
             ]
         }
+
+    注意: このエンドポイントは非推奨です。FastAPI 版の /api/v1/projects を使用してください。
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        "DEPRECATED endpoint /api/v1/projects (GET) called. "
+        "Use FastAPI /api/v1/projects instead. "
+        "This endpoint will be removed in v0.9.0."
+    )
     user = g.current_api_user
 
     projects = (
@@ -67,6 +80,7 @@ def list_projects():
     return jsonify({"projects": data})
 
 
+# TODO: FastAPI migration planned for CR-FASTAPI-010
 @external_api_bp.post("/projects/<int:project_id>/run")
 @api_key_required
 def external_trigger_run(project_id: int):
@@ -74,6 +88,8 @@ def external_trigger_run(project_id: int):
     Self-Healing Run を発火する
 
     POST /api/v1/projects/<project_id>/run
+
+    注意: このエンドポイントは FastAPI への移行予定です（CR-FASTAPI-010）。
 
     認証: X-Api-Key ヘッダまたは api_key クエリパラメータ
 
@@ -98,6 +114,13 @@ def external_trigger_run(project_id: int):
         - 400: requirement が未指定
         - 404: プロジェクトが見つからない
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        f"DEPRECATED endpoint /api/v1/projects/{project_id}/run (POST) called. "
+        "FastAPI migration planned for CR-FASTAPI-010. "
+        "This endpoint will be removed in v0.9.0."
+    )
     user = g.current_api_user
 
     # プロジェクトの所有権を確認
@@ -176,6 +199,7 @@ def external_trigger_run(project_id: int):
     }), status_code
 
 
+# TODO: FastAPI migration planned for CR-FASTAPI-010
 @external_api_bp.get("/projects/<int:project_id>/runs/latest")
 @api_key_required
 def get_latest_run(project_id: int):
@@ -183,6 +207,8 @@ def get_latest_run(project_id: int):
     最新の Run の概要を取得する
 
     GET /api/v1/projects/<project_id>/runs/latest
+
+    注意: このエンドポイントは FastAPI への移行予定です（CR-FASTAPI-010）。
 
     認証: X-Api-Key ヘッダまたは api_key クエリパラメータ
 
@@ -205,6 +231,13 @@ def get_latest_run(project_id: int):
         - 200: 成功
         - 404: プロジェクトが見つからない
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        f"DEPRECATED endpoint /api/v1/projects/{project_id}/runs/latest (GET) called. "
+        "FastAPI migration planned for CR-FASTAPI-010. "
+        "This endpoint will be removed in v0.9.0."
+    )
     user = g.current_api_user
 
     # プロジェクトの所有権を確認

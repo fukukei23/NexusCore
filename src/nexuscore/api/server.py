@@ -1,18 +1,15 @@
 # ==============================================================================
-# 操作するソフト: VSCode (または任意のテキストエディタ)
-# レジストリ/フォルダ: C:\Users\USER\tools\NexusCore\src\nexuscore\api\
-# ファイル名: server.py
-# 日付: 2025/09/03
+# DEPRECATED:
+#   This module previously hosted legacy Flask REST API endpoints.
+#   All internal REST APIs (/api/v1/execute, /api/v1/status) have been migrated to FastAPI
+#   under src/nexuscore/api/fastapi_app.py and removed in CR-FASTAPI-008.
+#   The module is kept only as a stub during the transition period.
 #
-# 使用方法:
-#   この内容で既存のファイルを上書きしてください。
-#   すべてのエージェントの初期化問題を、あなたのハイブリッド・アーキテクチャ設計に
-#   完全に準拠する形で解決する、最終FIX版です。
+#   Remaining Flask endpoints:
+#   - /api/github/webhook (POST) - Will be migrated in a future CR
 #
-# 改修内容:
-#   - 私の誤解であった`PostmortemAgent`の初期化方法を修正しました。
-#   - 全てのエージェントが、その役割（近代化/特殊任務）に応じて
-#     正しく初期化されるように、チーム編成ロジックを全面的に改良しました。
+#   The `tasks` dictionary is kept here for backward compatibility with FastAPI routes
+#   that import it. It will be moved to a shared module in a future refactoring.
 # ==============================================================================
 import os
 import sys
@@ -119,111 +116,31 @@ def require_auth(f):
 
     return decorated_function
 
-def run_orchestrator_task(task_id: str, requirement: str, project_path: str, constitution: dict):
-    """Orchestratorをバックグラウンドで実行するワーカー関数"""
-    logger.info(f"Starting background task: {task_id}")
-    tasks[task_id] = {"status": "running", "message": "Initializing agents..."}
+# REMOVED: run_orchestrator_task() function has been removed in CR-FASTAPI-008.
+# The FastAPI implementation uses its own run_orchestrator_task() function in src/nexuscore/api/routes/execute.py.
 
-    try:
-        # --- 1. 近代化されたエージェントの招集 (引数なし) ---
-        architect_agent = ArchitectAgent()
-        planner_agent = PlannerAgent()
-        coder_agent = CoderAgent()
-        tester_agent = TesterAgent()
-        debugger_agent = DebuggerAgent()
-        postmortem_agent = PostmortemAgent()
+# REMOVED: Flask REST API endpoints /api/v1/execute and /api/v1/status/<task_id> have been removed in CR-FASTAPI-008.
+# FastAPI equivalents are available at:
+#   - POST /api/v1/execute (see src/nexuscore/api/routes/execute.py)
+#   - GET /api/v1/status/{task_id} (see src/nexuscore/api/routes/execute.py)
+# All clients MUST use the FastAPI endpoints.
 
-        # --- 2. 特殊任務エージェントのプロビジョニング (引数あり) ---
-        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("A primary API key (e.g., GEMINI_API_KEY or OPENAI_API_KEY) must be set in the .env file.")
-
-        def provision_agent(agent_class, task_type: str, **kwargs):
-            """エージェントを動的にプロビジョニングするヘルパー関数"""
-            model_name = llm_router.task_model_map.get(task_type, llm_router.default_model)
-            logger.info(f"Provisioning {agent_class.__name__} for '{task_type}' task with model '{model_name}'.")
-            base_args = {'api_key': api_key, 'model': model_name}
-            all_args = {**base_args, **kwargs}
-            return agent_class(**all_args)
-
-        guardian_agent = provision_agent(GuardianAgent, 'review')
-        knowledge_curator_agent = provision_agent(KnowledgeCuratorAgent, 'general')
-
-        policy_rules_path = os.path.join(PROJECT_ROOT, "config", "policy_rules.json")
-        policy_agent = provision_agent(PolicyAgent, 'policy', policy_rules_path=policy_rules_path)
-
-        # --- 3. ユーティリティと司令塔 (Orchestrator) の任命 ---
-        patch_applier = PatchApplier()
-
-        orchestrator = Orchestrator(
-            project_path=project_path,
-            constitution=constitution,
-            requirement_agent=None,
-            architect_agent=architect_agent,
-            planner_agent=planner_agent,
-            coder_agent=coder_agent,
-            tester_agent=tester_agent,
-            debugger_agent=debugger_agent,
-            guardian_agent=guardian_agent,
-            policy_agent=policy_agent,
-            postmortem_agent=postmortem_agent,
-            knowledge_curator_agent=knowledge_curator_agent,
-            patch_applier=patch_applier
-        )
-
-        # --- 4. 開発プロセスの開始 ---
-        tasks[task_id]["message"] = "Design phase started."
-        orchestrator.design_phase(requirement)
-
-        tasks[task_id]["message"] = "Development cycle started."
-        orchestrator.development_cycle({"main_goal": requirement})
-
-        tasks[task_id] = {"status": "completed", "message": "Development process finished successfully."}
-        logger.info(f"Task {task_id} completed successfully.")
-
-    except Exception as e:
-        logger.critical(f"An error occurred in task {task_id}: {e}", exc_info=True)
-        tasks[task_id] = {"status": "error", "message": f"orchestrator failed: {e}"}
-
-# LEGACY: will be removed after FastAPI migration is completed
-@app.route('/api/v1/execute', methods=['POST'])
-@require_auth
-def execute_task():
-    data = request.json
-    if not data or 'requirement' not in data or 'project_path' not in data:
-        return jsonify({"error": "Missing 'requirement' or 'project_path' in request body", "error_code": "MISSING_FIELD"}), 400
-
-    task_id = str(uuid.uuid4())
-    requirement = data['requirement']
-    project_path = os.path.abspath(data['project_path'])
-
-    constitution = { "description": data.get("constitution_text", "Default constitution.") }
-
-    thread = threading.Thread(
-        target=run_orchestrator_task,
-        args=(task_id, requirement, project_path, constitution)
-    )
-    thread.daemon = True
-    thread.start()
-
-    logger.info(f"Task {task_id} created for requirement: '{requirement}'")
-
-    return jsonify({
-        "message": "Task accepted and is running in the background.",
-        "task_id": task_id,
-        "status_url": f"/api/v1/status/{task_id}"
-    }), 202
-
-@app.route('/api/v1/status/<task_id>', methods=['GET'])
-def get_task_status(task_id):
-    task = tasks.get(task_id)
-    if not task:
-        return jsonify({"error": "Task not found"}), 404
-    return jsonify(task)
-
+# DEPRECATED: This endpoint is deprecated and will be removed in CR-FASTAPI-008.
+# FastAPI equivalent: POST /api/v1/github/webhook (see src/nexuscore/api/routes/github_webhook.py)
+# This Flask endpoint is kept only for backward compatibility during migration.
+# All new clients MUST use the FastAPI endpoint.
 @app.route('/api/github/webhook', methods=['POST'])
 def github_webhook_endpoint():
-    """GitHub Webhook エンドポイント"""
+    """
+    GitHub Webhook エンドポイント（非推奨）
+
+    このエンドポイントは非推奨です。FastAPI 版の /api/v1/github/webhook を使用してください。
+    """
+    logger.warning(
+        "DEPRECATED endpoint /api/github/webhook called. "
+        "Use FastAPI /api/v1/github/webhook instead. "
+        "This endpoint will be removed in v0.9.0."
+    )
     try:
         from nexuscore.api.github_webhook_handler import handle_github_webhook
         result = handle_github_webhook()
