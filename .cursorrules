@@ -76,6 +76,7 @@ The AI MUST NOT move files outside this convention without explicit user instruc
 - The AI MUST NOT access auth globals directly inside route functions.
 - The authentication helpers MUST live in:
   - src/nexuscore/api/dependencies/auth.py  (or equivalent agreed module)
+- Exception: GitHub Webhook endpoints (/api/v1/github/webhook) use signature-based authentication (X-Hub-Signature-256) only and do NOT require API Key authentication.
 
 # Rule: API key / JWT consistency
 - The authentication mechanism (API key or JWT) MUST be consistent across /api/v1/*.
@@ -83,6 +84,7 @@ The AI MUST NOT move files outside this convention without explicit user instruc
 - If the existing codebase is inconsistent, the AI MUST:
   - Propose a single standard approach, and
   - Migrate touched endpoints to that standard.
+- Exception: GitHub Webhook endpoints use GitHub's standard signature-based authentication, which is different from API Key authentication.
 
 # Rule: No secrets in code
 - The AI MUST NOT hard-code secrets, API keys, or tokens.
@@ -183,3 +185,91 @@ When touching legacy Flask APIs, the AI MUST:
 - Do NOT couple FastAPI routes directly to UI frameworks.
 - Do NOT create behavior that depends on undocumented magic query params or headers.
 - Do NOT add non-deterministic behavior that cannot be represented in OpenAPI.
+
+# ======================================================================
+# Rule Group: FastAPI Migration CR Process Automation
+# ======================================================================
+
+# ----------------------------------------------------------------------
+# 1. すべての CR-FASTAPI-* は、完了レポート作成までを含めて「完了」とする
+# ----------------------------------------------------------------------
+For any task whose name matches /CR-FASTAPI-\d{3}/,
+the definition of "completed implementation" MUST include:
+
+1. Actual code implementation
+2. Related test creation or updates
+3. Documentation updates (API docs, README, links)
+4. **Creation of a completion report Markdown file**
+   Pattern:
+     docs/api/CR-FASTAPI-XXX_COMPLETION_REPORT.md
+5. The completion report MUST follow the structure used in:
+   - CR-FASTAPI-001_COMPLETION_REPORT.md
+   - CR-FASTAPI-002_COMPLETION_REPORT.md
+   - CR-FASTAPI-003_COMPLETION_REPORT.md
+   - CR-FASTAPI-004_COMPLETION_REPORT.md
+   - CR-FASTAPI-005_COMPLETION_REPORT.md
+   - CR-FASTAPI-006_COMPLETION_REPORT.md
+
+# ----------------------------------------------------------------------
+# 2. 完了レポートの必須構造
+# ----------------------------------------------------------------------
+Each completion report MUST contain all sections:
+
+- 実装日時
+- 概要（目的・ゴール・原則）
+- 実装ステップ（Step-by-step）
+- 変更ファイル一覧（新規作成・変更）
+- 動作確認結果（tests, lint, OpenAPI, manual checks）
+- 設計上の改善点（Architecture / Extensibility / Quality）
+- 既知の制約・注意事項
+- 次のステップ（Recommended next actions）
+
+Consistency of structure is mandatory.
+
+# ----------------------------------------------------------------------
+# 3. CR 実行時の Cursor の出力形式
+# ----------------------------------------------------------------------
+When executing a CR-FASTAPI-* prompt, Cursor must output:
+
+1. Unified diff only
+2. Absolutely no prose besides the diff
+3. After the diff patch, a summary of created/updated files
+4. Confirmation that **completion report was generated**
+
+# ----------------------------------------------------------------------
+# 4. README / API Migration Guide への反映
+# ----------------------------------------------------------------------
+After every CR-FASTAPI-* implementation:
+
+- README.md MUST be updated to record:
+  - Completion of the CR item
+  - Link to the generated completion report
+
+- docs/api/README.md MUST reflect:
+  - New endpoint(s) added
+  - Updated schemas
+  - Updated authentication/authorization rules
+  - Updated error handling rules (if applicable)
+
+# ----------------------------------------------------------------------
+# 5. バージョン整合性
+# ----------------------------------------------------------------------
+All code MUST comply with:
+
+- FastAPI
+- Pydantic BaseModel
+- Unified error handling (CR-FASTAPI-006 rules)
+- Authentication DI (CR-FASTAPI-004 rules)
+- /api/v1/ prefix policy
+
+# ----------------------------------------------------------------------
+# 6. レポート生成の義務
+# ----------------------------------------------------------------------
+Cursor MUST NEVER treat a CR as complete unless:
+
+- Code is implemented
+- Tests pass
+- A completion report Markdown file exists
+- README is updated
+
+This is mandatory and permanent.
