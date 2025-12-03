@@ -15,13 +15,23 @@ from nexuscore.webapp.auth import require_auth, get_current_user
 bp = Blueprint("api_badges", __name__, url_prefix="/api")
 
 
+# TODO: FastAPI migration planned for CR-FASTAPI-011
 @bp.route("/projects/<int:project_id>/badge/success_rate")
 def project_success_rate_badge(project_id: int):
     """
     プロジェクトの成功率バッジ用 JSON を返す（shields.io endpoint 互換）
 
     GET /api/projects/<project_id>/badge/success_rate
+
+    注意: このエンドポイントは FastAPI への移行予定です（CR-FASTAPI-011）。
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        f"DEPRECATED endpoint /api/projects/{project_id}/badge/success_rate (GET) called. "
+        "FastAPI migration planned for CR-FASTAPI-011. "
+        "This endpoint will be removed in v0.9.0."
+    )
     project = Project.query.filter_by(id=project_id).first_or_404()
 
     # 過去30回のRunを取得
@@ -51,8 +61,17 @@ def project_success_rate_badge(project_id: int):
     })
 
 
+# TODO: FastAPI migration planned for CR-FASTAPI-011
 @bp.route("/projects/<int:project_id>/badge/last_run")
 def project_last_run_badge(project_id: int):
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        f"DEPRECATED endpoint /api/projects/{project_id}/badge/last_run (GET) called. "
+        "FastAPI migration planned for CR-FASTAPI-011. "
+        "This endpoint will be removed in v0.9.0."
+    )
+    project = Project.query.filter_by(id=project_id).first_or_404()
     """
     プロジェクトの最新Runステータスバッジ用 JSON を返す（shields.io endpoint 互換）
 
