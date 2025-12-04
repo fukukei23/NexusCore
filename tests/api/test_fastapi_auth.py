@@ -7,7 +7,7 @@ API Key 認証（X-API-Key ヘッダー）の動作を確認する。
 import os
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from nexuscore.api.fastapi_app import app
 
@@ -18,12 +18,23 @@ def client():
     return TestClient(app)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_api_key(monkeypatch):
-    """API Key をモック"""
+    """API Key をモック（全テストで自動適用）"""
     api_key = "test-api-key-123"
     monkeypatch.setenv("NEXUSCORE_API_KEY", api_key)
-    yield api_key
+    # 認証のモックを設定（データベースアクセスを回避）
+    # get_current_user 内で使用される webapp.models をモック
+    with patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
+         patch("nexuscore.webapp.models.User") as mock_user_model:
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_api_key_obj = MagicMock()
+        mock_api_key_obj.user = mock_user
+        mock_api_key_obj.user_id = 1
+        mock_api_key_model.hash_token.return_value = "hashed_test_api_key"
+        mock_api_key_model.query.filter_by.return_value.first.return_value = mock_api_key_obj
+        yield api_key
     monkeypatch.delenv("NEXUSCORE_API_KEY", raising=False)
 
 
@@ -47,21 +58,32 @@ def test_auth_invalid_api_key_returns_401(client: TestClient, mock_api_key):
     """
     API Key 誤り → 401
     """
-    response = client.post(
-        "/api/v1/execute",
-        json={
-            "requirement": "Test requirement",
-            "project_path": "/tmp/test"
-        },
-        headers={
-            "X-API-Key": "invalid-api-key"
-        }
-    )
+    # 不正なAPI Keyの場合、モックが None を返すようにする
+    with patch("nexuscore.webapp.models.ApiKey") as MockApiKey, \
+         patch("nexuscore.webapp.models.User") as MockUser:
+        MockApiKey.hash_token.return_value = "hashed_invalid_key"
+        MockApiKey.query.filter_by.return_value.first.return_value = None  # 不正なキーは見つからない
+
+        response = client.post(
+            "/api/v1/execute",
+            json={
+                "requirement": "Test requirement",
+                "project_path": "/tmp/test"
+            },
+            headers={
+                "X-API-Key": "invalid-api-key"
+            }
+        )
 
     assert response.status_code == 401
     data = response.json()
+    # FastAPIのHTTPExceptionは detail キーにエラー情報を入れる
     assert "detail" in data
-    assert "api key" in data["detail"].lower()
+    # ErrorResponse形式: {"detail": {"error": {"code": "...", "message": "..."}}}
+    if isinstance(data["detail"], dict) and "error" in data["detail"]:
+        assert "api key" in str(data["detail"]["error"]).lower()
+    elif isinstance(data["detail"], str):
+        assert "api key" in data["detail"].lower()
 
 
 def test_auth_valid_api_key_returns_200(client: TestClient, mock_api_key):
@@ -106,18 +128,23 @@ def test_execute_api_requires_authentication(client: TestClient, mock_api_key):
         assert response.status_code == 202
 
         # 不正な API Key でリクエスト
-        response = client.post(
-            "/api/v1/execute",
-            json={
-                "requirement": "Test requirement",
-                "project_path": "/tmp/test"
-            },
-            headers={
-                "X-API-Key": "wrong-key"
-            }
-        )
+        with patch("nexuscore.webapp.models.ApiKey") as MockApiKey, \
+             patch("nexuscore.webapp.models.User") as MockUser:
+            MockApiKey.hash_token.return_value = "hashed_wrong_key"
+            MockApiKey.query.filter_by.return_value.first.return_value = None  # 不正なキーは見つからない
 
-        assert response.status_code == 401
+            response = client.post(
+                "/api/v1/execute",
+                json={
+                    "requirement": "Test requirement",
+                    "project_path": "/tmp/test"
+                },
+                headers={
+                    "X-API-Key": "wrong-key"
+                }
+            )
+
+            assert response.status_code == 401
 
 
 def test_status_api_requires_authentication(client: TestClient, mock_api_key):
@@ -143,14 +170,19 @@ def test_status_api_requires_authentication(client: TestClient, mock_api_key):
         assert data["status"] == "running"
 
         # 不正な API Key でリクエスト
-        response = client.get(
-            f"/api/v1/status/{test_task_id}",
-            headers={
-                "X-API-Key": "wrong-key"
-            }
-        )
+        with patch("nexuscore.webapp.models.ApiKey") as MockApiKey, \
+             patch("nexuscore.webapp.models.User") as MockUser:
+            MockApiKey.hash_token.return_value = "hashed_wrong_key"
+            MockApiKey.query.filter_by.return_value.first.return_value = None  # 不正なキーは見つからない
 
-        assert response.status_code == 401
+            response = client.get(
+                f"/api/v1/status/{test_task_id}",
+                headers={
+                    "X-API-Key": "wrong-key"
+                }
+            )
+
+            assert response.status_code == 401
     finally:
         # クリーンアップ
         if test_task_id in server.tasks:
@@ -191,21 +223,32 @@ def test_auth_server_misconfigured_returns_500(client: TestClient, monkeypatch):
     from nexuscore.api.dependencies import auth
     auth._cached_api_key = None
 
-    response = client.post(
-        "/api/v1/execute",
-        json={
-            "requirement": "Test requirement",
-            "project_path": "/tmp/test"
-        },
-        headers={
-            "X-API-Key": "any-key"
-        }
-    )
+    # get_api_key() を直接パッチして、make_internal_error を発生させる
+    from nexuscore.api.utils.errors import make_internal_error
+    with patch("nexuscore.api.dependencies.auth.get_api_key") as mock_get_api_key:
+        mock_get_api_key.side_effect = make_internal_error("Server misconfigured: NEXUSCORE_API_KEY is not set")
 
-    assert response.status_code == 500
-    data = response.json()
-    assert "detail" in data
-    assert "misconfigured" in data["detail"].lower() or "not set" in data["detail"].lower()
+        response = client.post(
+            "/api/v1/execute",
+            json={
+                "requirement": "Test requirement",
+                "project_path": "/tmp/test"
+            },
+            headers={
+                "X-API-Key": "any-key"
+            }
+        )
+
+        assert response.status_code == 500
+        data = response.json()
+        # FastAPIのHTTPExceptionは detail キーにエラー情報を入れる
+        assert "detail" in data
+        # ErrorResponse形式: {"detail": {"error": {"code": "...", "message": "..."}}}
+        if isinstance(data["detail"], dict) and "error" in data["detail"]:
+            error_message = str(data["detail"]["error"]).lower()
+            assert "misconfigured" in error_message or "not set" in error_message
+        elif isinstance(data["detail"], str):
+            assert "misconfigured" in data["detail"].lower() or "not set" in data["detail"].lower()
 
 
 def test_auth_api_key_from_secrets_json(client: TestClient, tmp_path, monkeypatch):

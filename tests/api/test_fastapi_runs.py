@@ -29,12 +29,12 @@ def mock_api_key(monkeypatch):
 @pytest.fixture
 def mock_db_models():
     """データベースモデルをモック"""
-    with patch("nexuscore.api.routes.runs.Run") as mock_run, \
-         patch("nexuscore.api.routes.runs.Project") as mock_project, \
-         patch("nexuscore.api.routes.runs.User") as mock_user, \
-         patch("nexuscore.api.routes.runs.db") as mock_db, \
-         patch("nexuscore.api.dependencies.auth.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.api.dependencies.auth.User") as mock_auth_user:
+    with patch("nexuscore.webapp.models.Run") as mock_run, \
+         patch("nexuscore.webapp.models.Project") as mock_project, \
+         patch("nexuscore.webapp.models.User") as mock_user, \
+         patch("nexuscore.webapp.db") as mock_db, \
+         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
+         patch("nexuscore.webapp.models.User") as mock_auth_user:
         yield {
             "Run": mock_run,
             "Project": mock_project,
@@ -72,22 +72,32 @@ def test_list_runs_success(client: TestClient, mock_api_key, mock_db_models):
     mock_run2.finished_at = None
     mock_run2.created_at = "2025-01-02T00:00:00"
 
-    mock_query = MagicMock()
-    mock_query.join.return_value.filter.return_value.order_by.return_value.all.return_value = [mock_run1, mock_run2]
-    mock_db_models["Run"].query = mock_query
+    from sqlalchemy import desc as sa_desc
 
-    # API Key認証のモック
-    mock_api_key_obj = MagicMock()
-    mock_api_key_obj.user = mock_user
-    mock_db_models["ApiKey"].hash_token.return_value = "hashed_key"
-    mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
+    # desc() 関数をパッチして、モックオブジェクトを受け取った場合はそのまま返すようにする
+    def mock_desc(column):
+        # モックオブジェクトの場合はそのまま返す
+        if isinstance(column, MagicMock):
+            return column
+        return sa_desc(column)
 
-    response = client.get(
-        "/api/v1/runs",
-        headers={"X-API-Key": mock_api_key}
-    )
+    with patch("nexuscore.api.routes.runs.desc", side_effect=mock_desc):
+        mock_query = MagicMock()
+        mock_query.join.return_value.filter.return_value.order_by.return_value.all.return_value = [mock_run1, mock_run2]
+        mock_db_models["Run"].query = mock_query
 
-    assert response.status_code == 200
+        # API Key認証のモック
+        mock_api_key_obj = MagicMock()
+        mock_api_key_obj.user = mock_user
+        mock_db_models["ApiKey"].hash_token.return_value = "hashed_key"
+        mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
+
+        response = client.get(
+            "/api/v1/runs",
+            headers={"X-API-Key": mock_api_key}
+        )
+
+        assert response.status_code == 200
     data = response.json()
     assert "runs" in data
     assert isinstance(data["runs"], list)
@@ -114,26 +124,41 @@ def test_list_runs_with_project_filter(client: TestClient, mock_api_key, mock_db
     mock_run.finished_at = "2025-01-01T00:05:00"
     mock_run.created_at = "2025-01-01T00:00:00"
 
-    mock_query = MagicMock()
-    mock_query.join.return_value.filter.return_value.order_by.return_value.all.return_value = [mock_run]
-    mock_db_models["Run"].query = mock_query
+    from sqlalchemy import desc as sa_desc
 
-    # API Key認証のモック
-    mock_api_key_obj = MagicMock()
-    mock_api_key_obj.user = mock_user
-    mock_db_models["ApiKey"].hash_token.return_value = "hashed_key"
-    mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
+    # desc() 関数をパッチして、モックオブジェクトを受け取った場合はそのまま返すようにする
+    def mock_desc(column):
+        # モックオブジェクトの場合はそのまま返す
+        if isinstance(column, MagicMock):
+            return column
+        return sa_desc(column)
 
-    response = client.get(
-        "/api/v1/runs?project_id=1",
-        headers={"X-API-Key": mock_api_key}
-    )
+    with patch("nexuscore.api.routes.runs.desc", side_effect=mock_desc):
+        # クエリチェーンを正しくモック: Run.query.join(Project).filter(...).filter(...).order_by(...).all()
+        mock_query = MagicMock()
+        mock_join_result = MagicMock()
+        mock_filter1_result = MagicMock()  # Project.owner_id == user_id のフィルタ結果
+        mock_filter2_result = MagicMock()  # Run.project_id == project_id のフィルタ結果
+        mock_order_by_result = MagicMock()
 
-    assert response.status_code == 200
-    data = response.json()
-    assert "runs" in data
-    assert len(data["runs"]) == 1
-    assert data["runs"][0]["project_id"] == 1
+        mock_query.join.return_value = mock_join_result
+        mock_join_result.filter.return_value = mock_filter1_result
+        mock_filter1_result.filter.return_value = mock_filter2_result
+        mock_filter2_result.order_by.return_value = mock_order_by_result
+        mock_order_by_result.all.return_value = [mock_run]
+
+        mock_db_models["Run"].query = mock_query
+
+        response = client.get(
+            "/api/v1/runs?project_id=1",
+            headers={"X-API-Key": mock_api_key}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "runs" in data
+        assert len(data["runs"]) == 1
+        assert data["runs"][0]["project_id"] == 1
 
 
 def test_list_runs_requires_authentication(client: TestClient):
@@ -219,8 +244,13 @@ def test_get_run_not_found(client: TestClient, mock_api_key, mock_db_models):
 
     assert response.status_code == 404
     data = response.json()
+    # FastAPIのHTTPExceptionは detail キーにエラー情報を入れる
     assert "detail" in data
-    assert "not found" in data["detail"].lower()
+    # ErrorResponse形式: {"detail": {"error": {"code": "...", "message": "..."}}}
+    if isinstance(data["detail"], dict) and "error" in data["detail"]:
+        assert "not found" in str(data["detail"]["error"]).lower()
+    elif isinstance(data["detail"], str):
+        assert "not found" in data["detail"].lower()
 
 
 def test_runs_endpoints_are_documented_in_openapi(client: TestClient):

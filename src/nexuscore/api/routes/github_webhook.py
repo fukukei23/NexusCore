@@ -17,6 +17,7 @@ from fastapi import APIRouter, Header, HTTPException, Request, status
 
 from ..schemas.error import ErrorResponse
 from ..schemas.github_webhook import GitHubWebhookPayload, GitHubWebhookResponse
+from ..utils.errors import make_bad_request_error, make_unauthorized_error
 
 router = APIRouter(
     prefix="/api/v1/github",
