@@ -13,6 +13,9 @@ from unittest.mock import patch, MagicMock
 from nexuscore.api.fastapi_app import app
 from nexuscore.api.dependencies.auth import AuthenticatedUser
 
+# os モジュールをインポート（getenv のモック用）
+import os as os_module
+
 client = TestClient(app)
 
 # テスト用のAPIキー
@@ -127,11 +130,25 @@ def test_trigger_project_run_sync_mode(mock_db_session, mock_project, mock_run, 
     """
     POST /api/v1/projects/{project_id}/run が同期実行モードで正常に動作することを確認
     """
+    # 環境変数を設定
     monkeypatch.setenv("NEXUS_USE_CELERY", "0")
 
-    with patch("nexuscore.webapp.models.Project") as MockProject, \
+    # os.getenv を直接パッチ（モジュールレベルでインポートされている os をパッチ）
+    # projects.py の trigger_project_run 関数内で使用される os.getenv をパッチ
+    import nexuscore.api.routes.projects as projects_module
+
+    with patch.object(projects_module.os, "getenv") as mock_getenv, \
+         patch("nexuscore.webapp.models.Project") as MockProject, \
          patch("nexuscore.webapp.models.Run") as MockRun, \
          patch("nexuscore.webapp.orchestrator_inline.run_orchestrator_inline") as mock_inline:
+
+        # os.getenv のモックを設定
+        def getenv_side_effect(key, default=None):
+            if key == "NEXUS_USE_CELERY":
+                return "0"  # 同期モード
+            return os_module.getenv(key, default)
+
+        mock_getenv.side_effect = getenv_side_effect
 
         # プロジェクトのクエリをモック
         MockProject.query.filter_by.return_value.first.return_value = mock_project
@@ -163,6 +180,9 @@ def test_trigger_project_run_sync_mode(mock_db_session, mock_project, mock_run, 
         assert "run_id" in data
         assert data["project_id"] == mock_project.id
         assert data["queue_mode"] == "sync"
+        mock_inline.assert_called_once()
+        mock_db_session.add.assert_called_once_with(mock_run)
+        mock_db_session.commit.assert_called()
 
 
 def test_trigger_project_run_project_not_found(mock_db_session):

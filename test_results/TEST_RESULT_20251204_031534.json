@@ -1,0 +1,24 @@
+{
+  "timestamp": "20251204_031534",
+  "executed_at": "2025-12-04T03:15:34.281394",
+  "test_target": "tests/api/test_fastapi_auth.py",
+  "result": {
+    "total": 9,
+    "passed": 5,
+    "failed": 4,
+    "skipped": 0,
+    "errors": 0,
+    "failed_tests": [
+      "[ 22%]",
+      "[ 44%]",
+      "[ 55%]",
+      "[ 77%]",
+      "tests/api/test_fastapi_auth.py::test_auth_invalid_api_key_returns_401",
+      "tests/api/test_fastapi_auth.py::test_execute_api_requires_authentication",
+      "tests/api/test_fastapi_auth.py::test_status_api_requires_authentication",
+      "tests/api/test_fastapi_auth.py::test_auth_server_misconfigured_returns_500"
+    ],
+    "error_tests": [],
+    "execution_time": 7.33
+  }
+}

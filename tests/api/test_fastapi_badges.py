@@ -2,8 +2,8 @@
 FastAPI Badge エンドポイントのテスト
 
 CR-FASTAPI-009 で作成された以下のエンドポイントのテスト:
-- GET /api/projects/{project_id}/badge/success_rate
-- GET /api/projects/{project_id}/badge/last_run
+- GET /api/v1/projects/{project_id}/badge/success_rate
+- GET /api/v1/projects/{project_id}/badge/last_run
 """
 import pytest
 from fastapi.testclient import TestClient
@@ -48,7 +48,7 @@ def mock_latest_run():
 
 def test_project_success_rate_badge_success(mock_project, mock_runs):
     """
-    GET /api/projects/{project_id}/badge/success_rate が正常に動作することを確認
+    GET /api/v1/projects/{project_id}/badge/success_rate が正常に動作することを確認
     """
     with patch("nexuscore.webapp.models.Project") as MockProject, \
          patch("nexuscore.webapp.models.Run") as MockRun, \
@@ -65,7 +65,7 @@ def test_project_success_rate_badge_success(mock_project, mock_runs):
         mock_query_chain.order_by.return_value.limit.return_value.all.return_value = mock_runs
         MockRun.query.filter_by.return_value = mock_query_chain
 
-        response = client.get(f"/api/projects/{mock_project.id}/badge/success_rate")
+        response = client.get(f"/api/v1/projects/{mock_project.id}/badge/success_rate")
 
         assert response.status_code == 200
         data = response.json()
@@ -77,7 +77,7 @@ def test_project_success_rate_badge_success(mock_project, mock_runs):
 
 def test_project_success_rate_badge_no_runs(mock_project):
     """
-    GET /api/projects/{project_id}/badge/success_rate がRunが存在しない場合に0%を返すことを確認
+    GET /api/v1/projects/{project_id}/badge/success_rate がRunが存在しない場合に0%を返すことを確認
     """
     with patch("nexuscore.webapp.models.Project") as MockProject, \
          patch("nexuscore.webapp.models.Run") as MockRun, \
@@ -94,7 +94,7 @@ def test_project_success_rate_badge_no_runs(mock_project):
         mock_query_chain.order_by.return_value.limit.return_value.all.return_value = []
         MockRun.query.filter_by.return_value = mock_query_chain
 
-        response = client.get(f"/api/projects/{mock_project.id}/badge/success_rate")
+        response = client.get(f"/api/v1/projects/{mock_project.id}/badge/success_rate")
 
         assert response.status_code == 200
         data = response.json()
@@ -106,13 +106,13 @@ def test_project_success_rate_badge_no_runs(mock_project):
 
 def test_project_success_rate_badge_project_not_found():
     """
-    GET /api/projects/{project_id}/badge/success_rate が存在しないプロジェクトIDで404を返すことを確認
+    GET /api/v1/projects/{project_id}/badge/success_rate が存在しないプロジェクトIDで404を返すことを確認
     """
     with patch("nexuscore.webapp.models.Project") as MockProject:
         # プロジェクトが見つからない場合
         MockProject.query.filter_by.return_value.first.return_value = None
 
-        response = client.get("/api/projects/99999/badge/success_rate")
+        response = client.get("/api/v1/projects/99999/badge/success_rate")
 
         assert response.status_code == 404
         error_data = response.json()
@@ -123,7 +123,7 @@ def test_project_success_rate_badge_project_not_found():
 
 def test_project_last_run_badge_success(mock_project, mock_latest_run):
     """
-    GET /api/projects/{project_id}/badge/last_run が正常に動作することを確認
+    GET /api/v1/projects/{project_id}/badge/last_run が正常に動作することを確認
     """
     with patch("nexuscore.webapp.models.Project") as MockProject, \
          patch("nexuscore.webapp.models.Run") as MockRun, \
@@ -140,7 +140,7 @@ def test_project_last_run_badge_success(mock_project, mock_latest_run):
         mock_query_chain.order_by.return_value.first.return_value = mock_latest_run
         MockRun.query.filter_by.return_value = mock_query_chain
 
-        response = client.get(f"/api/projects/{mock_project.id}/badge/last_run")
+        response = client.get(f"/api/v1/projects/{mock_project.id}/badge/last_run")
 
         assert response.status_code == 200
         data = response.json()
@@ -152,7 +152,7 @@ def test_project_last_run_badge_success(mock_project, mock_latest_run):
 
 def test_project_last_run_badge_no_runs(mock_project):
     """
-    GET /api/projects/{project_id}/badge/last_run がRunが存在しない場合に適切なメッセージを返すことを確認
+    GET /api/v1/projects/{project_id}/badge/last_run がRunが存在しない場合に適切なメッセージを返すことを確認
     """
     with patch("nexuscore.webapp.models.Project") as MockProject, \
          patch("nexuscore.webapp.models.Run") as MockRun, \
@@ -169,7 +169,7 @@ def test_project_last_run_badge_no_runs(mock_project):
         mock_query_chain.order_by.return_value.first.return_value = None
         MockRun.query.filter_by.return_value = mock_query_chain
 
-        response = client.get(f"/api/projects/{mock_project.id}/badge/last_run")
+        response = client.get(f"/api/v1/projects/{mock_project.id}/badge/last_run")
 
         assert response.status_code == 200
         data = response.json()
@@ -181,7 +181,7 @@ def test_project_last_run_badge_no_runs(mock_project):
 
 def test_project_last_run_badge_different_statuses(mock_project):
     """
-    GET /api/projects/{project_id}/badge/last_run が異なるステータスで適切なカラーを返すことを確認
+    GET /api/v1/projects/{project_id}/badge/last_run が異なるステータスで適切なカラーを返すことを確認
     """
     status_colors = [
         ("SUCCESS", "brightgreen"),
@@ -207,7 +207,7 @@ def test_project_last_run_badge_different_statuses(mock_project):
             mock_query_chain.order_by.return_value.first.return_value = mock_run
             MockRun.query.filter_by.return_value = mock_query_chain
 
-            response = client.get(f"/api/projects/{mock_project.id}/badge/last_run")
+            response = client.get(f"/api/v1/projects/{mock_project.id}/badge/last_run")
 
             assert response.status_code == 200
             data = response.json()
@@ -217,13 +217,13 @@ def test_project_last_run_badge_different_statuses(mock_project):
 
 def test_project_last_run_badge_project_not_found():
     """
-    GET /api/projects/{project_id}/badge/last_run が存在しないプロジェクトIDで404を返すことを確認
+    GET /api/v1/projects/{project_id}/badge/last_run が存在しないプロジェクトIDで404を返すことを確認
     """
     with patch("nexuscore.webapp.models.Project") as MockProject:
         # プロジェクトが見つからない場合
         MockProject.query.filter_by.return_value.first.return_value = None
 
-        response = client.get("/api/projects/99999/badge/last_run")
+        response = client.get("/api/v1/projects/99999/badge/last_run")
 
         assert response.status_code == 404
         error_data = response.json()
@@ -248,7 +248,7 @@ def test_badge_endpoints_no_authentication_required(mock_project, mock_runs):
         MockRun.query.filter_by.return_value = mock_query_chain
 
         # 認証ヘッダーなしでリクエスト
-        response = client.get(f"/api/projects/{mock_project.id}/badge/success_rate")
+        response = client.get(f"/api/v1/projects/{mock_project.id}/badge/success_rate")
 
         assert response.status_code == 200
         data = response.json()

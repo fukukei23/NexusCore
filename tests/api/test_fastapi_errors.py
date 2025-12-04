@@ -36,15 +36,16 @@ def test_not_found_error_format(client: TestClient, mock_api_key, monkeypatch):
     mock_user = MagicMock()
     mock_user.id = 1
 
-    with patch("nexuscore.api.routes.projects.User") as mock_user_model, \
-         patch("nexuscore.api.routes.projects.Project") as mock_project_model, \
-         patch("nexuscore.api.routes.projects.db") as mock_db, \
-         patch("nexuscore.api.dependencies.auth.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.api.dependencies.auth.User") as mock_auth_user:
-        mock_user_model.query.first.return_value = mock_user
+    with patch("nexuscore.webapp.models.Project") as mock_project_model, \
+         patch("nexuscore.webapp.models.Run") as mock_run_model, \
+         patch("nexuscore.webapp.db") as mock_db, \
+         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
+         patch("nexuscore.webapp.models.User") as mock_auth_user:
+        # Project と Run のクエリをモック
         mock_query = MagicMock()
         mock_query.filter_by.return_value.first.return_value = None
         mock_project_model.query = mock_query
+        mock_run_model.query = mock_query
 
         # API Key認証のモック
         mock_api_key_obj = MagicMock()
@@ -59,11 +60,13 @@ def test_not_found_error_format(client: TestClient, mock_api_key, monkeypatch):
 
         assert response.status_code == 404
         data = response.json()
-        assert "error" in data
-        assert "code" in data["error"]
-        assert "message" in data["error"]
-        assert data["error"]["code"] == "NOT_FOUND"
-        assert "not found" in data["error"]["message"].lower()
+        # FastAPIのHTTPExceptionは detail キーにエラー情報を入れる
+        assert "detail" in data
+        assert "error" in data["detail"]
+        assert "code" in data["detail"]["error"]
+        assert "message" in data["detail"]["error"]
+        assert data["detail"]["error"]["code"] == "NOT_FOUND"
+        assert "not found" in data["detail"]["error"]["message"].lower()
 
 
 def test_unauthorized_error_format(client: TestClient):
@@ -103,12 +106,16 @@ def test_validation_error_format(client: TestClient, mock_api_key, monkeypatch):
     mock_user = MagicMock()
     mock_user.id = 1
 
-    with patch("nexuscore.api.routes.projects.User") as mock_user_model, \
-         patch("nexuscore.api.routes.projects.Project") as mock_project_model, \
-         patch("nexuscore.api.routes.projects.db") as mock_db, \
-         patch("nexuscore.api.dependencies.auth.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.api.dependencies.auth.User") as mock_auth_user:
-        mock_user_model.query.first.return_value = mock_user
+    with patch("nexuscore.webapp.models.Project") as mock_project_model, \
+         patch("nexuscore.webapp.models.Run") as mock_run_model, \
+         patch("nexuscore.webapp.db") as mock_db, \
+         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
+         patch("nexuscore.webapp.models.User") as mock_auth_user:
+        # Project と Run のクエリをモック
+        mock_query = MagicMock()
+        mock_query.filter_by.return_value.first.return_value = None
+        mock_project_model.query = mock_query
+        mock_run_model.query = mock_query
 
         # API Key認証のモック
         mock_api_key_obj = MagicMock()
@@ -140,17 +147,16 @@ def test_internal_error_format(client: TestClient, mock_api_key, monkeypatch):
     mock_user = MagicMock()
     mock_user.id = 1
 
-    with patch("nexuscore.api.routes.projects.User") as mock_user_model, \
-         patch("nexuscore.api.routes.projects.Project") as mock_project_model, \
-         patch("nexuscore.api.routes.projects.db") as mock_db, \
-         patch("nexuscore.api.dependencies.auth.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.api.dependencies.auth.User") as mock_auth_user:
-        mock_user_model.query.first.return_value = mock_user
-
+    with patch("nexuscore.webapp.models.Project") as mock_project_model, \
+         patch("nexuscore.webapp.models.Run") as mock_run_model, \
+         patch("nexuscore.webapp.db") as mock_db, \
+         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
+         patch("nexuscore.webapp.models.User") as mock_auth_user:
         # データベースエラーをシミュレート
         mock_query = MagicMock()
         mock_query.filter_by.return_value.order_by.side_effect = Exception("Database error")
         mock_project_model.query = mock_query
+        mock_run_model.query = mock_query
 
         # API Key認証のモック
         mock_api_key_obj = MagicMock()
@@ -165,10 +171,12 @@ def test_internal_error_format(client: TestClient, mock_api_key, monkeypatch):
 
         assert response.status_code == 500
         data = response.json()
-        assert "error" in data
-        assert "code" in data["error"]
-        assert "message" in data["error"]
-        assert data["error"]["code"] == "INTERNAL_ERROR"
+        # FastAPIのHTTPExceptionは detail キーにエラー情報を入れる
+        assert "detail" in data
+        assert "error" in data["detail"]
+        assert "code" in data["detail"]["error"]
+        assert "message" in data["detail"]["error"]
+        assert data["detail"]["error"]["code"] == "INTERNAL_ERROR"
 
 
 def test_error_schemas_in_openapi(client: TestClient):
@@ -227,7 +235,12 @@ def test_all_endpoints_have_error_responses(client: TestClient):
                     operation = path_item[method]
                     responses = operation.get("responses", {})
                     # 4xx または 5xx のレスポンスが定義されていることを確認
-                    error_statuses = [str(code) for code in responses.keys() if code >= 400]
+                    # OpenAPI スキーマではステータスコードが文字列として保存されているため、int に変換
+                    error_statuses = [
+                        code for code in responses.keys()
+                        if (isinstance(code, str) and code.isdigit() and int(code) >= 400)
+                        or (isinstance(code, int) and code >= 400)
+                    ]
                     if error_statuses:
                         # エラーレスポンスに ErrorResponse が含まれていることを確認
                         assert any(
