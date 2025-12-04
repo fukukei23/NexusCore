@@ -9,8 +9,8 @@
 
 <!-- NOTE: {PROJECT_ID} は実際の Project.id に置き換えてください（例: 1）。your-nexuscore-host は運用環境のホスト名に置き換えてください。 -->
 
-[![Self-Healing Success Rate](https://your-nexuscore-host/api/projects/1/badge/success_rate)](https://your-nexuscore-host/dashboard/projects/1)
-[![Self-Healing Last Run](https://your-nexuscore-host/api/projects/1/badge/last_run)](https://your-nexuscore-host/dashboard/projects/1)
+[![Self-Healing Success Rate](https://your-nexuscore-host/api/v1/projects/1/badge/success_rate)](https://your-nexuscore-host/dashboard/projects/1)
+[![Self-Healing Last Run](https://your-nexuscore-host/api/v1/projects/1/badge/last_run)](https://your-nexuscore-host/dashboard/projects/1)
 
 - 🧠 **AIコード修復／開発支援**：Requirement→Planning→Coding→Testing まで各フェーズを担当するエージェント。
 - ☁️ **SaaS展開を意識した分離設計**：LLM/エージェント/オーケストレータを独立レイヤーで構築。
@@ -60,19 +60,19 @@ NexusCore can be triggered from VSCode extensions, Chrome extensions, or other t
 
 NexusCore の API は以下のように構成されています：
 
-- **FastAPI**: 公開 API 層（`/api/v1/*`）- 正式版
+- **FastAPI**: 公開 API 層（`/api/v1/*`）- 正式版（単一の正）
   - 外部統合向けの REST API は FastAPI ベースで実装されています
   - 統一された認証（API Key）、エラーハンドリング、OpenAPI スキーマを提供
+  - すべてのクライアントは FastAPI エンドポイント（`/api/v1/*`）を使用する必要があります
   - 詳細は `docs/api/README.md` を参照してください
 
 - **Flask**: Web UI 層（`/projects/*`, `/dashboard/*` など）- 当面存続
   - HTML テンプレート・ビューを提供する Web UI は Flask ベースで実装されています
-  - Flask 内部 REST API (`/api/v1/execute`, `/api/v1/status`) は **CR-FASTAPI-008 で物理削除済み**です
-  - 残りの Flask API（外部公開用の Webapp blueprints、バッジ API 等）は、別 CR（CR-FASTAPI-009 以降）で FastAPI 移行 → 削除する予定です
-  - すべてのクライアントは FastAPI エンドポイント（`/api/v1/*`）を使用する必要があります
+  - Flask REST API（`/api/v1/*` 配下のエンドポイント）は **CR-FASTAPI-010 で完全削除済み**です
+  - すべての REST API は FastAPI 側に統一されました
   - 詳細は `docs/api/FASTAPI_MIGRATION_STATUS.md` を参照してください
 
-**重要**: The legacy Flask internal REST API (`/api/v1/execute`, `/api/v1/status`) has been removed in CR-FASTAPI-008. All clients must use the FastAPI endpoints under `/api/v1`.
+**重要**: Flask REST API (`/api/v1/*` 配下のエンドポイント) は CR-FASTAPI-010 で完全削除されました。すべてのクライアントは FastAPI エンドポイント（`/api/v1/*`）を使用する必要があります。
 
 ---
 
