@@ -1,11 +1,19 @@
 """
 外部統合 API のテスト
+
+注意: このテストファイルは Flask API (api_external.py, api_badges.py) を前提としています。
+CR-FASTAPI-010 でこれらのファイルが削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
 import pytest
-from unittest.mock import Mock, patch
 
-from nexuscore.webapp import create_app, db
-from nexuscore.webapp.models import User, Project, ApiKey
+# CR-FASTAPI-010: Flask API (api_external.py, api_badges.py) は削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask API (api_external.py, api_badges.py) has been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 @pytest.fixture

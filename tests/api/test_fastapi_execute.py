@@ -7,7 +7,7 @@ CR-FASTAPI-002 で作成された /api/v1/execute と /api/v1/status/{task_id} �
 import os
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from nexuscore.api.fastapi_app import app
 
@@ -18,18 +18,31 @@ def client():
     return TestClient(app)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_auth_token(monkeypatch):
-    """認証トークンをモック"""
-    monkeypatch.setenv("NEXUSCORE_API_TOKEN", "test-token-123")
-    yield "test-token-123"
-    monkeypatch.delenv("NEXUSCORE_API_TOKEN", raising=False)
+    """認証トークンをモック（全テストで自動適用）"""
+    api_key = "test-token-123"
+    monkeypatch.setenv("NEXUSCORE_API_KEY", api_key)
+    # 認証のモックを設定（データベースアクセスを回避）
+    # get_current_user 内で使用される webapp.models をモック
+    with patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
+         patch("nexuscore.webapp.models.User") as mock_user_model:
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_api_key_obj = MagicMock()
+        mock_api_key_obj.user = mock_user
+        mock_api_key_obj.user_id = 1
+        mock_api_key_model.hash_token.return_value = "hashed_test_api_key"
+        mock_api_key_model.query.filter_by.return_value.first.return_value = mock_api_key_obj
+        yield api_key
+    monkeypatch.delenv("NEXUSCORE_API_KEY", raising=False)
 
 
 @pytest.fixture
 def auth_headers(mock_auth_token):
     """認証ヘッダーのフィクスチャ"""
-    return {"Authorization": f"Bearer {mock_auth_token}"}
+    # CR-FASTAPI-004 で X-API-Key 認証に変更されたため、X-API-Key を使用
+    return {"X-API-Key": mock_auth_token}
 
 
 def test_execute_endpoint_accepts_valid_request(client: TestClient, auth_headers: dict):
@@ -78,10 +91,10 @@ def test_execute_endpoint_rejects_invalid_request_missing_fields(client: TestCli
     assert response.status_code == 422  # FastAPI のバリデーションエラー
 
 
-def test_execute_endpoint_requires_authentication(client: TestClient, mock_auth_token):
+def test_execute_endpoint_requires_authentication(client: TestClient):
     """
     Execute エンドポイントが認証を要求することを確認
-    認証ヘッダーがない場合に 401 を返すことを確認
+    認証ヘッダーがない場合に 422（バリデーションエラー）を返すことを確認
     """
     response = client.post(
         "/api/v1/execute",
@@ -91,9 +104,8 @@ def test_execute_endpoint_requires_authentication(client: TestClient, mock_auth_
         }
         # 認証ヘッダーを付けない
     )
-    # FastAPI HTTPBearer は認証ヘッダーがない場合、auto_error=False でも 403 を返す可能性がある
-    # 実際の動作に合わせて調整
-    assert response.status_code in [401, 403]
+    # FastAPI では必須ヘッダー（X-API-Key）が欠如している場合、422 Unprocessable Entity を返す
+    assert response.status_code == 422
 
 
 def test_execute_endpoint_with_constitution_text(client: TestClient, auth_headers: dict):
@@ -116,7 +128,7 @@ def test_execute_endpoint_with_constitution_text(client: TestClient, auth_header
         # run_orchestrator_task が呼ばれることを確認（スレッド経由のため、直接確認は難しい）
 
 
-def test_status_endpoint_returns_task_state(client: TestClient):
+def test_status_endpoint_returns_task_state(client: TestClient, mock_auth_token):
     """
     Status エンドポイントがタスクの状態を返すことを確認
     既存の Flask テスト (`test_get_task_status_found`) に準拠
@@ -127,7 +139,10 @@ def test_status_endpoint_returns_task_state(client: TestClient):
     server.tasks[test_task_id] = {"status": "running", "message": "Test message"}
 
     try:
-        response = client.get(f"/api/v1/status/{test_task_id}")
+        response = client.get(
+            f"/api/v1/status/{test_task_id}",
+            headers={"X-API-Key": mock_auth_token}
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "running"
@@ -138,16 +153,24 @@ def test_status_endpoint_returns_task_state(client: TestClient):
             del server.tasks[test_task_id]
 
 
-def test_status_endpoint_returns_404_for_nonexistent_task(client: TestClient):
+def test_status_endpoint_returns_404_for_nonexistent_task(client: TestClient, mock_auth_token):
     """
     Status エンドポイントが存在しないタスクに対して 404 を返すことを確認
     既存の Flask テスト (`test_get_task_status_not_found`) に準拠
     """
-    response = client.get("/api/v1/status/nonexistent-task-id")
+    response = client.get(
+        "/api/v1/status/nonexistent-task-id",
+        headers={"X-API-Key": mock_auth_token}
+    )
     assert response.status_code == 404
     data = response.json()
+    # FastAPIのHTTPExceptionは detail キーにエラー情報を入れる
     assert "detail" in data
-    assert "not found" in data["detail"].lower()
+    # ErrorResponse形式: {"detail": {"error": {"code": "...", "message": "..."}}}
+    if isinstance(data["detail"], dict) and "error" in data["detail"]:
+        assert "not found" in str(data["detail"]["error"]).lower()
+    elif isinstance(data["detail"], str):
+        assert "not found" in data["detail"].lower()
 
 
 def test_execute_and_status_are_documented_in_openapi(client: TestClient):
@@ -212,7 +235,7 @@ def test_execute_response_structure(client: TestClient, auth_headers: dict):
         assert len(data["status_url"]) > len("/api/v1/status/")
 
 
-def test_status_response_structure(client: TestClient):
+def test_status_response_structure(client: TestClient, mock_auth_token):
     """
     ステータスレスポンスの構造テスト
     既存の Flask テスト (`test_get_task_status_response_structure`) に準拠
@@ -226,7 +249,10 @@ def test_status_response_structure(client: TestClient):
     }
 
     try:
-        response = client.get(f"/api/v1/status/{test_task_id}")
+        response = client.get(
+            f"/api/v1/status/{test_task_id}",
+            headers={"X-API-Key": mock_auth_token}
+        )
         assert response.status_code == 200
         data = response.json()
 

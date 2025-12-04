@@ -48,8 +48,8 @@ def create_app() -> FastAPI:
     # Plans router をマウント
     app.include_router(plans.router, prefix="/api/v1")
 
-    # Badges router をマウント（/api プレフィックス、認証不要）
-    app.include_router(badges.router, prefix="/api")
+    # Badges router をマウント（/api/v1 プレフィックス、認証不要）
+    app.include_router(badges.router, prefix="/api/v1")
 
     # 将来、以下のような router を追加予定:
     # app.include_router(auth.router, prefix="/api/v1")

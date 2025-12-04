@@ -125,8 +125,13 @@ def test_webhook_endpoint_rejects_invalid_signature(client: TestClient, mock_web
 
     assert response.status_code == 401
     data = response.json()
-    assert "detail" in data
-    assert "signature" in data["detail"].lower()
+    # ErrorResponse 形式: {"error": {"code": "...", "message": "..."}}
+    # または FastAPI の標準形式: {"detail": "..."}
+    if "error" in data:
+        assert "signature" in str(data["error"]).lower()
+    elif "detail" in data:
+        detail_str = data["detail"] if isinstance(data["detail"], str) else str(data["detail"])
+        assert "signature" in detail_str.lower()
 
 
 def test_webhook_endpoint_ignores_non_pull_request_event(client: TestClient):

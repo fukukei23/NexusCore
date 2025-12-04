@@ -5,9 +5,10 @@ Projects エンドポイント
 既存の Flask 実装 (`src/nexuscore/webapp/api_external.py`) と互換性を保つ。
 """
 import logging
+import os
 from typing import List
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import desc
 
 from ..schemas.project import ProjectCreateRequest, ProjectListResponse, ProjectResponse, ProjectSummary
@@ -295,10 +296,9 @@ async def get_project(
 
 
 @router.post(
-    "/projects/{project_id}/run",
-    response_model=ProjectRunResponse,
-    summary="Trigger project run",
-    status_code=status.HTTP_202_ACCEPTED,
+        "/projects/{project_id}/run",
+        response_model=ProjectRunResponse,
+        summary="Trigger project run",
     responses={
         200: {"model": ProjectRunResponse, "description": "Synchronous execution completed"},
         202: {"model": ProjectRunResponse, "description": "Asynchronous execution started"},
@@ -311,6 +311,7 @@ async def get_project(
 async def trigger_project_run(
     project_id: int,
     request: ProjectRunRequest,
+    response: Response,
     current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> ProjectRunResponse:
     """
@@ -352,7 +353,6 @@ async def trigger_project_run(
     Raises:
         HTTPException: プロジェクトが見つからない場合（404）、requirement が未指定の場合（400）、または内部エラー時（500）
     """
-    import os
     import uuid
     from datetime import datetime
 
@@ -420,6 +420,9 @@ async def trigger_project_run(
                 raise make_internal_error(f"Failed to run orchestrator: {str(exc)}")
 
         db.session.refresh(run)
+
+        # ステータスコードを明示的に設定
+        response.status_code = status_code
 
         return ProjectRunResponse(
             run_id=run.run_id,

@@ -33,7 +33,7 @@ async def project_success_rate_badge(project_id: int) -> BadgeResponse:
     """
     プロジェクトの成功率バッジ用 JSON を返す（shields.io endpoint 互換）
 
-    GET /api/projects/{project_id}/badge/success_rate
+    GET /api/v1/projects/{project_id}/badge/success_rate
 
     認証: 不要（公開エンドポイント）
 
@@ -114,7 +114,7 @@ async def project_last_run_badge(project_id: int) -> BadgeResponse:
     """
     プロジェクトの最新Runステータスバッジ用 JSON を返す（shields.io endpoint 互換）
 
-    GET /api/projects/{project_id}/badge/last_run
+    GET /api/v1/projects/{project_id}/badge/last_run
 
     認証: 不要（公開エンドポイント）
 
