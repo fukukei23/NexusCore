@@ -14,6 +14,18 @@ Flask REST API（`/api/v1/*` 配下のエンドポイント）は **CR-FASTAPI-0
 - **FastAPI**: 公開 API 層（`/api/v1/*`）- 正式版（単一の正）
 - **Flask**: Web UI 層（`/projects/*`, `/dashboard/*` など）- 当面存続（REST API は提供していません）
 
+## 責務分離: WebApp HTML UI と FastAPI API
+
+- **WebApp HTML UI (Flask)**: サーバー内部 UI（人間向け HTML 画面）
+  - HTML レンダリングとフォーム受け付けを担当
+  - データ取得は FastAPI 経由ではなく、直接データベースアクセスまたは services 層を使用
+  - FastAPI API migration の対象外（責務分離のため）
+  - 詳細は [WEBAPP_UI_API_MAPPING.md](./WEBAPP_UI_API_MAPPING.md) を参照してください
+
+- **FastAPI API**: 公開 API（外部/機械向け JSON API）
+  - SDK / CLI / 外部統合向けのエンドポイント（`/api/v1/*`）
+  - 統一された認証、エラーハンドリング、OpenAPI スキーマを提供
+
 ## プロンプト一覧
 
 ### CR-FASTAPI-000: API Inventory
@@ -104,6 +116,150 @@ Flask REST API（`/api/v1/*` 配下のエンドポイント）は **CR-FASTAPI-0
 - **出力**: パス統一、ドキュメント更新
 - **ステータス**: ✅ 完了
 - **完了レポート**: [CR-FASTAPI-010A_COMPLETION_REPORT.md](./CR-FASTAPI-010A_COMPLETION_REPORT.md)
+
+### CR-NEXUS-011: WebApp HTML UI の API 移行整合 & クリーンアップ
+- **ファイル**: プロンプトは CR-NEXUS-011 として実行
+- **目的**: WebApp HTML UI の URL 正規化、docstring 整備、責務分離の明文化
+- **出力**: docstring 追加、ドキュメント作成、URL 統一確認
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-011_COMPLETION_REPORT.md](./CR-NEXUS-011_COMPLETION_REPORT.md)
+- **関連ドキュメント**: [WEBAPP_UI_API_MAPPING.md](./WEBAPP_UI_API_MAPPING.md)
+
+### CR-FASTAPI-012: SDK 自動生成導線の構築
+- **ファイル**: プロンプトは CR-FASTAPI-012 として実行
+- **目的**: OpenAPI 仕様書を元に Python / TypeScript 向け SDK を自動生成できる導線を追加
+- **出力**: SDK 生成スクリプト、Makefile コマンド、ドキュメント更新
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-FASTAPI-012_COMPLETION_REPORT.md](./CR-FASTAPI-012_COMPLETION_REPORT.md)
+- **関連 Spec**: [CR-FASTAPI-012 Spec](../spec/CR-FASTAPI-012_SDK_Auto_Generation.md)
+
+### CR-FASTAPI-012A: SDK Generator Tooling Hardening
+- **ファイル**: プロンプトは CR-FASTAPI-012A として実行
+- **目的**: SDK 生成ツールの固定化と安全性テストの追加
+- **出力**: ツール・バージョン情報の明示、軽量テスト追加、ドキュメント更新
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-FASTAPI-012A_COMPLETION_REPORT.md](./CR-FASTAPI-012A_COMPLETION_REPORT.md)
+- **関連 Spec**: [CR-FASTAPI-012A Spec](../spec/CR-FASTAPI-012A_SDK_Tooling_Hardening.md)
+
+### CR-FASTAPI-013: SDK / FastAPI E2E テスト基盤構築
+- **ファイル**: プロンプトは CR-FASTAPI-013 として実行
+- **目的**: FastAPI アプリと SDK の連携を実際に検証する E2E テスト基盤の構築
+- **出力**: uvicorn 起動ヘルパー、E2E テスト、Makefile コマンド、ドキュメント更新
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-FASTAPI-013_COMPLETION_REPORT.md](./CR-FASTAPI-013_COMPLETION_REPORT.md)
+- **関連 Spec**: [CR-FASTAPI-013 Spec](../spec/CR-FASTAPI-013_SDK_E2E_Testing.md)
+
+## SDK 自動生成
+
+NexusCore の FastAPI API から OpenAPI 仕様書を取得し、Python / TypeScript 向け SDK を自動生成できます。
+
+### 前提条件
+
+SDK 生成には以下のツールが必要です：
+
+- **推奨**: `@openapitools/openapi-generator-cli`（npm パッケージ）
+  - インストール方法: `npx --yes openapi-generator-cli`（最新版を自動取得）
+  - または: `npm install -g @openapitools/openapi-generator-cli`
+- **代替**: Java 版 `openapi-generator`（バージョン 7.x 系推奨）
+  - Java がインストールされている必要があります
+
+**重要**: SDK コードは手書きせず、必ず `tools/generate_sdk.py` を使用して OpenAPI 仕様書から自動生成してください。OpenAPI 仕様書が SDK の単一のソース（Single Source of Truth）です。
+
+### SDK 生成方法
+
+#### すべての SDK を生成
+
+```bash
+make sdk
+# または
+python tools/generate_sdk.py --all
+```
+
+#### Python SDK のみ生成
+
+```bash
+make sdk-python
+# または
+python tools/generate_sdk.py --python
+```
+
+#### TypeScript SDK のみ生成
+
+```bash
+make sdk-ts
+# または
+python tools/generate_sdk.py --typescript
+```
+
+### 生成物の場所
+
+- **Python SDK**: `sdk/python/`
+- **TypeScript SDK**: `sdk/typescript/`
+
+### 生成物の活用例
+
+#### Python
+
+```python
+from nexuscore_sdk import NexusCoreClient
+
+client = NexusCoreClient(base_url="http://localhost:8000")
+response = client.health()
+```
+
+#### TypeScript
+
+```typescript
+import { NexusCoreClient } from 'nexuscore-sdk';
+
+const client = new NexusCoreClient({ baseURL: 'http://localhost:8000' });
+const response = await client.health();
+```
+
+### 注意事項
+
+- SDK 生成時は FastAPI アプリが起動している必要があります（`http://localhost:8000/api/openapi.json` から OpenAPI 仕様書を取得）
+- または `--openapi-file` オプションで OpenAPI JSON ファイルを直接指定できます
+- 生成された SDK は `.gitignore` で除外されています（再生成可能なため）
+
+## E2E テスト
+
+生成された SDK と FastAPI アプリの連携を実際に検証する E2E テストを実行できます。
+
+### 前提条件
+
+- SDK が事前に生成されていること（`make sdk-python` を実行）
+- FastAPI アプリが正常に起動できること
+- 必要な環境変数（API Key など）が設定されていること
+
+### E2E テストの実行
+
+```bash
+# SDK を生成（事前に実行）
+make sdk-python
+
+# E2E テストを実行
+make test-e2e
+
+# または直接実行
+pytest tests/e2e/test_sdk_e2e.py -v
+```
+
+### E2E テストの内容
+
+E2E テストでは以下のケースを検証します：
+
+1. **Health エンドポイント**: `/api/v1/health` が 200 を返す
+2. **Projects API**: `/api/v1/projects` の一覧取得が動作する（認証必要）
+3. **Execute API**: `/api/v1/execute` がトークン必須で動作エラーなく返る
+
+### E2E テストの仕組み
+
+- FastAPI アプリを uvicorn でバックグラウンド起動
+- 生成された SDK を使用して API を呼び出し
+- テスト終了時にサーバーを自動停止
+
+詳細は `tests/e2e/test_sdk_e2e.py` を参照してください。
 
 ## 使用方法
 
