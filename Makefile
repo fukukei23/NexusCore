@@ -18,7 +18,7 @@ endif
 SRC := src
 TESTS := tests
 
-.PHONY: help venv install-dev format lint typecheck test test-fast test-coverage test-phase3 coverage-phase3 qa clean
+.PHONY: help venv install-dev format lint typecheck test test-fast test-coverage test-phase3 coverage-phase3 qa clean sdk sdk-python sdk-ts test-e2e
 
 help:
 	@echo "Available targets:"
@@ -33,6 +33,10 @@ help:
 	@echo "  make test-phase3  - run Phase3 analyzer tests with coverage"
 	@echo "  make coverage-phase3 - generate Phase3 coverage report (Markdown)"
 	@echo "  make qa           - format + lint + typecheck + test"
+	@echo "  make sdk          - generate all SDKs (Python + TypeScript)"
+	@echo "  make sdk-python   - generate Python SDK only"
+	@echo "  make sdk-ts       - generate TypeScript SDK only"
+	@echo "  make test-e2e     - run E2E tests (requires SDK to be generated)"
 	@echo "  make clean        - clean cache files"
 	@echo ""
 	@echo "Using Python: $(PYTHON)"
@@ -108,6 +112,32 @@ coverage-phase3:
 # ==== 一括品質チェック ====
 qa: format lint-fix typecheck test
 	@echo "✅ All quality checks passed!"
+
+# ==== SDK 生成 ====
+sdk:
+	@echo "Generating all SDKs..."
+	$(PYTHON) tools/generate_sdk.py --all
+	@echo "✅ SDK generation complete"
+
+sdk-python:
+	@echo "Generating Python SDK..."
+	$(PYTHON) tools/generate_sdk.py --python
+	@echo "✅ Python SDK generation complete"
+
+sdk-ts:
+	@echo "Generating TypeScript SDK..."
+	$(PYTHON) tools/generate_sdk.py --typescript
+	@echo "✅ TypeScript SDK generation complete"
+
+# ==== E2E テスト ====
+test-e2e:
+	@echo "Running E2E tests..."
+	@if [ ! -d "sdk/python/nexuscore_sdk" ]; then \
+		echo "⚠️  SDK not found. Generating Python SDK first..."; \
+		$(PYTHON) tools/generate_sdk.py --python || exit 1; \
+	fi
+	$(PYTHON) -m pytest tests/e2e/test_sdk_e2e.py -v --tb=short
+	@echo "✅ E2E tests complete"
 
 # ==== クリーンアップ ====
 clean:
