@@ -1,24 +1,21 @@
 # ==== 共通設定 ====
 PYTHON := python3
 VENV_PYTHON := .venv/bin/python
-MYENV_PYTHON := myenv_linux/bin/python
 
-# 仮想環境の Python を自動検出
-ifeq ($(shell test -f myenv_linux/bin/python && echo yes),yes)
-	PYTHON := $(MYENV_PYTHON)
-	VENV_NAME := myenv_linux
+# 仮想環境の Python を自動検出（venv を優先）
+ifeq ($(shell test -f venv/bin/python && echo yes),yes)
+	PYTHON := venv/bin/python
+	VENV_NAME := venv
 else ifeq ($(shell test -f .venv/bin/python && echo yes),yes)
 	PYTHON := $(VENV_PYTHON)
 	VENV_NAME := .venv
-else ifeq ($(shell test -f venv/bin/python && echo yes),yes)
-	PYTHON := venv/bin/python
-	VENV_NAME := venv
+# myenv_linux は削除されたため、フォールバックから除外
 endif
 
 SRC := src
 TESTS := tests
 
-.PHONY: help venv install-dev format lint typecheck test test-fast test-coverage test-phase3 coverage-phase3 qa clean sdk sdk-python sdk-ts test-e2e
+.PHONY: help venv install-dev format lint typecheck test test-fast test-coverage test-phase3 coverage-phase3 qa clean sdk sdk-python sdk-ts test-e2e export-chat export-chat-watch server
 
 help:
 	@echo "Available targets:"
@@ -36,7 +33,10 @@ help:
 	@echo "  make sdk          - generate all SDKs (Python + TypeScript)"
 	@echo "  make sdk-python   - generate Python SDK only"
 	@echo "  make sdk-ts       - generate TypeScript SDK only"
+	@echo "  make server       - start FastAPI server (for SDK generation)"
 	@echo "  make test-e2e     - run E2E tests (requires SDK to be generated)"
+	@echo "  make export-chat  - export Cursor IDE chat history (one-time)"
+	@echo "  make export-chat-watch - export Cursor IDE chat history (watch mode)"
 	@echo "  make clean        - clean cache files"
 	@echo ""
 	@echo "Using Python: $(PYTHON)"
@@ -129,6 +129,22 @@ sdk-ts:
 	$(PYTHON) tools/generate_sdk.py --typescript
 	@echo "✅ TypeScript SDK generation complete"
 
+# ==== FastAPI サーバー起動 ====
+server:
+	@echo "🚀 Starting FastAPI server..."
+	@echo "📖 OpenAPI docs: http://127.0.0.1:8000/api/docs"
+	@echo "📄 OpenAPI JSON: http://127.0.0.1:8000/api/openapi.json"
+	@echo ""
+	@if [ ! -f "venv/bin/uvicorn" ] && [ ! -f ".venv/bin/uvicorn" ]; then \
+		echo "⚠️  uvicorn not found. Installing uvicorn..."; \
+		$(PYTHON) -m pip install uvicorn[standard] -q; \
+	fi
+	@export PYTHONPATH="${PYTHONPATH:-}:src" && \
+		$(PYTHON) -m uvicorn nexuscore.api.fastapi_app:app \
+			--reload \
+			--host 127.0.0.1 \
+			--port 8000
+
 # ==== E2E テスト ====
 test-e2e:
 	@echo "Running E2E tests..."
@@ -138,6 +154,16 @@ test-e2e:
 	fi
 	$(PYTHON) -m pytest tests/e2e/test_sdk_e2e.py -v --tb=short
 	@echo "✅ E2E tests complete"
+
+# ==== チャット履歴エクスポート ====
+export-chat:
+	@echo "Exporting Cursor IDE chat history..."
+	$(PYTHON) tools/export_cursor_chat_history.py
+	@echo "✅ Chat history export complete"
+
+export-chat-watch:
+	@echo "Starting chat history watch mode..."
+	$(PYTHON) tools/export_cursor_chat_history.py --watch
 
 # ==== クリーンアップ ====
 clean:

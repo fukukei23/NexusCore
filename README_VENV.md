@@ -17,10 +17,18 @@ source activate
 または
 
 ```bash
-source venv
+source activate_venv.sh
+```
+
+または（直接的な方法）
+
+```bash
+source venv/bin/activate
 ```
 
 これだけで仮想環境が有効化されます！
+
+**推奨**: `source activate` が最も簡単です。
 
 ## 📝 使い方の例
 
@@ -52,5 +60,6 @@ deactivate
 ## ⚠️ 注意
 
 - 新しいターミナルを開くたびに `source activate` を実行する必要があります
-- ターミナルのプロンプトに `(myenv_linux)` などが表示されていれば有効化されています
+- ターミナルのプロンプトに `(venv)` が表示されていれば有効化されています
+- **重要**: `source venv` は動作しません（`venv` はディレクトリ名です）
 

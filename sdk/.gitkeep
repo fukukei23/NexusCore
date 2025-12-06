@@ -1,0 +1,16 @@
+# SDK 生成物のディレクトリ
+
+このディレクトリには、`tools/generate_sdk.py` によって生成された SDK が保存されます。
+
+- `python/` - Python SDK
+- `typescript/` - TypeScript SDK
+
+生成された SDK は `.gitignore` で除外されるため、このディレクトリは空のままです。
+
+SDK を生成するには:
+```bash
+make sdk          # すべての SDK を生成
+make sdk-python   # Python SDK のみ生成
+make sdk-ts       # TypeScript SDK のみ生成
+```
+

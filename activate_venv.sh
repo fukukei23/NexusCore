@@ -1,21 +1,19 @@
 #!/usr/bin/env bash
-# venv
+# activate_venv.sh
 #
 # 仮想環境を簡単に有効化するスクリプト（activate のエイリアス）
-# 使い方: source venv または . venv
+# 使い方: source activate_venv.sh または . activate_venv.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 仮想環境を探す
-if [ -d "$SCRIPT_DIR/myenv_linux" ]; then
-    source "$SCRIPT_DIR/myenv_linux/bin/activate"
-    echo "✅ 仮想環境を有効化しました: myenv_linux"
+# 仮想環境を探す（venv を優先）
+if [ -d "$SCRIPT_DIR/venv" ]; then
+    source "$SCRIPT_DIR/venv/bin/activate"
+    echo "✅ 仮想環境を有効化しました: venv"
 elif [ -d "$SCRIPT_DIR/.venv" ]; then
     source "$SCRIPT_DIR/.venv/bin/activate"
     echo "✅ 仮想環境を有効化しました: .venv"
-elif [ -d "$SCRIPT_DIR/venv" ]; then
-    source "$SCRIPT_DIR/venv/bin/activate"
-    echo "✅ 仮想環境を有効化しました: venv"
+# myenv_linux は削除されたため、フォールバックから除外
 else
     echo "❌ 仮想環境が見つかりません"
     echo "   以下のコマンドで作成してください:"

@@ -47,6 +47,11 @@ venv.bak/
 # 開発用データベース
 db.sqlite3
 
+# --- SDK generated files ---
+sdk/python/
+sdk/typescript/
+!sdk/.gitkeep
+
 # --- Project-specific ignores ---
 # 生成されたファイルが出力されるフォルダ
 output/*

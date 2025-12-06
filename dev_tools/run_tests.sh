@@ -19,8 +19,17 @@ fi
 
 cd "$PROJECT_ROOT"
 
-echo "Activating virtual environment: myenv_linux"
-source myenv_linux/bin/activate
+# 仮想環境を自動検出（venv を優先）
+if [ -d "venv" ]; then
+    echo "Activating virtual environment: venv"
+    source venv/bin/activate
+elif [ -d ".venv" ]; then
+    echo "Activating virtual environment: .venv"
+    source .venv/bin/activate
+else
+    echo "⚠️  No virtual environment found. Please create one first."
+    exit 1
+fi
 
 echo "Running pytest on: $TEST_TARGET"
 echo "----------------------------------------"

@@ -21,11 +21,8 @@ fi
 PROJECT_ROOT=$(cd "$PROJECT_ROOT" && pwd)
 echo "Using project_root: $PROJECT_ROOT"
 
-# venv を使っている場合はここで有効化（必要に応じて書き換え）
-if [ -d "myenv_linux" ]; then
-    # WSL/Linux用のvenv
-    source myenv_linux/bin/activate || true
-elif [ -d "venv" ]; then
+# 仮想環境を有効化（venv を優先）
+if [ -d "venv" ]; then
     source venv/bin/activate || true
 elif [ -d ".venv" ]; then
     source .venv/bin/activate || true

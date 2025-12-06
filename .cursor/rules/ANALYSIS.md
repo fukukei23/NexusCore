@@ -27,7 +27,7 @@
   - または `python -m pytest tests/`
 - **nexuscore-safe-test-execution.mdc**:
   - `cd /home/yn441611/NexusCore`
-  - `source myenv_linux/bin/activate`
+  - `source venv/bin/activate`
   - `python -m pytest tests/`
 
 **評価**: 重複あり。`nexuscore-auto-test.mdc` は `dev_tools/run_tests.sh` を推奨、`nexuscore-safe-test-execution.mdc` は直接実行を推奨。統一推奨。
@@ -40,9 +40,9 @@
 
 ### 3. 仮想環境の指定
 
-#### myenv_linux の使用
-- **nexuscore-auto-test.mdc**: `source myenv_linux/bin/activate`
-- **nexuscore-safe-test-execution.mdc**: `source myenv_linux/bin/activate`
+#### venv の使用
+- **nexuscore-auto-test.mdc**: `source venv/bin/activate`（または自動有効化）
+- プロジェクトディレクトリに移動すると自動的に `venv` が有効化されます
 
 **評価**: 重複あり。内容は一致。
 
