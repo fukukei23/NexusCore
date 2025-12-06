@@ -1,6 +1,12 @@
 """
 4.5: External API テスト UI
 
+WebApp HTML UI view.
+
+この画面は FastAPI エンドポイント（/api/v1/projects, /api/v1/projects/{id}/run）の
+テスト用 UI を提供するが、実際の API 呼び出しは行わない（シミュレーションのみ）。
+実際の API 呼び出しは外部クライアント（curl, VSCode extension など）から行う。
+
 E-1/E-2 で実装した /api/v1/projects / /api/v1/projects/<id>/run を、
 Web UI 上から簡易的に試せるフォームを提供する。
 """

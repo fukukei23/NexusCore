@@ -1,6 +1,15 @@
 """
 NexusCore SaaS基盤 - Flaskアプリファクトリ
 
+WebApp HTML UI の責務:
+- HTML レンダリングとフォーム受け付け（人間向け画面）
+- データ取得は FastAPI 経由ではなく、services / DB direct access を使用
+- FastAPI API migration の対象外（責務分離のため）
+
+FastAPI の責務:
+- 外部/機械向け JSON API（/api/v1/*）
+- SDK / CLI / 外部統合向けのエンドポイント
+
 既存の Orchestrator / NPE / Agents アーキテクチャを壊さずに、
 Web UI と API を提供するための Flask アプリケーション。
 

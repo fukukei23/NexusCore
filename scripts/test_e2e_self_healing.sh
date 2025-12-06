@@ -12,10 +12,8 @@ cd "$PROJECT_ROOT"
 echo "=== Self-Healing E2E テスト ==="
 echo "Project root: $PROJECT_ROOT"
 
-# 仮想環境を有効化
-if [ -d "myenv_linux" ]; then
-    source myenv_linux/bin/activate
-elif [ -d "venv" ]; then
+# 仮想環境を有効化（venv を優先）
+if [ -d "venv" ]; then
     source venv/bin/activate
 elif [ -d ".venv" ]; then
     source .venv/bin/activate

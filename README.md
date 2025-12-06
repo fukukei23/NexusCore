@@ -108,6 +108,9 @@ make sdk-python
 make test-e2e
 ```
 
+**注意**: SDK が生成されていない場合、E2E テストは自動的にスキップされます。
+これは「テスト環境の問題」であり、SDK / API 実装のバグではありません。
+
 詳細は `docs/api/README.md` の「SDK 自動生成」と「E2E テスト」セクションを参照してください。
 
 ---
@@ -117,11 +120,13 @@ make test-e2e
 ### 1. WSL (Ubuntu) 環境での基本手順
 
 1. `\\wsl.localhost\Ubuntu\home\yn441611\NexusCore`（Linux シェルでは `/home/yn441611/NexusCore`）に移動し、これを作業ルートにします。
-2. システム Python には `pip` が入っていないため、`python -m venv .venv` で仮想環境を作成します。
-3. `.venv/bin/python -m pip install -r requirements.txt` で依存をインストール。
-   - 開発ツールも含める場合: `.venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt`
+2. システム Python には `pip` が入っていないため、`python3 -m venv venv` で仮想環境を作成します。
+3. `source venv/bin/activate` で仮想環境を有効化し、`pip install -r requirements.txt` で依存をインストール。
+   - 開発ツールも含める場合: `pip install -r requirements.txt -r requirements-dev.txt`
    - 主要な依存関係はバージョンレンジで固定されています（例: `openai>=1.30.0,<2.0.0`）。詳細は `requirements.txt` を参照してください。
-4. 実行時は `.venv/bin/python main_cli.py …` や `PYTHONPATH=src .venv/bin/pytest …` を使う、または `.venv/bin/activate` してから `python` / `pip` を呼び出してください。
+4. 実行時は仮想環境を有効化（`source activate` または `source venv/bin/activate`）してから `python` / `pip` を呼び出してください。
+   - より簡単な方法: プロジェクトルートで `source activate` を実行（推奨）
+   - 詳細は `README_VENV.md` を参照してください。
 5. ネイティブなログ・出力先は `/home/yn441611/NexusCore/...` に向け、権限エラーを回避します。
 6. 依存を追加したら `pip freeze > requirements.lock.txt` などでロックファイルを更新して共有してください。
 
