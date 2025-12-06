@@ -1,0 +1,27 @@
+{
+  "name": "nexuscore",
+  "version": "1.0.0",
+  "description": "**NexusCore** は自律型 AI エージェント群を組み合わせてソフトウェア開発支援を行うフレームワークです。 道具立て（エージェント／Orchestrator／LLM ルーター）を分離しつつ、必要なツール・UI・テストを同一リポジトリ内で管理する設計になっています。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fukukei23/NexusCore.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/fukukei23/NexusCore/issues"
+  },
+  "homepage": "https://github.com/fukukei23/NexusCore#readme",
+  "devDependencies": {
+    "@openapitools/openapi-generator-cli": "^2.25.2"
+  }
+}

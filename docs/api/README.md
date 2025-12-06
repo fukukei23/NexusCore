@@ -149,6 +149,14 @@ Flask REST API（`/api/v1/*` 配下のエンドポイント）は **CR-FASTAPI-0
 - **完了レポート**: [CR-FASTAPI-013_COMPLETION_REPORT.md](./CR-FASTAPI-013_COMPLETION_REPORT.md)
 - **関連 Spec**: [CR-FASTAPI-013 Spec](../spec/CR-FASTAPI-013_SDK_E2E_Testing.md)
 
+### CR-FASTAPI-013A: SDK E2E Tests – Real SDK Integration
+- **ファイル**: プロンプトは CR-FASTAPI-013A として実行
+- **目的**: 実際に生成された Python SDK を使用した E2E テストの実装
+- **出力**: SDK クライアントヘルパー、実際の SDK API に合わせた E2E テスト、ドキュメント更新
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-FASTAPI-013A_COMPLETION_REPORT.md](./CR-FASTAPI-013A_COMPLETION_REPORT.md)
+- **関連 Spec**: [CR-FASTAPI-013A Spec](../spec/CR-FASTAPI-013A_SDK_E2E_RealSDK.md)
+
 ## SDK 自動生成
 
 NexusCore の FastAPI API から OpenAPI 仕様書を取得し、Python / TypeScript 向け SDK を自動生成できます。
@@ -234,30 +242,45 @@ const response = await client.health();
 
 ### E2E テストの実行
 
+**重要**: E2E テストを実行するには、事前に SDK を生成する必要があります。
+
 ```bash
-# SDK を生成（事前に実行）
+# 1. SDK を生成（事前に実行）
 make sdk-python
 
-# E2E テストを実行
+# 2. E2E テストを実行
 make test-e2e
 
 # または直接実行
 pytest tests/e2e/test_sdk_e2e.py -v
 ```
 
+**注意**: SDK が生成されていない場合、E2E テストは自動的にスキップされます。
+これは「テスト環境の問題」であり、SDK / API 実装のバグではありません。
+
 ### E2E テストの内容
 
 E2E テストでは以下のケースを検証します：
 
-1. **Health エンドポイント**: `/api/v1/health` が 200 を返す
-2. **Projects API**: `/api/v1/projects` の一覧取得が動作する（認証必要）
-3. **Execute API**: `/api/v1/execute` がトークン必須で動作エラーなく返る
+1. **Health エンドポイント** (`test_health_e2e`):
+   - Python SDK 経由で `/api/v1/health` を呼び出し
+   - HTTP ステータス 200、status == "ok"、version が非空文字列、timestamp が ISO8601 形式を検証
+
+2. **Projects API** (`test_projects_list_e2e`):
+   - Python SDK 経由で `/api/v1/projects` の一覧取得を行う
+   - 呼び出しが例外なく完了、戻り値が list / iterable、各要素に id, name など Project スキーマに準拠したフィールドが存在することを検証
+
+3. **Execute API** (`test_execute_e2e`):
+   - Python SDK 経由で `/api/v1/execute` を呼び出す
+   - 正しい API Key を付けた場合の正常系（task_id, status_url など）を検証
+   - API Key を付けない／不正なキーの場合の Unauthorized エラーを検証
 
 ### E2E テストの仕組み
 
-- FastAPI アプリを uvicorn でバックグラウンド起動
-- 生成された SDK を使用して API を呼び出し
+- FastAPI アプリを uvicorn でバックグラウンド起動（`tests/e2e/helpers/server.py`）
+- 生成された Python SDK を使用して API を呼び出し（`tests/e2e/helpers/sdk_client.py`）
 - テスト終了時にサーバーを自動停止
+- SDK が存在しない場合は適切にスキップ
 
 詳細は `tests/e2e/test_sdk_e2e.py` を参照してください。
 
@@ -274,11 +297,15 @@ E2E テストでは以下のケースを検証します：
 ```bash
 # 仮想環境を有効化
 source myenv_linux/bin/activate
+# または venv を使用している場合
+# source venv/bin/activate
 
 # PYTHONPATH を設定して FastAPI アプリを起動
 export PYTHONPATH=/home/yn441611/NexusCore/src:$PYTHONPATH
 uvicorn nexuscore.api.fastapi_app:app --reload --host 127.0.0.1 --port 8000
 ```
+
+**重要**: `PYTHONPATH` を設定しないと `ModuleNotFoundError: No module named 'nexuscore'` エラーが発生します。
 
 ### アクセス先
 
