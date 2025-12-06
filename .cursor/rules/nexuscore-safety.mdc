@@ -54,11 +54,13 @@ LLM ルーティング関連のユニットテストを実行。
 
 - すべての pytest / shell 実行は **WSL Ubuntu** が前提
 - プロジェクトルートは `/home/yn441611/NexusCore`
-- WSL では Linux 形式の仮想環境 `myenv_linux` を使用
+- WSL では Linux 形式の仮想環境 `venv` を使用（自動有効化される場合は不要）
 
 ```bash
-# 仮想環境を有効化
-source myenv_linux/bin/activate
+# プロジェクトディレクトリに移動すると自動的に venv が有効化されます
+cd /home/yn441611/NexusCore
+# または手動で有効化する場合
+source venv/bin/activate
 
 # テスト実行（推奨）
 bash dev_tools/run_tests.sh tests/

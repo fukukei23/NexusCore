@@ -1,6 +1,11 @@
 """
 NexusCore SaaS基盤 - ダッシュボードビュー
 
+WebApp HTML UI view.
+
+データ取得は FastAPI 経由ではなく、services / DB direct access を使用する。
+本画面は FastAPI API migration の対象外（責務分離のため）。
+
 既存の Orchestrator / NPE とは独立して動作する。
 Gradio UI との統合もここで行う。
 """
@@ -30,6 +35,9 @@ def dashboard():
     """
     PoC用ダッシュボード
     GET /dashboard/?project_id=123
+
+    Data access: Direct DB access (no API call)
+    FastAPI equivalent: N/A (internal UI only)
     """
     user = get_current_user()
     project_id = request.args.get("project_id", type=int)
@@ -124,6 +132,9 @@ def project_dashboard(project_id: int):
     """
     プロジェクトダッシュボード（カードレイアウト）
     GET /dashboard/projects/<project_id>
+
+    Data access: Direct DB access (no API call)
+    FastAPI equivalent: N/A (internal UI only)
     """
     from sqlalchemy import desc, func
 
@@ -535,8 +546,11 @@ def render_project_dashboard_html(
 @require_auth
 def gradio_dashboard(project_id: int):
     """
-    Gradio UI の iframe 統合
+    Gradio UI iframe統合
     GET /dashboard/gradio/<project_id>
+
+    Data access: Direct DB access (no API call)
+    FastAPI equivalent: N/A (internal UI only)
     """
     user = get_current_user()
     project = Project.query.filter_by(id=project_id, owner_id=user.id).first_or_404()

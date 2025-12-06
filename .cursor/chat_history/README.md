@@ -26,12 +26,23 @@
 ---
 ```
 
-### 自動エクスポート（将来実装予定）
+### 自動エクスポート
 
 ```bash
-# Cursorからチャット履歴をエクスポート
-python tools/export_cursor_chat_history.py --input-json exported_chat.json
+# 1回だけエクスポート
+python tools/export_cursor_chat_history.py
+
+# 監視モード（新しいチャットを自動エクスポート）
+python tools/export_cursor_chat_history.py --watch
+
+# 特定の日付範囲をエクスポート
+python tools/export_cursor_chat_history.py --from-date 2025-12-01 --to-date 2025-12-05
+
+# チェック間隔を変更（デフォルト: 60秒）
+python tools/export_cursor_chat_history.py --watch --interval 30
 ```
+
+**注意**: 監視モードはバックグラウンドで実行できます。ターミナルを閉じる場合は、`Ctrl+C`で停止してください。
 
 ## ファイル命名規則
 

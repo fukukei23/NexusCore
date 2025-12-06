@@ -36,7 +36,7 @@ bash dev_tools/run_tests.sh tests/
 **または直接実行**
 ```bash
 cd /home/yn441611/NexusCore
-source myenv_linux/bin/activate
+source venv/bin/activate
 python -m pytest tests/
 ```
 
@@ -51,7 +51,7 @@ python -m pytest tests/
 ## 3. 実行手順
 
 1. 実行コマンドを提示して確認を取る
-2. venv（myenv）を有効化
+2. venv を有効化（自動有効化される場合は不要）
 3. pytest 実行（レポート生成付き）
 4. 結果の要約：
    - 合計テスト数
