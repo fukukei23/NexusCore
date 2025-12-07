@@ -10,14 +10,18 @@ NexusCore API の FastAPI ベース実装。
 - Public API は /api/v1/* プレフィックスを使用
 - 認証依存関係は src/nexuscore/api/dependencies/ 配下に配置
 """
+import os
 from fastapi import FastAPI
 
 from .routes import health, execute, github_webhook, projects, runs, plans, badges
 
 
-def create_app() -> FastAPI:
+def create_app(test_db_path: str | None = None) -> FastAPI:
     """
     FastAPI アプリケーションインスタンスを作成する。
+
+    Args:
+        test_db_path: E2E テスト用の DB パス（指定された場合、テスト用 DB を使用）
 
     Returns:
         FastAPI: 設定済みの FastAPI アプリケーション
@@ -29,6 +33,21 @@ def create_app() -> FastAPI:
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
     )
+
+    # E2E テスト用 DB のオーバーライド
+    if test_db_path:
+        db_uri = f"sqlite:///{test_db_path}"
+        # Flask アプリの DB 設定をオーバーライド
+        from nexuscore.webapp import create_app as create_flask_app
+        flask_app = create_flask_app(config_overrides={"SQLALCHEMY_DATABASE_URI": db_uri})
+        # アプリコンテキストを設定
+        app.state.flask_app = flask_app
+        app.state.test_db_path = test_db_path
+        
+        # FastAPI の startup イベントで Flask アプリコンテキストを設定
+        @app.on_event("startup")
+        async def setup_flask_context():
+            flask_app.app_context().push()
 
     # Health check router をマウント
     app.include_router(health.router, prefix="/api/v1")

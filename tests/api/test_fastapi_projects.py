@@ -94,10 +94,43 @@ def test_list_projects_success(client: TestClient, mock_api_key, mock_db_models)
         )
 
         assert response.status_code == 200
-    data = response.json()
-    assert "projects" in data
-    assert isinstance(data["projects"], list)
-    assert len(data["projects"]) == 2
+        data = response.json()
+        assert "projects" in data
+        assert isinstance(data["projects"], list)
+        assert len(data["projects"]) == 2
+
+
+def test_list_projects_requires_authentication(client: TestClient, mock_api_key, mock_db_models):
+    """
+    認証なしリクエストが 401 を返すことを確認するテスト
+    """
+    # 認証ヘッダーなしでリクエスト
+    response = client.get("/api/v1/projects")
+
+    # FastAPI のバリデーションエラー（422）または認証エラー（401）が返る
+    # ヘッダーが必須の場合、422 が返る可能性がある
+    assert response.status_code in [401, 422]
+
+    # 不正な API Key でリクエスト
+    with patch("nexuscore.webapp.models.ApiKey") as MockApiKey, \
+         patch("nexuscore.webapp.models.User") as MockUser:
+        MockApiKey.hash_token.return_value = "hashed_invalid_key"
+        MockApiKey.query.filter_by.return_value.first.return_value = None  # 不正なキーは見つからない
+
+        response = client.get(
+            "/api/v1/projects",
+            headers={
+                "X-API-Key": "invalid-api-key"
+            }
+        )
+
+        # 無効な API Key は 401 を返す（500 ではない）
+        assert response.status_code == 401
+        data = response.json()
+        assert "detail" in data
+        # エラーメッセージに "api key" が含まれることを確認
+        error_str = str(data["detail"]).lower()
+        assert "api key" in error_str or "unauthorized" in error_str
     assert data["projects"][0]["id"] == 1
     assert data["projects"][0]["name"] == "Project 1"
 
