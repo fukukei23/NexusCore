@@ -326,3 +326,98 @@ def test_authenticated_user_model(client: TestClient, mock_api_key):
     user_default = AuthenticatedUser(user_id="test_user")
     assert user_default.roles == []
 
+
+def test_auth_database_error_returns_500_not_401(client: TestClient, mock_api_key):
+    """
+    DB アクセスエラーの場合に 500 が返ること（ただし認証フェイルと区別できること）
+    """
+    from sqlalchemy.exc import SQLAlchemyError
+
+    # DB アクセスエラーをシミュレート
+    with patch("nexuscore.webapp.models.ApiKey") as MockApiKey:
+        MockApiKey.hash_token.return_value = "hashed_test_key"
+        # SQLAlchemyError を発生させる
+        MockApiKey.query.filter_by.side_effect = SQLAlchemyError("Database connection error")
+
+        response = client.post(
+            "/api/v1/execute",
+            json={
+                "requirement": "Test requirement",
+                "project_path": "/tmp/test"
+            },
+            headers={
+                "X-API-Key": "test-api-key"
+            }
+        )
+
+        # DB アクセスエラーは 500 を返す（認証フェイルではない）
+        assert response.status_code == 500
+        data = response.json()
+        assert "detail" in data
+        # エラーメッセージに "database" または "connection" が含まれることを確認
+        error_str = str(data["detail"]).lower()
+        assert "database" in error_str or "connection" in error_str
+
+
+def test_auth_invalid_api_key_returns_401_not_500(client: TestClient, mock_api_key):
+    """
+    無効な API Key の場合に 401 が返ること（500 ではない）
+    """
+    # 無効なAPI Keyの場合、モックが None を返すようにする
+    with patch("nexuscore.webapp.models.ApiKey") as MockApiKey, \
+         patch("nexuscore.webapp.models.User") as MockUser:
+        MockApiKey.hash_token.return_value = "hashed_invalid_key"
+        MockApiKey.query.filter_by.return_value.first.return_value = None  # 不正なキーは見つからない
+
+        response = client.post(
+            "/api/v1/execute",
+            json={
+                "requirement": "Test requirement",
+                "project_path": "/tmp/test"
+            },
+            headers={
+                "X-API-Key": "invalid-api-key"
+            }
+        )
+
+        # 無効な API Key は 401 を返す（500 ではない）
+        assert response.status_code == 401
+        data = response.json()
+        assert "detail" in data
+        # エラーメッセージに "api key" が含まれることを確認
+        error_str = str(data["detail"]).lower()
+        assert "api key" in error_str or "unauthorized" in error_str
+
+
+def test_auth_user_not_found_returns_401_not_500(client: TestClient, mock_api_key):
+    """
+    API Key は見つかるが User が見つからない場合に 401 が返ること（500 ではない）
+    """
+    # API Key は見つかるが User が見つからない場合
+    with patch("nexuscore.webapp.models.ApiKey") as MockApiKey, \
+         patch("nexuscore.webapp.models.User") as MockUser:
+        mock_api_key_obj = MagicMock()
+        mock_api_key_obj.user_id = 999  # 存在しないユーザーID
+        mock_api_key_obj.user = None  # User リレーションが None
+        MockApiKey.hash_token.return_value = "hashed_test_key"
+        MockApiKey.query.filter_by.return_value.first.return_value = mock_api_key_obj
+        MockUser.query.get.return_value = None  # User が見つからない
+
+        response = client.post(
+            "/api/v1/execute",
+            json={
+                "requirement": "Test requirement",
+                "project_path": "/tmp/test"
+            },
+            headers={
+                "X-API-Key": "test-api-key"
+            }
+        )
+
+        # User が見つからない場合は 401 を返す（500 ではない）
+        assert response.status_code == 401
+        data = response.json()
+        assert "detail" in data
+        # エラーメッセージに "api key" が含まれることを確認
+        error_str = str(data["detail"]).lower()
+        assert "api key" in error_str or "unauthorized" in error_str
