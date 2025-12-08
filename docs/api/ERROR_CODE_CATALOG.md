@@ -20,6 +20,9 @@
 | `VALIDATION_ERROR` | 422 | Validation | バリデーション不正。リクエストボディのバリデーションに失敗した場合に返される。 | すべてのエンドポイント（FastAPI の自動バリデーション） |
 | `CONFLICT` | 409 | Conflict | 既存・重複エラー。リソースが既に存在する、または競合状態が発生した場合に返される。 | Projects エンドポイント（将来の拡張） |
 | `INTERNAL_ERROR` | 500 | Internal | サーバー内部エラー。予期しないエラーが発生した場合に返される。認証フェイルでは使用しない（認証フェイルは必ず 401 を返す）。 | すべてのエンドポイント（DB アクセスエラー、予期しない例外など） |
+| `API_KEY_LIMIT_EXCEEDED` | 403 | Auth | API Key 発行数の上限超過。1ユーザーあたりの API Key 発行数が上限（5個）に達した場合に返される。 | API Keys (`/api/v1/api-keys` POST) |
+| `API_KEY_NOT_FOUND` | 404 | NotFound | API Key が見つからない。指定された ID の API Key が存在しない場合に返される。 | API Keys (`/api/v1/api-keys/{api_key_id}` DELETE) |
+| `API_KEY_FORBIDDEN` | 403 | Auth | API Key へのアクセス権限なし。他ユーザーの API Key にアクセスしようとした場合に返される。 | API Keys (`/api/v1/api-keys/{api_key_id}` DELETE) |
 
 ## エラーコードの命名規則
 
@@ -33,9 +36,12 @@
 ### Auth（認証・認可）
 - `UNAUTHORIZED` (401): 認証が必要、または認証に失敗した
 - `FORBIDDEN` (403): 認証は成功したが、権限がない
+- `API_KEY_LIMIT_EXCEEDED` (403): API Key 発行数の上限超過
+- `API_KEY_FORBIDDEN` (403): 他ユーザーの API Key へのアクセス権限なし
 
 ### NotFound（リソース未検出）
 - `NOT_FOUND` (404): 指定されたリソースが見つからない
+- `API_KEY_NOT_FOUND` (404): 指定された API Key が見つからない
 
 ### Validation（バリデーション）
 - `INVALID_REQUEST` (400): リクエストパラメータが不正

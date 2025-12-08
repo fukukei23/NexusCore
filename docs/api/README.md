@@ -157,6 +157,52 @@ Flask REST API（`/api/v1/*` 配下のエンドポイント）は **CR-FASTAPI-0
 - **完了レポート**: [CR-FASTAPI-013A_COMPLETION_REPORT.md](./CR-FASTAPI-013A_COMPLETION_REPORT.md)
 - **関連 Spec**: [CR-FASTAPI-013A Spec](../spec/CR-FASTAPI-013A_SDK_E2E_RealSDK.md)
 
+### CR-FASTAPI-014: Auth Error Normalization（認証エラーの正規化）
+- **ファイル**: プロンプトは CR-FASTAPI-014 として実行
+- **目的**: 認証エラーを 500 ではなく 401 に正規化
+- **出力**: get_current_user() のエラー正規化、テスト更新
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-FASTAPI-014_COMPLETION_REPORT.md](./CR-FASTAPI-014_COMPLETION_REPORT.md)
+- **関連 Spec**: [CR-FASTAPI-014 Spec](../spec/CR-FASTAPI-014_Auth_Error_Normalization.md)
+
+### CR-FASTAPI-015: Error Code Catalog 作成（エラーコード一覧の単一ソース化）
+- **ファイル**: プロンプトは CR-FASTAPI-015 として実行
+- **目的**: エラーコードの単一のソース（Single Source of Truth）を作成
+- **出力**: ERROR_CODE_CATALOG.md、カタログと OpenAPI の整合性チェックテスト
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-FASTAPI-015_COMPLETION_REPORT.md](./CR-FASTAPI-015_COMPLETION_REPORT.md)
+- **関連 Spec**: [CR-FASTAPI-015 Spec](../spec/CR-FASTAPI-015_Error_Code_Catalog.md)
+
+### CR-FASTAPI-016: Orchestrator の UI（Gradio）依存分離
+- **ファイル**: プロンプトは CR-FASTAPI-016 として実行
+- **目的**: FastAPI の API テスト実行時に Gradio / UI 層が import されないようにする
+- **出力**: RequirementAgent の Gradio import を lazy import に変更
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-FASTAPI-016_COMPLETION_REPORT.md](./CR-FASTAPI-016_COMPLETION_REPORT.md)
+- **関連 Spec**: [CR-FASTAPI-016 Spec](../spec/CR-FASTAPI-016_Orchestrator_UI_Decoupling.md)
+
+### CR-FASTAPI-017: E2E テスト用 SQLite DB セットアップ
+- **ファイル**: プロンプトは CR-FASTAPI-017 として実行
+- **目的**: E2E テスト用の SQLite DB を作成し、FastAPI アプリでテスト時に使用するようオーバーライド
+- **出力**: E2E 用 DB セットアップ fixture、test_projects_list_e2e
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-FASTAPI-017_COMPLETION_REPORT.md](./CR-FASTAPI-017_COMPLETION_REPORT.md)
+
+### CR-FASTAPI-018: Python SDK 商品化（v0.1.0）
+- **ファイル**: プロンプトは CR-FASTAPI-018 として実行
+- **目的**: Python SDK を v0.1.0 として「外部に配布可能な製品レベル」に引き上げる
+- **出力**: pyproject.toml、README.md、LICENSE、examples、tests、ビルド・公開手順
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-FASTAPI-018_COMPLETION_REPORT.md](./CR-FASTAPI-018_COMPLETION_REPORT.md)
+- **関連 Spec**: [CR-FASTAPI-018 Spec](../spec/CR-FASTAPI-018_Python_SDK_Productization_v0.1.0.md)
+
+### CR-FASTAPI-019: TypeScript SDK の整備 & E2E
+- **ファイル**: プロンプトは CR-FASTAPI-019 として実行
+- **目的**: TypeScript SDK を Python SDK と同等レベル（v0.1.0 商品化＋E2E 確立）まで引き上げる
+- **出力**: package.json、README.md、LICENSE、examples、tests、ビルド・公開手順
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-FASTAPI-019_COMPLETION_REPORT.md](./CR-FASTAPI-019_COMPLETION_REPORT.md)
+
 ## SDK 自動生成
 
 NexusCore の FastAPI API から OpenAPI 仕様書を取得し、Python / TypeScript 向け SDK を自動生成できます。
@@ -432,10 +478,37 @@ export NEXUSCORE_API_KEY=your-api-key-here
 }
 ```
 
+### 初回 API Key 発行 CLI（CR-FASTAPI-021）
+
+**ブートストラップ CLI**を使用して初回 API Key を発行できます。ユーザーが存在しない場合は自動的に作成されます。
+
+```bash
+# ユーザーが存在しない場合は自動作成
+python -m nexuscore.cli.bootstrap_apikey \
+  --user-login dev \
+  --user-name "Dev User" \
+  --key-name "Local Dev Key"
+
+# 出力例:
+# [INFO] Created user: dev (id=1)
+# [INFO] Created API key: "Local Dev Key" (id=3)
+# export NEXUSCORE_API_KEY="nexus_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+**出力をコピーして環境変数に設定**:
+```bash
+export NEXUSCORE_API_KEY="nexus_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+詳細は [CR-FASTAPI-021 完了レポート](./CR-FASTAPI-021_COMPLETION_REPORT.md) を参照してください。
+
 ### 認証が必要なエンドポイント
 
 - `/api/v1/execute` - 必須認証
 - `/api/v1/status/{task_id}` - 必須認証
+- `/api/v1/api-keys` - 必須認証（API Key 発行・一覧取得・削除）
+- `/api/v1/projects` - 必須認証
+- `/api/v1/runs` - 必須認証
 
 ### 認証不要なエンドポイント
 
