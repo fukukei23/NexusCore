@@ -121,13 +121,60 @@ sdk:
 
 sdk-python:
 	@echo "Generating Python SDK..."
-	$(PYTHON) tools/generate_sdk.py --python
+	@if [ -f "tmp/openapi.json" ]; then \
+		echo "📄 Using local OpenAPI file: tmp/openapi.json"; \
+		$(PYTHON) tools/generate_sdk.py --python --openapi-file tmp/openapi.json; \
+	else \
+		echo "🌐 Fetching OpenAPI spec from server..."; \
+		$(PYTHON) tools/generate_sdk.py --python; \
+	fi
 	@echo "✅ Python SDK generation complete"
+
+sdk-python-build:
+	@echo "Building Python SDK (wheel and sdist)..."
+	@cd sdk/python && $(PYTHON) -m pip install build --quiet
+	@cd sdk/python && $(PYTHON) -m build
+	@echo "✅ Python SDK build complete"
+	@echo "📦 Built packages are in sdk/python/dist/"
+
+sdk-python-publish-test:
+	@echo "Publishing Python SDK to TestPyPI..."
+	@echo "⚠️  Note: This requires TESTPYPI_API_TOKEN environment variable"
+	@echo "   Example: export TESTPYPI_API_TOKEN='pypi-xxxxx'"
+	@cd sdk/python && $(PYTHON) -m pip install twine --quiet
+	@cd sdk/python && $(PYTHON) -m twine upload --repository testpypi dist/* || \
+		echo "❌ Publish failed. Make sure TESTPYPI_API_TOKEN is set and packages are built (run 'make sdk-python-build' first)"
 
 sdk-ts:
 	@echo "Generating TypeScript SDK..."
-	$(PYTHON) tools/generate_sdk.py --typescript
+	@if [ -f "tmp/openapi.json" ]; then \
+		echo "📄 Using local OpenAPI file: tmp/openapi.json"; \
+		$(PYTHON) tools/generate_sdk.py --typescript --openapi-file tmp/openapi.json; \
+	else \
+		echo "🌐 Fetching OpenAPI spec from server..."; \
+		$(PYTHON) tools/generate_sdk.py --typescript; \
+	fi
 	@echo "✅ TypeScript SDK generation complete"
+
+sdk-ts-build:
+	@echo "Building TypeScript SDK..."
+	@cd sdk/typescript && npm install
+	@cd sdk/typescript && npm run build
+	@echo "✅ TypeScript SDK build complete"
+
+sdk-ts-test:
+	@echo "Running TypeScript SDK tests..."
+	@cd sdk/typescript && npm install
+	@cd sdk/typescript && npm test
+	@echo "✅ TypeScript SDK tests complete"
+
+sdk-ts-publish-test:
+	@echo "Publishing TypeScript SDK to Test npm Registry..."
+	@echo "⚠️  Note: This requires NPM_TOKEN environment variable"
+	@echo "   Example: export NPM_TOKEN='npm_xxxxx'"
+	@cd sdk/typescript && npm install
+	@cd sdk/typescript && npm publish --registry=https://registry.npmjs.org/ --dry-run || \
+		echo "❌ Publish failed. Make sure NPM_TOKEN is set and packages are built (run 'make sdk-ts-build' first)"
 
 # ==== FastAPI サーバー起動 ====
 server:

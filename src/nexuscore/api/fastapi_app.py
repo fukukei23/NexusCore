@@ -13,7 +13,7 @@ NexusCore API の FastAPI ベース実装。
 import os
 from fastapi import FastAPI
 
-from .routes import health, execute, github_webhook, projects, runs, plans, badges
+from .routes import health, execute, github_webhook, projects, runs, plans, badges, api_keys
 
 
 def create_app(test_db_path: str | None = None) -> FastAPI:
@@ -43,7 +43,7 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
         # アプリコンテキストを設定
         app.state.flask_app = flask_app
         app.state.test_db_path = test_db_path
-        
+
         # FastAPI の startup イベントで Flask アプリコンテキストを設定
         @app.on_event("startup")
         async def setup_flask_context():
@@ -70,11 +70,12 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
     # Badges router をマウント（/api/v1 プレフィックス、認証不要）
     app.include_router(badges.router, prefix="/api/v1")
 
+    # API Keys router をマウント（/api/v1 プレフィックス、認証必須）
+    app.include_router(api_keys.router, prefix="/api/v1")
+
     # 将来、以下のような router を追加予定:
     # app.include_router(auth.router, prefix="/api/v1")
     # app.include_router(admin.router, prefix="/api/v1")
-    # app.include_router(projects.router, prefix="/api/v1")
-    # app.include_router(runs.router, prefix="/api/v1")
 
     return app
 

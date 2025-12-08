@@ -118,6 +118,45 @@ def fetch_openapi_spec(url: str) -> dict:
         raise RuntimeError(f"Failed to fetch OpenAPI spec from {url}: {e}")
 
 
+def post_process_python_sdk(output_dir: Path) -> bool:
+    """
+    Python SDK 生成後の後処理（バージョン番号の反映など）
+
+    Args:
+        output_dir: SDK の出力先ディレクトリ
+
+    Returns:
+        成功した場合 True
+    """
+    try:
+        # pyproject.toml のバージョンを 0.1.0 に更新
+        pyproject_path = output_dir / "pyproject.toml"
+        if pyproject_path.exists():
+            import re
+            content = pyproject_path.read_text(encoding="utf-8")
+            # version = "1.0.0" を version = "0.1.0" に置換
+            content = re.sub(r'version\s*=\s*"1\.0\.0"', 'version = "0.1.0"', content)
+            # name を "nexuscore-sdk" に統一
+            content = re.sub(r'name\s*=\s*"nexuscore_sdk"', 'name = "nexuscore-sdk"', content)
+            pyproject_path.write_text(content, encoding="utf-8")
+            print("✅ Updated pyproject.toml version to 0.1.0")
+
+        # setup.py のバージョンを 0.1.0 に更新
+        setup_path = output_dir / "setup.py"
+        if setup_path.exists():
+            import re
+            content = setup_path.read_text(encoding="utf-8")
+            # VERSION = "1.0.0" を VERSION = "0.1.0" に置換
+            content = re.sub(r'VERSION\s*=\s*"1\.0\.0"', 'VERSION = "0.1.0"', content)
+            setup_path.write_text(content, encoding="utf-8")
+            print("✅ Updated setup.py version to 0.1.0")
+
+        return True
+    except Exception as e:
+        print(f"⚠️  Warning: Failed to post-process Python SDK: {e}")
+        return True  # 後処理の失敗は致命的ではない
+
+
 def generate_python_sdk(openapi_spec_path: Path, output_dir: Path, generator_cmd: str) -> bool:
     """
     Python SDK を生成する。
@@ -154,6 +193,42 @@ def generate_python_sdk(openapi_spec_path: Path, output_dir: Path, generator_cmd
         print(f"stdout: {e.stdout}")
         print(f"stderr: {e.stderr}")
         return False
+
+
+def post_process_typescript_sdk(output_dir: Path) -> bool:
+    """
+    TypeScript SDK 生成後の後処理（バージョン番号の反映など）
+
+    Args:
+        output_dir: SDK の出力先ディレクトリ
+
+    Returns:
+        成功した場合 True
+    """
+    try:
+        # package.json のバージョンを 0.1.0 に更新
+        package_json_path = output_dir / "package.json"
+        if package_json_path.exists():
+            import json
+            with open(package_json_path, "r", encoding="utf-8") as f:
+                package_data = json.load(f)
+
+            # バージョンを 0.1.0 に設定
+            package_data["version"] = "0.1.0"
+            # ライセンスを MIT に設定
+            package_data["license"] = "MIT"
+            # パッケージ名を統一（既存の命名に合わせて調整）
+            if "name" not in package_data or not package_data["name"]:
+                package_data["name"] = "@nexuscore/sdk"
+
+            with open(package_json_path, "w", encoding="utf-8") as f:
+                json.dump(package_data, f, indent=2, ensure_ascii=False)
+            print("✅ Updated package.json version to 0.1.0")
+
+        return True
+    except Exception as e:
+        print(f"⚠️  Warning: Failed to post-process TypeScript SDK: {e}")
+        return True  # 後処理の失敗は致命的ではない
 
 
 def generate_typescript_sdk(openapi_spec_path: Path, output_dir: Path, generator_cmd: str) -> bool:
@@ -322,6 +397,8 @@ def main() -> int:
         if not generate_typescript_sdk(openapi_spec_path, SDK_TYPESCRIPT_DIR, generator_cmd):
             success = False
         else:
+            # TypeScript SDK の後処理（バージョン番号の反映など）
+            post_process_typescript_sdk(SDK_TYPESCRIPT_DIR)
             if not verify_generated_sdk(SDK_TYPESCRIPT_DIR, "typescript"):
                 success = False
 
