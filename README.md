@@ -102,6 +102,67 @@ NexusCore の FastAPI API から OpenAPI 仕様書を取得し、Python / TypeSc
 
 **重要**: SDK コードは手書きせず、必ず `tools/generate_sdk.py` を使用して OpenAPI 仕様書から自動生成してください。OpenAPI 仕様書が SDK の単一のソース（Single Source of Truth）です。
 
+#### SDK 商品化（CR-FASTAPI-018, CR-FASTAPI-019）
+
+**Python SDK** は v0.1.0 として商品化されました。詳細は [CR-FASTAPI-018 完了レポート](docs/api/CR-FASTAPI-018_COMPLETION_REPORT.md) を参照してください。
+
+- **バージョン**: 0.1.0
+- **インストール**: `cd sdk/python && pip install .`
+- **ビルド**: `make sdk-python-build`
+- **TestPyPI 公開**: `make sdk-python-publish-test`（TESTPYPI_API_TOKEN 環境変数が必要）
+
+**TypeScript SDK** も v0.1.0 として整備されました。詳細は [CR-FASTAPI-019 完了レポート](docs/api/CR-FASTAPI-019_COMPLETION_REPORT.md) を参照してください。
+
+- **バージョン**: 0.1.0
+- **インストール**: `cd sdk/typescript && npm install`
+- **ビルド**: `make sdk-ts-build`
+- **テスト**: `make sdk-ts-test`
+- **Test npm Registry 公開**: `make sdk-ts-publish-test`（NPM_TOKEN 環境変数が必要）
+
+#### API Key 発行 API（CR-FASTAPI-020）
+
+認証済みユーザーが API Key を発行・管理できる正式な HTTP API が追加されました。詳細は [CR-FASTAPI-020 完了レポート](docs/api/CR-FASTAPI-020_COMPLETION_REPORT.md) を参照してください。
+
+- **POST /api/v1/api-keys**: API Key を新規発行（認証必須）
+- **GET /api/v1/api-keys**: API Key 一覧取得（認証必須）
+- **DELETE /api/v1/api-keys/{api_key_id}**: API Key 無効化（認証必須）
+- **制約**: 1ユーザーあたり最大5個の API Key 発行上限
+
+#### API Key 運用フロー（CR-FASTAPI-021, CR-FASTAPI-022）
+
+**初回 API Key 発行（ブートストラップ CLI）**:
+```bash
+# ユーザーが存在しない場合は自動作成
+python -m nexuscore.cli.bootstrap_apikey \
+  --user-login dev \
+  --user-name "Dev User" \
+  --key-name "Local Dev Key"
+
+# 出力をコピーして環境変数に設定
+export NEXUSCORE_API_KEY="nexus_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+**2本目以降の API Key 発行**:
+```bash
+# 既存の API Key で認証して新しい API Key を発行
+curl -X POST http://localhost:8000/api/v1/api-keys \
+  -H "X-API-Key: existing-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "CI/CD Key"}'
+```
+
+**TypeScript E2E テスト用**:
+```bash
+# ブートストラップキーを設定
+export NEXUSCORE_BOOTSTRAP_API_KEY="nexus_xxx..."
+
+# E2E テスト実行（helper が自動的に API Key を発行）
+cd sdk/typescript
+npm test -- tests/test_projects_e2e.test.ts
+```
+
+詳細は [CR-FASTAPI-021 完了レポート](docs/api/CR-FASTAPI-021_COMPLETION_REPORT.md) と [CR-FASTAPI-022 完了レポート](docs/api/CR-FASTAPI-022_COMPLETION_REPORT.md) を参照してください。
+
 ### E2E テスト
 
 生成された SDK と FastAPI アプリの連携を実際に検証する E2E テストを実行できます：
