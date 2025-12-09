@@ -478,11 +478,57 @@ export NEXUSCORE_API_KEY=your-api-key-here
 }
 ```
 
-### 初回 API Key 発行 CLI（CR-FASTAPI-021）
+### API Key 運用フロー（CR-FASTAPI-021, CR-FASTAPI-022, CR-FASTAPI-023）
 
-**ブートストラップ CLI**を使用して初回 API Key を発行できます。ユーザーが存在しない場合は自動的に作成されます。
+**運用フロー図**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 1. 初回 API Key 発行（ローカル / CI）                       │
+│    └─> bootstrap_apikey CLI (CR-FASTAPI-021)               │
+│        └─> NEXUSCORE_BOOTSTRAP_API_KEY を生成              │
+└─────────────────────────────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 2. 2本目以降の API Key 発行                                 │
+│    └─> POST /api/v1/api-keys (CR-FASTAPI-020)              │
+│        └─> 既存の API Key で認証して新しい Key を発行      │
+└─────────────────────────────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 3. TypeScript E2E テスト（ローカル / CI）                   │
+│    └─> getE2EApiKey() helper (CR-FASTAPI-022)             │
+│        ├─> NEXUSCORE_API_KEY があればそれを使用           │
+│        └─> なければ NEXUSCORE_BOOTSTRAP_API_KEY から      │
+│            /api/v1/api-keys を叩いて自動発行                │
+└─────────────────────────────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 4. CI での自動化（CR-FASTAPI-023）                         │
+│    └─> .github/workflows/ts-e2e.yml                       │
+│        ├─> bootstrap-apikey job: bootstrap key を生成      │
+│        └─> ts-e2e job: NEXUSCORE_BOOTSTRAP_API_KEY を     │
+│            受け取り、E2E テストを実行                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**初回 API Key 発行 CLI（CR-FASTAPI-021）**:
+
+ブートストラップ CLI を使用して初回 API Key を発行できます。ユーザーが存在しない場合は自動的に作成されます。
 
 ```bash
+# プロジェクトルートに移動（重要）
+cd /home/yn441611/NexusCore
+
+# 仮想環境を有効化
+source activate
+
+# PYTHONPATH を設定（重要）
+export PYTHONPATH=src
+
 # ユーザーが存在しない場合は自動作成
 python -m nexuscore.cli.bootstrap_apikey \
   --user-login dev \
@@ -500,7 +546,27 @@ python -m nexuscore.cli.bootstrap_apikey \
 export NEXUSCORE_API_KEY="nexus_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
+**注意**: `python -m nexuscore.cli.bootstrap_apikey` を実行する際は、必ずプロジェクトルートから実行し、`PYTHONPATH=src` を設定してください。
+
 詳細は [CR-FASTAPI-021 完了レポート](./CR-FASTAPI-021_COMPLETION_REPORT.md) を参照してください。
+
+**CI での API Key 自動生成（CR-FASTAPI-023）**:
+
+GitHub Actions では、`.github/workflows/ts-e2e.yml` が自動的に bootstrap API Key を生成し、後続の TS E2E テストジョブに渡します。
+
+**CI フロー**:
+1. `bootstrap-apikey` ジョブが `bootstrap_apikey` CLI を実行して bootstrap key を生成
+2. 生成された key を job output として後続ジョブに渡す（`::add-mask::` でログに表示されないようにマスク）
+3. `ts-e2e` ジョブが `NEXUSCORE_BOOTSTRAP_API_KEY` 環境変数を受け取り、FastAPI サーバーを起動
+4. E2E テスト内の helper (`getE2EApiKey()`) が自動的にテスト用 API Key を発行してテストを実行
+
+**ローカルで CI フローを再現**:
+```bash
+# CI と同じ方法で bootstrap key を生成
+make ci-bootstrap-apikey
+```
+
+詳細は [CR-FASTAPI-023 完了レポート](./CR-FASTAPI-023_COMPLETION_REPORT.md) を参照してください。
 
 ### 認証が必要なエンドポイント
 

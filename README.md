@@ -128,10 +128,19 @@ NexusCore の FastAPI API から OpenAPI 仕様書を取得し、Python / TypeSc
 - **DELETE /api/v1/api-keys/{api_key_id}**: API Key 無効化（認証必須）
 - **制約**: 1ユーザーあたり最大5個の API Key 発行上限
 
-#### API Key 運用フロー（CR-FASTAPI-021, CR-FASTAPI-022）
+#### API Key 運用フロー（CR-FASTAPI-021, CR-FASTAPI-022, CR-FASTAPI-023）
 
 **初回 API Key 発行（ブートストラップ CLI）**:
 ```bash
+# プロジェクトルートに移動（重要）
+cd /home/yn441611/NexusCore
+
+# 仮想環境を有効化
+source activate
+
+# PYTHONPATH を設定（重要）
+export PYTHONPATH=src
+
 # ユーザーが存在しない場合は自動作成
 python -m nexuscore.cli.bootstrap_apikey \
   --user-login dev \
@@ -158,6 +167,23 @@ export NEXUSCORE_BOOTSTRAP_API_KEY="nexus_xxx..."
 
 # E2E テスト実行（helper が自動的に API Key を発行）
 cd sdk/typescript
+npm test -- tests/test_projects_e2e.test.ts
+```
+
+**CI での API Key 取り扱い（CR-FASTAPI-023）**:
+
+GitHub Actions では、`.github/workflows/ts-e2e.yml` が自動的に bootstrap API Key を生成し、後続の TS E2E テストジョブに渡します。
+
+**CI フロー**:
+1. `bootstrap-apikey` ジョブが `bootstrap_apikey` CLI を実行して bootstrap key を生成
+2. 生成された key を job output として後続ジョブに渡す
+3. `ts-e2e` ジョブが `NEXUSCORE_BOOTSTRAP_API_KEY` 環境変数を受け取り、E2E テストを実行
+4. E2E テスト内の helper (`getE2EApiKey()`) が自動的にテスト用 API Key を発行
+
+**ローカルで CI フローを再現**:
+```bash
+# CI と同じ方法で bootstrap key を生成
+make ci-bootstrap-apikey
 npm test -- tests/test_projects_e2e.test.ts
 ```
 
