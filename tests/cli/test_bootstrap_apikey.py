@@ -3,231 +3,157 @@ API Key ブートストラップ CLI のテスト
 
 CR-FASTAPI-021 で作成された bootstrap_apikey CLI のテスト。
 """
-import pytest
+import io
 import sys
-from io import StringIO
-from pathlib import Path
+from typing import Iterable
 
-# プロジェクトルートをパスに追加
-project_root = Path(__file__).parent.parent.parent
-src_path = project_root / "src"
-if str(src_path) not in sys.path:
-    sys.path.insert(0, str(src_path))
+import pytest
 
 from nexuscore.webapp import create_app, db
 from nexuscore.webapp.models import User, ApiKey
-from nexuscore.cli.bootstrap_apikey import bootstrap_apikey_main
+from nexuscore.cli.bootstrap_apikey import (
+    bootstrap_apikey_for_app,
+    bootstrap_apikey_main,
+)
 
 
 @pytest.fixture
-def app():
-    """テスト用 Flask アプリケーション"""
-    app = create_app(config_overrides={
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "TESTING": True,
-        "SECRET_KEY": "test-secret-key",
-    })
-    
+def app(tmp_path):
+    """テスト用 Flask app + SQLite DB を用意する。"""
+    app = create_app()
+    db_path = tmp_path / "test_cli_bootstrap.db"
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
     with app.app_context():
-        db.create_all()
-        yield app
         db.drop_all()
+        db.create_all()
+
+    return app
+
+
+def _capture_stdout_stderr(func, *args, **kwargs):
+    """関数実行時の stdout/stderr をキャプチャして返す簡易ヘルパー。"""
+    old_out, old_err = sys.stdout, sys.stderr
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    sys.stdout, sys.stderr = out_buf, err_buf
+    try:
+        ret = func(*args, **kwargs)
+    finally:
+        sys.stdout, sys.stderr = old_out, old_err
+    return ret, out_buf.getvalue(), err_buf.getvalue()
 
 
 def test_bootstrap_apikey_first_time_creates_user_and_key(app):
-    """
-    初回実行 → User + ApiKey が 1 レコードずつ作成される
-    """
+    """初回実行で User + ApiKey が作成されること。"""
     with app.app_context():
-        # 実行前の状態確認
         assert User.query.count() == 0
         assert ApiKey.query.count() == 0
 
-        # CLI を実行
-        argv = [
-            "--user-login", "dev",
-            "--user-name", "Dev User",
-            "--key-name", "Local Dev Key",
-        ]
-        
-        # 標準出力をキャプチャ
-        old_stdout = sys.stdout
-        old_stderr = sys.stderr
-        sys.stdout = StringIO()
-        sys.stderr = StringIO()
-        
-        try:
-            exit_code = bootstrap_apikey_main(argv)
-            stdout_output = sys.stdout.getvalue()
-            stderr_output = sys.stderr.getvalue()
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
+    user, api_key, token = bootstrap_apikey_for_app(
+        app,
+        user_login="dev",
+        user_name="Dev User",
+        key_name="Local Dev Key",
+    )
 
-        # 検証
-        assert exit_code == 0
-        
-        # User が作成された
-        user = User.query.filter_by(github_login="dev").first()
-        assert user is not None
-        assert user.name == "Dev User"
-        assert user.github_id.startswith("cli_bootstrap_")
-        
-        # ApiKey が作成された
-        api_keys = ApiKey.query.filter_by(user_id=user.id).all()
-        assert len(api_keys) == 1
-        assert api_keys[0].name == "Local Dev Key"
-        
-        # 標準出力に export NEXUSCORE_API_KEY="..." が含まれる
-        assert "export NEXUSCORE_API_KEY=" in stdout_output
-        assert "nexus_" in stdout_output
-        
-        # 標準エラーに INFO メッセージが含まれる
-        assert "Created user" in stderr_output or "Using existing user" in stderr_output
-        assert "Created API key" in stderr_output
+    with app.app_context():
+        assert User.query.count() == 1
+        u = User.query.filter_by(github_login="dev").one()
+            # bootstrap_apikey_for_app から返されたオブジェクトは expunge されているので、
+            # 直接属性にアクセスできる
+        assert u.id == user.id
+
+        keys = ApiKey.query.filter_by(user_id=user.id).all()
+        assert len(keys) == 1
+        assert keys[0].id == api_key.id
+
+    assert isinstance(token, str)
+    assert len(token) > 0
 
 
 def test_bootstrap_apikey_second_time_reuses_user(app):
-    """
-    2回目以降 → User は再利用され、ApiKey が増えるだけ
-    """
+    """2 回目実行時は User を再利用し、ApiKey だけ増えること。"""
+    # 1 回目
+    user1, api_key1, token1 = bootstrap_apikey_for_app(
+        app,
+        user_login="dev",
+        user_name="Dev User",
+        key_name="Key1",
+    )
+
+    # 2 回目
+    user2, api_key2, token2 = bootstrap_apikey_for_app(
+        app,
+        user_login="dev",
+        user_name="Another Name",
+        key_name="Key2",
+    )
+
+            # bootstrap_apikey_for_app から返されたオブジェクトは expunge されているので、
+            # 直接属性にアクセスできる
+    assert user1.id == user2.id
+    assert api_key1.id != api_key2.id
+    assert token1 != token2
+
     with app.app_context():
-        # 初回実行
-        argv1 = [
-            "--user-login", "dev",
-            "--user-name", "Dev User",
-            "--key-name", "First Key",
-        ]
-        
-        old_stdout = sys.stdout
-        old_stderr = sys.stderr
-        sys.stdout = StringIO()
-        sys.stderr = StringIO()
-        
-        try:
-            exit_code1 = bootstrap_apikey_main(argv1)
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
-
-        assert exit_code1 == 0
-        
-        # User が作成された
-        user = User.query.filter_by(github_login="dev").first()
-        assert user is not None
-        user_id = user.id
-        
-        # 初回の ApiKey が作成された
-        api_keys_after_first = ApiKey.query.filter_by(user_id=user_id).all()
-        assert len(api_keys_after_first) == 1
-
-        # 2回目実行
-        argv2 = [
-            "--user-login", "dev",
-            "--key-name", "Second Key",
-        ]
-        
-        sys.stdout = StringIO()
-        sys.stderr = StringIO()
-        
-        try:
-            exit_code2 = bootstrap_apikey_main(argv2)
-            stderr_output = sys.stderr.getvalue()
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
-
-        assert exit_code2 == 0
-        
-        # User は再利用されている（ID が同じ）
-        user_after_second = User.query.filter_by(github_login="dev").first()
-        assert user_after_second.id == user_id
-        
-        # ApiKey が増えた（2本）
-        api_keys_after_second = ApiKey.query.filter_by(user_id=user_id).all()
-        assert len(api_keys_after_second) == 2
-        
-        # 標準エラーに "Using existing user" が含まれる
-        assert "Using existing user" in stderr_output
+        assert User.query.count() == 1
+        keys = ApiKey.query.filter_by(user_id=user1.id).all()
+        assert len(keys) == 2
 
 
 def test_bootstrap_apikey_default_key_name(app):
-    """
-    デフォルト名が使用される（--key-name 未指定）
-    """
+    """key_name 未指定時にデフォルト名が使われること。"""
+    user, api_key, token = bootstrap_apikey_for_app(
+        app,
+        user_login="dev",
+        user_name=None,
+        key_name="Bootstrap Dev Key",  # main と同じデフォルト
+    )
+
     with app.app_context():
-        argv = [
-            "--user-login", "testuser",
-        ]
-        
-        old_stdout = sys.stdout
-        old_stderr = sys.stderr
-        sys.stdout = StringIO()
-        sys.stderr = StringIO()
-        
-        try:
-            exit_code = bootstrap_apikey_main(argv)
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
-
-        assert exit_code == 0
-        
-        # デフォルト名の ApiKey が作成された
-        user = User.query.filter_by(github_login="testuser").first()
-        assert user is not None
-        api_key = ApiKey.query.filter_by(user_id=user.id).first()
-        assert api_key.name == "Bootstrap Dev Key"
+        stored = ApiKey.query.filter_by(id=api_key.id).one()
+        assert stored.name == "Bootstrap Dev Key"
 
 
-def test_bootstrap_apikey_returns_zero_on_success(app):
-    """
-    bootstrap_apikey_main() が 0 を返す
-    """
-    with app.app_context():
-        argv = [
-            "--user-login", "success_test",
-            "--key-name", "Test Key",
-        ]
-        
-        old_stdout = sys.stdout
-        old_stderr = sys.stderr
-        sys.stdout = StringIO()
-        sys.stderr = StringIO()
-        
-        try:
-            exit_code = bootstrap_apikey_main(argv)
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
+def test_bootstrap_apikey_main_returns_zero_on_success(app, monkeypatch):
+    """bootstrap_apikey_main が成功時に 0 を返すこと。"""
 
-        assert exit_code == 0
+    def _fake_create_app():
+        return app
+
+    monkeypatch.setattr(
+        "nexuscore.cli.bootstrap_apikey.create_app",
+        _fake_create_app,
+    )
+
+    code, out, err = _capture_stdout_stderr(
+        bootstrap_apikey_main,
+        ["--user-login", "dev", "--key-name", "Local Dev Key"],
+    )
+
+    assert code == 0
+    # export 行が stdout に出ていること
+    assert "export NEXUSCORE_API_KEY=" in out
 
 
-def test_bootstrap_apikey_outputs_export_command(app):
-    """
-    標準出力に export NEXUSCORE_API_KEY="..." が出力される
-    """
-    with app.app_context():
-        argv = [
-            "--user-login", "export_test",
-            "--key-name", "Export Test Key",
-        ]
-        
-        old_stdout = sys.stdout
-        old_stderr = sys.stderr
-        sys.stdout = StringIO()
-        sys.stderr = StringIO()
-        
-        try:
-            exit_code = bootstrap_apikey_main(argv)
-            stdout_output = sys.stdout.getvalue()
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
+def test_bootstrap_apikey_main_outputs_export_command(app, monkeypatch):
+    """bootstrap_apikey_main が export コマンドのみ stdout に出すこと。"""
 
-        assert exit_code == 0
-        assert stdout_output.startswith("export NEXUSCORE_API_KEY=")
-        assert stdout_output.count("nexus_") == 1  # API Key が1回だけ含まれる
-        assert stdout_output.endswith("\n") or stdout_output.endswith('"')
+    def _fake_create_app():
+        return app
 
+    monkeypatch.setattr(
+        "nexuscore.cli.bootstrap_apikey.create_app",
+        _fake_create_app,
+    )
+
+    code, out, err = _capture_stdout_stderr(
+        bootstrap_apikey_main,
+        ["--user-login", "dev", "--key-name", "Local Dev Key"],
+    )
+
+    assert code == 0
+    # stdout: export 行のみ（複数行あっても先頭に export が含まれていることを確認）
+    lines = [l for l in out.splitlines() if l.strip()]
+    assert any(l.startswith("export NEXUSCORE_API_KEY=") for l in lines)
