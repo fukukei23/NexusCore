@@ -15,7 +15,7 @@ endif
 SRC := src
 TESTS := tests
 
-.PHONY: help venv install-dev format lint typecheck test test-fast test-coverage test-phase3 coverage-phase3 qa clean sdk sdk-python sdk-ts test-e2e export-chat export-chat-watch server
+.PHONY: help venv install-dev format lint typecheck test test-fast test-coverage test-phase3 coverage-phase3 qa clean sdk sdk-python sdk-ts test-e2e export-chat export-chat-watch server ci-bootstrap-apikey
 
 help:
 	@echo "Available targets:"
@@ -35,6 +35,7 @@ help:
 	@echo "  make sdk-ts       - generate TypeScript SDK only"
 	@echo "  make server       - start FastAPI server (for SDK generation)"
 	@echo "  make test-e2e     - run E2E tests (requires SDK to be generated)"
+	@echo "  make ci-bootstrap-apikey - generate CI bootstrap API key (for CI/CD)"
 	@echo "  make export-chat  - export Cursor IDE chat history (one-time)"
 	@echo "  make export-chat-watch - export Cursor IDE chat history (watch mode)"
 	@echo "  make clean        - clean cache files"
@@ -201,6 +202,26 @@ test-e2e:
 	fi
 	$(PYTHON) -m pytest tests/e2e/test_sdk_e2e.py -v --tb=short
 	@echo "✅ E2E tests complete"
+
+# ==== CI Bootstrap API Key ====
+ci-bootstrap-apikey:
+	@echo "Generating CI Bootstrap API Key..."
+	@if [ -z "$(VENV_NAME)" ]; then \
+		echo "⚠️  No virtual environment found. Activating venv..."; \
+		if [ -f "venv/bin/activate" ]; then \
+			. venv/bin/activate; \
+		elif [ -f ".venv/bin/activate" ]; then \
+			. .venv/bin/activate; \
+		else \
+			echo "❌ No virtual environment found. Run 'make venv' first."; \
+			exit 1; \
+		fi; \
+	fi
+	@export PYTHONPATH="${PYTHONPATH:-}:src" && \
+		$(PYTHON) -m nexuscore.cli.bootstrap_apikey \
+			--user-login ci \
+			--key-name "CI Bootstrap Key"
+	@echo "✅ CI Bootstrap API Key generation complete"
 
 # ==== チャット履歴エクスポート ====
 export-chat:
