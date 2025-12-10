@@ -1,7 +1,8 @@
 # CR-FASTAPI-019: TypeScript SDK の整備 & E2E - 完了レポート
 
 ## 実装日時
-2025年12月8日
+2025年12月8日（初回実装）
+2025年12月10日（NexusCoreClient 追加、エラーハンドリング改善）
 
 ## 概要
 
@@ -39,6 +40,20 @@ TypeScript SDK を Python SDK と同等レベル（v0.1.0 商品化＋E2E 確立
 **作成ファイル**:
 - `sdk/typescript/tests/test_imports.test.ts` - インポート確認テスト
 - `sdk/typescript/tests/test_projects_e2e.test.ts` - E2E テスト（環境変数チェック付き）
+- `sdk/typescript/tests/test_client_e2e.test.ts` - NexusCoreClient の E2E テスト（2025年12月10日追加）
+- `sdk/typescript/tests/utils/apikey_helper.ts` - E2E テスト用 API Key ヘルパー（2025年12月10日追加）
+
+### Step 7: NexusCoreClient の実装（2025年12月10日追加）
+**作成ファイル**:
+- `sdk/typescript/client.ts` - 商品レベルの SDK クライアント（`NexusCoreClient` クラス）
+- `sdk/typescript/errors.ts` - エラーハンドリング（`NexusCoreApiError` クラス）
+- `sdk/typescript/index.ts` - エントリーポイントの更新（`NexusCoreClient` と `NexusCoreApiError` をエクスポート）
+
+**機能**:
+- API Key 認証を内部で処理
+- FastAPI の `detail` 形式に対応したエラーハンドリング
+- ネットワークエラーの適切な処理（`ECONNREFUSED` など）
+- 型安全な API メソッド（Projects, Runs, Execute, Health）
 
 ### Step 6: Makefile の更新
 **変更ファイル**: `Makefile`
@@ -54,11 +69,19 @@ TypeScript SDK を Python SDK と同等レベル（v0.1.0 商品化＋E2E 確立
 - `sdk/typescript/examples/basic_usage.ts` - 基本的な使用例
 - `sdk/typescript/tests/test_imports.test.ts` - インポート確認テスト
 - `sdk/typescript/tests/test_projects_e2e.test.ts` - E2E テスト
+- `sdk/typescript/tests/test_client_e2e.test.ts` - NexusCoreClient の E2E テスト（2025年12月10日追加）
+- `sdk/typescript/tests/utils/apikey_helper.ts` - E2E テスト用 API Key ヘルパー（2025年12月10日追加）
+- `sdk/typescript/client.ts` - 商品レベルの SDK クライアント（2025年12月10日追加）
+- `sdk/typescript/errors.ts` - エラーハンドリング（2025年12月10日追加）
 - `docs/api/CR-FASTAPI-019_COMPLETION_REPORT.md` - 完了レポート（本ファイル）
 
 ### 変更ファイル
 - `tools/generate_sdk.py` - TypeScript SDK の後処理（バージョン 0.1.0 反映）を追加
 - `Makefile` - sdk-ts-build、sdk-ts-test、sdk-ts-publish-test ターゲットを追加
+- `sdk/typescript/index.ts` - `NexusCoreClient` と `NexusCoreApiError` をエクスポート（2025年12月10日更新）
+- `sdk/typescript/package.json` - `main` と `types` を `dist/index.js` と `dist/index.d.ts` に更新（2025年12月10日更新）
+- `sdk/typescript/tsconfig.json` - `rootDir` を `.` に設定、`src/` ディレクトリを除外（2025年12月10日更新）
+- `sdk/typescript/jest.config.js` - カバレッジ設定を更新（2025年12月10日更新）
 
 ## 動作確認結果
 
@@ -71,7 +94,14 @@ npm install
 npm test
 ```
 
-**結果**: ✅ テストフレームワークが設定済み（実際の SDK 生成後に実行可能）
+**結果（2025年12月10日確認）**: ✅ すべてのテストが成功
+- `test_imports.test.ts`: 10 passed（インポート確認テスト）
+- `test_client_e2e.test.ts`: 3 passed（NexusCoreClient の E2E テスト）
+  - プロジェクト一覧取得
+  - 無効な API Key で 401 エラー
+  - 存在しないプロジェクト ID で 404 エラー
+- `test_projects_e2e.test.ts`: 1 passed（Projects API の E2E テスト）
+- **合計**: 14 passed, 3 test suites
 
 **既存 API テスト**:
 ```bash
@@ -87,13 +117,22 @@ pytest tests/api -v -k "not e2e"
 make sdk-ts-build
 ```
 
-**結果**: ✅ TypeScript SDK のビルドが可能（実際の SDK 生成後に実行）
+**結果（2025年12月10日確認）**: ✅ TypeScript SDK のビルドが成功
+```bash
+cd sdk/typescript
+npm run build
+```
+- TypeScript コンパイルエラーなし
+- `dist/` ディレクトリに正常に出力
 
 ## 設計上の改善点
 
 - **バージョン管理**: Semantic Versioning に基づく v0.1.0 として明確化
 - **自動化**: generate_sdk.py の後処理でバージョンを自動反映
 - **E2E テスト**: 環境変数チェックにより、CI 環境でも安全に実行可能
+- **商品レベルの SDK クライアント**: `NexusCoreClient` クラスにより、API Key 認証を内部で処理し、型安全な API メソッドを提供（2025年12月10日追加）
+- **エラーハンドリング**: FastAPI の `detail` 形式に対応し、ネットワークエラーも適切に処理（2025年12月10日追加）
+- **型安全性**: TypeScript の strict モードを有効化し、型安全性を確保（2025年12月10日追加）
 
 ## 既知の制約・注意事項
 
@@ -104,9 +143,28 @@ make sdk-ts-build
 
 ## 次のステップ
 
-- **実際の SDK 生成**: `make sdk-ts` を実行して TypeScript SDK を生成
-- **テストの有効化**: 生成された SDK の構造に合わせてテストコードを調整
+- ✅ **実際の SDK 生成**: `make sdk-ts` を実行して TypeScript SDK を生成（完了）
+- ✅ **テストの有効化**: 生成された SDK の構造に合わせてテストコードを調整（完了）
+- ✅ **商品レベルの SDK クライアント**: `NexusCoreClient` を実装し、エラーハンドリングを改善（完了）
 - **公式 npm Registry 公開**: Test Registry での検証後、公式 npm Registry への公開を検討
+
+## 追加実装内容（2025年12月10日）
+
+### NexusCoreClient の実装
+- API Key 認証を内部で処理する商品レベルの SDK クライアント
+- 型安全な API メソッド（Projects, Runs, Execute, Health）
+- FastAPI の `detail` 形式に対応したエラーハンドリング
+- ネットワークエラーの適切な処理（`ECONNREFUSED` など）
+
+### エラーハンドリングの改善
+- `NexusCoreApiError` クラスによる統一されたエラー処理
+- FastAPI の `{ detail: { error: { code, message } } }` 形式に対応
+- ネットワークエラー（`status: 0`）の適切な処理
+
+### テストの追加
+- `test_client_e2e.test.ts`: NexusCoreClient の E2E テスト（3 passed）
+- ネットワークエラーの検出とスキップ機能
+- 無効な API Key で 401 エラーが正しく検出されることを確認
 
 ## 関連ドキュメント
 

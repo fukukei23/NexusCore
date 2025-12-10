@@ -12,7 +12,7 @@ import logging
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Sequence, Union, Dict
+from typing import Optional, Sequence, Union, Dict, Any, List
 
 from pydantic import BaseModel
 
@@ -51,6 +51,7 @@ class PRCommentContext(BaseModel):
     repo_full_name: Optional[str] = None  # "owner/repo"
     pr_number: Optional[int] = None
     branch_name: Optional[str] = None
+    commit_sha: Optional[str] = None  # CR-E3: 対象コミットの SHA
     change_summary: Optional[str] = None  # AI生成の修正要約（B-3）
     diff_summary: Optional[Union[str, Dict[str, str]]] = None  # E-4/E-5: Before/After 差分サマリー（単一ファイル: str, 複数ファイル: dict）
     markdown_report: Optional[str] = None  # E-3: Run Markdown レポート全文
@@ -101,29 +102,82 @@ def _estimate_diff_lines(diff_text: str) -> int:
     return count
 
 
+def _estimate_diff_lines_separated(diff_text: str) -> tuple[int, int]:
+    """
+    diff テキストから追加行数と削除行数を分けて推定（CR-E3）
+
+    Args:
+        diff_text: diff テキスト
+
+    Returns:
+        (added_lines, removed_lines) のタプル
+    """
+    if not diff_text:
+        return (0, 0)
+
+    lines = diff_text.splitlines()
+    added = 0
+    removed = 0
+
+    for line in lines:
+        # "+" で始まる行は追加行（ファイルヘッダー除く）
+        if line.startswith("+") and not line.startswith("+++"):
+            added += 1
+        # "-" で始まる行は削除行（ファイルヘッダー除く）
+        elif line.startswith("-") and not line.startswith("---"):
+            removed += 1
+
+    return (added, removed)
+
+
 def _collect_run_metrics(run: object) -> dict:
     """
-    Run からメトリクスを収集する
+    Run からメトリクスを収集する（CR-E3: 追加行数/削除行数を分けて収集）
+
+    Returns:
+        dict に以下のキーを含む:
+        - duration_str: 実行時間の文字列表現
+        - patch_files_count: 変更ファイル数
+        - patch_lines: 総変更行数（後方互換性のため残す）
+        - added_lines: 追加行数（CR-E3）
+        - removed_lines: 削除行数（CR-E3）
+        - model_call_counts: モデルごとの呼び出し回数
+        - estimated_cost_jpy: 推定コスト（JPY）
+        - start_time: 開始時刻（datetime、CR-E3）
+        - end_time: 終了時刻（datetime、CR-E3）
+        - duration_seconds: 経過時間（秒、CR-E3）
     """
     if not HAS_WEBAPP:
         return {
             "duration_str": "N/A",
             "patch_files_count": 0,
             "patch_lines": 0,
+            "added_lines": 0,
+            "removed_lines": 0,
             "model_call_counts": {},
             "estimated_cost_jpy": 0.0,
+            "start_time": None,
+            "end_time": None,
+            "duration_seconds": 0.0,
         }
 
     # パッチ情報
     patch_files = set()
     total_patch_lines = 0
+    total_added_lines = 0
+    total_removed_lines = 0
 
     try:
         if hasattr(run, "id") and PatchRecord:
             patches = PatchRecord.query.filter_by(run_id=run.id).all()  # type: ignore
             for p in patches:
                 patch_files.add(p.file_path)  # type: ignore
-                total_patch_lines += _estimate_diff_lines(p.diff_text or "")  # type: ignore
+                diff_text = p.diff_text or ""  # type: ignore
+                total_patch_lines += _estimate_diff_lines(diff_text)
+                # CR-E3: 追加行数と削除行数を分けて収集
+                added, removed = _estimate_diff_lines_separated(diff_text)
+                total_added_lines += added
+                total_removed_lines += removed
     except Exception as e:
         logger.warning(f"Failed to collect patch metrics: {e}", exc_info=True)
 
@@ -153,12 +207,31 @@ def _collect_run_metrics(run: object) -> dict:
     except Exception as e:
         logger.warning(f"Failed to collect LLM metrics: {e}", exc_info=True)
 
+    # CR-E3: 実行時間の詳細を取得
+    start_time = None
+    end_time = None
+    duration_seconds = 0.0
+
+    if hasattr(run, "started_at") and run.started_at:  # type: ignore
+        start_time = run.started_at  # type: ignore
+    if hasattr(run, "finished_at") and run.finished_at:  # type: ignore
+        end_time = run.finished_at  # type: ignore
+
+    if start_time and end_time:
+        delta = end_time - start_time  # type: ignore
+        duration_seconds = delta.total_seconds()
+
     return {
         "duration_str": _format_duration(run),
         "patch_files_count": len(patch_files),
-        "patch_lines": total_patch_lines,
+        "patch_lines": total_patch_lines,  # 後方互換性のため残す
+        "added_lines": total_added_lines,  # CR-E3
+        "removed_lines": total_removed_lines,  # CR-E3
         "model_call_counts": dict(models),
         "estimated_cost_jpy": total_cost,
+        "start_time": start_time,  # CR-E3
+        "end_time": end_time,  # CR-E3
+        "duration_seconds": duration_seconds,  # CR-E3
     }
 
 
@@ -355,6 +428,12 @@ def render_summary_card(
 {chr(10).join(rows)}
 
 """
+
+
+def format_diff_summary_block(
+    summary_text: Optional[str] = None,
+    file_summaries: Optional[Dict[str, str]] = None,
+) -> str:
     """
     Before/After 差分の AI 要約を <details> に収める。
 
@@ -469,6 +548,110 @@ def format_semantic_diff_block(
     return "\n\n".join(blocks)
 
 
+def format_metadata_block(
+    run_id: str,
+    pr_number: Optional[int],
+    commit_sha: Optional[str],
+    start_time: Optional[datetime],
+    end_time: Optional[datetime],
+    duration_seconds: float,
+    primary_model: str,
+    aux_models: list[str],
+    changed_files: int,
+    added_lines: int,
+    removed_lines: int,
+    success_rate_last_n: Optional[float] = None,
+    recent_runs_window: int = 30,
+) -> str:
+    """
+    CR-E3: Self-Healing メタ情報ブロックを生成する
+
+    Args:
+        run_id: Run ID
+        pr_number: PR 番号
+        commit_sha: 対象コミットの SHA（短縮形式）
+        start_time: 開始時刻
+        end_time: 終了時刻
+        duration_seconds: 経過時間（秒）
+        primary_model: メインで使用したモデル名
+        aux_models: 補助的に使用したモデル名のリスト
+        changed_files: 変更ファイル数
+        added_lines: 追加行数
+        removed_lines: 削除行数
+        success_rate_last_n: 過去 N 回の成功率（0.0-1.0）
+        recent_runs_window: 成功率計算の対象期間（デフォルト: 30）
+
+    Returns:
+        Markdown 形式のメタ情報ブロック
+    """
+    parts: list[str] = []
+
+    # ヘッダー
+    parts.append("### 🛠 Self-Healing Summary\n")
+
+    # Run 識別情報
+    parts.append(f"- Run ID: `{run_id}`")
+    if pr_number:
+        parts.append(f"- PR: #{pr_number}")
+    if commit_sha:
+        # 短縮形式（7文字）を表示
+        short_sha = commit_sha[:7] if len(commit_sha) > 7 else commit_sha
+        parts.append(f"- Commit: `{short_sha}`")
+    parts.append("")
+
+    # 実行時間
+    parts.append("**Execution**")
+    if start_time:
+        parts.append(f"- Start: {start_time.isoformat()}Z")
+    else:
+        parts.append("- Start: N/A")
+    if end_time:
+        parts.append(f"- End:   {end_time.isoformat()}Z")
+    else:
+        parts.append("- End:   N/A")
+
+    # 経過時間のフォーマット
+    if duration_seconds > 0:
+        if duration_seconds < 60:
+            duration_str = f"{duration_seconds:.1f}s"
+        elif duration_seconds < 3600:
+            duration_str = f"{duration_seconds / 60:.1f}m"
+        else:
+            hours = int(duration_seconds // 3600)
+            minutes = int((duration_seconds % 3600) // 60)
+            duration_str = f"{hours}h {minutes}m"
+    else:
+        duration_str = "N/A"
+    parts.append(f"- Duration: {duration_str}")
+
+    # 使用モデル
+    model_parts = [primary_model]
+    if aux_models:
+        model_parts.extend(aux_models)
+    if len(model_parts) == 1:
+        parts.append(f"- Model: {primary_model}")
+    else:
+        parts.append(f"- Model: {primary_model} (primary), {', '.join(aux_models)} (aux)")
+    parts.append("")
+
+    # 変更規模
+    parts.append("**Effect**")
+    parts.append(f"- Changed files: {changed_files}")
+    parts.append(f"- +{added_lines} / -{removed_lines} lines")
+    parts.append("")
+
+    # 信頼性（成功率）
+    parts.append("**Reliability**")
+    if success_rate_last_n is not None:
+        success_rate_percent = success_rate_last_n * 100
+        parts.append(f"- Success rate (last {recent_runs_window} runs): {success_rate_percent:.1f}%")
+    else:
+        parts.append(f"- Success rate (last {recent_runs_window} runs): N/A")
+    parts.append("")
+
+    return "\n".join(parts)
+
+
 def build_pr_comment(ctx: PRCommentContext) -> str:
     """
     PR コメント本文を組み立てる
@@ -480,6 +663,81 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
         Markdown 形式の PR コメント本文
     """
     parts: list[str] = []
+
+    # === CR-E3: Self-Healing メタ情報ブロック ===
+    if ctx.run is not None and ctx.project is not None:
+        try:
+            metrics = _collect_run_metrics(ctx.run)
+
+            # プロジェクトIDを取得
+            project_id = 0
+            if hasattr(ctx.project, "id"):
+                project_id = ctx.project.id  # type: ignore
+
+            success_rate = None
+            if project_id > 0:
+                success_rate = _compute_recent_success_rate(project_id, limit=30)
+
+            # Run ID を取得
+            run_id = "unknown"
+            if hasattr(ctx.run, "run_id"):
+                run_id = ctx.run.run_id  # type: ignore
+
+            # 実行時間を取得
+            start_time = metrics.get("start_time")
+            end_time = metrics.get("end_time")
+            duration_seconds = metrics.get("duration_seconds", 0.0)
+
+            # 使用モデルを取得
+            model_call_counts = metrics.get("model_call_counts", {})
+            primary_model = "N/A"
+            aux_models: list[str] = []
+
+            # details からモデル名を取得（優先）
+            if ctx.details:
+                model_name = ctx.details.get("model") or ctx.details.get("model_name")
+                if model_name:
+                    primary_model = str(model_name)
+
+            # model_call_counts からモデルを取得（フォールバック）
+            if primary_model == "N/A" and model_call_counts:
+                # 呼び出し回数が多い順にソート
+                sorted_models = sorted(
+                    model_call_counts.items(),
+                    key=lambda x: x[1],
+                    reverse=True
+                )
+                if sorted_models:
+                    primary_model = sorted_models[0][0]
+                    # 2番目以降を aux_models に追加
+                    aux_models = [model for model, _ in sorted_models[1:]]
+
+            # 変更規模を取得
+            changed_files = metrics.get("patch_files_count", 0)
+            added_lines = metrics.get("added_lines", 0)
+            removed_lines = metrics.get("removed_lines", 0)
+
+            # CR-E3: メタ情報ブロックを生成
+            metadata_block = format_metadata_block(
+                run_id=run_id,
+                pr_number=ctx.pr_number,
+                commit_sha=ctx.commit_sha,
+                start_time=start_time,
+                end_time=end_time,
+                duration_seconds=duration_seconds,
+                primary_model=primary_model,
+                aux_models=aux_models,
+                changed_files=changed_files,
+                added_lines=added_lines,
+                removed_lines=removed_lines,
+                success_rate_last_n=success_rate,
+                recent_runs_window=30,
+            )
+            parts.append(metadata_block)
+            parts.append("")  # 空行を追加
+
+        except Exception as e:
+            logger.warning(f"Failed to build Self-Healing metadata block: {e}", exc_info=True)
 
     # === E-5: Self-Healing Summary (カード形式) ===
     if ctx.run is not None and ctx.project is not None:

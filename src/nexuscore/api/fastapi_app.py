@@ -34,20 +34,27 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
         openapi_url="/api/openapi.json",
     )
 
-    # E2E テスト用 DB のオーバーライド
-    if test_db_path:
-        db_uri = f"sqlite:///{test_db_path}"
-        # Flask アプリの DB 設定をオーバーライド
-        from nexuscore.webapp import create_app as create_flask_app
-        flask_app = create_flask_app(config_overrides={"SQLALCHEMY_DATABASE_URI": db_uri})
-        # アプリコンテキストを設定
-        app.state.flask_app = flask_app
-        app.state.test_db_path = test_db_path
+    # Flask アプリケーションを作成（DB アクセスに必要）
+    from nexuscore.webapp import create_app as create_flask_app
 
-        # FastAPI の startup イベントで Flask アプリコンテキストを設定
-        @app.on_event("startup")
-        async def setup_flask_context():
-            flask_app.app_context().push()
+    if test_db_path:
+        # E2E テスト用 DB のオーバーライド
+        db_uri = f"sqlite:///{test_db_path}"
+        flask_app = create_flask_app(config_overrides={"SQLALCHEMY_DATABASE_URI": db_uri})
+        app.state.test_db_path = test_db_path
+    else:
+        # 通常起動時はデフォルトの DB 設定を使用
+        flask_app = create_flask_app()
+
+    # Flask アプリを FastAPI アプリの state に保存
+    app.state.flask_app = flask_app
+
+    # FastAPI のミドルウェアで Flask アプリコンテキストを設定（各リクエストごと）
+    @app.middleware("http")
+    async def setup_flask_context_middleware(request, call_next):
+        with flask_app.app_context():
+            response = await call_next(request)
+            return response
 
     # Health check router をマウント
     app.include_router(health.router, prefix="/api/v1")
