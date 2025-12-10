@@ -86,6 +86,8 @@ def _post_pr_comment_if_configured(result: Dict[str, Any], payload: Dict[str, An
 
         repo_full_name = payload.get("repository", {}).get("full_name")
         pr_number = payload.get("pull_request", {}).get("number")
+        # CR-E3: commit_sha を取得
+        commit_sha = payload.get("pull_request", {}).get("head", {}).get("sha")
 
         if not repo_full_name or not pr_number:
             logger.warning("Cannot post PR comment: missing repo_full_name or pr_number")
@@ -98,6 +100,7 @@ def _post_pr_comment_if_configured(result: Dict[str, Any], payload: Dict[str, An
             project_root=project_root,
             repo_full_name=repo_full_name,
             pr_number=pr_number,
+            commit_sha=commit_sha,  # CR-E3
         )
 
         # GitHub API で PR コメントを投稿

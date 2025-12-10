@@ -263,10 +263,30 @@ response = client.health()
 
 #### TypeScript
 
-```typescript
-import { NexusCoreClient } from 'nexuscore-sdk';
+商品レベルの SDK を使用（推奨）:
 
-const client = new NexusCoreClient({ baseURL: 'http://localhost:8000' });
+```typescript
+import { NexusCoreClient } from '@nexuscore/sdk';
+
+const client = new NexusCoreClient({
+  baseUrl: 'http://localhost:8000',
+  apiKey: 'nexus_xxx...' // 必須
+});
+
+// プロジェクト一覧を取得
+const projects = await client.listProjects();
+
+// エラーハンドリング
+try {
+  await client.listProjects();
+} catch (error) {
+  if (error instanceof NexusCoreApiError) {
+    console.log(`Error: ${error.code} (${error.status})`);
+  }
+}
+```
+
+詳細は [TypeScript SDK README](../../sdk/typescript/README.md) を参照してください。
 const response = await client.health();
 ```
 
