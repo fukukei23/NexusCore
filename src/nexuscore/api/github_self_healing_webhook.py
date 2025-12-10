@@ -103,6 +103,7 @@ def format_pr_comment(
     project_root: Optional[str] = None,
     repo_full_name: Optional[str] = None,
     pr_number: Optional[int] = None,
+    commit_sha: Optional[str] = None,  # CR-E3: 対象コミットの SHA
 ) -> str:
     """
     Self-Healing の実行結果を GitHub PR コメント形式の Markdown に整形する。
@@ -187,6 +188,7 @@ def format_pr_comment(
         guardian_review_markdown=guardian_review_markdown,
         repo_full_name=repo_full_name,
         pr_number=pr_number,
+        commit_sha=commit_sha,  # CR-E3: 対象コミットの SHA
         change_summary=change_summary,
         diff_summary=diff_summary,
         markdown_report=markdown_report,
