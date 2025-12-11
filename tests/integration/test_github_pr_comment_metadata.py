@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 from datetime import datetime
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from nexuscore.integration.github_pr_comment import (
     format_metadata_block,
@@ -206,9 +206,9 @@ class TestCollectRunMetrics:
 """
 
         # webapp モデルをモック
-        with pytest.mock.patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", True), \
-             pytest.mock.patch("nexuscore.integration.github_pr_comment.PatchRecord") as MockPatchRecord, \
-             pytest.mock.patch("nexuscore.integration.github_pr_comment.ExecutionLog") as MockExecutionLog:
+        with patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", True), \
+             patch("nexuscore.integration.github_pr_comment.PatchRecord") as MockPatchRecord, \
+             patch("nexuscore.integration.github_pr_comment.ExecutionLog") as MockExecutionLog:
 
             MockPatchRecord.query.filter_by.return_value.all.return_value = [mock_patch]
             MockExecutionLog.query.filter_by.return_value.all.return_value = []
@@ -252,10 +252,10 @@ class TestBuildPrCommentWithMetadata:
         )
 
         # webapp モデルをモック
-        with pytest.mock.patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", True), \
-             pytest.mock.patch("nexuscore.integration.github_pr_comment.PatchRecord") as MockPatchRecord, \
-             pytest.mock.patch("nexuscore.integration.github_pr_comment.ExecutionLog") as MockExecutionLog, \
-             pytest.mock.patch("nexuscore.integration.github_pr_comment.Run") as MockRun:
+        with patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", True), \
+             patch("nexuscore.integration.github_pr_comment.PatchRecord") as MockPatchRecord, \
+             patch("nexuscore.integration.github_pr_comment.ExecutionLog") as MockExecutionLog, \
+             patch("nexuscore.integration.github_pr_comment.Run") as MockRun:
 
             MockPatchRecord.query.filter_by.return_value.all.return_value = []
             MockExecutionLog.query.filter_by.return_value.all.return_value = []
