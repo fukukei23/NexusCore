@@ -1,7 +1,8 @@
 # CR-E3: Self-Healing PR コメント メタ情報強化 - 完了レポート
 
 ## 1. 実装日時
-2025年12月10日
+2025年12月10日（初回実装）
+2025年12月11日（テスト修正・完了）
 
 ## 2. 目的・ゴール
 Self-Healing 実行結果の PR コメントに、実行時間・成功率・使用モデル・変更規模・run_id などのメタ情報ブロックを標準化して追加し、「NexusCore がどの程度 Self-Healing を実現しているか」を外部から即座に判断できる状態を作る。
@@ -27,6 +28,7 @@ Self-Healing 実行結果の PR コメントに、実行時間・成功率・使
 ### 3.5 テスト追加
 - `tests/integration/test_github_pr_comment_metadata.py` を新規作成
 - `_estimate_diff_lines_separated()`、`format_metadata_block()`、`_collect_run_metrics()`、`build_pr_comment()` のテストを追加
+- `pytest.mock.patch` を `unittest.mock.patch` に修正（2025年12月11日）
 
 ## 4. 変更ファイル一覧
 
@@ -35,11 +37,11 @@ Self-Healing 実行結果の PR コメントに、実行時間・成功率・使
 
 **変更**:
 - `src/nexuscore/integration/github_pr_comment.py`
-  - `_estimate_diff_lines_separated()` 追加
+  - `_estimate_diff_lines_separated()` 追加（追加行数と削除行数を分けて収集）
   - `_collect_run_metrics()` 拡張（added_lines, removed_lines, start_time, end_time, duration_seconds 追加）
-  - `format_metadata_block()` 追加
+  - `format_metadata_block()` 追加（標準化されたメタ情報ブロック生成）
   - `format_diff_summary_block()` 関数定義の修正（docstring が関数定義になっていた問題を修正）
-  - `build_pr_comment()` にメタ情報ブロック追加
+  - `build_pr_comment()` にメタ情報ブロック追加（E-5 カード形式の前に配置）
   - `PRCommentContext` に `commit_sha` フィールド追加
   - `typing` インポートに `Any`, `List` を追加
 
@@ -51,6 +53,8 @@ Self-Healing 実行結果の PR コメントに、実行時間・成功率・使
 
 - `src/nexuscore/api/github_webhook_handler.py`
   - `format_pr_comment()` 呼び出し時に `commit_sha` を渡すように修正
+- `src/nexuscore/api/fastapi_app.py`
+  - Flask アプリケーションコンテキストを全リクエストで確実に push するように修正（DB 初期化警告の解消）
 
 ## 5. 動作確認結果
 
@@ -62,10 +66,39 @@ Self-Healing 実行結果の PR コメントに、実行時間・成功率・使
 - ✅ GitHub Webhook から `commit_sha` を取得して渡す
 
 ### 5.2 テスト
+
+**実行コマンド**:
 ```bash
 pytest tests/integration/test_github_pr_comment_metadata.py -v
 ```
-テストファイルを作成済み。実行環境で動作確認が必要。
+
+**テスト結果** (2025年12月11日):
+```
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.6.0
+collected 9 items
+
+tests/integration/test_github_pr_comment_metadata.py::TestEstimateDiffLinesSeparated::test_empty_diff PASSED [ 11%]
+tests/integration/test_github_pr_comment_metadata.py::TestEstimateDiffLinesSeparated::test_simple_additions PASSED [ 22%]
+tests/integration/test_github_pr_comment_metadata.py::TestEstimateDiffLinesSeparated::test_simple_deletions PASSED [ 33%]
+tests/integration/test_github_pr_comment_metadata.py::TestEstimateDiffLinesSeparated::test_mixed_changes PASSED [ 44%]
+tests/integration/test_github_pr_comment_metadata.py::TestFormatMetadataBlock::test_basic_metadata_block PASSED [ 55%]
+tests/integration/test_github_pr_comment_metadata.py::TestFormatMetadataBlock::test_metadata_block_without_optional_fields PASSED [ 66%]
+tests/integration/test_github_pr_comment_metadata.py::TestFormatMetadataBlock::test_metadata_block_duration_formatting PASSED [ 77%]
+tests/integration/test_github_pr_comment_metadata.py::TestCollectRunMetrics::test_collect_run_metrics_includes_added_removed_lines PASSED [ 88%]
+tests/integration/test_github_pr_comment_metadata.py::TestBuildPrCommentWithMetadata::test_build_pr_comment_includes_metadata_block PASSED [100%]
+
+============================== 9 passed in 0.28s ===============================
+```
+
+**テストカバレッジ**:
+- ✅ `_estimate_diff_lines_separated()`: 4テスト（空diff、追加のみ、削除のみ、混在）
+- ✅ `format_metadata_block()`: 3テスト（基本、オプショナルフィールドなし、経過時間フォーマット）
+- ✅ `_collect_run_metrics()`: 1テスト（追加行数・削除行数の収集確認）
+- ✅ `build_pr_comment()`: 1テスト（メタ情報ブロックの含まれ方確認）
+
+**修正内容**:
+- `pytest.mock.patch` を `unittest.mock.patch` に修正（`pytest.mock` は存在しないため）
 
 ## 6. 設計上の改善点
 
