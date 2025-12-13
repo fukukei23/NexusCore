@@ -1,0 +1,12 @@
+{
+  "session_id": "self_healing_webhook",
+  "status": "running",
+  "last_phase": "start",
+  "last_updated": 1765557798.6716235,
+  "metadata": {
+    "run_id": "sh-1765557798-1-799dc79",
+    "repo": "fukukei23/NexusCore",
+    "pr_number": 1,
+    "head_sha": "799dc799358b3e6240c0ac569c0689f330e21fba"
+  }
+}
