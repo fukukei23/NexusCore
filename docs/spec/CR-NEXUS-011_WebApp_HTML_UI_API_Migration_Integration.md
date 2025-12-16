@@ -1,5 +1,9 @@
 # CR-NEXUS-011: WebApp HTML UI の API 移行整合 & クリーンアップ
 
+> **SRS Traceability**
+> - Related SRS: docs/srs/NEXUSCORE_SRS.md
+> - This CR satisfies: FR-3
+
 - **CR-ID**: CR-NEXUS-011
 - **Status**: Completed
 - **Author**: AI Codex
