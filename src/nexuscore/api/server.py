@@ -21,6 +21,16 @@ import threading
 import uuid
 from flask import Flask, request, jsonify
 
+# セキュリティ: JWT認証のインポート
+try:
+    from nexuscore.api.auth import require_auth, generate_token
+except ImportError:
+    # 認証モジュールがない場合のフォールバック（開発環境用）
+    def require_auth(f):
+        return f
+    def generate_token(user_id, expires_in_hours=24):
+        return "dev-token-auth-disabled"
+
 # --- パス設定 ---
 # WSL/Windows 混在環境で main_cli.py と同等の import パスを保証する暫定措置。
 try:
@@ -144,6 +154,7 @@ def run_orchestrator_task(task_id: str, requirement: str, project_path: str, con
         tasks[task_id] = {"status": "error", "message": f"orchestrator failed: {e}"}
 
 @app.route('/api/v1/execute', methods=['POST'])
+@require_auth  # セキュリティ: JWT認証を要求
 def execute_task():
     data = request.json
     if not data or 'requirement' not in data or 'project_path' not in data:
@@ -152,6 +163,17 @@ def execute_task():
     task_id = str(uuid.uuid4())
     requirement = data['requirement']
     project_path = os.path.abspath(data['project_path'])
+
+    # セキュリティ: パストラバーサル対策
+    allowed_base = os.getenv("NEXUS_ALLOWED_PROJECT_BASE", "/workspace")
+    allowed_base_abs = os.path.abspath(allowed_base)
+    if not project_path.startswith(allowed_base_abs):
+        logger.warning(f"Rejected project_path outside allowed base: {project_path}")
+        return jsonify({
+            "error": "Project path not allowed. Must be under allowed base directory.",
+            "error_code": "FORBIDDEN_PATH",
+            "allowed_base": allowed_base
+        }), 403
 
     constitution = { "description": data.get("constitution_text", "Default constitution.") }
 
@@ -196,6 +218,49 @@ def github_webhook_endpoint():
         logger.error(f"GitHub webhook endpoint error: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
+
+# ==============================================================================
+# 開発用: トークン生成エンドポイント（本番環境では無効化すること）
+# ==============================================================================
+@app.route('/api/v1/dev/generate-token', methods=['POST'])
+def generate_dev_token():
+    """
+    開発用トークン生成エンドポイント
+
+    本番環境では FLASK_ENV=production に設定することで無効化される。
+
+    使用方法:
+        curl -X POST http://localhost:5001/api/v1/dev/generate-token \
+             -H "Content-Type: application/json" \
+             -d '{"user_id": "test-user"}'
+
+    Returns:
+        {"token": "eyJ0eXAiOiJKV1QiLCJhbGc..."}
+    """
+    # 本番環境では無効化
+    if os.getenv("FLASK_ENV") == "production":
+        return jsonify({"error": "Token generation not available in production"}), 403
+
+    data = request.json or {}
+    user_id = data.get('user_id', 'dev-user')
+    expires_in = data.get('expires_in_hours', 24)
+
+    try:
+        token = generate_token(user_id, expires_in_hours=expires_in)
+        logger.info(f"Generated dev token for user: {user_id}")
+        return jsonify({
+            "token": token,
+            "user_id": user_id,
+            "expires_in_hours": expires_in,
+            "usage": f"Authorization: Bearer {token}"
+        })
+    except Exception as e:
+        logger.error(f"Token generation failed: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
     logger.info("Starting NexusCore API Server...")
-    app.run(host='0.0.0.0', port=5001, debug=True, use_reloader=False)
+    # セキュリティ: 本番環境ではdebug=Falseに設定
+    debug_mode = os.getenv("FLASK_ENV") != "production"
+    app.run(host='0.0.0.0', port=5001, debug=debug_mode, use_reloader=False)
