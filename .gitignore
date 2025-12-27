@@ -8,6 +8,11 @@
 # secrets.py は追跡しない
 src/nexuscore/config/secrets.py
 
+# Kubernetes Secrets（機密情報を含むため除外）
+k8s/nexuscore-secrets.yaml
+k8s/*-secrets.yaml
+k8s/*.secret.yaml
+
 # --- Byte-compiled / optimized / DLL files ---
 __pycache__/
 *.pyc

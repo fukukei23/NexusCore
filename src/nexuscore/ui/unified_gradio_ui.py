@@ -312,16 +312,16 @@ def build_test_runner_tab(state: gr.State) -> None:
     def run_test_handler(command: str, test_file: str, current_state: AppState) -> Tuple[str, str, AppState]:
         """テストを実行"""
         try:
-            # テストコマンドを構築
+            # テストコマンドを構築（リスト形式でコマンドインジェクション対策）
             if test_file.strip():
-                cmd = f"{command} {test_file}"
+                cmd_list = [command, test_file]
             else:
-                cmd = command
+                cmd_list = [command]
 
             # テスト実行
             result = subprocess.run(
-                cmd,
-                shell=True,
+                cmd_list,
+                shell=False,  # セキュリティ: コマンドインジェクション対策
                 capture_output=True,
                 text=True,
                 cwd=Path.cwd(),
