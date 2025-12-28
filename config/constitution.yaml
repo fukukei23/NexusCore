@@ -1,0 +1,265 @@
+# ==============================================================================
+# NexusCore Constitution (憲法)
+# ==============================================================================
+# 目的:
+#   NexusOSが生成する全てのコードとテストが満たすべき品質基準を定義します。
+#   この憲法は、AIエージェントが自律的に品質を保証するための「自己免疫システム」
+#   の基盤となります。
+#
+# 適用範囲:
+#   - すべてのCoderAgentが生成するコード
+#   - すべてのTesterAgentが生成するテスト
+#   - GuardianAgentの最終承認判断
+#
+# バージョン: 1.0
+# 最終更新: 2025-12-28
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# プロジェクト情報
+# ------------------------------------------------------------------------------
+project:
+  name: "NexusCore"
+  version: "7.25.0"
+  description: "Self-Evolving AI Software Development Framework"
+  repository: "https://github.com/fukukei23/NexusCore"
+
+# ------------------------------------------------------------------------------
+# 品質ゲート設定
+# ------------------------------------------------------------------------------
+quality_gates:
+  # ----------------------------------------------------------------------------
+  # Tier 1: コード品質の「量」の保証
+  # ----------------------------------------------------------------------------
+  tier1:
+    # テストカバレッジ
+    test_coverage_min: 90          # 最低90%のライン カバレッジ
+    branch_coverage_min: 85        # 最低85%のブランチカバレッジ
+
+    # コードスタイル（Pylint）
+    pylint_score_min: 8.0          # 10点満点中8.0以上
+    pylint_max_line_length: 120    # 1行の最大文字数
+
+    # コードの複雑度
+    cyclomatic_complexity_max: 10  # 循環的複雑度の上限（関数単位）
+    max_function_length: 50        # 関数の最大行数
+    max_class_length: 300          # クラスの最大行数
+
+    # 型チェック（MyPy）
+    mypy_strict_mode: true         # 厳格モードを有効化
+    mypy_check_untyped_defs: true  # 型アノテーションのない関数をチェック
+
+    # セキュリティスキャン（Bandit）
+    bandit_severity_max: "MEDIUM"  # HIGH以上の脆弱性は許容しない
+    bandit_confidence_min: "MEDIUM"  # 信頼度MEDIUM以上の警告のみ
+
+    # ドキュメント
+    require_docstrings: true       # 全ての公開関数にdocstringを要求
+    require_type_annotations: true # 全ての関数に型アノテーションを要求
+
+  # ----------------------------------------------------------------------------
+  # Tier 2: テスト品質の「質」の証明
+  # ----------------------------------------------------------------------------
+  tier2:
+    # ミューテーションテスト
+    mutation_score_min: 80         # 最低80%のミューテーションスコア
+    mutation_timeout_sec: 10       # 各テストのタイムアウト（秒）
+
+    # テストの網羅性
+    test_edge_cases: true          # エッジケースのテストを要求
+    test_error_handling: true      # エラーハンドリングのテストを要求
+
+    # テストの品質
+    no_redundant_tests: true       # 冗長なテストを禁止
+    no_flaky_tests: true           # 不安定なテストを禁止
+
+  # ----------------------------------------------------------------------------
+  # Guardian: 最終承認基準
+  # ----------------------------------------------------------------------------
+  guardian:
+    # アーキテクチャレビュー
+    check_architecture_consistency: true  # 既存の設計原則との一貫性をチェック
+    check_layer_boundaries: true          # レイヤー境界違反をチェック
+    prohibit_circular_dependencies: true  # 循環依存を禁止
+
+    # パフォーマンス
+    max_response_time_ms: 100      # APIエンドポイントの最大応答時間
+    max_memory_usage_mb: 512       # 最大メモリ使用量
+
+    # コードレビュー
+    require_meaningful_names: true # 意味のある変数名・関数名を要求
+    prohibit_magic_numbers: true   # マジックナンバーを禁止
+    prohibit_globals: true         # グローバル変数を禁止（定数除く）
+
+    # ビジネスロジック
+    check_requirement_compliance: true  # 要件との整合性をチェック
+    check_fkb_violations: true          # FKB（故障知識ベース）違反をチェック
+
+# ------------------------------------------------------------------------------
+# セキュリティポリシー
+# ------------------------------------------------------------------------------
+security:
+  # NPE (Nexus Protocol Engine) - カーネル層のセキュリティゲート
+  npe:
+    enabled: true
+
+    # 機密情報検出
+    detect_api_keys: true
+    detect_passwords: true
+    detect_pem_keys: true          # RSA/EC/OPENSSH/PKCS#8 全形式
+    detect_aws_credentials: true
+    detect_pii_email: true
+    detect_pii_phone: true
+
+    # マスキング戦略
+    mask_before_llm_call: true     # LLM呼び出し前に必ずマスキング
+    preserve_key_names: true       # デバッグ用にキー名は保持
+    log_detection_events: true     # 検出イベントをログに記録
+
+  # 依存関係スキャン
+  dependency_scanning:
+    enabled: true
+    check_vulnerabilities: true    # 既知の脆弱性をチェック
+    allow_dev_dependencies: true   # 開発依存関係は許容
+    block_deprecated_packages: true  # 非推奨パッケージをブロック
+
+  # 認証・認可
+  authentication:
+    require_jwt: true              # JWT認証を要求
+    token_expiry_hours: 24         # トークンの有効期限
+    enforce_https: true            # HTTPS通信を強制
+
+# ------------------------------------------------------------------------------
+# コンプライアンス設定
+# ------------------------------------------------------------------------------
+compliance:
+  # データ保護規制
+  gdpr:
+    enabled: true
+    data_retention_days: 90        # データ保持期間
+    require_user_consent: true     # ユーザー同意を要求
+    allow_data_export: true        # データエクスポートを許可
+
+  hipaa:
+    enabled: false                 # HIPAA準拠（医療データ）
+
+  sox:
+    enabled: false                 # SOX法準拠（財務報告）
+
+  # 監査ログ
+  audit_logging:
+    enabled: true
+    log_level: "INFO"              # ログレベル
+    log_retention_days: 365        # ログ保持期間
+    log_sensitive_operations: true # 機密操作をログ記録
+    log_quality_gate_results: true # 品質ゲート結果をログ記録
+
+# ------------------------------------------------------------------------------
+# エラー分類とリトライ戦略
+# ------------------------------------------------------------------------------
+error_handling:
+  # エラー分類（CR-NEXUS-051準拠）
+  classification:
+    detect_rate_limit: true
+    detect_timeout: true
+    detect_connection_error: true
+    detect_invalid_output: true    # JSON検出はOR論理
+    detect_sandbox_error: true
+    detect_patch_error: true
+
+  # リトライ戦略
+  retry:
+    max_retries: 3
+    base_delay_sec: 1.0
+    exponential_backoff: true
+    retry_on_rate_limit: true
+    retry_on_timeout: true
+    retry_on_connection_error: true
+    retry_on_invalid_output: true  # JSONエラーは即座にリトライ
+
+# ------------------------------------------------------------------------------
+# FKB (Fault Knowledge Base) 設定
+# ------------------------------------------------------------------------------
+fkb:
+  # 学習サイクル
+  learning:
+    enabled: true
+    trigger_on_debugger_failure: true  # Debugger失敗時に学習発動
+    require_scientific_validation: true  # 科学的検証を必須化
+
+  # 知識の階層化
+  hierarchy:
+    use_fkb_core: true             # 普遍的知識（NexusCore提供）
+    use_fkb_customer: true         # 顧客固有知識
+    customer_knowledge_priority: "high"  # 顧客知識を優先
+
+  # PostmortemAgent
+  postmortem:
+    max_analysis_depth: 3          # 根本原因分析の最大深度
+    generate_reproducible_tests: true  # 再現可能なテストを生成
+
+# ------------------------------------------------------------------------------
+# パフォーマンス設定
+# ------------------------------------------------------------------------------
+performance:
+  # Tier 1 品質ゲート
+  tier1_timeout_sec: 30            # Tier 1 全体のタイムアウト
+
+  # Tier 2 品質ゲート
+  tier2_timeout_sec: 300           # Tier 2 全体のタイムアウト（5分）
+
+  # 並列実行
+  parallel_execution:
+    enabled: true
+    max_workers: 4                 # 最大ワーカー数
+
+# ------------------------------------------------------------------------------
+# 環境別設定の上書き
+# ------------------------------------------------------------------------------
+environments:
+  # 開発環境
+  development:
+    quality_gates:
+      tier1:
+        test_coverage_min: 80      # 開発時は80%に緩和
+        pylint_score_min: 7.0      # 開発時は7.0に緩和
+      tier2:
+        mutation_score_min: 70     # 開発時は70%に緩和
+
+  # ステージング環境
+  staging:
+    quality_gates:
+      tier1:
+        test_coverage_min: 90      # 本番と同じ基準
+      tier2:
+        mutation_score_min: 80
+
+  # 本番環境
+  production:
+    quality_gates:
+      tier1:
+        test_coverage_min: 95      # 本番は95%に厳格化
+        pylint_score_min: 9.0      # 本番は9.0に厳格化
+      tier2:
+        mutation_score_min: 85     # 本番は85%に厳格化
+    security:
+      npe:
+        mask_before_llm_call: true # 本番では必須
+      authentication:
+        enforce_https: true        # 本番ではHTTPS強制
+
+# ------------------------------------------------------------------------------
+# カスタムルール（顧客固有の拡張）
+# ------------------------------------------------------------------------------
+custom_rules:
+  # この領域は顧客ごとにカスタマイズ可能
+  # 例:
+  # - 特定のライブラリの使用禁止
+  # - 社内コーディング規約
+  # - 業界特有のセキュリティ要件
+
+  # 例: 金融業界向け
+  # financial_industry:
+  #   prohibit_floating_point_for_money: true
+  #   require_decimal_for_currency: true
+  #   enforce_transaction_logging: true

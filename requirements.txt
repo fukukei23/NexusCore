@@ -51,7 +51,7 @@ httpcore>=1.0.0,<2.0.0
 requests>=2.31.0,<3.0.0  # For Slack notifications
 python-dotenv>=1.0.0,<2.0.0
 termcolor>=2.4.0,<3.0.0
-pyyaml>=6.0.0,<7.0.0  # For test strategy config
+pyyaml>=6.0.0,<7.0.0  # For test strategy config and constitution file
 
 # --- Authentication (新規追加) ---
 pyjwt>=2.8.0,<3.0.0  # JWT認証用（タスク2で使用）
