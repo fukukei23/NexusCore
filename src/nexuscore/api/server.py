@@ -71,21 +71,10 @@ tasks = {}
 llm_router = LLMRouter()
 
 # --- ロギング設定 ---
-from nexuscore.utils.log_config import get_logs_dir
+from nexuscore.logging_standard import get_logger
 
-logs_dir = get_logs_dir()
-log_path = logs_dir / "nexus_api_server.log"
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)-8s - %(name)-20s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(log_path, mode='a', encoding='utf-8')
-    ]
-)
-logger = logging.getLogger(__name__)
-logger.info(f"API server log file: {log_path}")
+logger = get_logger(__name__)
+logger.info("API server initialized with standard logging")
 
 def run_orchestrator_task(task_id: str, requirement: str, project_path: str, constitution: dict):
     """Orchestratorをバックグラウンドで実行するワーカー関数"""
