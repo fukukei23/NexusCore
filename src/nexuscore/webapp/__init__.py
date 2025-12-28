@@ -78,6 +78,13 @@ def create_app(config_overrides: dict | None = None) -> Flask:
             "Install with: pip install flask-cors"
         )
 
+    # ロギングプロバイダーの登録（Core層へのDB拡張ロガーの注入）
+    from nexuscore.webapp.logging_provider import WebappLoggingProvider
+    from nexuscore.core.logging_interface import register_logging_provider
+
+    register_logging_provider(WebappLoggingProvider())
+    # これにより、Core/NPE層がWebapp層に直接依存せずにDB logging機能を利用可能になる
+
     # ルートページ（リダイレクト）
     @app.route("/")
     def index():

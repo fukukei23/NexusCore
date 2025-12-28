@@ -6,6 +6,9 @@
 # ==============================================================================
 from __future__ import annotations
 import re
+from nexuscore.logging_standard import get_logger
+
+logger = get_logger(__name__)
 
 _SENSITIVE_PATTERNS = [
     # .env形式のキー=値
@@ -25,13 +28,13 @@ def context_scanner(code: str) -> str:
     """
     コンテキストをスキャンし、機密情報の有無を判定する ('safe' or 'sensitive')。
     """
-    print("[NPE-PolicyScanner] Context scan initiated...")
+    logger.info("Context scan initiated...")
     for pat in _SENSITIVE_PATTERNS:
         if re.search(pat, code, flags=re.IGNORECASE | re.MULTILINE):
             m = re.search(pat, code, flags=re.IGNORECASE | re.MULTILINE)
-            print(f"[NPE-PolicyScanner] RESULT: Sensitive pattern found. Match: '{m.group(0)[:64]}...'")
+            logger.warning(f"RESULT: Sensitive pattern found. Match: '{m.group(0)[:64]}...'")
             return "sensitive"
-    print("[NPE-PolicyScanner] RESULT: No sensitive patterns found.")
+    logger.info("RESULT: No sensitive patterns found.")
     return "safe"
 
 
@@ -39,7 +42,7 @@ def secure_context_builder(code: str) -> str:
     """
     機密情報をマスキング（匿名化）処理する。
     """
-    print("[NPE-SecureBuilder] Masking sensitive data in context...")
+    logger.info("Masking sensitive data in context...")
     masked = code
     # キー=値の一般マスク
     masked = re.sub(
