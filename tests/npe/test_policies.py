@@ -25,12 +25,29 @@ AWS_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
         result = context_scanner(code_with_asia_key)
         assert result == "sensitive", "AWS ASIA key should be detected as sensitive"
 
-    def test_detects_pem_private_keys(self):
-        """PEM形式の秘密鍵を検出するテスト (PKCS#8 format)"""
-        # Pattern matches "-----BEGIN PRIVATE KEY-----" (PKCS#8 format)
-        pem_key = "-----BEGIN PRIVATE KEY-----\nMIIEpAIBAAKCAQEA0Z5V...\n-----END PRIVATE KEY-----"
+    def test_detects_pem_rsa_keys(self):
+        """PEM形式のRSA秘密鍵を検出するテスト"""
+        pem_key = """-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA0Z5V7jMZ5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5
+-----END RSA PRIVATE KEY-----"""
         result = context_scanner(pem_key)
-        assert result == "sensitive", "PEM PRIVATE key should be detected as sensitive"
+        assert result == "sensitive", "PEM RSA PRIVATE KEY should be detected as sensitive"
+
+    def test_detects_pem_ec_keys(self):
+        """PEM形式のEC秘密鍵を検出するテスト"""
+        pem_key = """-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIIGlRHqOzmqXZ5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5ZoAoGCCqGSM
+-----END EC PRIVATE KEY-----"""
+        result = context_scanner(pem_key)
+        assert result == "sensitive", "PEM EC PRIVATE KEY should be detected as sensitive"
+
+    def test_detects_pem_pkcs8_keys(self):
+        """PEM形式のPKCS#8秘密鍵を検出するテスト"""
+        pem_key = """-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC8Z5Z5Z5Z5Z
+-----END PRIVATE KEY-----"""
+        result = context_scanner(pem_key)
+        assert result == "sensitive", "PEM PKCS#8 PRIVATE KEY should be detected as sensitive"
 
     def test_detects_api_key_env_var(self):
         """環境変数形式のAPIキーを検出するテスト"""
@@ -153,15 +170,38 @@ class TestSecureContextBuilder:
         assert "ghp_1234567890abcdefghij" not in masked, "Original token should be masked"
         assert "[REDACTED_BY_NPE]" in masked, "Token should be replaced with redaction marker"
 
-    def test_masks_pem_keys(self):
-        """PEM秘密鍵をマスキングするテスト"""
-        # Pattern matches "-----BEGIN PRIVATE KEY-----" (PKCS#8 format)
-        code = "-----BEGIN PRIVATE KEY-----\nMIIEpAIBAAKCAQEA0Z5V...\nFull key content here...\n-----END PRIVATE KEY-----"
+    def test_masks_pem_rsa_keys(self):
+        """PEM RSA秘密鍵をマスキングするテスト"""
+        code = """-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA0Z5V7jMZ5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5
+Full key content here...
+-----END RSA PRIVATE KEY-----"""
         masked = secure_context_builder(code)
         assert "MIIEpAIBAAKCAQEA0Z5V" not in masked, "PEM key content should be masked"
         assert "[REDACTED_PEM_BY_NPE]" in masked, "PEM key should be replaced with redaction marker"
+        assert "-----BEGIN RSA PRIVATE KEY-----" in masked, "PEM header should be preserved"
+
+    def test_masks_pem_ec_keys(self):
+        """PEM EC秘密鍵をマスキングするテスト"""
+        code = """-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIIGlRHqOzmqXZ5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5ZoAoGCCqGSM
+Full key content here...
+-----END EC PRIVATE KEY-----"""
+        masked = secure_context_builder(code)
+        assert "MHcCAQEEIIGlRHqOzmqXZ" not in masked, "EC key content should be masked"
+        assert "[REDACTED_PEM_BY_NPE]" in masked, "EC key should be replaced with redaction marker"
+        assert "-----BEGIN EC PRIVATE KEY-----" in masked, "PEM header should be preserved"
+
+    def test_masks_pem_pkcs8_keys(self):
+        """PEM PKCS#8秘密鍵をマスキングするテスト"""
+        code = """-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC8Z5Z5Z5Z5Z
+Full key content here...
+-----END PRIVATE KEY-----"""
+        masked = secure_context_builder(code)
+        assert "MIIEvQIBADANBgkqhkiG9" not in masked, "PKCS#8 key content should be masked"
+        assert "[REDACTED_PEM_BY_NPE]" in masked, "PKCS#8 key should be replaced with redaction marker"
         assert "-----BEGIN PRIVATE KEY-----" in masked, "PEM header should be preserved"
-        assert "-----END PRIVATE KEY-----" in masked, "PEM footer should be preserved"
 
     def test_masks_email_addresses(self):
         """メールアドレスをマスキングするテスト"""

@@ -18,7 +18,7 @@ _SENSITIVE_PATTERNS = [
     r'AKIA[0-9A-Z]{16}',
     r'ASIA[0-9A-Z]{16}',
     # PEM鍵
-    r'-----BEGIN (?:RSA|EC|OPENSSH|PRIVATE) KEY-----',
+    r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',
     # メール/電話（誤送出防止のゆるめヒット）
     r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+',
     r'\b\d{2,4}[-\s]?\d{2,4}[-\s]?\d{3,4}\b',
@@ -59,7 +59,7 @@ def secure_context_builder(code: str) -> str:
     )
     masked = re.sub(r'AKIA[0-9A-Z]{16}', '[REDACTED_AWS_KEY_BY_NPE]', masked, flags=re.IGNORECASE)
     masked = re.sub(r'ASIA[0-9A-Z]{16}', '[REDACTED_AWS_KEY_BY_NPE]', masked, flags=re.IGNORECASE)
-    masked = re.sub(r'(-----BEGIN (?:RSA|EC|OPENSSH|PRIVATE) KEY-----)[\s\S]+?(-----END .*? KEY-----)', r'\1\n[REDACTED_PEM_BY_NPE]\n\2', masked, flags=re.IGNORECASE)
+    masked = re.sub(r'(-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----)[\s\S]+?(-----END .*? KEY-----)', r'\1\n[REDACTED_PEM_BY_NPE]\n\2', masked, flags=re.IGNORECASE)
     # 連絡先のゆるマスク
     masked = re.sub(r'([a-zA-Z0-9_.+-]+)@([a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', r'[\1]@[REDACTED_DOMAIN]', masked)
     masked = re.sub(r'\b(\d{2,4})[-\s]?(\d{2,4})[-\s]?(\d{3,4})\b', r'\1-[REDACTED]-\3', masked)

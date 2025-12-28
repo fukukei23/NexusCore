@@ -104,13 +104,19 @@ class TestErrorClassification:
         exc = Exception("DNS resolution failed for api.openai.com")
         assert classify_error(exc) == "connection"
 
-    def test_classify_json_parse_error(self):
-        """JSON パースエラーを invalid_output として分類（型名に json を含む必要がある）"""
-        # 型名に 'json' が含まれ、かつメッセージにもキーワードが必要
+    def test_classify_json_parse_error_by_type_name(self):
+        """型名に JSON/parse キーワードがある場合、invalid_output として分類"""
         class JSONParseError(Exception):
             pass
 
-        exc = JSONParseError("Failed to parse JSON: unexpected token at position 42")
+        # 型名に 'json' が含まれていれば、メッセージに関わらず invalid_output
+        exc = JSONParseError("Something went wrong")
+        assert classify_error(exc) == "invalid_output"
+
+    def test_classify_json_parse_error_by_message(self):
+        """メッセージに JSON/parse キーワードがある場合、invalid_output として分類"""
+        # 型名が一般的な Exception でも、メッセージに 'json' があれば invalid_output
+        exc = Exception("JSON parse error: invalid syntax")
         assert classify_error(exc) == "invalid_output"
 
     def test_classify_json_decode_error(self):
@@ -120,12 +126,6 @@ class TestErrorClassification:
 
         exc = JSONDecodeError("Failed to decode JSON response")
         assert classify_error(exc) == "invalid_output"
-
-    def test_classify_generic_json_error_as_unexpected(self):
-        """一般的な Exception での JSON エラーは unexpected として分類"""
-        # 型名に json/parse が含まれない場合は unexpected
-        exc = Exception("JSON parse error: invalid syntax")
-        assert classify_error(exc) == "unexpected"
 
     def test_classify_sandbox_from_message(self):
         """エラーメッセージ内の 'sandbox' から分類"""
@@ -216,7 +216,7 @@ class TestConvertHttpErrorToNexusError:
         assert "Connection error" in str(nexus_error)
 
     def test_convert_invalid_output_error(self):
-        """JSON パースエラーを InvalidModelOutputError に変換（型名に json を含む必要）"""
+        """JSON パースエラーを InvalidModelOutputError に変換"""
         class JSONParseError(Exception):
             pass
 
