@@ -2,13 +2,16 @@
 # ファイル: src/nexuscore/agents/mutation_tester_agent.py
 # 目的  : Tier 2品質ゲート - テストの質をミューテーションテストで検証
 # ==============================================================================
+"""
+MutationTesterAgent: Tier 2品質ゲートの実装
+
+ミューテーションテストを実行してテストの質を検証します。
+"""
 from __future__ import annotations
 
 import subprocess
 import re
-import json
-from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from dataclasses import dataclass, field
 
 from nexuscore.agents.base_agent import BaseAgent
@@ -17,12 +20,10 @@ from nexuscore.agents.base_agent import BaseAgent
 # ==================== カスタム例外 ====================
 class MutationTestError(Exception):
     """ミューテーションテスト実行時の基底エラー"""
-    pass
 
 
 class MutationTestTimeoutError(MutationTestError):
     """ミューテーションテストのタイムアウトエラー"""
-    pass
 
 
 # ==================== データクラス ====================
@@ -52,6 +53,7 @@ class MutationReport:
     feedback: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
+        """MutationReportを辞書形式に変換"""
         return {
             "passed": self.passed,
             "mutation_score": self.mutation_score,
@@ -106,15 +108,15 @@ class MutationTesterAgent(BaseAgent):
         tier2_config = constitution.get("quality_gates", {}).get("tier2", {})
         min_mutation_score = tier2_config.get("mutation_score_min", 80)
 
-        self.logger.info(f"Tier 2品質ゲート開始: MutationScore≥{min_mutation_score}%")
+        self.logger.info("Tier 2品質ゲート開始: MutationScore≥%s%%", min_mutation_score)
 
         # Step 1: mutmut実行
-        self.logger.info(f"mutmut実行中: {source_path}")
+        self.logger.info("mutmut実行中: %s", source_path)
         try:
             mutmut_result = self._run_mutmut(source_path, test_path, timeout_per_test)
         except MutationTestTimeoutError as e:
             # タイムアウト時の処理
-            self.logger.error(f"ミューテーションテストがタイムアウトしました: {e}")
+            self.logger.error("ミューテーションテストがタイムアウトしました: %s", e)
             return MutationReport(
                 passed=False,
                 mutation_score=0.0,
@@ -132,7 +134,7 @@ class MutationTesterAgent(BaseAgent):
             )
         except MutationTestError as e:
             # その他のエラー時の処理
-            self.logger.error(f"ミューテーションテストの実行に失敗しました: {e}")
+            self.logger.error("ミューテーションテストの実行に失敗しました: %s", e)
             return MutationReport(
                 passed=False,
                 mutation_score=0.0,
@@ -200,7 +202,7 @@ class MutationTesterAgent(BaseAgent):
             MutationTestError: その他のエラー時
         """
         # mutmutキャッシュをクリア
-        subprocess.run(["mutmut", "run", "--rerun-all"], capture_output=True)
+        subprocess.run(["mutmut", "run", "--rerun-all"], capture_output=True, check=False)
 
         # mutmut実行
         cmd = [
@@ -217,7 +219,8 @@ class MutationTesterAgent(BaseAgent):
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=600  # 全体のタイムアウト: 10分
+                timeout=600,  # 全体のタイムアウト: 10分
+                check=False
             )
 
             # 結果パース
@@ -228,7 +231,7 @@ class MutationTesterAgent(BaseAgent):
             self.logger.error("mutmut実行がタイムアウトしました")
             raise MutationTestTimeoutError("mutmut execution timed out after 600 seconds") from e
         except Exception as e:
-            self.logger.error(f"mutmut実行エラー: {e}", exc_info=True)
+            self.logger.error("mutmut実行エラー: %s", e, exc_info=True)
             raise MutationTestError(f"mutmut execution failed: {e}") from e
 
     def _parse_mutmut_output(self, output: str) -> Dict[str, int]:
@@ -275,13 +278,14 @@ class MutationTesterAgent(BaseAgent):
             result = subprocess.run(
                 ["mutmut", "results"],
                 capture_output=True,
-                text=True
+                text=True,
+                check=False
             )
 
             return self._parse_survived_mutants(result.stdout)
 
-        except Exception as e:
-            self.logger.error(f"ミュータント詳細取得エラー: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            self.logger.error("ミュータント詳細取得エラー: %s", e)
             return []
 
     def _parse_survived_mutants(self, output: str) -> List[Mutant]:
@@ -344,7 +348,7 @@ class MutationTesterAgent(BaseAgent):
             return f"✅ ミューテーションスコア {mutation_score:.1f}% - 基準をクリアしました。"
 
         feedback_lines = [
-            f"❌ Tier 2品質ゲート不合格",
+            "❌ Tier 2品質ゲート不合格",
             f"ミューテーションスコア: {mutation_score:.1f}% < {min_score}% (最低基準)\n",
             f"以下の{len(survived_mutants)}個のミュータントが生き残りました。",
             "テストを追加してバグ検出能力を向上させてください。\n"
