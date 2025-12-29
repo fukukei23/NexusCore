@@ -7,7 +7,7 @@ MutationTesterAgent: Tier 2品質ゲートの実装
 
 ミューテーションテストを実行してテストの質を検証します。
 """
-from __future__ import annotations
+# from __future__ import annotations  # mutmut パーサーとの互換性のためコメントアウト
 
 import subprocess
 import re
