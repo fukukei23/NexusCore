@@ -14,6 +14,18 @@ from dataclasses import dataclass, field
 from nexuscore.agents.base_agent import BaseAgent
 
 
+# ==================== カスタム例外 ====================
+class MutationTestError(Exception):
+    """ミューテーションテスト実行時の基底エラー"""
+    pass
+
+
+class MutationTestTimeoutError(MutationTestError):
+    """ミューテーションテストのタイムアウトエラー"""
+    pass
+
+
+# ==================== データクラス ====================
 @dataclass
 class Mutant:
     """生き残ったミュータント（バグ）の情報"""
@@ -98,7 +110,46 @@ class MutationTesterAgent(BaseAgent):
 
         # Step 1: mutmut実行
         self.logger.info(f"mutmut実行中: {source_path}")
-        mutmut_result = self._run_mutmut(source_path, test_path, timeout_per_test)
+        try:
+            mutmut_result = self._run_mutmut(source_path, test_path, timeout_per_test)
+        except MutationTestTimeoutError as e:
+            # タイムアウト時の処理
+            self.logger.error(f"ミューテーションテストがタイムアウトしました: {e}")
+            return MutationReport(
+                passed=False,
+                mutation_score=0.0,
+                total_mutants=0,
+                killed=0,
+                survived=0,
+                timeout=0,
+                suspicious=0,
+                survived_mutants=[],
+                feedback="❌ Tier 2品質ゲート実行エラー\n\n"
+                        "ミューテーションテストがタイムアウトしました (600秒)。\n"
+                        "テスト実行時間が長すぎる可能性があります。\n"
+                        "- テストの実行時間を確認してください\n"
+                        "- 無限ループや遅い処理がないか確認してください"
+            )
+        except MutationTestError as e:
+            # その他のエラー時の処理
+            self.logger.error(f"ミューテーションテストの実行に失敗しました: {e}")
+            return MutationReport(
+                passed=False,
+                mutation_score=0.0,
+                total_mutants=0,
+                killed=0,
+                survived=0,
+                timeout=0,
+                suspicious=0,
+                survived_mutants=[],
+                feedback=f"❌ Tier 2品質ゲート実行エラー\n\n"
+                        f"ミューテーションテストの実行に失敗しました。\n"
+                        f"エラー詳細: {str(e)}\n\n"
+                        f"考えられる原因:\n"
+                        f"- mutmutがインストールされていない\n"
+                        f"- テストパスが正しくない\n"
+                        f"- ソースコードに構文エラーがある"
+            )
 
         # Step 2: 結果パース
         total = mutmut_result["total"]
@@ -143,6 +194,10 @@ class MutationTesterAgent(BaseAgent):
 
         Returns:
             dict: {"total": X, "killed": Y, "survived": Z, ...}
+
+        Raises:
+            MutationTestTimeoutError: タイムアウト時
+            MutationTestError: その他のエラー時
         """
         # mutmutキャッシュをクリア
         subprocess.run(["mutmut", "run", "--rerun-all"], capture_output=True)
@@ -169,12 +224,12 @@ class MutationTesterAgent(BaseAgent):
             output = result.stdout + result.stderr
             return self._parse_mutmut_output(output)
 
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as e:
             self.logger.error("mutmut実行がタイムアウトしました")
-            return {"total": 0, "killed": 0, "survived": 0, "timeout": 0, "suspicious": 0}
+            raise MutationTestTimeoutError("mutmut execution timed out after 600 seconds") from e
         except Exception as e:
             self.logger.error(f"mutmut実行エラー: {e}", exc_info=True)
-            return {"total": 0, "killed": 0, "survived": 0, "timeout": 0, "suspicious": 0}
+            raise MutationTestError(f"mutmut execution failed: {e}") from e
 
     def _parse_mutmut_output(self, output: str) -> Dict[str, int]:
         """

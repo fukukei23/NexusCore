@@ -15,7 +15,9 @@ from dataclasses import asdict
 from nexuscore.agents.mutation_tester_agent import (
     MutationTesterAgent,
     MutationReport,
-    Mutant
+    Mutant,
+    MutationTestError,
+    MutationTestTimeoutError
 )
 
 
@@ -234,6 +236,48 @@ class TestRunMutationTesting:
                 assert result.survived == 0
                 assert "✅" in result.feedback
 
+    def test_run_mutation_testing_timeout_error(
+        self,
+        mutation_agent,
+        mock_constitution
+    ):
+        """mutmutタイムアウト時は適切なMutationReportを返す"""
+        with patch.object(mutation_agent, '_run_mutmut', side_effect=MutationTestTimeoutError("timeout")):
+            result = mutation_agent.run_mutation_testing(
+                source_path="src/example.py",
+                test_path="tests/test_example.py",
+                constitution=mock_constitution
+            )
+
+            # タイムアウトエラーは適切に処理される
+            assert isinstance(result, MutationReport)
+            assert result.passed is False
+            assert result.mutation_score == 0.0
+            assert result.total_mutants == 0
+            assert "タイムアウト" in result.feedback
+            assert "600秒" in result.feedback
+
+    def test_run_mutation_testing_execution_error(
+        self,
+        mutation_agent,
+        mock_constitution
+    ):
+        """mutmut実行エラー時は適切なMutationReportを返す"""
+        with patch.object(mutation_agent, '_run_mutmut', side_effect=MutationTestError("execution failed")):
+            result = mutation_agent.run_mutation_testing(
+                source_path="src/example.py",
+                test_path="tests/test_example.py",
+                constitution=mock_constitution
+            )
+
+            # 実行エラーは適切に処理される
+            assert isinstance(result, MutationReport)
+            assert result.passed is False
+            assert result.mutation_score == 0.0
+            assert result.total_mutants == 0
+            assert "実行に失敗" in result.feedback
+            assert "execution failed" in result.feedback
+
 
 class TestRunMutmut:
     """_run_mutmut メソッドのテスト"""
@@ -264,7 +308,7 @@ class TestRunMutmut:
             assert result["suspicious"] == 0
 
     def test_run_mutmut_timeout(self, mutation_agent):
-        """mutmut実行タイムアウト"""
+        """mutmut実行タイムアウト時に適切な例外を投げる"""
         # 1回目のcall (rerun-all) は成功、2回目のcall (本体) がタイムアウト
         mock_rerun_result = Mock()
         mock_rerun_result.stdout = ""
@@ -274,19 +318,19 @@ class TestRunMutmut:
             mock_rerun_result,
             subprocess.TimeoutExpired(cmd="mutmut", timeout=600)
         ]):
-            result = mutation_agent._run_mutmut(
-                source_path="src/example.py",
-                test_path="tests/test_example.py",
-                timeout=10
-            )
+            # タイムアウト時はMutationTestTimeoutErrorを投げる
+            with pytest.raises(MutationTestTimeoutError) as exc_info:
+                mutation_agent._run_mutmut(
+                    source_path="src/example.py",
+                    test_path="tests/test_example.py",
+                    timeout=10
+                )
 
-            # エラー時はデフォルト値を返す
-            assert result["total"] == 0
-            assert result["killed"] == 0
-            assert result["survived"] == 0
+            # エラーメッセージの検証
+            assert "timed out" in str(exc_info.value).lower()
 
     def test_run_mutmut_exception(self, mutation_agent):
-        """mutmut実行時の予期しない例外"""
+        """mutmut実行時の予期しない例外を適切にラップする"""
         # 1回目のcall (rerun-all) は成功、2回目のcall (本体) が例外
         mock_rerun_result = Mock()
         mock_rerun_result.stdout = ""
@@ -296,14 +340,17 @@ class TestRunMutmut:
             mock_rerun_result,
             Exception("Unexpected error")
         ]):
-            result = mutation_agent._run_mutmut(
-                source_path="src/example.py",
-                test_path="tests/test_example.py",
-                timeout=10
-            )
+            # 予期しない例外はMutationTestErrorでラップされる
+            with pytest.raises(MutationTestError) as exc_info:
+                mutation_agent._run_mutmut(
+                    source_path="src/example.py",
+                    test_path="tests/test_example.py",
+                    timeout=10
+                )
 
-            assert result["total"] == 0
-            assert result["killed"] == 0
+            # エラーメッセージの検証
+            assert "execution failed" in str(exc_info.value).lower()
+            assert "unexpected error" in str(exc_info.value).lower()
 
 
 class TestParseMutmutOutput:
