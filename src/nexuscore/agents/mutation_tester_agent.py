@@ -11,6 +11,10 @@ from __future__ import annotations
 
 import subprocess
 import re
+import json
+import tempfile
+import shutil
+from pathlib import Path
 from typing import Dict, Any, List
 from dataclasses import dataclass, field
 
@@ -192,7 +196,7 @@ class MutationTesterAgent(BaseAgent):
         timeout: int
     ) -> Dict[str, int]:
         """
-        mutmutを実行して結果を取得
+        mutmut v3.4.0を実行して結果を取得
 
         Returns:
             dict: {"total": X, "killed": Y, "survived": Z, ...}
@@ -201,31 +205,49 @@ class MutationTesterAgent(BaseAgent):
             MutationTestTimeoutError: タイムアウト時
             MutationTestError: その他のエラー時
         """
-        # mutmutキャッシュをクリア
-        subprocess.run(["mutmut", "run", "--rerun-all"], capture_output=True, check=False)
-
-        # mutmut実行
-        cmd = [
-            "mutmut",
-            "run",
-            "--paths-to-mutate", source_path,
-            "--tests-dir", test_path,
-            "--runner", "python -m pytest",
-            "--timeout", str(timeout)
-        ]
+        # 一時ディレクトリで実行
+        temp_dir = tempfile.mkdtemp(prefix="mutmut_")
 
         try:
+            # pyproject.toml生成
+            pyproject_path = Path(temp_dir) / "pyproject.toml"
+            config = {
+                "tool": {
+                    "mutmut": {
+                        "paths_to_mutate": [source_path],
+                        "runner": f"python -m pytest {test_path} -x --tb=no -q"
+                    }
+                }
+            }
+
+            with open(pyproject_path, "w", encoding="utf-8") as f:
+                # TOMLフォーマットで書き込み
+                f.write("[tool.mutmut]\n")
+                f.write(f'paths_to_mutate = ["{source_path}"]\n')
+                f.write(f'runner = "python -m pytest {test_path} -x --tb=no -q"\n')
+
+            # mutmut実行（pyproject.tomlがあるディレクトリで実行）
+            cmd = ["mutmut", "run", "--max-children", "1"]
+
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 timeout=600,  # 全体のタイムアウト: 10分
-                check=False
+                check=False,
+                cwd=temp_dir
             )
 
             # 結果パース
             output = result.stdout + result.stderr
-            return self._parse_mutmut_output(output)
+            parsed_result = self._parse_mutmut_output(output)
+
+            # mutantsフォルダからJSON統計を読み取り
+            stats_file = Path(temp_dir) / "mutants" / "mutmut-stats.json"
+            if stats_file.exists():
+                self.logger.info("mutmut統計ファイル発見: %s", stats_file)
+
+            return parsed_result
 
         except subprocess.TimeoutExpired as e:
             self.logger.error("mutmut実行がタイムアウトしました")
@@ -233,17 +255,27 @@ class MutationTesterAgent(BaseAgent):
         except Exception as e:
             self.logger.error("mutmut実行エラー: %s", e, exc_info=True)
             raise MutationTestError(f"mutmut execution failed: {e}") from e
+        finally:
+            # 一時ディレクトリをクリーンアップ
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                self.logger.warning("一時ディレクトリ削除失敗: %s", e)
 
     def _parse_mutmut_output(self, output: str) -> Dict[str, int]:
         """
-        mutmutの出力をパース
+        mutmut v3.4.0の出力をパース（絵文字ベース）
 
         出力例:
-            Total mutants: 120
-            Killed: 96 (80.0%)
-            Survived: 18 (15.0%)
-            Timeout: 4 (3.3%)
-            Suspicious: 2 (1.7%)
+            ⠧ 2/2  🎉 2 🫥 0  ⏰ 0  🤔 0  🙁 0  🔇 0
+
+        絵文字の意味:
+            🎉 = killed
+            🙁 = survived
+            ⏰ = timeout
+            🤔 = suspicious
+            🫥 = skipped
+            🔇 = muted
         """
         result = {
             "total": 0,
@@ -253,18 +285,29 @@ class MutationTesterAgent(BaseAgent):
             "suspicious": 0
         }
 
-        patterns = {
-            "total": r"Total mutants:\s*(\d+)",
-            "killed": r"Killed:\s*(\d+)",
-            "survived": r"Survived:\s*(\d+)",
-            "timeout": r"Timeout:\s*(\d+)",
-            "suspicious": r"Suspicious:\s*(\d+)"
+        # 絵文字ベースのパターン
+        # 例: "2/2  🎉 2 🫥 0  ⏰ 0  🤔 0  🙁 0  🔇 0"
+        emoji_patterns = {
+            "total": r"(\d+)/\d+",  # "2/2" の最初の数字
+            "killed": r"🎉\s*(\d+)",
+            "survived": r"🙁\s*(\d+)",
+            "timeout": r"⏰\s*(\d+)",
+            "suspicious": r"🤔\s*(\d+)"
         }
 
-        for key, pattern in patterns.items():
+        for key, pattern in emoji_patterns.items():
             match = re.search(pattern, output)
             if match:
                 result[key] = int(match.group(1))
+
+        # totalが見つからない場合、killed + survived + timeout + suspicious
+        if result["total"] == 0:
+            result["total"] = (
+                result["killed"] +
+                result["survived"] +
+                result["timeout"] +
+                result["suspicious"]
+            )
 
         return result
 

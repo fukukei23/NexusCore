@@ -57,7 +57,7 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 
+
 [tool.mutmut]
-paths_to_mutate = ["src/"]
-tests_dir = "tests/"
-runner = "python -m pytest"
+paths_to_mutate = ["src/nexuscore/agents/mutation_tester_agent.py"]
+runner = "python -m pytest tests/agents/test_mutation_tester_agent.py --tb=no -q --import-mode=importlib"
