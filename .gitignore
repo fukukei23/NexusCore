@@ -76,6 +76,11 @@ htmlcov/
 .pytest_cache/
 .mypy_cache/
 
+# mutmut (mutation testing)
+mutants/
+.mutmut-cache
+.mutmut_temp.toml
+
 # テスト結果ファイル（自動生成）
 docs/reports/TEST_RESULTS_*.txt
 docs/reports/TEST_ERRORS_*.txt
