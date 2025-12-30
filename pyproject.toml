@@ -60,4 +60,4 @@ line-ending = "auto"
 
 [tool.mutmut]
 paths_to_mutate = ["src/nexuscore/agents/mutation_tester_agent.py"]
-tests_dir = ["tests/agents/test_mutation_tester_agent.py", "-k", "not (TestRunMutmut or TestParseMutmutOutput or TestIntegration or TestIntegrationReal)"]
+tests_dir = ["tests/agents/test_mutation_tester_agent.py", "-m", "not slow"]
