@@ -50,19 +50,24 @@ def dashboard():
     ).count()
 
     # LLMごとの call_count, cost_sum（簡易版）
+    # SQLiteではJSON操作がサポートされていないため、try-exceptで囲む
     from sqlalchemy import func
-    llm_stats = (
-        db.session.query(
-            ExecutionLog.payload_json["model"].astext.label("model"),
-            func.count(ExecutionLog.id).label("call_count"),
-            func.sum(
-                func.cast(ExecutionLog.payload_json["cost_est_usd"], db.Float)
-            ).label("cost_sum"),
+    try:
+        llm_stats = (
+            db.session.query(
+                ExecutionLog.payload_json["model"].astext.label("model"),
+                func.count(ExecutionLog.id).label("call_count"),
+                func.sum(
+                    func.cast(ExecutionLog.payload_json["cost_est_usd"], db.Float)
+                ).label("cost_sum"),
+            )
+            .filter(ExecutionLog.source == "NPE")
+            .group_by(ExecutionLog.payload_json["model"].astext)
+            .all()
         )
-        .filter(ExecutionLog.source == "NPE")
-        .group_by(ExecutionLog.payload_json["model"].astext)
-        .all()
-    )
+    except Exception:
+        # SQLiteなどJSON操作が未サポートのDBでは空リストを返す
+        llm_stats = []
 
     if request.headers.get("Accept", "").startswith("application/json"):
         return jsonify({

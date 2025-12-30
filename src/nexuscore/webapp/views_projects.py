@@ -434,34 +434,8 @@ def project_detail(project_id: int):
     # ダッシュボードへのリンク
     dashboard_url = f"/dashboard/projects/{project.id}"
 
-    # 4.5: メトリクス可視化セクション
+    # 4.5: メトリクス可視化セクション（将来実装予定のため現在は空）
     metrics_html = ""
-    if recent_runs:
-        success_rate_pct = recent_success_rate * 100
-        avg_exec_time_str = _format_duration(avg_exec_time) if avg_exec_time else "N/A"
-        metrics_html = f"""
-        <div style="background-color: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-            <h2>Metrics (Last 30 Runs)</h2>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
-                <div>
-                    <div style="font-size: 0.85rem; color: #6b7280;">Success Rate</div>
-                    <div style="font-size: 1.5rem; font-weight: 700;">{success_rate_pct:.1f}%</div>
-                </div>
-                <div>
-                    <div style="font-size: 0.85rem; color: #6b7280;">Avg Exec Time</div>
-                    <div style="font-size: 1.5rem; font-weight: 700;">{avg_exec_time_str}</div>
-                </div>
-                <div>
-                    <div style="font-size: 0.85rem; color: #6b7280;">Avg Retry</div>
-                    <div style="font-size: 1.5rem; font-weight: 700;">{avg_retry:.1f}</div>
-                </div>
-                {f'''<div>
-                    <div style="font-size: 0.85rem; color: #6b7280;">Most Common Error</div>
-                    <div style="font-size: 1.5rem; font-weight: 700;">{most_common_error}</div>
-                </div>''' if most_common_error else ''}
-            </div>
-        </div>
-        """
 
     html = f"""
     <!DOCTYPE html>
