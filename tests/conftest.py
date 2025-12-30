@@ -5,7 +5,7 @@ Flask SaaS UI のスモークテストで使用する共通フィクスチャを
 テスト結果自動保存機能も含む。
 """
 
-from __future__ import annotations
+# from __future__ import annotations  # mutmut パーサーとの互換性のためコメントアウト
 
 import pytest
 from datetime import datetime, timedelta
@@ -403,8 +403,12 @@ def pytest_ignore_collect(collection_path, config):
     path_str = str(collection_path)
     file_name = collection_path.name
 
+    # Always allow test_mutation_tester_agent.py (needed for mutmut)
+    if file_name == "test_mutation_tester_agent.py":
+        return False
+
     # Check if this is in the agents directory
-    if "/tests/agents/" in path_str:
+    if "/tests/agents/" in path_str or "tests/agents/" in path_str:
         # Files to ignore due to missing dependencies
         ignore_files = [
             "test_knowledge_curator_agent.py",
