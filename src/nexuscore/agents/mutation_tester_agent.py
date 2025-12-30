@@ -264,10 +264,15 @@ class MutationTesterAgent(BaseAgent):
 
     def _parse_mutmut_output(self, output: str) -> Dict[str, int]:
         """
-        mutmut v3.4.0の出力をパース（絵文字ベース）
+        mutmut の出力をパース（v2.x/v3.x 両対応）
 
-        出力例:
+        v3.x 出力例（絵文字ベース）:
             ⠧ 2/2  🎉 2 🫥 0  ⏰ 0  🤔 0  🙁 0  🔇 0
+
+        v2.x 出力例（テキストベース）:
+            Total mutants: 20
+            Killed: 17 (85.0%)
+            Survived: 3 (15.0%)
 
         絵文字の意味:
             🎉 = killed
@@ -285,8 +290,7 @@ class MutationTesterAgent(BaseAgent):
             "suspicious": 0
         }
 
-        # 絵文字ベースのパターン
-        # 例: "2/2  🎉 2 🫥 0  ⏰ 0  🤔 0  🙁 0  🔇 0"
+        # まず v3.x の絵文字ベースのパターンを試す
         emoji_patterns = {
             "total": r"(\d+)/\d+",  # "2/2" の最初の数字
             "killed": r"🎉\s*(\d+)",
@@ -295,10 +299,27 @@ class MutationTesterAgent(BaseAgent):
             "suspicious": r"🤔\s*(\d+)"
         }
 
+        emoji_found = False
         for key, pattern in emoji_patterns.items():
             match = re.search(pattern, output)
             if match:
                 result[key] = int(match.group(1))
+                emoji_found = True
+
+        # 絵文字形式が見つからない場合、v2.x のテキスト形式を試す
+        if not emoji_found:
+            text_patterns = {
+                "total": r"Total mutants:\s*(\d+)",
+                "killed": r"Killed:\s*(\d+)",
+                "survived": r"Survived:\s*(\d+)",
+                "timeout": r"Timeout:\s*(\d+)",
+                "suspicious": r"Suspicious:\s*(\d+)"
+            }
+
+            for key, pattern in text_patterns.items():
+                match = re.search(pattern, output)
+                if match:
+                    result[key] = int(match.group(1))
 
         # totalが見つからない場合、killed + survived + timeout + suspicious
         if result["total"] == 0:

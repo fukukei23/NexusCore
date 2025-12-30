@@ -284,16 +284,11 @@ class TestRunMutmut:
 
     def test_run_mutmut_success(self, mutation_agent, mock_mutmut_success_output):
         """mutmut正常実行"""
-        # 2回の subprocess.run 呼び出し: 1. mutmut run --rerun-all, 2. mutmut run 本体
-        mock_rerun_result = Mock()
-        mock_rerun_result.stdout = ""
-        mock_rerun_result.stderr = ""
-
         mock_result = Mock()
         mock_result.stdout = mock_mutmut_success_output
         mock_result.stderr = ""
 
-        with patch('subprocess.run', side_effect=[mock_rerun_result, mock_result]):
+        with patch('subprocess.run', return_value=mock_result):
             result = mutation_agent._run_mutmut(
                 source_path="src/example.py",
                 test_path="tests/test_example.py",
@@ -309,15 +304,7 @@ class TestRunMutmut:
 
     def test_run_mutmut_timeout(self, mutation_agent):
         """mutmut実行タイムアウト時に適切な例外を投げる"""
-        # 1回目のcall (rerun-all) は成功、2回目のcall (本体) がタイムアウト
-        mock_rerun_result = Mock()
-        mock_rerun_result.stdout = ""
-        mock_rerun_result.stderr = ""
-
-        with patch('subprocess.run', side_effect=[
-            mock_rerun_result,
-            subprocess.TimeoutExpired(cmd="mutmut", timeout=600)
-        ]):
+        with patch('subprocess.run', side_effect=subprocess.TimeoutExpired(cmd="mutmut", timeout=600)):
             # タイムアウト時はMutationTestTimeoutErrorを投げる
             with pytest.raises(MutationTestTimeoutError) as exc_info:
                 mutation_agent._run_mutmut(
@@ -331,15 +318,7 @@ class TestRunMutmut:
 
     def test_run_mutmut_exception(self, mutation_agent):
         """mutmut実行時の予期しない例外を適切にラップする"""
-        # 1回目のcall (rerun-all) は成功、2回目のcall (本体) が例外
-        mock_rerun_result = Mock()
-        mock_rerun_result.stdout = ""
-        mock_rerun_result.stderr = ""
-
-        with patch('subprocess.run', side_effect=[
-            mock_rerun_result,
-            Exception("Unexpected error")
-        ]):
+        with patch('subprocess.run', side_effect=Exception("Unexpected error")):
             # 予期しない例外はMutationTestErrorでラップされる
             with pytest.raises(MutationTestError) as exc_info:
                 mutation_agent._run_mutmut(
@@ -760,11 +739,7 @@ class TestIntegration:
         mock_mutmut_success_output
     ):
         """完全なワークフロー（成功）"""
-        # subprocess.run の呼び出し順: 1. rerun-all, 2. run本体, 3. results
-        mock_rerun_result = Mock()
-        mock_rerun_result.stdout = ""
-        mock_rerun_result.stderr = ""
-
+        # subprocess.run の呼び出し順: 1. mutmut run, 2. mutmut results
         mock_run_result = Mock()
         mock_run_result.stdout = mock_mutmut_success_output
         mock_run_result.stderr = ""
@@ -774,7 +749,6 @@ class TestIntegration:
         mock_results_result.stderr = ""
 
         with patch('subprocess.run', side_effect=[
-            mock_rerun_result,
             mock_run_result,
             mock_results_result
         ]):
@@ -798,10 +772,6 @@ class TestIntegration:
         mock_survived_mutants_output
     ):
         """完全なワークフロー（不合格）"""
-        mock_rerun_result = Mock()
-        mock_rerun_result.stdout = ""
-        mock_rerun_result.stderr = ""
-
         mock_run_result = Mock()
         mock_run_result.stdout = mock_mutmut_fail_output
         mock_run_result.stderr = ""
@@ -811,7 +781,6 @@ class TestIntegration:
         mock_results_result.stderr = ""
 
         with patch('subprocess.run', side_effect=[
-            mock_rerun_result,
             mock_run_result,
             mock_results_result
         ]):
@@ -880,11 +849,7 @@ Survived 🙁
    - to:   value / 2
 """
 
-        # subprocessのみモック
-        mock_rerun_result = Mock()
-        mock_rerun_result.stdout = ""
-        mock_rerun_result.stderr = ""
-
+        # subprocessのみモック (mutmut run, mutmut results)
         mock_run_result = Mock()
         mock_run_result.stdout = real_mutmut_output
         mock_run_result.stderr = ""
@@ -894,7 +859,6 @@ Survived 🙁
         mock_results_result.stderr = ""
 
         with patch('subprocess.run', side_effect=[
-            mock_rerun_result,
             mock_run_result,
             mock_results_result
         ]):
@@ -963,10 +927,6 @@ Survived 🙁
    - to:   if a or b:
 """
 
-        mock_rerun_result = Mock()
-        mock_rerun_result.stdout = ""
-        mock_rerun_result.stderr = ""
-
         mock_run_result = Mock()
         mock_run_result.stdout = real_mutmut_output
         mock_run_result.stderr = ""
@@ -976,7 +936,6 @@ Survived 🙁
         mock_results_result.stderr = ""
 
         with patch('subprocess.run', side_effect=[
-            mock_rerun_result,
             mock_run_result,
             mock_results_result
         ]):
