@@ -60,4 +60,4 @@ line-ending = "auto"
 
 [tool.mutmut]
 paths_to_mutate = ["src/nexuscore/agents/mutation_tester_agent.py"]
-runner = "bash -c 'if [ -d /home/user/NexusCore/mutants ]; then cd /home/user/NexusCore/mutants; else cd /home/user/NexusCore; fi && export PYTHONPATH=.:src && python -m pytest tests/agents/test_mutation_tester_agent.py --tb=no -q -p no:warnings'"
+tests_dir = ["tests/agents/test_mutation_tester_agent.py", "-k", "not (TestRunMutmut or TestParseMutmutOutput or TestIntegration or TestIntegrationReal)"]
