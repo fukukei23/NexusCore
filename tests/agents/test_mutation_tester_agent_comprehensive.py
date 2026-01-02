@@ -19,9 +19,6 @@ from unittest.mock import MagicMock, Mock, patch, call
 
 import pytest
 
-# 依存モジュールをモック
-sys.modules['nexuscore.agents.base_agent'] = MagicMock()
-
 try:
     from nexuscore.agents.mutation_tester_agent import (
         MutationTesterAgent,
@@ -96,10 +93,14 @@ class TestDataClasses:
 class TestMutationTesterAgentInit:
     """MutationTesterAgent 初期化のテスト"""
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_init_basic(self, mock_base_init):
         """基本的な初期化"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         mock_base_init.assert_called_once()
 
@@ -108,10 +109,14 @@ class TestMutationTesterAgentInit:
 class TestParseMutmutOutput:
     """MutationTesterAgent._parse_mutmut_output() のテスト"""
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_parse_v3_emoji_output(self, mock_base_init):
         """v3.x絵文字ベース出力のパース"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         output = "⠧ 20/20  🎉 17 🫥 0  ⏰ 0  🤔 0  🙁 3  🔇 0"
         result = agent._parse_mutmut_output(output)
@@ -122,10 +127,14 @@ class TestParseMutmutOutput:
         assert result["timeout"] == 0
         assert result["suspicious"] == 0
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_parse_v2_text_output(self, mock_base_init):
         """v2.xテキストベース出力のパース"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         output = """
 Total mutants: 20
@@ -140,20 +149,28 @@ Suspicious: 0
         assert result["killed"] == 17
         assert result["survived"] == 3
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_parse_empty_output(self, mock_base_init):
         """空の出力"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         result = agent._parse_mutmut_output("")
 
         assert result["total"] == 0
         assert result["killed"] == 0
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_parse_calculate_total_from_components(self, mock_base_init):
         """totalが見つからない場合は他の値から計算"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         output = "🎉 10 🙁 5 ⏰ 2 🤔 1"
         result = agent._parse_mutmut_output(output)
@@ -166,10 +183,14 @@ Suspicious: 0
 class TestParseSurvivedMutants:
     """MutationTesterAgent._parse_survived_mutants() のテスト"""
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_parse_survived_mutants_basic(self, mock_base_init):
         """基本的なmutmut results出力のパース"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         output = """
 Survived 🙁
@@ -190,10 +211,14 @@ Survived 🙁
         assert mutants[0].original_code == "result = a + b"
         assert mutants[0].mutated_code == "result = a - b"
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_parse_survived_mutants_empty(self, mock_base_init):
         """空の出力"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         mutants = agent._parse_survived_mutants("")
 
@@ -204,20 +229,28 @@ Survived 🙁
 class TestGenerateFeedback:
     """MutationTesterAgent._generate_feedback() のテスト"""
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_generate_feedback_passed(self, mock_base_init):
         """合格時のフィードバック"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         feedback = agent._generate_feedback([], mutation_score=85.0, min_score=80.0)
 
         assert "✅" in feedback
         assert "85.0%" in feedback
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_generate_feedback_failed(self, mock_base_init):
         """不合格時のフィードバック"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         mutants = [
             Mutant("calc.py", 10, "Op", "a + b", "a - b", "survived"),
@@ -227,14 +260,18 @@ class TestGenerateFeedback:
 
         assert "❌" in feedback
         assert "50.0%" in feedback
-        assert "80%" in feedback
+        assert "80.0%" in feedback
         assert "calc.py:10" in feedback
         assert "calc.py:15" in feedback
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_generate_feedback_many_mutants(self, mock_base_init):
         """多数のミュータントがある場合（最初の10個のみ）"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         mutants = [
             Mutant(f"file{i}.py", i, "Op", "old", "new", "survived")
@@ -252,30 +289,42 @@ class TestGenerateFeedback:
 class TestSuggestTestForMutant:
     """MutationTesterAgent._suggest_test_for_mutant() のテスト"""
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_suggest_for_addition_to_subtraction(self, mock_base_init):
         """加算→減算の変異"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         mutant = Mutant("file.py", 1, "Op", "a + b", "a - b", "survived")
         suggestion = agent._suggest_test_for_mutant(mutant)
 
         assert "加算と減算" in suggestion
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_suggest_for_comparison_operator(self, mock_base_init):
         """比較演算子の変異"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         mutant = Mutant("file.py", 1, "Cmp", "x > y", "x >= y", "survived")
         suggestion = agent._suggest_test_for_mutant(mutant)
 
         assert "境界値" in suggestion
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_suggest_for_logical_operator(self, mock_base_init):
         """論理演算子の変異"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         mutant = Mutant("file.py", 1, "Logic", "a and b", "a or b", "survived")
         suggestion = agent._suggest_test_for_mutant(mutant)
@@ -287,7 +336,7 @@ class TestSuggestTestForMutant:
 class TestRunMutationTesting:
     """MutationTesterAgent.run_mutation_testing() のテスト"""
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     @patch('subprocess.run')
     def test_run_mutation_testing_success(self, mock_subprocess, mock_base_init, tmp_path):
         """ミューテーションテスト成功"""
@@ -298,7 +347,13 @@ class TestRunMutationTesting:
             returncode=0
         )
 
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+
+        agent.logger = Mock()
+
+
+        MutationTesterAgent.__init__(agent)
         constitution = {
             "quality_gates": {
                 "tier2": {
@@ -318,7 +373,7 @@ class TestRunMutationTesting:
         assert result.mutation_score == 85.0
         assert result.passed is True
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     @patch('subprocess.run')
     def test_run_mutation_testing_timeout(self, mock_subprocess, mock_base_init, tmp_path):
         """mutmutタイムアウト"""
@@ -326,7 +381,13 @@ class TestRunMutationTesting:
             cmd=["mutmut"], timeout=600
         )
 
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+
+        agent.logger = Mock()
+
+
+        MutationTesterAgent.__init__(agent)
         constitution = {"quality_gates": {"tier2": {"mutation_score_min": 80}}}
 
         result = agent.run_mutation_testing(
@@ -338,13 +399,19 @@ class TestRunMutationTesting:
         assert result.passed is False
         assert "タイムアウト" in result.feedback
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     @patch('subprocess.run')
     def test_run_mutation_testing_error(self, mock_subprocess, mock_base_init, tmp_path):
         """mutmut実行エラー"""
         mock_subprocess.side_effect = Exception("mutmut not found")
 
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+
+        agent.logger = Mock()
+
+
+        MutationTesterAgent.__init__(agent)
         constitution = {"quality_gates": {"tier2": {"mutation_score_min": 80}}}
 
         result = agent.run_mutation_testing(
@@ -361,7 +428,7 @@ class TestRunMutationTesting:
 class TestEdgeCases:
     """エッジケースのテスト"""
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     @patch('subprocess.run')
     def test_run_mutation_testing_no_mutants(self, mock_subprocess, mock_base_init):
         """ミュータントが0個の場合"""
@@ -371,7 +438,13 @@ class TestEdgeCases:
             returncode=0
         )
 
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+
+        agent.logger = Mock()
+
+
+        MutationTesterAgent.__init__(agent)
         constitution = {"quality_gates": {"tier2": {"mutation_score_min": 80}}}
 
         result = agent.run_mutation_testing(
@@ -384,10 +457,14 @@ class TestEdgeCases:
         assert result.total_mutants == 0
         assert result.mutation_score == 0.0
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_get_survived_mutants_command_failure(self, mock_base_init):
         """mutmut resultsコマンド失敗"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         with patch('subprocess.run', side_effect=Exception("Command failed")):
             mutants = agent._get_survived_mutants()
@@ -395,10 +472,14 @@ class TestEdgeCases:
             # エラー時は空リストを返す
             assert mutants == []
 
-    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.mutation_tester_agent.BaseAgent.__init__', return_value=None)
     def test_suggest_test_for_unknown_mutation(self, mock_base_init):
         """不明な変異タイプ"""
-        agent = MutationTesterAgent()
+        agent = MutationTesterAgent.__new__(MutationTesterAgent)
+
+        agent.logger = Mock()
+
+        MutationTesterAgent.__init__(agent)
 
         mutant = Mutant("file.py", 1, "Unknown", "foo", "bar", "survived")
         suggestion = agent._suggest_test_for_mutant(mutant)
