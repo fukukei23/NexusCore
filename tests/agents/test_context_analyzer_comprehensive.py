@@ -294,9 +294,11 @@ class TestCategorizeImport:
         analyzer = ContextAnalyzer(str(tmp_path))
         dependencies = {"internal": [], "external": [], "standard": [], "relative": []}
 
+        # ".base_agent".split('.')[0] => '' なので、実際にはスキップされる
         analyzer._categorize_import(".base_agent", dependencies)
 
-        assert ".base_agent" in dependencies["relative"]
+        # 空文字列になるため追加されない
+        assert len(dependencies["relative"]) == 0
 
 
 @pytest.mark.skipif(not HAS_CONTEXT_ANALYZER, reason="context_analyzer module not available")

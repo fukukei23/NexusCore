@@ -19,10 +19,6 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-# 依存モジュールをモック
-sys.modules['nexuscore.agents.base_agent'] = MagicMock()
-sys.modules['database.knowledge_base'] = MagicMock()
-
 try:
     from nexuscore.agents.debugger_agent import DebuggerAgent
     HAS_DEBUGGER_AGENT = True
@@ -37,7 +33,7 @@ class TestDebuggerAgentInit:
 
     def test_init_without_knowledge_base(self):
         """ナレッジベースなしで初期化"""
-        with patch('nexuscore.agents.debugger_agent.BaseAgent.__init__'):
+        with patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None):
             agent = DebuggerAgent()
 
             assert agent.local_knowledge_base is None
@@ -77,7 +73,7 @@ class TestDebuggerAgentInit:
 class TestDebugAndPatch:
     """DebuggerAgent.debug_and_patch() のテスト"""
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     @patch('nexuscore.agents.debugger_agent.BaseAgent.execute_llm_task')
     def test_debug_and_patch_basic(self, mock_execute_llm, mock_base_init):
         """基本的なデバッグとパッチ生成"""
@@ -98,7 +94,7 @@ class TestDebugAndPatch:
         assert "fixed_code" in result
         assert result["fixed_code"] == fixed_code
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     @patch('nexuscore.agents.debugger_agent.BaseAgent.execute_llm_task')
     def test_debug_and_patch_no_files(self, mock_execute_llm, mock_base_init):
         """ファイルが提供されない場合"""
@@ -112,7 +108,7 @@ class TestDebugAndPatch:
         assert "error" in result
         assert result["error"] == "No files provided for debugging."
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     @patch('nexuscore.agents.debugger_agent.BaseAgent.execute_llm_task')
     def test_debug_and_patch_with_known_solution(self, mock_execute_llm, mock_base_init, tmp_path):
         """ナレッジベースから既知の解決策が見つかる場合"""
@@ -146,7 +142,7 @@ class TestDebugAndPatch:
 class TestFindSolutionFromKB:
     """DebuggerAgent._find_solution_from_kb() のテスト"""
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     def test_find_solution_from_local_kb(self, mock_base_init, tmp_path):
         """ローカルナレッジベースから解決策を検索"""
         kb_file = tmp_path / "kb.json"
@@ -167,7 +163,7 @@ class TestFindSolutionFromKB:
         assert solution is not None
         assert solution["cause"] == "Variable not defined"
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     def test_find_solution_no_match(self, mock_base_init, tmp_path):
         """ナレッジベースに一致するエントリがない場合"""
         kb_file = tmp_path / "kb.json"
@@ -187,7 +183,7 @@ class TestFindSolutionFromKB:
 
         assert solution is None
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     @patch('nexuscore.agents.debugger_agent.knowledge_base')
     def test_find_solution_from_global_kb(self, mock_kb, mock_base_init):
         """グローバルナレッジベースから解決策を検索"""
@@ -210,7 +206,7 @@ class TestFindSolutionFromKB:
 class TestGenerateFixedCode:
     """DebuggerAgent._generate_fixed_code() のテスト"""
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     @patch('nexuscore.agents.debugger_agent.BaseAgent.execute_llm_task')
     def test_generate_fixed_code_basic(self, mock_execute_llm, mock_base_init):
         """基本的なコード修正生成"""
@@ -227,7 +223,7 @@ class TestGenerateFixedCode:
 
         assert result == fixed_code
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     @patch('nexuscore.agents.debugger_agent.BaseAgent.execute_llm_task')
     def test_generate_fixed_code_with_code_fence(self, mock_execute_llm, mock_base_init):
         """コードフェンス付きのレスポンス"""
@@ -240,7 +236,7 @@ class TestGenerateFixedCode:
         # コードフェンスが除去される
         assert result == fixed_code
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     @patch('nexuscore.agents.debugger_agent.BaseAgent.execute_llm_task')
     def test_generate_fixed_code_llm_failure(self, mock_execute_llm, mock_base_init):
         """LLM実行失敗時"""
@@ -256,7 +252,7 @@ class TestGenerateFixedCode:
 class TestCreateDiff:
     """DebuggerAgent._create_diff() のテスト"""
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     def test_create_diff_basic(self, mock_base_init):
         """基本的なdiff生成"""
         agent = DebuggerAgent()
@@ -274,7 +270,7 @@ class TestCreateDiff:
         assert "-    return a + 'b'" in diff
         assert "+    return a + b" in diff
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     def test_create_diff_no_changes(self, mock_base_init):
         """変更がない場合"""
         agent = DebuggerAgent()
@@ -288,7 +284,7 @@ class TestCreateDiff:
         # 変更がない場合は空文字列
         assert diff == ""
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     def test_create_diff_relative_path_error(self, mock_base_init):
         """相対パス計算エラー時"""
         agent = DebuggerAgent()
@@ -308,7 +304,7 @@ class TestCreateDiff:
 class TestEdgeCases:
     """エッジケースのテスト"""
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     @patch('nexuscore.agents.debugger_agent.BaseAgent.execute_llm_task')
     def test_debug_and_patch_empty_error_log(self, mock_execute_llm, mock_base_init):
         """空のエラーログ"""
@@ -324,7 +320,7 @@ class TestEdgeCases:
         # エラーログが空でも処理は継続
         assert "patch" in result
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     @patch('nexuscore.agents.debugger_agent.BaseAgent.execute_llm_task')
     def test_generate_fixed_code_empty_response(self, mock_execute_llm, mock_base_init):
         """LLMが空のレスポンスを返す場合"""
@@ -335,7 +331,7 @@ class TestEdgeCases:
 
         assert result is None
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     @patch('nexuscore.agents.debugger_agent.BaseAgent.execute_llm_task')
     def test_generate_fixed_code_diff_format_response(self, mock_execute_llm, mock_base_init):
         """diff形式のレスポンス"""
@@ -349,7 +345,7 @@ class TestEdgeCases:
         assert "```" not in result
         assert "diff" not in result.lower() or result.strip().startswith("---")
 
-    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__')
+    @patch('nexuscore.agents.debugger_agent.BaseAgent.__init__', return_value=None)
     def test_find_solution_invalid_regex(self, mock_base_init, tmp_path):
         """無効な正規表現のerror_signature"""
         kb_file = tmp_path / "kb.json"

@@ -325,8 +325,8 @@ class TestCheckNexuscoreSpecific:
         diff_text = """--- a/src/orchestrator.py
 +++ b/src/orchestrator.py
 @@ -1,2 +1,1 @@
- # Requirement phase
--# Plan phase
+-# Requirement and Plan phase stages
++# Modified phase
 """
         reviewer = GuardianAutoReviewer("nexuscore")
         files = reviewer._parse_unified_diff(diff_text)
