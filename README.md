@@ -1,136 +1,356 @@
 # NexusCore
 
-**NexusCore** は自律型 AI エージェント群を組み合わせてソフトウェア開発支援を行うフレームワークです。
-道具立て（エージェント／Orchestrator／LLM ルーター）を分離しつつ、必要なツール・UI・テストを同一リポジトリ内で管理する設計になっています。
+> **多層品質ゲートを備えた自律型マルチエージェントAI開発フレームワーク**
+
+[![Test Coverage](https://img.shields.io/badge/coverage-16.85%25-yellow)](docs/reports/COVERAGE_SUMMARY.md)
+[![Tests](https://img.shields.io/badge/tests-431%20passing-brightgreen)](tests/agents/)
+[![Python](https://img.shields.io/badge/python-3.11+-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+**NexusCore** は、ソフトウェア開発ライフサイクル全体を支援する自律型AIエージェント群を統合したフレームワークです。要件分析からアーキテクチャ設計、コード生成、テスト、品質保証まで、各フェーズを専門エージェントが担当します。
 
 ---
 
-**Self-Healing Status (NexusCore SaaS MVP)**
+## ✨ 主要機能
 
-<!-- NOTE: {PROJECT_ID} は実際の Project.id に置き換えてください（例: 1）。your-nexuscore-host は運用環境のホスト名に置き換えてください。 -->
+### 🤖 マルチエージェントシステム
+- **10+ 専門エージェント**: Architect, Coder, Debugger, Tester, Guardian, Requirement, Postmortem, Knowledge Curator, Policy, Constitutional Council
+- **タスクベースLLMルーティング**: 各タスクに最適なLLMを自動選択（GPT-5.1, Claude 4.5, DeepSeek R1, Gemini 3.0等）
+- **コスト最適化**: 予算管理、自動フォールバック、日次上限設定
 
-[![Self-Healing Success Rate](https://your-nexuscore-host/api/projects/1/badge/success_rate)](https://your-nexuscore-host/dashboard/projects/1)
-[![Self-Healing Last Run](https://your-nexuscore-host/api/projects/1/badge/last_run)](https://your-nexuscore-host/dashboard/projects/1)
+### 🛡️ 多層品質ゲート
+- **Tier 1 - コード品質**
+  - カバレッジ分析（80%以上）
+  - Pylint（8.0/10以上）
+  - Mypy型チェック
+  - Banditセキュリティスキャン
 
-- 🧠 **AIコード修復／開発支援**：Requirement→Planning→Coding→Testing まで各フェーズを担当するエージェント。
-- ☁️ **SaaS展開を意識した分離設計**：LLM/エージェント/オーケストレータを独立レイヤーで構築。
+- **Tier 2 - ミューテーションテスト**
+  - コード変異生成
+  - テストスイート強度測定
+  - 生存変異の検出
+
+### 🏛️ Constitutional AI ガバナンス
+- ポリシー駆動の意思決定
+- 修正案提案システム
+- 承認ワークフロー
+- 監査証跡
+
+### 🧠 ナレッジベース統合
+- 失敗事例からの学習
+- パターンマッチングによる解決策提示
+- グローバル/ローカルナレッジベース
+
+---
+
+## 📊 プロジェクト状況
+
+| 指標 | 値 |
+|------|-----|
+| **テストカバレッジ** | 16.85% (Core Agents: 65-89%) |
+| **包括的テスト** | 20ファイル, 431テスト合格 |
+| **エージェント数** | 20+ 専門エージェント |
+| **LLMプロバイダー** | 5プロバイダー（OpenAI, Anthropic, DeepSeek, Google, Kimi） |
+| **品質ゲート** | 2層（静的解析＋動的テスト） |
+
+📈 [詳細なカバレッジレポート](docs/reports/COVERAGE_SUMMARY.md) | 🏗️ [アーキテクチャドキュメント](docs/ARCHITECTURE.md)
+
+---
+
+## 🚀 クイックスタート
+
+### 前提条件
+
+- Python 3.11以上
+- pip
+- Git
+
+### インストール
+
+```bash
+# リポジトリのクローン
+git clone https://github.com/your-org/NexusCore.git
+cd NexusCore
+
+# 仮想環境の作成と有効化
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# 依存関係のインストール
+pip install -r requirements.txt
+
+# 環境変数の設定
+cp .env.template .env
+# .envファイルを編集してAPIキーを設定
+```
+
+### 環境変数の設定
+
+`.env`ファイルに以下を設定：
+
+```env
+# LLM API Keys
+OPENAI_API_KEY=your-openai-api-key
+ANTHROPIC_API_KEY=your-anthropic-api-key
+DEEPSEEK_API_KEY=your-deepseek-api-key
+GEMINI_API_KEY=your-gemini-api-key
+
+# Budget Settings
+DAILY_BUDGET_USD=5.0
+ENABLE_BUDGET_GUARD=true
+
+# Quality Gate Settings
+MIN_COVERAGE_PERCENTAGE=80.0
+MIN_PYLINT_SCORE=8.0
+MIN_MUTATION_SCORE=70.0
+```
+
+### 基本的な使用例
+
+```python
+from src.nexuscore.agents.coder_agent import CoderAgent
+from src.nexuscore.llm.llm_router import LLMRouter
+
+# LLMルーターの初期化
+router = LLMRouter()
+
+# CoderAgentの初期化
+coder = CoderAgent(llm_router=router)
+
+# コード生成
+result = coder.implement_code(
+    task_description="Pythonで二分探索を実装してください",
+    context="データ構造の勉強用"
+)
+
+print(result["code"])
+```
+
+### テストの実行
+
+```bash
+# 包括的テストの実行
+python -m pytest tests/agents/test_*_comprehensive.py -v
+
+# カバレッジ付きでテスト実行
+python -m pytest tests/agents/test_*_comprehensive.py --cov=src/nexuscore --cov-report=html
+
+# 特定のエージェントのテスト
+python -m pytest tests/agents/test_guardian_agent_comprehensive.py -v
+```
 
 ---
 
 ## 📂 プロジェクト構成
 
-
-主要な構成を踏まえ、以下のディレクトリ構成と設定ファイルが重要です。
-
-### 主要ディレクトリ構成
-
 ```
 NexusCore/
 ├── src/nexuscore/
-│   ├── agents/           # 構成エージェント（planner, coder, debugger, guardian, policy 等）
-│   ├── core/             # Orchestrator、NPE インテグレーション、主要フロー制御
-│   ├── llm/              # LLMRouter、Provider 統合、プロンプト管理
-│   ├── modules/          # エージェントから呼ばれるコード生成・テスト・差分表示ツール
-│   ├── npe/              # 予算・ポリシー・ログ・ガード機能の集合
-│   └── gradio_app/       # UI/ダッシュボード/修復タイムライン（必要に応じて Streamlit 構成も）
-├── dev_tools/             # Fast Lane チェックや開発支援スクリプト
-├── tools/                 # ファイル一覧取得・エクスポート・ダッシュボードなどの補助ユーティリティ
-├── tests/                 # pytest ベースのユニット / 統合テスト群
-├── output/                # 実行ログ / 集計 / 一時ファイル（gitignore 対象）
-└── .venv/                 # 仮想環境（WSL 操作時に生成・使用）
+│   ├── agents/              # AIエージェント実装
+│   │   ├── base_agent.py           # ベースエージェント（LLM統合）
+│   │   ├── architect_agent.py      # アーキテクチャ設計
+│   │   ├── coder_agent.py          # コード生成
+│   │   ├── debugger_agent.py       # エラー修正
+│   │   ├── tester_agent.py         # テスト生成
+│   │   ├── guardian_agent.py       # 品質ゲート
+│   │   ├── requirement_agent.py    # 要件分析
+│   │   ├── postmortem_agent.py     # 失敗分析
+│   │   ├── knowledge_curator_agent.py  # ナレッジ管理
+│   │   ├── policy_agent.py         # ポリシー適用
+│   │   ├── constitutional_council_agent.py  # ガバナンス
+│   │   └── mutation_tester_agent.py  # ミューテーションテスト
+│   │
+│   ├── llm/                 # LLM統合レイヤー
+│   │   ├── llm_router.py           # タスクベースモデルルーティング
+│   │   ├── budget_manager.py       # コスト追跡
+│   │   └── providers/              # LLMプロバイダー実装
+│   │
+│   ├── utils/               # ユーティリティモジュール
+│   │   ├── code_analyzer.py        # コード品質分析
+│   │   ├── vcs.py                  # Git操作
+│   │   ├── diff_tools.py           # 差分生成
+│   │   └── test_generator.py      # テスト生成ユーティリティ
+│   │
+│   ├── core/                # オーケストレーター
+│   ├── npe/                 # 予算・ポリシー・ガード機能
+│   └── webapp/              # Webインターフェース
+│
+├── tests/                   # テストスイート
+│   └── agents/              # エージェントテスト（431テスト）
+│
+├── docs/                    # ドキュメント
+│   ├── ARCHITECTURE.md      # アーキテクチャドキュメント
+│   └── reports/             # テストレポート
+│
+├── dev_tools/               # 開発支援ツール
+├── tools/                   # 補助ユーティリティ
+└── output/                  # 実行ログ・一時ファイル
 ```
 
-### 重要な設定ファイル
+---
 
-- `.env` / `.env.template` … OpenAI や Gemini など LLM API キー、予算、動作モードなど環境変数をまとめたファイル。`.env` は `.env.template` をコピーして内容を埋めたもの。
-- `requirements.txt` / `requirements.lock.txt` / `pyproject.toml` … Python 依存の宣言とロック。依存追加時は `pip freeze > requirements.lock.txt` などで整合を取るのが重要です。
-- `dev_tools/fast_lane_check.py` … 差分解析と Fast Lane 判定用。CI に組み込む場合は `python -m dev_tools.fast_lane_check --json` をコマンド化します。
-- `.gitignore` / `output/` 以下 / `.venv/` … ログや生成ファイル、仮想環境などの除外を定義。`output/core_files.txt` などの共有リストを活用する際も位置を参考に。
-- `src/nexuscore/config/config.py` & `src/nexuscore/config/generate_secrets.py` … プロジェクト固有の設定ロードと秘密情報生成を担うモジュール。README 内の環境変数手順と合わせて使います。
+## 🏗️ アーキテクチャ
+
+### システム概要
+
+```
+User/Developer
+      ↓
+  Orchestrator
+      ↓
+  ┌─────────────┐
+  │ Agent Layer │
+  └─────┬───────┘
+        ├→ LLM Router ──→ [GPT-5.1 | Claude 4.5 | DeepSeek | Gemini | Kimi]
+        └→ Quality Gates
+             ├→ Tier 1: Code Quality (Coverage, Pylint, Mypy, Bandit)
+             └→ Tier 2: Mutation Testing
+```
+
+詳細は [アーキテクチャドキュメント](docs/ARCHITECTURE.md) を参照してください。
+
+### 主要なデザインパターン
+
+1. **エージェントパターン**: 各エージェントは`BaseAgent`を継承し、標準化されたLLM連携を実現
+2. **品質ゲートパターン**: 多層検証（静的→動的）でクリティカルな問題を早期検出
+3. **Constitutional AIパターン**: ポリシー駆動の意思決定と修正案システム
+4. **ルーターパターン**: タスクベースのモデル選択とコスト最適化
+5. **ナレッジベースパターン**: 失敗からの学習とパターンマッチング
 
 ---
 
-## 🔌 External Integrations
+## 🛠️ 使用技術
 
-NexusCore can be triggered from VSCode extensions, Chrome extensions, or other tools via a simple REST API.
-
-- See `docs/external_run_api_examples.md` for concrete examples (TypeScript / JavaScript / Python / curl).
+| カテゴリ | 技術 |
+|---------|------|
+| **言語** | Python 3.11+ |
+| **AI/LLM** | OpenAI GPT, Anthropic Claude, DeepSeek, Google Gemini, Kimi |
+| **テスト** | pytest, pytest-cov, カスタムミューテーションテスト |
+| **品質** | pylint, mypy, bandit |
+| **VCS** | GitPython |
+| **Web** | Flask, Gradio |
+| **その他** | patch-ng, dataclasses |
 
 ---
 
-## 🚀 Quick Start
+## 📚 ドキュメント
 
-### 1. WSL (Ubuntu) 環境での基本手順
+- [アーキテクチャドキュメント](docs/ARCHITECTURE.md) - システム設計の詳細
+- [カバレッジレポート](docs/reports/COVERAGE_SUMMARY.md) - テストカバレッジの詳細
+- [HTMLカバレッジレポート](docs/reports/coverage/index.html) - 対話的カバレッジレポート
+- [API リファレンス](docs/API.md) - エージェントAPIドキュメント（作成予定）
 
-1. `\\wsl.localhost\Ubuntu\home\yn441611\NexusCore`（Linux シェルでは `/home/yn441611/NexusCore`）に移動し、これを作業ルートにします。
-2. システム Python には `pip` が入っていないため、`python -m venv .venv` で仮想環境を作成します。
-3. `.venv/bin/python -m pip install -r requirements.txt` で依存をインストール。
-4. 実行時は `.venv/bin/python main_cli.py …` や `PYTHONPATH=src .venv/bin/pytest …` を使う、または `.venv/bin/activate` してから `python` / `pip` を呼び出してください。
-5. ネイティブなログ・出力先は `/home/yn441611/NexusCore/...` に向け、権限エラーを回避します。
-6. 依存を追加したら `pip freeze > requirements.lock.txt` などでロックファイルを更新して共有してください。
+---
 
-### 2. 依存要件
+## 🧪 テスト
 
-- Python **3.11+**
-- Git
-- Docker（任意：サービス連携 / デプロイ用）
-- `pip-tools`：`pip install pip-tools`
+### 包括的テストスイート
 
-### 3. ローカルで試すコマンド
-
-- **Fast lane regression gate**
-  リポジトリの差分検査には `dev_tools.fast_lane_check` を使います。
-
-  ```bash
-  .venv/bin/python -m dev_tools.fast_lane_check --json
-  ```
-
-  - `--base` … 比較対象ブランチ（既定 `origin/main`）
-  - `--max-files` / `--max-lines-total` / `--max-lines-per-file` … 切り分けパラメータ
-  - `FAST_LANE_FORCE=1` を使うとしきい値を無視
-
-- **重要ファイル一覧の取得**
-
-  ```bash
-  .venv/bin/python -m tools.list_core_files --format text
-  ```
-
-  `--include` / `--exclude` でパターンを追加したり、`--format json` / `--output` で整形できます。
-
-## 💬 Codex / AI への指示
-
-- 対話の最初に Codex や他の AI に渡すプロンプトの冒頭で `「日本語でお願いします」` のテンプレート文を使うようにしてください。この README にそのテンプレートを残しておくと、各チャットが新しくなっても同じ日本語指定を繰り返し注入でき、記述忘れも防げます。
-
-### 4. CLI 起動例
+20の包括的テストファイル、431のテストケース：
 
 ```bash
-.venv/bin/python main_cli.py --project-path /tmp/nxcore --language ja "ChatOps ダッシュボードを作る"
+# 全包括的テストの実行
+python -m pytest tests/agents/test_*_comprehensive.py -v
+
+# 個別エージェントのテスト
+python -m pytest tests/agents/test_guardian_agent_comprehensive.py -v
+python -m pytest tests/agents/test_coder_agent_comprehensive.py -v
+python -m pytest tests/agents/test_debugger_agent_comprehensive.py -v
 ```
 
-引数例：`--constitution-text` でプロジェクト方針、`--requirement-ui` で RequirementAgent UI モード、`-v` で詳細ログ出力。
+### テストカバレッジ
+
+| モジュール | カバレッジ |
+|-----------|----------|
+| architect_agent.py | 89.13% |
+| patch_applier.py | 82.98% |
+| postmortem_agent.py | 84.21% |
+| mutation_tester_agent.py | 78.95% |
+| coder_agent.py | 71.60% |
+| base_agent.py | 70.53% |
+| guardian_agent.py | 69.11% |
+| debugger_agent.py | 65.12% |
 
 ---
 
-## 🧪 テストと検証
+## 🔍 品質保証
 
-- `PYTHONPATH=src .venv/bin/pytest tests/core/test_orchestrator.py`
-- `PYTHONPATH=src .venv/bin/pytest tests/agents/test_policy_agent.py`
-- `PYTHONPATH=src .venv/bin/pytest tests/gradio_app/test_app_ui.py`
-- `rg --files tests/agents` や `coverage run -m pytest tests/agents` / `coverage html` でテストファイルやカバレッジ状況を定期的に可視化すると、どのエージェント層が未テストか把握しやすくなります。
+### Guardian Agent による多層品質ゲート
 
-全体のテスト・CI は `PYTHONPATH=src` を忘れずに設定してください。
+```python
+from src.nexuscore.agents.guardian_agent import GuardianAgent
+
+guardian = GuardianAgent()
+
+# 品質ゲートの実行
+result = guardian.run_quality_gates(
+    code_path="/path/to/code",
+    test_path="/path/to/tests",
+    constitution=constitution_config
+)
+
+if result["overall_passed"]:
+    print("✅ 全ての品質ゲートに合格")
+    print(f"Tier 1: {result['tier1']['passed']}")
+    print(f"Tier 2: {result['tier2']['passed']}")
+else:
+    print("❌ 品質ゲート不合格")
+    print(f"理由: {result.get('feedback')}")
+```
+
+### 品質基準
+
+- **カバレッジ**: 80%以上
+- **Pylint**: 8.0/10以上
+- **Mypy**: エラーなし
+- **Bandit**: セキュリティ問題なし
+- **ミューテーションスコア**: 70%以上
 
 ---
 
-## 🧰 補足メモ
+## 🤝 コントリビューション
 
-- `.env.template` をコピーして `.env` を作成し、API キーや最大予算などを記入してください。
-- `output/` 以下にログや自動テスト結果がたまりますので、コミット不要のものは `.gitignore` に入れています。
-- 大型変更を加えるときは `python -m tools.list_core_files --format json` などで影響範囲を確認しつつ、`tests/` の適切なユニットを更新してください。
-- 新しい LLM プロバイダ追加時は下記フローに従ってください。
-  1. `src/nexuscore/llm/providers/` に `<vendor>_provider.py` を新規作成し、`BaseLLM` を継承したクラスで実装（API キーの `None` 判定と `HTTP_CLIENT_FACTORY` の Session 取得が必須）。
-  2. JSON 整形／スタブ応答には `src/nexuscore/llm/helpers.py` の `_strip_jsonish` / `_stub_response` / `DEFAULT_STUB_CONTENT` を利用し、例外は `self.logger` で `real`/`stub-fallback` のモードを分かるように記録する。
-  3. `src/nexuscore/llm/providers/__init__.py` に新クラスを export し、`src/nexuscore/llm/llm_router.py` の `_make_client()` へファミリ判定を追加する。
-  4. `LLMRouter` のタスクモデルマップ（`TASK_MODEL_MAP_DEFAULT` など）に新モデルを登録した上で、`nexuscore/npe` の budget/policy 設定にもモデル名を加える。
-  5. ランタイム状態の確認には `from nexuscore.llm.runtime import log_runtime_status` を使い、`pytest tests/llm` にプロバイダ用のスタブテスト（API キーなし時の挙動等）を追加する。
-- 2025-11-22 00:51 JST / Version 2.3.5-hotfix 時点で `src/nexuscore/llm/http_client.py` に `HttpClientFactory` を実装し、429/5xx リトライや `requests` 未導入時のスタブ降格処理を一元管理しています。LLM プロバイダを追加／拡張する際はこのモジュールから Session を取得してください。
+コントリビューションを歓迎します！
+
+1. このリポジトリをフォーク
+2. フィーチャーブランチを作成 (`git checkout -b feature/amazing-feature`)
+3. 変更をコミット (`git commit -m 'Add amazing feature'`)
+4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
+5. プルリクエストを作成
+
+### 開発ガイドライン
+
+- 新機能には包括的なテストを追加
+- コードは品質ゲート（Tier 1 & Tier 2）をパス
+- ドキュメントを更新
+- コミットメッセージは明確に
+
+---
+
+## 📄 ライセンス
+
+MIT License - 詳細は [LICENSE](LICENSE) ファイルを参照してください。
+
+---
+
+## 📞 サポート
+
+- **Issues**: [GitHub Issues](https://github.com/your-org/NexusCore/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-org/NexusCore/discussions)
+- **Email**: support@nexuscore.dev
+
+---
+
+## 🌟 謝辞
+
+このプロジェクトは以下の技術・プロジェクトに支えられています：
+
+- [OpenAI](https://openai.com/) - GPT-5.1 Codex
+- [Anthropic](https://anthropic.com/) - Claude 4.5 Sonnet
+- [DeepSeek](https://deepseek.com/) - DeepSeek R1
+- [Google AI](https://ai.google/) - Gemini 3.0 Pro
+- [pytest](https://pytest.org/) - テストフレームワーク
+
+---
+
+**Built with ❤️ using AI-driven development**
