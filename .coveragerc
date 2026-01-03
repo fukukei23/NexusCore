@@ -1,7 +1,20 @@
+# Coverage configuration for NexusCore
+# Updated during Phase 2: Test Coverage Improvement
+
 [run]
 source = src
 branch = True
+omit =
+    */tests/*
+    */venv/*
+    */__pycache__/*
+    */migrations/*
+    */.venv/*
 
 [report]
+precision = 2
 show_missing = True
-skip_covered = True
+skip_covered = False
+
+[html]
+directory = htmlcov

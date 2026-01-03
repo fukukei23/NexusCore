@@ -10,8 +10,8 @@
 from __future__ import annotations
 
 import os
-import logging
 from typing import Optional
+from nexuscore.logging_standard import get_logger
 
 # .env を環境にロード（既存環境変数は上書きしない = 環境変数が最優先）
 try:
@@ -58,9 +58,7 @@ class BaseAgent:
     SYSTEM_PROMPT: str = "You are a helpful assistant."
 
     def __init__(self) -> None:
-        self.logger = logging.getLogger(self.__class__.__name__)
-        if not self.logger.handlers:
-            logging.basicConfig(level=logging.INFO)
+        self.logger = get_logger(__name__)
         # ルーター初期化（失敗しても動作は継続する）
         self.llm_router: Optional[object] = None
         try:
