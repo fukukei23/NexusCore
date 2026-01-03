@@ -7,6 +7,11 @@
 from __future__ import annotations
 
 import re
+
+from nexuscore.logging_standard import get_logger
+
+logger = get_logger(__name__)
+
 from dataclasses import dataclass
 from typing import List
 
@@ -30,6 +35,7 @@ class SecretMatch:
 _AWS_ACCESS_KEY_PATTERNS = [
     r'AKIA[0-9A-Z]{16}',
     r'ASIA[0-9A-Z]{16}',
+
 ]
 
 _PEM_PRIVATE_KEY_PATTERN = r'-----BEGIN (?:RSA|EC|OPENSSH|PRIVATE) KEY-----'
@@ -144,6 +150,7 @@ def context_scanner(code: str) -> str:
 
     後方互換性のため、新しい scan_text_for_secrets() API を使用する。
     """
+
     matches = scan_text_for_secrets(code)
     if matches:
         return "sensitive"
@@ -156,6 +163,9 @@ def secure_context_builder(code: str) -> str:
 
     後方互換性のため、既存のマスキングロジックを維持。
     """
+
+    logger.info("Masking sensitive data in context...")
+
     masked = code
     # キー=値の一般マスク
     masked = re.sub(
@@ -172,7 +182,7 @@ def secure_context_builder(code: str) -> str:
     )
     masked = re.sub(r'AKIA[0-9A-Z]{16}', '[REDACTED_AWS_KEY_BY_NPE]', masked, flags=re.IGNORECASE)
     masked = re.sub(r'ASIA[0-9A-Z]{16}', '[REDACTED_AWS_KEY_BY_NPE]', masked, flags=re.IGNORECASE)
-    masked = re.sub(r'(-----BEGIN (?:RSA|EC|OPENSSH|PRIVATE) KEY-----)[\s\S]+?(-----END .*? KEY-----)', r'\1\n[REDACTED_PEM_BY_NPE]\n\2', masked, flags=re.IGNORECASE)
+    masked = re.sub(r'(-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----)[\s\S]+?(-----END .*? KEY-----)', r'\1\n[REDACTED_PEM_BY_NPE]\n\2', masked, flags=re.IGNORECASE)
     # 連絡先のゆるマスク
     masked = re.sub(r'([a-zA-Z0-9_.+-]+)@([a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', r'[\1]@[REDACTED_DOMAIN]', masked)
     masked = re.sub(r'\b(\d{2,4})[-\s]?(\d{2,4})[-\s]?(\d{3,4})\b', r'\1-[REDACTED]-\3', masked)

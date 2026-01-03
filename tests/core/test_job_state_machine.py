@@ -28,6 +28,10 @@ class TestJobStateMachine:
         machine = JobStateMachine(job_id="test-job-1")
         assert isinstance(machine.state, PendingState)
         assert machine.get_current_state() == "pending"
+        # メタデータも確認
+        metadata = machine.get_metadata()
+        assert metadata.job_id == "test-job-1"
+        assert metadata.status == "pending"
 
     def test_transition_pending_to_running(self):
         """Pending → Running の遷移をテスト"""
@@ -80,6 +84,129 @@ class TestJobStateMachine:
         machine.fail("Test error")
         # 終端状態からは遷移できない
         assert machine.state.can_transition_to(RunningState) is False
+
+    def test_invalid_transition_raises_value_error(self):
+        """不正な遷移を試みると ValueError が発生"""
+        machine = JobStateMachine(job_id="test-job-7b")
+        # PendingState から CompletedState への直接遷移は不可
+        with pytest.raises(ValueError, match="Cannot transition from pending to CompletedState"):
+            machine.transition_to(CompletedState)
+
+    def test_cannot_start_from_running_state(self):
+        """Running 状態から start() を呼ぶと ValueError"""
+        machine = JobStateMachine(job_id="test-job-7c")
+        machine.start()
+        with pytest.raises(ValueError, match="Cannot start job in state running"):
+            machine.start()
+
+    def test_cannot_fail_from_pending_state(self):
+        """Pending 状態から fail() を呼ぶと ValueError"""
+        machine = JobStateMachine(job_id="test-job-7d")
+        with pytest.raises(ValueError, match="Cannot fail job in state pending"):
+            machine.fail("Test error")
+
+    def test_metadata_updates_through_lifecycle(self):
+        """ライフサイクル全体でメタデータが正しく更新される"""
+        machine = JobStateMachine(job_id="test-job-7e", job_type="metadata_test")
+
+        # 初期状態
+        assert machine.metadata.status == "pending"
+        assert machine.metadata.message == "Job is waiting to start"
+        assert machine.metadata.started_at is None
+
+        # 開始
+        machine.start()
+        assert machine.metadata.status == "running"
+        assert machine.metadata.message == "Job is executing"
+        assert machine.metadata.started_at is not None
+
+        # 完了
+        machine.complete(details={"result": "success", "count": 42})
+        assert machine.metadata.status == "completed"
+        assert machine.metadata.message == "Job completed successfully"
+        assert machine.metadata.finished_at is not None
+        assert machine.metadata.details["result"] == "success"
+        assert machine.metadata.details["count"] == 42
+
+    def test_failed_state_with_custom_error_message(self):
+        """FailedState がカスタムエラーメッセージを保持"""
+        machine = JobStateMachine(job_id="test-job-7f")
+        machine.start()
+        error_msg = "Custom error message"
+        machine.fail(error_message=error_msg)
+
+        # FailedState がエラーメッセージを保持
+        assert isinstance(machine.state, FailedState)
+        assert machine.state.error_message == error_msg
+        assert machine.metadata.error == error_msg
+
+
+class TestStateClasses:
+    """State クラス個別のテスト"""
+
+    def test_pending_state_name(self):
+        """PendingState の状態名"""
+        machine = JobStateMachine(job_id="test-state-1")
+        assert machine.state.get_state_name() == "pending"
+
+    def test_running_state_name(self):
+        """RunningState の状態名"""
+        machine = JobStateMachine(job_id="test-state-2")
+        machine.start()
+        assert machine.state.get_state_name() == "running"
+
+    def test_completed_state_name(self):
+        """CompletedState の状態名"""
+        machine = JobStateMachine(job_id="test-state-3")
+        machine.start()
+        machine.complete()
+        assert machine.state.get_state_name() == "completed"
+
+    def test_failed_state_name(self):
+        """FailedState の状態名"""
+        machine = JobStateMachine(job_id="test-state-4")
+        machine.start()
+        machine.fail("Test error")
+        assert machine.state.get_state_name() == "failed"
+
+    def test_pending_state_transition_rules(self):
+        """PendingState の遷移ルール"""
+        machine = JobStateMachine(job_id="test-state-5")
+        # RunningState への遷移は可能
+        assert machine.state.can_transition_to(RunningState) is True
+        # CompletedState への遷移は不可
+        assert machine.state.can_transition_to(CompletedState) is False
+        # FailedState への遷移は不可
+        assert machine.state.can_transition_to(FailedState) is False
+
+    def test_running_state_transition_rules(self):
+        """RunningState の遷移ルール"""
+        machine = JobStateMachine(job_id="test-state-6")
+        machine.start()
+        # CompletedState への遷移は可能
+        assert machine.state.can_transition_to(CompletedState) is True
+        # FailedState への遷移は可能
+        assert machine.state.can_transition_to(FailedState) is True
+        # PendingState への遷移は不可
+        assert machine.state.can_transition_to(PendingState) is False
+
+
+class TestJobStateMachineWithoutDependencies:
+    """SessionController と RunHistoryLogger なしでの動作テスト"""
+
+    def test_state_machine_without_session_controller(self):
+        """SessionController なしでも正常に動作"""
+        machine = JobStateMachine(job_id="test-no-session")
+        machine.start()
+        machine.complete(details={"test": "data"})
+        assert machine.get_current_state() == "completed"
+
+    def test_state_machine_without_history_logger(self):
+        """RunHistoryLogger なしでも正常に動作"""
+        machine = JobStateMachine(job_id="test-no-history")
+        machine.start()
+        machine.fail("Test error")
+        assert machine.get_current_state() == "failed"
 
 
 class TestJobStateMachineWithSessionController:
