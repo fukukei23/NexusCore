@@ -1,22 +1,24 @@
 # ==============================================================================
-# 操作するソフト: VSCode (または任意のテキストエディタ)
-# レジストリ/フォルダ: C:\Users\USER\tools\NexusCore\src\nexuscore\config\
-# ファイル名: config.py
-# 日付: 2025/09/02
+# DEPRECATED: This module is being migrated to nexuscore.config.unified_config
 #
-# 使用方法:
-#   この内容で既存のファイルを上書きしてください。
-#   あなたの最新のAppConfigクラス設計を完全に維持しつつ、ImportErrorを解決します。
+# For new code, use:
+#   from nexuscore.config.unified_config import get_config
+#   config = get_config()
 #
-# 改修内容:
-#   - ファイルの末尾で `config = AppConfig()` というインスタンスを生成。
-#     これにより、他のモジュールは `from .config import config` で安全に設定を
-#     インポートできるようになり、循環参照の問題が解消されます。
+# This module is kept for backward compatibility only.
 # ==============================================================================
 
 from __future__ import annotations
 from typing import Dict, Any, List
 import os
+import warnings
+
+# Issue deprecation warning when this module is imported
+warnings.warn(
+    "nexuscore.config.config is deprecated. Use nexuscore.config.unified_config instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 class AppConfig:
     """

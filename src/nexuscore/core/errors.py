@@ -110,9 +110,11 @@ def classify_error(exc: Exception) -> str:
         return "connection"
 
     # JSON パースエラー（LLM 出力が不正）
-    if any(keyword in error_str for keyword in ["json", "parse", "decode", "invalid format"]):
-        if "json" in error_type.lower() or "parse" in error_type.lower():
-            return "invalid_output"
+    # メッセージまたは型名にJSON/parseキーワードが含まれる場合
+    has_json_in_message = any(keyword in error_str for keyword in ["json", "parse", "decode", "invalid format"])
+    has_json_in_type = any(keyword in error_type for keyword in ["json", "parse", "decode"])
+    if has_json_in_message or has_json_in_type:
+        return "invalid_output"
 
     # サンドボックス関連
     if any(keyword in error_str for keyword in ["sandbox", "subprocess", "execution failed"]):

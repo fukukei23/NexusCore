@@ -22,7 +22,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 
-from nexuscore.config.config import AppConfig
+from nexuscore.config.unified_config import get_config
 
 # グローバルなDBインスタンス（models.pyで使用）
 db = SQLAlchemy()
@@ -41,10 +41,9 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     """
     app = Flask(__name__)
 
-    # 基本設定（AppConfigから読み込み）
-    app.config["SECRET_KEY"] = AppConfig.FLASK_SECRET_KEY
-    app.config["SQLALCHEMY_DATABASE_URI"] = AppConfig.DATABASE_URI
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    # 統一設定システムから設定を読み込み
+    config = get_config()
+    app.config.update(config.to_flask_config())
 
     # 設定の上書き（テスト用など）
     if config_overrides:
@@ -85,6 +84,13 @@ def create_app(config_overrides: dict | None = None) -> Flask:
             "flask-cors is not installed. CORS support for /api/v1/* is disabled. "
             "Install with: pip install flask-cors"
         )
+
+    # ロギングプロバイダーの登録（Core層へのDB拡張ロガーの注入）
+    from nexuscore.webapp.logging_provider import WebappLoggingProvider
+    from nexuscore.core.logging_interface import register_logging_provider
+
+    register_logging_provider(WebappLoggingProvider())
+    # これにより、Core/NPE層がWebapp層に直接依存せずにDB logging機能を利用可能になる
 
     # ルートページ（リダイレクト）
     @app.route("/")

@@ -8,6 +8,11 @@
 # secrets.py は追跡しない
 src/nexuscore/config/secrets.py
 
+# Kubernetes Secrets（機密情報を含むため除外）
+k8s/nexuscore-secrets.yaml
+k8s/*-secrets.yaml
+k8s/*.secret.yaml
+
 # --- Byte-compiled / optimized / DLL files ---
 __pycache__/
 *.pyc
@@ -40,12 +45,20 @@ __pycache__/
 # 開発用データベース
 db.sqlite3
 
+
+# --- Flask specific ---
+# Flask instance folder
+instance/
+src/instance/
+*.db
+
 # --- SDK generated files ---
 sdk/python/
 # TypeScript SDK: ソースは追跡、ビルド成果物のみ無視
 sdk/typescript/dist/
 sdk/typescript/node_modules/
 !sdk/.gitkeep
+
 
 # --- Project-specific ignores ---
 # 生成されたファイルが出力されるフォルダ
@@ -70,6 +83,11 @@ coverage.xml
 htmlcov/
 .pytest_cache/
 .mypy_cache/
+
+# mutmut (mutation testing)
+mutants/
+.mutmut-cache
+.mutmut_temp.toml
 
 # テスト結果ファイル（自動生成）
 docs/reports/TEST_RESULTS_*.txt

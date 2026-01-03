@@ -69,13 +69,13 @@ def log_transaction(log_data: dict, log_file: str | Path = DEFAULT_LOG):
             print(f"[NPE-Logger] CRITICAL: failed to write audit file '{log_file}': {e}")
             print(entry_compact)
 
-    # DBにも書き込む（Flaskアプリコンテキストが存在する場合のみ）
+    # DBにも書き込む（ロギングプロバイダー経由）
+    # Webapp層への直接依存を削除し、インターフェース経由でアクセス
     try:
-        from nexuscore.webapp.db_logger import enhance_log_transaction
-        enhance_log_transaction(log_data, log_file)
-    except ImportError:
-        # webapp がインストールされていない場合はスキップ（CLI実行時など）
-        pass
-    except Exception:
+        from nexuscore.core.logging_interface import get_logging_provider
+        provider = get_logging_provider()
+        provider.enhance_transaction(log_data, log_file)
+    except Exception as e:
         # DB書き込み失敗は既存の処理を止めない
+        # （プロバイダーが NoOp の場合も含む）
         pass

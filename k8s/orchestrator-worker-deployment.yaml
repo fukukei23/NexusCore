@@ -38,26 +38,32 @@ spec:
           - --concurrency=4
           - --max-tasks-per-child=100  # メモリリーク対策
         env:
+        # セキュリティ: 機密情報はSecretから取得
         - name: CELERY_BROKER_URL
           valueFrom:
-            configMapKeyRef:
-              name: nexuscore-config
+            secretKeyRef:
+              name: nexuscore-secrets
               key: celery_broker_url
         - name: CELERY_RESULT_BACKEND
           valueFrom:
-            configMapKeyRef:
-              name: nexuscore-config
+            secretKeyRef:
+              name: nexuscore-secrets
               key: celery_result_backend
         - name: DATABASE_URI
           valueFrom:
-            configMapKeyRef:
-              name: nexuscore-config
+            secretKeyRef:
+              name: nexuscore-secrets
               key: database_uri
         - name: REDIS_URL
           valueFrom:
-            configMapKeyRef:
-              name: nexuscore-config
+            secretKeyRef:
+              name: nexuscore-secrets
               key: redis_url
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: nexuscore-secrets
+              key: jwt_secret_key
         resources:
           requests:
             memory: "512Mi"
@@ -125,15 +131,17 @@ spec:
 
 ---
 # ==============================================================================
-# ConfigMap (設定例)
+# ConfigMap (機密情報以外の設定のみ)
 # ==============================================================================
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nexuscore-config
 data:
-  celery_broker_url: "redis://redis-service:6379/0"
-  celery_result_backend: "redis://redis-service:6379/1"
-  database_uri: "postgresql://user:password@postgres-service:5432/nexuscore"
-  redis_url: "redis://redis-service:6379/0"
+  # 機密情報ではない設定のみ残す
+  log_level: "INFO"
+  worker_concurrency: "4"
+  max_tasks_per_child: "100"
+
+# 注意: 機密情報（パスワード、APIキー等）はk8s/nexuscore-secrets.yamlに移動しました
 
