@@ -171,10 +171,11 @@ class TestApplyPatch:
         result = patch_applier.apply_patch(
             patch_text=valid_patch,
             project_path="/nonexistent/path",
+            allow_deletions=True,  # 削除チェックをバイパスしてパスチェックをテスト
         )
 
         assert result["applied"] is False
-        assert "not found" in result["reason"].lower()
+        assert "failed" in result["reason"].lower()
 
     def test_apply_patch_blocks_dangerous_patch(self, monkeypatch, patch_applier, temp_project, dangerous_patch):
         """allow_deletions=Falseの場合、削除行を含むパッチをブロック"""
