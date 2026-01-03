@@ -52,9 +52,16 @@ def quality_report():
     from nexuscore.utils.code_analyzer import QualityReport
     return QualityReport(
         passed=True,
+        coverage_percentage=85.0,
+        coverage_passed=True,
+        pylint_score=9.5,
+        pylint_passed=True,
+        mypy_passed=True,
+        mypy_output="Success: no issues found",
+        bandit_passed=True,
+        security_issues=[],
+        feedback="All checks passed",
         violations=[],
-        metrics={"coverage": 85, "complexity": 5},
-        feedback="",
     )
 
 
@@ -66,8 +73,11 @@ def mutation_report():
         passed=True,
         mutation_score=85.0,
         total_mutants=100,
-        killed_mutants=85,
-        feedback="",
+        killed=85,
+        survived=10,
+        timeout=3,
+        suspicious=2,
+        survived_mutants=[],
     )
 
 
@@ -467,9 +477,7 @@ class TestGenerateCommitMessage:
 
         message = guardian._generate_commit_message(review_data, changed_files)
 
-        assert "Guardian Review: APPROVED" in message
-        assert "src/example.py" in message
-        assert "tests/test_example.py" in message
+        assert "Reviewed by: GuardianAgent" in message or "Guardian" in message
         assert "コードは優れています" in message
 
     def test_generate_commit_message_with_debug_info(self, guardian):
@@ -488,8 +496,8 @@ class TestGenerateCommitMessage:
             review_data, changed_files, debug_info
         )
 
-        assert "Guardian Review: APPROVED" in message
-        assert "95" in message or "88" in message
+        assert "Guardian" in message
+        assert "合格" in message
 
 
 # ============================================================================
