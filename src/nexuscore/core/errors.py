@@ -43,6 +43,11 @@ class SandboxExecutionError(NexusCoreError):
     pass
 
 
+class SandboxSecurityError(NexusCoreError):
+    """サンドボックスセキュリティ違反（禁止モジュールの利用など）"""
+    pass
+
+
 class PatchApplyError(NexusCoreError):
     """patch_applier の適用失敗"""
     pass

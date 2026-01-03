@@ -5,7 +5,7 @@
 set -e
 
 PROJECT_ROOT="/home/yn441611/NexusCore"
-VENV_NAME="myenv_linux"
+VENV_NAME="venv"
 
 cd "$PROJECT_ROOT"
 
@@ -29,10 +29,15 @@ fi
 echo ""
 echo "✅ Virtual environment setup complete!"
 echo ""
-echo "To activate:"
+echo "To activate (recommended):"
+echo "  source activate"
+echo ""
+echo "Or use direct method:"
 echo "  source $VENV_NAME/bin/activate"
 echo ""
 echo "To run tests:"
-echo "  source $VENV_NAME/bin/activate"
+echo "  source activate"
 echo "  python -m pytest tests/"
+echo ""
+echo "For more details, see README_VENV.md"
 

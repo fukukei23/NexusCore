@@ -19,11 +19,25 @@ fi
 
 cd "$PROJECT_ROOT"
 
-echo "Activating virtual environment: myenv_linux"
-source myenv_linux/bin/activate
+# 仮想環境を自動検出（venv を優先）
+if [ -d "venv" ]; then
+    echo "Activating virtual environment: venv"
+    source venv/bin/activate
+elif [ -d ".venv" ]; then
+    echo "Activating virtual environment: .venv"
+    source .venv/bin/activate
+else
+    echo "⚠️  No virtual environment found. Please create one first."
+    exit 1
+fi
 
-echo "Running pytest on: $TEST_TARGET"
-echo "----------------------------------------"
+# コマンド実行の開始マーカー
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "▶ COMMAND: python -m pytest $TEST_TARGET -v --tb=short"
+echo "▶ TIMESTAMP: $(date '+%Y-%m-%d %H:%M:%S')"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
 
 # 結果ディレクトリの準備
 RESULTS_DIR="${PROJECT_ROOT}/test_results"
@@ -40,7 +54,16 @@ else
     PYTEST_EXIT_CODE=$?
 fi
 
-echo "----------------------------------------"
+# コマンド実行の終了マーカー
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+if [ $PYTEST_EXIT_CODE -eq 0 ]; then
+    echo "▶ COMMAND END: SUCCESS (exit code: $PYTEST_EXIT_CODE)"
+else
+    echo "▶ COMMAND END: FAILED (exit code: $PYTEST_EXIT_CODE)"
+fi
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
 echo "✅ Test execution complete"
 echo ""
 

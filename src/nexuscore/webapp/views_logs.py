@@ -1,6 +1,11 @@
 """
 NexusCore SaaS基盤 - ログビューア
 
+WebApp HTML UI view.
+
+データ取得は FastAPI 経由ではなく、services / DB direct access を使用する。
+本画面は FastAPI API migration の対象外（責務分離のため）。
+
 既存の Orchestrator / NPE とは独立して動作する。
 """
 from __future__ import annotations
@@ -20,6 +25,9 @@ def project_logs(project_id: int):
     """
     プロジェクト単位のログ一覧
     GET /logs/projects/<project_id>?source=NPE&level=ERROR&page=1&per_page=50
+
+    Data access: Direct DB access (no API call)
+    FastAPI equivalent: N/A (internal UI only)
     """
     user = get_current_user()
     project = Project.query.filter_by(id=project_id, owner_id=user.id).first_or_404()
@@ -110,6 +118,9 @@ def run_logs(run_id: str):
     """
     特定のRunのログ一覧（4.5: Self-Healing メトリクス追加）
     GET /logs/runs/<run_id>?source=NPE&level=ERROR&page=1&per_page=50
+
+    Data access: Direct DB access (no API call)
+    FastAPI equivalent: GET /api/v1/runs/{id} (for external clients, but different data structure)
     """
     import json
     from nexuscore.webapp.views_projects import _format_duration, _compute_run_duration, _render_run_status_badge

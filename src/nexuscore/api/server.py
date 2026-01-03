@@ -1,24 +1,22 @@
 # ==============================================================================
-# 操作するソフト: VSCode (または任意のテキストエディタ)
-# レジストリ/フォルダ: C:\Users\USER\tools\NexusCore\src\nexuscore\api\
-# ファイル名: server.py
-# 日付: 2025/09/03
+# DEPRECATED:
+#   This module previously hosted legacy Flask REST API endpoints.
+#   All internal REST APIs (/api/v1/execute, /api/v1/status) have been migrated to FastAPI
+#   under src/nexuscore/api/fastapi_app.py and removed in CR-FASTAPI-008.
+#   The module is kept only as a stub during the transition period.
 #
-# 使用方法:
-#   この内容で既存のファイルを上書きしてください。
-#   すべてのエージェントの初期化問題を、あなたのハイブリッド・アーキテクチャ設計に
-#   完全に準拠する形で解決する、最終FIX版です。
+#   Remaining Flask endpoints:
+#   - /api/github/webhook (POST) - Will be migrated in a future CR
 #
-# 改修内容:
-#   - 私の誤解であった`PostmortemAgent`の初期化方法を修正しました。
-#   - 全てのエージェントが、その役割（近代化/特殊任務）に応じて
-#     正しく初期化されるように、チーム編成ロジックを全面的に改良しました。
+#   The `tasks` dictionary is kept here for backward compatibility with FastAPI routes
+#   that import it. It will be moved to a shared module in a future refactoring.
 # ==============================================================================
 import os
 import sys
 import logging
 import threading
 import uuid
+from functools import wraps
 from flask import Flask, request, jsonify
 
 # セキュリティ: JWT認証のインポート
@@ -76,13 +74,42 @@ from nexuscore.logging_standard import get_logger
 logger = get_logger(__name__)
 logger.info("API server initialized with standard logging")
 
+def require_auth(f):
+    """
+    認証デコレータ: Authorization: Bearer <TOKEN> ヘッダを検証する。
+    Mainブランチのセキュリティ機能を採用。
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        expected_token = os.getenv("NEXUSCORE_API_TOKEN")
+        if not expected_token:
+            logger.error("NEXUSCORE_API_TOKEN is not set. Server misconfiguration.")
+            return jsonify({"error": "Server misconfigured: NEXUSCORE_API_TOKEN is not set"}), 500
+
+        auth_header = request.headers.get("Authorization")
+        if not auth_header:
+            logger.warning("Authorization header missing")
+            return jsonify({"error": "Authorization required"}), 401
+
+        if not auth_header.startswith("Bearer "):
+            logger.warning("Invalid Authorization header format")
+            return jsonify({"error": "Authorization required"}), 401
+
+        token = auth_header[7:].strip()
+        if token != expected_token:
+            logger.warning("Invalid token provided")
+            return jsonify({"error": "Authorization required"}), 401
+
+        return f(*args, **kwargs)
+    return decorated_function
+
 def run_orchestrator_task(task_id: str, requirement: str, project_path: str, constitution: dict):
     """Orchestratorをバックグラウンドで実行するワーカー関数"""
     logger.info(f"Starting background task: {task_id}")
     tasks[task_id] = {"status": "running", "message": "Initializing agents..."}
 
     try:
-        # --- 1. 近代化されたエージェントの招集 (引数なし) ---
+        # --- 1. 近代化されたエージェントの招集 ---
         architect_agent = ArchitectAgent()
         planner_agent = PlannerAgent()
         coder_agent = CoderAgent()
@@ -90,26 +117,24 @@ def run_orchestrator_task(task_id: str, requirement: str, project_path: str, con
         debugger_agent = DebuggerAgent()
         postmortem_agent = PostmortemAgent()
 
-        # --- 2. 特殊任務エージェントのプロビジョニング (引数あり) ---
+        # --- 2. 特殊任務エージェントのプロビジョニング ---
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
         if not api_key:
-            raise ValueError("A primary API key (e.g., GEMINI_API_KEY or OPENAI_API_KEY) must be set in the .env file.")
+            raise ValueError("A primary API key must be set in the .env file.")
 
         def provision_agent(agent_class, task_type: str, **kwargs):
-            """エージェントを動的にプロビジョニングするヘルパー関数"""
             model_name = llm_router.task_model_map.get(task_type, llm_router.default_model)
-            logger.info(f"Provisioning {agent_class.__name__} for '{task_type}' task with model '{model_name}'.")
             base_args = {'api_key': api_key, 'model': model_name}
             all_args = {**base_args, **kwargs}
             return agent_class(**all_args)
 
         guardian_agent = provision_agent(GuardianAgent, 'review')
         knowledge_curator_agent = provision_agent(KnowledgeCuratorAgent, 'general')
-
+        
         policy_rules_path = os.path.join(PROJECT_ROOT, "config", "policy_rules.json")
         policy_agent = provision_agent(PolicyAgent, 'policy', policy_rules_path=policy_rules_path)
 
-        # --- 3. ユーティリティと司令塔 (Orchestrator) の任命 ---
+        # --- 3. ユーティリティと司令塔の任命 ---
         patch_applier = PatchApplier()
 
         orchestrator = Orchestrator(
@@ -147,7 +172,7 @@ def run_orchestrator_task(task_id: str, requirement: str, project_path: str, con
 def execute_task():
     data = request.json
     if not data or 'requirement' not in data or 'project_path' not in data:
-        return jsonify({"error": "Missing 'requirement' or 'project_path' in request body", "error_code": "MISSING_FIELD"}), 400
+        return jsonify({"error": "Missing 'requirement' or 'project_path'"}), 400
 
     task_id = str(uuid.uuid4())
     requirement = data['requirement']
@@ -155,14 +180,8 @@ def execute_task():
 
     # セキュリティ: パストラバーサル対策
     allowed_base = os.getenv("NEXUS_ALLOWED_PROJECT_BASE", "/workspace")
-    allowed_base_abs = os.path.abspath(allowed_base)
-    if not project_path.startswith(allowed_base_abs):
-        logger.warning(f"Rejected project_path outside allowed base: {project_path}")
-        return jsonify({
-            "error": "Project path not allowed. Must be under allowed base directory.",
-            "error_code": "FORBIDDEN_PATH",
-            "allowed_base": allowed_base
-        }), 403
+    if not project_path.startswith(os.path.abspath(allowed_base)):
+        return jsonify({"error": "Project path not allowed."}), 403
 
     constitution = { "description": data.get("constitution_text", "Default constitution.") }
 
@@ -172,8 +191,6 @@ def execute_task():
     )
     thread.daemon = True
     thread.start()
-
-    logger.info(f"Task {task_id} created for requirement: '{requirement}'")
 
     return jsonify({
         "message": "Task accepted and is running in the background.",
@@ -187,10 +204,19 @@ def get_task_status(task_id):
     if not task:
         return jsonify({"error": "Task not found"}), 404
     return jsonify(task)
-
+  
 @app.route('/api/github/webhook', methods=['POST'])
 def github_webhook_endpoint():
-    """GitHub Webhook エンドポイント"""
+    """
+    GitHub Webhook エンドポイント（非推奨）
+
+    このエンドポイントは非推奨です。FastAPI 版の /api/v1/github/webhook を使用してください。
+    """
+    logger.warning(
+        "DEPRECATED endpoint /api/github/webhook called. "
+        "Use FastAPI /api/v1/github/webhook instead. "
+        "This endpoint will be removed in v0.9.0."
+    )
     try:
         from nexuscore.api.github_webhook_handler import handle_github_webhook
         result = handle_github_webhook()

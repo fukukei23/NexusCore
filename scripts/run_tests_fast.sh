@@ -7,13 +7,11 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-# 仮想環境を有効化
-if [ -d "myenv_linux" ]; then
-    source myenv_linux/bin/activate
+# 仮想環境を有効化（venv を優先）
+if [ -d "venv" ]; then
+    source venv/bin/activate
 elif [ -d ".venv" ]; then
     source .venv/bin/activate
-elif [ -d "venv" ]; then
-    source venv/bin/activate
 fi
 
 echo "=== 高速テスト実行（カバレッジなし） ==="

@@ -1,6 +1,11 @@
 """
 NexusCore SaaS基盤 - プロジェクト管理ビュー
 
+WebApp HTML UI view.
+
+データ取得は FastAPI 経由ではなく、services / DB direct access を使用する。
+本画面は FastAPI API migration の対象外（責務分離のため）。
+
 既存の Orchestrator / NPE とは独立して動作する。
 """
 from __future__ import annotations
@@ -177,6 +182,9 @@ def list_projects():
     """
     プロジェクト一覧（4.5: カード形式表示）
     GET /projects/
+
+    Data access: Direct DB access (no API call)
+    FastAPI equivalent: GET /api/v1/projects (for external clients)
     """
     from sqlalchemy import desc, func
     from nexuscore.integration.github_pr_comment import _compute_recent_success_rate
@@ -385,6 +393,9 @@ def project_detail(project_id: int):
     """
     プロジェクト詳細＋直近のRun一覧
     GET /projects/<project_id>
+
+    Data access: Direct DB access (no API call)
+    FastAPI equivalent: GET /api/v1/projects/{id} (for external clients)
     """
     user = get_current_user()
     project = Project.query.filter_by(id=project_id, owner_id=user.id).first_or_404()
@@ -507,6 +518,9 @@ def create_project():
     新規プロジェクト作成
     GET /projects/new - フォーム表示
     POST /projects/new - プロジェクト作成
+
+    Data access: Direct DB access (no API call)
+    FastAPI equivalent: POST /api/v1/projects (for external clients)
     """
     if request.method == "GET":
         html = """
@@ -555,6 +569,9 @@ def trigger_run(project_id: int):
     プロジェクト実行トリガー（フェーズ1: 同期接続版 → フェーズ2: Celery 非同期版に切り替え可能）
 
     POST /projects/<project_id>/run
+
+    Data access: Direct DB access + Orchestrator service call (no API call)
+    FastAPI equivalent: POST /api/v1/projects/{id}/run (for external clients)
 
     フェーズ1: 同期実行（直接 Orchestrator を呼び出す）
     フェーズ2: Celery タスクとして Orchestrator を非同期実行する（コメントアウトで切り替え可能）

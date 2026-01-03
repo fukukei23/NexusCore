@@ -19,27 +19,18 @@ __pycache__/
 *.pyo
 *.pyd
 
-# --- Distribution / packaging ---
-.Python
+# --- Build / Generated outputs ---
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+exports/
 
-# --- venv ---
+# --- Node.js ---
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# --- Python ---
 .venv/
 venv/
 myenv_linux/
@@ -47,16 +38,27 @@ ENV/
 env/
 env.bak/
 venv.bak/
+__pycache__/
+*.pyc
 
 # --- Django specific ---
 # 開発用データベース
 db.sqlite3
+
 
 # --- Flask specific ---
 # Flask instance folder
 instance/
 src/instance/
 *.db
+
+# --- SDK generated files ---
+sdk/python/
+# TypeScript SDK: ソースは追跡、ビルド成果物のみ無視
+sdk/typescript/dist/
+sdk/typescript/node_modules/
+!sdk/.gitkeep
+
 
 # --- Project-specific ignores ---
 # 生成されたファイルが出力されるフォルダ
@@ -100,14 +102,13 @@ nexus_core_run.log
 project_chronicle.jsonl
 *.log
 
-# バックアップ・エクスポート
-NexusCore_backup.zip
-exports/*.zip
-
-# 一時ファイル
+# --- Archives / Backups ---
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.bak
 *.tmp
-
-exports/*.json
 
 # Kubernetes バイナリ（サイズが大きいため）
 kubectl

@@ -1,40 +1,43 @@
-# 仮想環境
-.venv/
+# Python 仮想環境
 venv/
-
-# ビルド・配布物
-dist/
-build/
+.env/
+.venv/
 
 # キャッシュ類
 __pycache__/
-.mypy_cache/
-.pytest_cache/
 *.pyc
+*.pyo
+*.pyd
+.nox/
+.build/
+dist/
 
-# VCS
-.git/
+# エディタ・IDE
+.vscode/
+.idea/
 
-# データ・ログ類
-logs/
-data/
-tmp/
+# ログ・一時ファイル
 *.log
+*.tmp
+*.cache
 
-# AI / ベクターストア・モデルなど
-chroma_db/
-vector_store/
-models/
+# OSごみ
+.DS_Store
 
-# ドキュメント・出力アーカイブなど
-docs/_build/
-docs/.vitepress/
-site/
+# データ/成果物
 *.zip
 *.tar
 *.tar.gz
+*.pdf
+*.png
+*.jpg
+*.jpeg
 
-# NexusCore 固有
-.nexus/self_healing_sandbox/
-.nexus/history/*.log.jsonl
+# NexusCore の生成物
+run_reports/
+reports/
+completion_reports/
 
+# Streamlit/Gradio 生成物
+*.gradio/
+.gradio/

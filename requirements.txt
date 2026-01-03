@@ -6,33 +6,32 @@
 # ===================================================
 
 # --- Core AI and Machine Learning ---
-openai>=1.30.0,<2.0.0  # v1 API互換、v2は破壊的変更あり
-# CPU-only PyTorch to avoid pulling large CUDA dependencies in CI
+openai>=1.30.0,<2.0.0
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.2.2+cpu
-tensorflow>=2.14.0,<3.0.0  # TF 3.0は破壊的変更の可能性
-google-generativeai>=0.4.0,<1.0.0  # For Gemini models
-scipy>=1.11.0,<2.0.0  # For audio processing
+tensorflow>=2.14.0,<3.0.0
+google-generativeai>=0.4.0,<1.0.0
+scipy>=1.11.0,<2.0.0
 
 # --- Testing Framework ---
 pytest>=7.4.0,<8.0.0
 pytest-cov>=4.1.0,<5.0.0
-pytest-anyio>=0.0.0,<1.0.0
+anyio>=4.0.0,<5.0.0  # Mainブランチの修正を採用（正しいパッケージ名）
 pytest-mock>=3.12.0,<4.0.0
 
 # --- Web UI and Server ---
-gradio>=4.16.0,<5.0.0  # v4系で安定
-fastapi>=0.104.0,<1.0.0
-uvicorn>=0.24.0,<1.0.0
+gradio>=4.16.0,<5.0.0
+fastapi>=0.110.0,<1.0.0 # Mainの新しいバージョンを採用
+uvicorn>=0.27.0,<1.0.0  # Mainの新しいバージョンを採用
 websockets>=12.0,<13.0
 streamlit>=1.29.0,<2.0.0
-Flask>=3.0.0,<4.0.0
+Flask>=3.0.0,<4.0.0     # あなたのPRのアップグレードを採用
 Flask-SQLAlchemy>=3.1.0,<4.0.0
 Flask-Migrate>=4.0.0,<5.0.0
-Flask-CORS>=4.0.0,<5.0.0  # CORS support for external API
+Flask-CORS>=4.0.0,<5.0.0
 authlib>=1.3.0,<2.0.0
 celery>=5.3.0,<6.0.0
-redis>=5.0.0,<6.0.0  # Celery broker/backend
+redis>=5.0.0,<6.0.0
 matplotlib>=3.8.0,<4.0.0
 
 # --- Audio Processing ---
@@ -40,16 +39,17 @@ SpeechRecognition>=3.10.0,<4.0.0
 pydub>=0.25.0,<1.0.0
 sounddevice>=0.4.6,<1.0.0
 standard-aifc; python_version < '3.13'
-patch>=1.16,<2.0  # library used by patch_applier
 
 # --- Translation ---
 google-cloud-translate>=3.15.0,<4.0.0
+patch>=1.16.0,<2.0.0 # library used by patch_applier
 
 # --- Utilities ---
 httpx>=0.25.0,<1.0.0
 httpcore>=1.0.0,<2.0.0
 requests>=2.31.0,<3.0.0  # For Slack notifications
 python-dotenv>=1.0.0,<2.0.0
+
 termcolor>=2.4.0,<3.0.0
 pyyaml>=6.0.0,<7.0.0  # For test strategy config and constitution file
 

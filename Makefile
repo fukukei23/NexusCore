@@ -1,24 +1,21 @@
 # ==== 共通設定 ====
 PYTHON := python3
 VENV_PYTHON := .venv/bin/python
-MYENV_PYTHON := myenv_linux/bin/python
 
-# 仮想環境の Python を自動検出
-ifeq ($(shell test -f myenv_linux/bin/python && echo yes),yes)
-	PYTHON := $(MYENV_PYTHON)
-	VENV_NAME := myenv_linux
+# 仮想環境の Python を自動検出（venv を優先）
+ifeq ($(shell test -f venv/bin/python && echo yes),yes)
+	PYTHON := venv/bin/python
+	VENV_NAME := venv
 else ifeq ($(shell test -f .venv/bin/python && echo yes),yes)
 	PYTHON := $(VENV_PYTHON)
 	VENV_NAME := .venv
-else ifeq ($(shell test -f venv/bin/python && echo yes),yes)
-	PYTHON := venv/bin/python
-	VENV_NAME := venv
+# myenv_linux は削除されたため、フォールバックから除外
 endif
 
 SRC := src
 TESTS := tests
 
-.PHONY: help venv install-dev format lint typecheck test test-fast test-coverage test-phase3 coverage-phase3 qa clean
+.PHONY: help venv install-dev format lint typecheck test test-fast test-coverage test-phase3 coverage-phase3 qa clean sdk sdk-python sdk-ts test-e2e export-chat export-chat-watch server ci-bootstrap-apikey
 
 help:
 	@echo "Available targets:"
@@ -33,6 +30,14 @@ help:
 	@echo "  make test-phase3  - run Phase3 analyzer tests with coverage"
 	@echo "  make coverage-phase3 - generate Phase3 coverage report (Markdown)"
 	@echo "  make qa           - format + lint + typecheck + test"
+	@echo "  make sdk          - generate all SDKs (Python + TypeScript)"
+	@echo "  make sdk-python   - generate Python SDK only"
+	@echo "  make sdk-ts       - generate TypeScript SDK only"
+	@echo "  make server       - start FastAPI server (for SDK generation)"
+	@echo "  make test-e2e     - run E2E tests (requires SDK to be generated)"
+	@echo "  make ci-bootstrap-apikey - generate CI bootstrap API key (for CI/CD)"
+	@echo "  make export-chat  - export Cursor IDE chat history (one-time)"
+	@echo "  make export-chat-watch - export Cursor IDE chat history (watch mode)"
 	@echo "  make clean        - clean cache files"
 	@echo ""
 	@echo "Using Python: $(PYTHON)"
@@ -108,6 +113,125 @@ coverage-phase3:
 # ==== 一括品質チェック ====
 qa: format lint-fix typecheck test
 	@echo "✅ All quality checks passed!"
+
+# ==== SDK 生成 ====
+sdk:
+	@echo "Generating all SDKs..."
+	$(PYTHON) tools/generate_sdk.py --all
+	@echo "✅ SDK generation complete"
+
+sdk-python:
+	@echo "Generating Python SDK..."
+	@if [ -f "tmp/openapi.json" ]; then \
+		echo "📄 Using local OpenAPI file: tmp/openapi.json"; \
+		$(PYTHON) tools/generate_sdk.py --python --openapi-file tmp/openapi.json; \
+	else \
+		echo "🌐 Fetching OpenAPI spec from server..."; \
+		$(PYTHON) tools/generate_sdk.py --python; \
+	fi
+	@echo "✅ Python SDK generation complete"
+
+sdk-python-build:
+	@echo "Building Python SDK (wheel and sdist)..."
+	@cd sdk/python && $(PYTHON) -m pip install build --quiet
+	@cd sdk/python && $(PYTHON) -m build
+	@echo "✅ Python SDK build complete"
+	@echo "📦 Built packages are in sdk/python/dist/"
+
+sdk-python-publish-test:
+	@echo "Publishing Python SDK to TestPyPI..."
+	@echo "⚠️  Note: This requires TESTPYPI_API_TOKEN environment variable"
+	@echo "   Example: export TESTPYPI_API_TOKEN='pypi-xxxxx'"
+	@cd sdk/python && $(PYTHON) -m pip install twine --quiet
+	@cd sdk/python && $(PYTHON) -m twine upload --repository testpypi dist/* || \
+		echo "❌ Publish failed. Make sure TESTPYPI_API_TOKEN is set and packages are built (run 'make sdk-python-build' first)"
+
+sdk-ts:
+	@echo "Generating TypeScript SDK..."
+	@if [ -f "tmp/openapi.json" ]; then \
+		echo "📄 Using local OpenAPI file: tmp/openapi.json"; \
+		$(PYTHON) tools/generate_sdk.py --typescript --openapi-file tmp/openapi.json; \
+	else \
+		echo "🌐 Fetching OpenAPI spec from server..."; \
+		$(PYTHON) tools/generate_sdk.py --typescript; \
+	fi
+	@echo "✅ TypeScript SDK generation complete"
+
+sdk-ts-build:
+	@echo "Building TypeScript SDK..."
+	@cd sdk/typescript && npm install
+	@cd sdk/typescript && npm run build
+	@echo "✅ TypeScript SDK build complete"
+
+sdk-ts-test:
+	@echo "Running TypeScript SDK tests..."
+	@cd sdk/typescript && npm install
+	@cd sdk/typescript && npm test
+	@echo "✅ TypeScript SDK tests complete"
+
+sdk-ts-publish-test:
+	@echo "Publishing TypeScript SDK to Test npm Registry..."
+	@echo "⚠️  Note: This requires NPM_TOKEN environment variable"
+	@echo "   Example: export NPM_TOKEN='npm_xxxxx'"
+	@cd sdk/typescript && npm install
+	@cd sdk/typescript && npm publish --registry=https://registry.npmjs.org/ --dry-run || \
+		echo "❌ Publish failed. Make sure NPM_TOKEN is set and packages are built (run 'make sdk-ts-build' first)"
+
+# ==== FastAPI サーバー起動 ====
+server:
+	@echo "🚀 Starting FastAPI server..."
+	@echo "📖 OpenAPI docs: http://127.0.0.1:8000/api/docs"
+	@echo "📄 OpenAPI JSON: http://127.0.0.1:8000/api/openapi.json"
+	@echo ""
+	@if [ ! -f "venv/bin/uvicorn" ] && [ ! -f ".venv/bin/uvicorn" ]; then \
+		echo "⚠️  uvicorn not found. Installing uvicorn..."; \
+		$(PYTHON) -m pip install uvicorn[standard] -q; \
+	fi
+	@export PYTHONPATH="${PYTHONPATH:-}:src" && \
+		$(PYTHON) -m uvicorn nexuscore.api.fastapi_app:app \
+			--reload \
+			--host 127.0.0.1 \
+			--port 8000
+
+# ==== E2E テスト ====
+test-e2e:
+	@echo "Running E2E tests..."
+	@if [ ! -d "sdk/python/nexuscore_sdk" ]; then \
+		echo "⚠️  SDK not found. Generating Python SDK first..."; \
+		$(PYTHON) tools/generate_sdk.py --python || exit 1; \
+	fi
+	$(PYTHON) -m pytest tests/e2e/test_sdk_e2e.py -v --tb=short
+	@echo "✅ E2E tests complete"
+
+# ==== CI Bootstrap API Key ====
+ci-bootstrap-apikey:
+	@echo "Generating CI Bootstrap API Key..."
+	@if [ -z "$(VENV_NAME)" ]; then \
+		echo "⚠️  No virtual environment found. Activating venv..."; \
+		if [ -f "venv/bin/activate" ]; then \
+			. venv/bin/activate; \
+		elif [ -f ".venv/bin/activate" ]; then \
+			. .venv/bin/activate; \
+		else \
+			echo "❌ No virtual environment found. Run 'make venv' first."; \
+			exit 1; \
+		fi; \
+	fi
+	@export PYTHONPATH="${PYTHONPATH:-}:src" && \
+		$(PYTHON) -m nexuscore.cli.bootstrap_apikey \
+			--user-login ci \
+			--key-name "CI Bootstrap Key"
+	@echo "✅ CI Bootstrap API Key generation complete"
+
+# ==== チャット履歴エクスポート ====
+export-chat:
+	@echo "Exporting Cursor IDE chat history..."
+	$(PYTHON) tools/export_cursor_chat_history.py
+	@echo "✅ Chat history export complete"
+
+export-chat-watch:
+	@echo "Starting chat history watch mode..."
+	$(PYTHON) tools/export_cursor_chat_history.py --watch
 
 # ==== クリーンアップ ====
 clean:

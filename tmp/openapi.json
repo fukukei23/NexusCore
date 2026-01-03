@@ -1,0 +1,2123 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "NexusCore API",
+    "description": "NexusCore API - FastAPI implementation",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health Check",
+        "description": "Health check エンドポイント\n\nAPI の稼働状況を返す。\n認証不要な公開エンドポイント。\n\n将来的に認証が必要になった場合は、以下のように変更可能:\n```python\nasync def health_check(\n    current_user: AuthenticatedUser = Depends(get_current_user),\n) -> HealthCheckResponse:\n```\n\nReturns:\n    HealthCheckResponse: API の稼働状況とバージョン情報",
+        "operationId": "health_check_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthCheckResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/execute": {
+      "post": {
+        "tags": [
+          "execute"
+        ],
+        "summary": "Run self-healing job",
+        "description": "Execute エンドポイント\n\n指定されたプロジェクトパスに対して self-healing 実行をトリガーし、\n実行IDおよび現在のステータスを返します。\n\nこのエンドポイントは認証済みクライアントからのみ利用可能です。\n（CR-FASTAPI-003 で認証を追加予定）\n\nArgs:\n    payload: 実行リクエスト（requirement, project_path, constitution_text）\n\nReturns:\n    ExecuteResponse: タスクIDとステータスURLを含むレスポンス\n\nRaises:\n    HTTPException: バリデーションエラーまたは内部エラー時",
+        "operationId": "execute_endpoint_api_v1_execute_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "API Key for authentication",
+              "title": "X-Api-Key"
+            },
+            "description": "API Key for authentication"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/status/{task_id}": {
+      "get": {
+        "tags": [
+          "execute"
+        ],
+        "summary": "Get task status",
+        "description": "Get Task Status エンドポイント\n\n指定されたタスクIDの現在の状態を返します。\n既存の Flask 実装 (`get_task_status`) と互換性を保つ。\n\nArgs:\n    task_id: タスクID（UUID形式）\n\nReturns:\n    ExecuteStatusResponse: タスクの状態情報\n\nRaises:\n    HTTPException: タスクが見つからない場合（404）",
+        "operationId": "get_task_status_api_v1_status__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "API Key for authentication",
+              "title": "X-Api-Key"
+            },
+            "description": "API Key for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/github/webhook": {
+      "post": {
+        "tags": [
+          "github",
+          "webhook"
+        ],
+        "summary": "GitHub Webhook endpoint",
+        "description": "GitHub Webhook エンドポイント\n\nGitHub pull_request イベントを受信して Self-Healing Service を実行する。\n既存の Flask 実装 (`handle_github_webhook`) と互換性を保つ。\n\nArgs:\n    request: FastAPI Request オブジェクト（ボディ取得用）\n    x_github_event: X-GitHub-Event ヘッダー\n    x_github_delivery: X-GitHub-Delivery ヘッダー\n    x_hub_signature_256: X-Hub-Signature-256 ヘッダー（署名検証用）\n\nReturns:\n    GitHubWebhookResponse: Webhook処理結果\n\nRaises:\n    HTTPException: 署名検証失敗時（401）または内部エラー時（500）",
+        "operationId": "github_webhook_endpoint_api_v1_github_webhook_post",
+        "parameters": [
+          {
+            "name": "X-GitHub-Event",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Github-Event"
+            }
+          },
+          {
+            "name": "X-GitHub-Delivery",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Github-Delivery"
+            }
+          },
+          {
+            "name": "X-Hub-Signature-256",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Hub-Signature-256"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubWebhookResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "List projects",
+        "description": "プロジェクト一覧を取得する\n\nGET /api/v1/projects\n\n認証: X-API-Key ヘッダー必須\n\nレスポンス:\n    {\n        \"projects\": [\n            {\n                \"id\": 1,\n                \"name\": \"Project Name\",\n                \"repo_url\": \"https://github.com/owner/repo\",\n                \"local_path\": \"/path/to/project\",\n                \"created_at\": \"2025-01-01T00:00:00\",\n                \"updated_at\": \"2025-01-01T00:00:00\"\n            }\n        ]\n    }\n\nArgs:\n    current_user: 認証済みユーザー情報\n\nReturns:\n    ProjectListResponse: プロジェクト一覧\n\nRaises:\n    HTTPException: 内部エラー時（500）",
+        "operationId": "list_projects_api_v1_projects_get",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "API Key for authentication",
+              "title": "X-Api-Key"
+            },
+            "description": "API Key for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Create project",
+        "description": "新規プロジェクトを作成する\n\nPOST /api/v1/projects\n\n認証: X-API-Key ヘッダー必須\n\nリクエストボディ:\n    {\n        \"name\": \"Project Name\",\n        \"repo_url\": \"https://github.com/owner/repo\",\n        \"local_path\": \"/path/to/project\",\n        \"context_bundle_path\": \"/path/to/context.json\"\n    }\n\nレスポンス:\n    {\n        \"id\": 1,\n        \"name\": \"Project Name\",\n        \"repo_url\": \"https://github.com/owner/repo\",\n        \"local_path\": \"/path/to/project\",\n        \"context_bundle_path\": \"/path/to/context.json\",\n        \"created_at\": \"2025-01-01T00:00:00\",\n        \"updated_at\": \"2025-01-01T00:00:00\"\n    }\n\nArgs:\n    payload: プロジェクト作成リクエスト\n    current_user: 認証済みユーザー情報\n\nReturns:\n    ProjectResponse: 作成されたプロジェクト情報\n\nRaises:\n    HTTPException: バリデーションエラー時（400）または内部エラー時（500）",
+        "operationId": "create_project_api_v1_projects_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "API Key for authentication",
+              "title": "X-Api-Key"
+            },
+            "description": "API Key for authentication"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project_id}": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Get project by ID",
+        "description": "プロジェクトIDでプロジェクトを取得する\n\nGET /api/v1/projects/{project_id}\n\n認証: X-API-Key ヘッダー必須\n\nレスポンス:\n    {\n        \"id\": 1,\n        \"name\": \"Project Name\",\n        \"repo_url\": \"https://github.com/owner/repo\",\n        \"local_path\": \"/path/to/project\",\n        \"context_bundle_path\": \"/path/to/context.json\",\n        \"created_at\": \"2025-01-01T00:00:00\",\n        \"updated_at\": \"2025-01-01T00:00:00\"\n    }\n\nArgs:\n    project_id: プロジェクトID\n    current_user: 認証済みユーザー情報\n\nReturns:\n    ProjectResponse: プロジェクト情報\n\nRaises:\n    HTTPException: プロジェクトが見つからない場合（404）または内部エラー時（500）",
+        "operationId": "get_project_api_v1_projects__project_id__get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "API Key for authentication",
+              "title": "X-Api-Key"
+            },
+            "description": "API Key for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project_id}/run": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Trigger project run",
+        "description": "Self-Healing Run を発火する\n\nPOST /api/v1/projects/{project_id}/run\n\n認証: X-API-Key ヘッダー必須\n\nリクエスト JSON:\n    {\n        \"requirement\": \"Run self-healing for this repo\",\n        \"autonomy_level\": 2,\n        \"fast_lane\": true\n    }\n\nレスポンス:\n    {\n        \"run_id\": \"abc123...\",\n        \"project_id\": 1,\n        \"status\": \"PENDING\",\n        \"queue_mode\": \"async\" または \"sync\"\n    }\n\nステータスコード:\n    - 200: 同期実行完了\n    - 202: 非同期実行開始（キューに入った）\n    - 400: requirement が未指定\n    - 404: プロジェクトが見つからない\n\nArgs:\n    project_id: プロジェクトID\n    request: 実行リクエスト\n    current_user: 認証済みユーザー情報\n\nReturns:\n    ProjectRunResponse: 実行結果\n\nRaises:\n    HTTPException: プロジェクトが見つからない場合（404）、requirement が未指定の場合（400）、または内部エラー時（500）",
+        "operationId": "trigger_project_run_api_v1_projects__project_id__run_post",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "API Key for authentication",
+              "title": "X-Api-Key"
+            },
+            "description": "API Key for authentication"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectRunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Synchronous execution completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRunResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Asynchronous execution started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRunResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project_id}/runs/latest": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Get latest run for project",
+        "description": "最新の Run の概要を取得する\n\nGET /api/v1/projects/{project_id}/runs/latest\n\n認証: X-API-Key ヘッダー必須\n\nレスポンス:\n    {\n        \"run\": {\n            \"id\": 1,\n            \"run_id\": \"abc123...\",\n            \"status\": \"SUCCESS\",\n            \"started_at\": \"2025-01-01T00:00:00\",\n            \"finished_at\": \"2025-01-01T00:05:00\"\n        }\n    }\n    または\n    {\n        \"run\": null\n    }\n\nステータスコード:\n    - 200: 成功\n    - 404: プロジェクトが見つからない\n\nArgs:\n    project_id: プロジェクトID\n    current_user: 認証済みユーザー情報\n\nReturns:\n    LatestRunResponse: 最新Run情報\n\nRaises:\n    HTTPException: プロジェクトが見つからない場合（404）または内部エラー時（500）",
+        "operationId": "get_latest_run_api_v1_projects__project_id__runs_latest_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "API Key for authentication",
+              "title": "X-Api-Key"
+            },
+            "description": "API Key for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestRunResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "List runs",
+        "description": "Run一覧を取得する\n\nGET /api/v1/runs?project_id=1\n\n認証: X-API-Key ヘッダー必須\n\nクエリパラメータ:\n    project_id: プロジェクトIDでフィルタ（任意）\n\nレスポンス:\n    {\n        \"runs\": [\n            {\n                \"id\": 1,\n                \"run_id\": \"abc123def456\",\n                \"project_id\": 1,\n                \"status\": \"SUCCESS\",\n                \"started_at\": \"2025-01-01T00:00:00\",\n                \"finished_at\": \"2025-01-01T00:05:00\",\n                \"created_at\": \"2025-01-01T00:00:00\"\n            }\n        ]\n    }\n\nArgs:\n    project_id: プロジェクトIDでフィルタ（任意）\n    current_user: 認証済みユーザー情報\n\nReturns:\n    RunListResponse: Run一覧\n\nRaises:\n    HTTPException: 内部エラー時（500）",
+        "operationId": "list_runs_api_v1_runs_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "プロジェクトIDでフィルタ",
+              "title": "Project Id"
+            },
+            "description": "プロジェクトIDでフィルタ"
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "API Key for authentication",
+              "title": "X-Api-Key"
+            },
+            "description": "API Key for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Get run by ID",
+        "description": "Run IDでRunを取得する\n\nGET /api/v1/runs/{run_id}\n\n認証: X-API-Key ヘッダー必須\n\nレスポンス:\n    {\n        \"id\": 1,\n        \"run_id\": \"abc123def456\",\n        \"project_id\": 1,\n        \"triggered_by\": 1,\n        \"status\": \"SUCCESS\",\n        \"started_at\": \"2025-01-01T00:00:00\",\n        \"finished_at\": \"2025-01-01T00:05:00\",\n        \"autonomy_level\": 2,\n        \"llm_model_summary\": \"gpt-4\",\n        \"requirement\": \"Run self-healing\",\n        \"created_at\": \"2025-01-01T00:00:00\"\n    }\n\nArgs:\n    run_id: Run ID（UUID形式）\n    current_user: 認証済みユーザー情報\n\nReturns:\n    RunResponse: Run情報\n\nRaises:\n    HTTPException: Runが見つからない場合（404）または内部エラー時（500）",
+        "operationId": "get_run_api_v1_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "API Key for authentication",
+              "title": "X-Api-Key"
+            },
+            "description": "API Key for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/plans": {
+      "get": {
+        "tags": [
+          "plans"
+        ],
+        "summary": "List plans",
+        "description": "Plan一覧を取得する\n\nGET /api/v1/plans?project_id=1\n\n認証: X-API-Key ヘッダー必須\n\nクエリパラメータ:\n    project_id: プロジェクトIDでフィルタ（任意）\n\nレスポンス:\n    {\n        \"plans\": [\n            {\n                \"id\": 1,\n                \"project_id\": 1,\n                \"name\": \"Implementation Plan\",\n                \"created_at\": \"2025-01-01T00:00:00\",\n                \"updated_at\": \"2025-01-01T00:00:00\"\n            }\n        ]\n    }\n\n注意: 現時点では Plan モデルがデータベースに存在しないため、\n空のリストを返します。将来的に Plan モデルが実装されたら、\n実際のデータを返すように更新されます。\n\nArgs:\n    project_id: プロジェクトIDでフィルタ（任意）\n    current_user: 認証済みユーザー情報\n\nReturns:\n    PlanListResponse: Plan一覧（現時点では空のリスト）\n\nRaises:\n    HTTPException: 内部エラー時（500）",
+        "operationId": "list_plans_api_v1_plans_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "プロジェクトIDでフィルタ",
+              "title": "Project Id"
+            },
+            "description": "プロジェクトIDでフィルタ"
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "API Key for authentication",
+              "title": "X-Api-Key"
+            },
+            "description": "API Key for authentication"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project_id}/badge/success_rate": {
+      "get": {
+        "tags": [
+          "badges"
+        ],
+        "summary": "Get project success rate badge",
+        "description": "プロジェクトの成功率バッジ用 JSON を返す（shields.io endpoint 互換）\n\nGET /api/v1/projects/{project_id}/badge/success_rate\n\n認証: 不要（公開エンドポイント）\n\nレスポンス:\n    {\n        \"schemaVersion\": 1,\n        \"label\": \"self-healing\",\n        \"message\": \"95.0% success\",\n        \"color\": \"brightgreen\"\n    }\n\nステータスコード:\n    - 200: 成功\n    - 404: プロジェクトが見つからない\n\nArgs:\n    project_id: プロジェクトID\n\nReturns:\n    BadgeResponse: 成功率バッジ情報\n\nRaises:\n    HTTPException: プロジェクトが見つからない場合（404）または内部エラー時（500）",
+        "operationId": "project_success_rate_badge_api_v1_projects__project_id__badge_success_rate_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadgeResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project_id}/badge/last_run": {
+      "get": {
+        "tags": [
+          "badges"
+        ],
+        "summary": "Get project last run badge",
+        "description": "プロジェクトの最新Runステータスバッジ用 JSON を返す（shields.io endpoint 互換）\n\nGET /api/v1/projects/{project_id}/badge/last_run\n\n認証: 不要（公開エンドポイント）\n\nレスポンス:\n    {\n        \"schemaVersion\": 1,\n        \"label\": \"self-healing\",\n        \"message\": \"last: SUCCESS\",\n        \"color\": \"brightgreen\"\n    }\n\nステータスコード:\n    - 200: 成功\n    - 404: プロジェクトが見つからない\n\nArgs:\n    project_id: プロジェクトID\n\nReturns:\n    BadgeResponse: 最新Runステータスバッジ情報\n\nRaises:\n    HTTPException: プロジェクトが見つからない場合（404）または内部エラー時（500）",
+        "operationId": "project_last_run_badge_api_v1_projects__project_id__badge_last_run_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadgeResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BadgeResponse": {
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schemaversion",
+            "description": "スキーマバージョン",
+            "default": 1
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "バッジラベル"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "バッジメッセージ"
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "brightgreen",
+              "green",
+              "yellow",
+              "red",
+              "blue",
+              "lightgrey"
+            ],
+            "title": "Color",
+            "description": "バッジカラー"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "message",
+          "color"
+        ],
+        "title": "BadgeResponse",
+        "description": "Badge レスポンスモデル（shields.io 互換）\n\nAttributes:\n    schemaVersion: スキーマバージョン（常に1）\n    label: バッジラベル\n    message: バッジメッセージ\n    color: バッジカラー（brightgreen, green, yellow, red, blue, lightgrey）",
+        "example": {
+          "color": "brightgreen",
+          "label": "self-healing",
+          "message": "95.0% success",
+          "schemaVersion": 1
+        }
+      },
+      "ErrorDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "エラーコード"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "人間が読めるエラーメッセージ"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorDetail",
+        "description": "エラー詳細モデル\n\nAttributes:\n    code: エラーコード（例: \"PROJECT_NOT_FOUND\", \"VALIDATION_ERROR\"）\n    message: 人間が読めるエラーメッセージ"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail",
+            "description": "エラー詳細情報"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "description": "標準化されたエラーレスポンスモデル\n\nすべての API エンドポイントで統一されたエラー構造。\n\nAttributes:\n    error: エラー詳細情報",
+        "example": {
+          "error": {
+            "code": "PROJECT_NOT_FOUND",
+            "message": "Project with id 123 not found"
+          }
+        }
+      },
+      "ExecuteRequest": {
+        "properties": {
+          "requirement": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Requirement",
+            "description": "実行する要件"
+          },
+          "project_path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Project Path",
+            "description": "プロジェクトのパス"
+          },
+          "constitution_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Constitution Text",
+            "description": "プロジェクト憲法のテキスト（デフォルト: 'Default constitution.'）"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requirement",
+          "project_path"
+        ],
+        "title": "ExecuteRequest",
+        "description": "Execute リクエストモデル\n\nAttributes:\n    requirement: 実行する要件（必須）\n    project_path: プロジェクトのパス（必須）\n    constitution_text: プロジェクト憲法のテキスト（任意）",
+        "example": {
+          "constitution_text": "Write clean, maintainable code.",
+          "project_path": "/path/to/project",
+          "requirement": "Add a new feature"
+        }
+      },
+      "ExecuteResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "タスク受け入れメッセージ"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "description": "タスクID（UUID形式）"
+          },
+          "status_url": {
+            "type": "string",
+            "title": "Status Url",
+            "description": "ステータス確認用URL（相対パス）"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "task_id",
+          "status_url"
+        ],
+        "title": "ExecuteResponse",
+        "description": "Execute レスポンスモデル\n\nAttributes:\n    message: メッセージ\n    task_id: タスクID（UUID形式）\n    status_url: ステータス確認用URL",
+        "example": {
+          "message": "Task accepted and is running in the background.",
+          "status_url": "/api/v1/status/123e4567-e89b-12d3-a456-426614174000",
+          "task_id": "123e4567-e89b-12d3-a456-426614174000"
+        }
+      },
+      "ExecuteStatusResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "タスクの状態"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "ステータスメッセージ"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "ExecuteStatusResponse",
+        "description": "Execute Status レスポンスモデル\n\nタスクの状態を表すモデル。既存のFlask実装では `tasks` 辞書の値がそのまま返されるため、\n柔軟な構造を許容する必要がある。\n\nAttributes:\n    status: タスクの状態（\"running\", \"completed\", \"error\" など）\n    message: ステータスメッセージ"
+      },
+      "GitHubWebhookResponse": {
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "title": "Accepted",
+            "description": "Webhookが受け入れられたかどうか"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result",
+            "description": "実行結果"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "拒否理由"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "エラーメッセージ"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "skipped",
+                  "fixed",
+                  "not_fixed",
+                  "no_issues",
+                  "error"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "ステータス"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary",
+            "description": "サマリー"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accepted"
+        ],
+        "title": "GitHubWebhookResponse",
+        "description": "GitHub Webhook レスポンスモデル\n\n既存のFlask実装のレスポンス形式に準拠。\n\nAttributes:\n    accepted: Webhookが受け入れられたかどうか\n    result: 実行結果（accepted=Trueの場合）\n    reason: 拒否理由（accepted=Falseの場合）\n    error: エラーメッセージ（エラー時）\n    status: ステータス（\"skipped\", \"fixed\", \"not_fixed\", \"no_issues\", \"error\" など）\n    summary: サマリー",
+        "example": {
+          "accepted": true,
+          "result": {
+            "run_id": "sh-123",
+            "status": "fixed",
+            "summary": "Tests are now passing"
+          }
+        }
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthCheckResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version",
+          "timestamp"
+        ],
+        "title": "HealthCheckResponse",
+        "description": "Health check レスポンスモデル\n\nAttributes:\n    status: API の稼働状況（\"ok\" 固定）\n    version: API のバージョン\n    timestamp: レスポンス生成時刻"
+      },
+      "LatestRunDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Run ID（データベースID）"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id",
+            "description": "Run ID（UUID形式）"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "SUCCESS",
+              "FAILED"
+            ],
+            "title": "Status",
+            "description": "ステータス"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "開始日時"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At",
+            "description": "終了日時"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "status"
+        ],
+        "title": "LatestRunDetail",
+        "description": "最新Run詳細モデル\n\nAttributes:\n    id: Run ID（データベースID）\n    run_id: Run ID（UUID形式）\n    status: ステータス（PENDING, RUNNING, SUCCESS, FAILED）\n    started_at: 開始日時\n    finished_at: 終了日時"
+      },
+      "LatestRunResponse": {
+        "properties": {
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatestRunDetail"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "最新Run情報"
+          }
+        },
+        "type": "object",
+        "title": "LatestRunResponse",
+        "description": "最新Runレスポンスモデル\n\nAttributes:\n    run: 最新Run情報（存在しない場合は null）",
+        "example": {
+          "run": {
+            "finished_at": "2025-01-01T00:05:00",
+            "id": 1,
+            "run_id": "abc123def456",
+            "started_at": "2025-01-01T00:00:00",
+            "status": "SUCCESS"
+          }
+        }
+      },
+      "PlanListResponse": {
+        "properties": {
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/PlanSummary"
+            },
+            "type": "array",
+            "title": "Plans",
+            "description": "Plan一覧"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plans"
+        ],
+        "title": "PlanListResponse",
+        "description": "Plan 一覧レスポンスモデル\n\nAttributes:\n    plans: Plan一覧",
+        "example": {
+          "plans": [
+            {
+              "created_at": "2025-01-01T00:00:00",
+              "id": 1,
+              "name": "Implementation Plan",
+              "project_id": 1,
+              "updated_at": "2025-01-01T00:00:00"
+            }
+          ]
+        }
+      },
+      "PlanSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Plan ID"
+          },
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id",
+            "description": "プロジェクトID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "計画名"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "作成日時"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "更新日時"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PlanSummary",
+        "description": "Plan サマリーモデル（一覧表示用）\n\nAttributes:\n    id: Plan ID\n    project_id: プロジェクトID\n    name: 計画名\n    created_at: 作成日時\n    updated_at: 更新日時"
+      },
+      "ProjectCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name",
+            "description": "プロジェクト名"
+          },
+          "repo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Url",
+            "description": "リポジトリURL"
+          },
+          "local_path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Local Path",
+            "description": "ローカルパス"
+          },
+          "context_bundle_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Bundle Path",
+            "description": "コンテキストバンドルパス"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "local_path"
+        ],
+        "title": "ProjectCreateRequest",
+        "description": "Project 作成リクエストモデル\n\nAttributes:\n    name: プロジェクト名（必須）\n    repo_url: リポジトリURL（任意）\n    local_path: ローカルパス（必須）\n    context_bundle_path: コンテキストバンドルパス（任意）"
+      },
+      "ProjectListResponse": {
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectSummary"
+            },
+            "type": "array",
+            "title": "Projects",
+            "description": "プロジェクト一覧"
+          }
+        },
+        "type": "object",
+        "required": [
+          "projects"
+        ],
+        "title": "ProjectListResponse",
+        "description": "Project 一覧レスポンスモデル\n\nAttributes:\n    projects: プロジェクト一覧",
+        "example": {
+          "projects": [
+            {
+              "created_at": "2025-01-01T00:00:00",
+              "id": 1,
+              "local_path": "/path/to/project",
+              "name": "My Project",
+              "repo_url": "https://github.com/owner/repo",
+              "updated_at": "2025-01-01T00:00:00"
+            }
+          ]
+        }
+      },
+      "ProjectResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "プロジェクトID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "プロジェクト名"
+          },
+          "repo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Url",
+            "description": "リポジトリURL"
+          },
+          "local_path": {
+            "type": "string",
+            "title": "Local Path",
+            "description": "ローカルパス"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "作成日時"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "更新日時"
+          },
+          "context_bundle_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Bundle Path",
+            "description": "コンテキストバンドルパス"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "local_path",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ProjectResponse",
+        "description": "Project 詳細レスポンスモデル\n\nAttributes:\n    id: プロジェクトID\n    name: プロジェクト名\n    repo_url: リポジトリURL\n    local_path: ローカルパス\n    context_bundle_path: コンテキストバンドルパス\n    created_at: 作成日時\n    updated_at: 更新日時"
+      },
+      "ProjectRunRequest": {
+        "properties": {
+          "requirement": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Requirement",
+            "description": "ユーザー要件"
+          },
+          "autonomy_level": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Autonomy Level",
+            "description": "自律レベル",
+            "default": 2
+          },
+          "fast_lane": {
+            "type": "boolean",
+            "title": "Fast Lane",
+            "description": "高速レーン実行フラグ",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "requirement"
+        ],
+        "title": "ProjectRunRequest",
+        "description": "Project Run リクエストモデル\n\nAttributes:\n    requirement: ユーザー要件（必須）\n    autonomy_level: 自律レベル（デフォルト: 2）\n    fast_lane: 高速レーン実行フラグ（デフォルト: False）"
+      },
+      "ProjectRunResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id",
+            "description": "Run ID（UUID形式）"
+          },
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id",
+            "description": "プロジェクトID"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "SUCCESS",
+              "FAILED"
+            ],
+            "title": "Status",
+            "description": "ステータス"
+          },
+          "queue_mode": {
+            "type": "string",
+            "enum": [
+              "async",
+              "sync"
+            ],
+            "title": "Queue Mode",
+            "description": "キューモード"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "project_id",
+          "status",
+          "queue_mode"
+        ],
+        "title": "ProjectRunResponse",
+        "description": "Project Run レスポンスモデル\n\nAttributes:\n    run_id: Run ID（UUID形式）\n    project_id: プロジェクトID\n    status: ステータス（PENDING, RUNNING, SUCCESS, FAILED）\n    queue_mode: キューモード（\"async\" または \"sync\"）",
+        "example": {
+          "project_id": 1,
+          "queue_mode": "async",
+          "run_id": "abc123def456",
+          "status": "PENDING"
+        }
+      },
+      "ProjectSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "プロジェクトID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "プロジェクト名"
+          },
+          "repo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Url",
+            "description": "リポジトリURL"
+          },
+          "local_path": {
+            "type": "string",
+            "title": "Local Path",
+            "description": "ローカルパス"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "作成日時"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "更新日時"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "local_path",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ProjectSummary",
+        "description": "Project サマリーモデル（一覧表示用）\n\nAttributes:\n    id: プロジェクトID\n    name: プロジェクト名\n    repo_url: リポジトリURL\n    local_path: ローカルパス\n    created_at: 作成日時\n    updated_at: 更新日時"
+      },
+      "RunListResponse": {
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/RunSummary"
+            },
+            "type": "array",
+            "title": "Runs",
+            "description": "Run一覧"
+          }
+        },
+        "type": "object",
+        "required": [
+          "runs"
+        ],
+        "title": "RunListResponse",
+        "description": "Run 一覧レスポンスモデル\n\nAttributes:\n    runs: Run一覧",
+        "example": {
+          "runs": [
+            {
+              "created_at": "2025-01-01T00:00:00",
+              "finished_at": "2025-01-01T00:05:00",
+              "id": 1,
+              "project_id": 1,
+              "run_id": "abc123def456",
+              "started_at": "2025-01-01T00:00:00",
+              "status": "SUCCESS"
+            }
+          ]
+        }
+      },
+      "RunResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Run ID（データベースID）"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id",
+            "description": "Run ID（UUID形式）"
+          },
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id",
+            "description": "プロジェクトID"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "SUCCESS",
+              "FAILED"
+            ],
+            "title": "Status",
+            "description": "ステータス"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "開始日時"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At",
+            "description": "終了日時"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "作成日時"
+          },
+          "triggered_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triggered By",
+            "description": "トリガーしたユーザーID"
+          },
+          "autonomy_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autonomy Level",
+            "description": "自律レベル"
+          },
+          "llm_model_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Model Summary",
+            "description": "使用されたLLMモデルの概要"
+          },
+          "requirement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirement",
+            "description": "ユーザー要件"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "project_id",
+          "status",
+          "created_at"
+        ],
+        "title": "RunResponse",
+        "description": "Run 詳細レスポンスモデル\n\nAttributes:\n    id: Run ID（データベースID）\n    run_id: Run ID（UUID形式）\n    project_id: プロジェクトID\n    triggered_by: トリガーしたユーザーID\n    status: ステータス（PENDING, RUNNING, SUCCESS, FAILED）\n    started_at: 開始日時\n    finished_at: 終了日時\n    autonomy_level: 自律レベル\n    llm_model_summary: 使用されたLLMモデルの概要\n    requirement: ユーザー要件\n    created_at: 作成日時"
+      },
+      "RunSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Run ID（データベースID）"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id",
+            "description": "Run ID（UUID形式）"
+          },
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id",
+            "description": "プロジェクトID"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "SUCCESS",
+              "FAILED"
+            ],
+            "title": "Status",
+            "description": "ステータス"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "開始日時"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At",
+            "description": "終了日時"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "作成日時"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "project_id",
+          "status",
+          "created_at"
+        ],
+        "title": "RunSummary",
+        "description": "Run サマリーモデル（一覧表示用）\n\nAttributes:\n    id: Run ID（データベースID）\n    run_id: Run ID（UUID形式）\n    project_id: プロジェクトID\n    status: ステータス（PENDING, RUNNING, SUCCESS, FAILED）\n    started_at: 開始日時\n    finished_at: 終了日時\n    created_at: 作成日時"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

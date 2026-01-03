@@ -11,22 +11,19 @@ cd "$(dirname "$0")/.."
 echo "=== NexusCore 開発環境セットアップ ==="
 echo ""
 
-# 仮想環境を探す
+# 仮想環境を探す（venv を優先）
 VENV_PATH=""
-if [ -d "myenv_linux" ]; then
-    VENV_PATH="myenv_linux"
-    echo "✅ 仮想環境を発見: myenv_linux"
+if [ -d "venv" ]; then
+    VENV_PATH="venv"
+    echo "✅ 仮想環境を発見: venv"
 elif [ -d ".venv" ]; then
     VENV_PATH=".venv"
     echo "✅ 仮想環境を発見: .venv"
-elif [ -d "venv" ]; then
-    VENV_PATH="venv"
-    echo "✅ 仮想環境を発見: venv"
 else
-    echo "⚠️  仮想環境が見つかりません。.venv を作成します..."
-    python3 -m venv .venv
-    VENV_PATH=".venv"
-    echo "✅ 仮想環境を作成しました: .venv"
+    echo "⚠️  仮想環境が見つかりません。venv を作成します..."
+    python3 -m venv venv
+    VENV_PATH="venv"
+    echo "✅ 仮想環境を作成しました: venv"
 fi
 
 # 仮想環境を有効化
@@ -66,5 +63,9 @@ echo ""
 echo "✅ 開発環境のセットアップが完了しました！"
 echo ""
 echo "次回からは以下のコマンドで仮想環境を有効化してください:"
-echo "  source $VENV_PATH/bin/activate"
+echo "  source activate          # 推奨（最も簡単）"
+echo "  または"
+echo "  source $VENV_PATH/bin/activate  # 直接的な方法"
+echo ""
+echo "詳細は README_VENV.md を参照してください。"
 

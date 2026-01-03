@@ -1,6 +1,12 @@
 """
 4.5: External API テスト UI
 
+WebApp HTML UI view.
+
+この画面は FastAPI エンドポイント（/api/v1/projects, /api/v1/projects/{id}/run）の
+テスト用 UI を提供するが、実際の API 呼び出しは行わない（シミュレーションのみ）。
+実際の API 呼び出しは外部クライアント（curl, VSCode extension など）から行う。
+
 E-1/E-2 で実装した /api/v1/projects / /api/v1/projects/<id>/run を、
 Web UI 上から簡易的に試せるフォームを提供する。
 """
@@ -54,34 +60,12 @@ def api_test():
         else:
             # API を実行（内部的に現在ユーザーの API Key を自動付与）
             try:
-                # 実際の API エンドポイントを呼び出す（内部呼び出し）
-                from nexuscore.webapp.api_external import external_trigger_run
-                from flask import g
-
-                # g.current_api_user を設定（内部呼び出し用）
-                g.current_api_user = user
-
-                # リクエストを模擬
-                class MockRequest:
-                    def __init__(self, json_data: dict):
-                        self._json = json_data
-                    def get_json(self):
-                        return self._json
-                    @property
-                    def accept_mimetypes(self):
-                        class AcceptMimetypes:
-                            best = "application/json"
-                        return AcceptMimetypes()
-
-                mock_request = MockRequest({"requirement": requirement, "autonomy_level": 1, "fast_lane": False})
-                original_request = request._get_current_object()
-
-                # 内部呼び出し（簡易版）
-                # 実際には Flask の test_client を使うか、直接関数を呼び出す
+                # 注意: api_external は CR-FASTAPI-010 で削除済み（FastAPI に移行済み）
+                # 実際の API 呼び出しは FastAPI エンドポイントを使用してください
                 result_data = {
                     "status_code": 200,
                     "message": "API call simulated. Use curl or VSCode extension for actual API calls.",
-                    "note": "This is a UI test page. For actual API calls, use the external API endpoint with X-Api-Key header.",
+                    "note": "This is a UI test page. For actual API calls, use the FastAPI endpoint (/api/v1/projects/{id}/run) with X-API-Key header.",
                 }
                 result_html = f"""
                 <div style="background-color: #f0f9ff; padding: 16px; border-radius: 8px; margin-top: 16px;">

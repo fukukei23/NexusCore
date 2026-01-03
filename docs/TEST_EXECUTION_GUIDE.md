@@ -60,6 +60,20 @@ python -m pytest tests/ --cov=src --cov-report=xml --cov-report=term-missing
 
 ## 注意事項
 
+### 依存関係のバージョン
+
+テスト実行時は、`requirements.txt` で指定されたバージョンレンジ内の依存関係がインストールされていることを前提としています。
+
+主要な依存関係のバージョンレンジ：
+- `openai>=1.30.0,<2.0.0` - OpenAI SDK は 1.x 系を前提
+- `tensorflow>=2.14.0,<3.0.0` - TensorFlow は 2.x 系を前提
+- `gradio>=4.16.0,<5.0.0` - Gradio は 4.x 系を前提
+- `pytest>=7.4.0,<8.0.0` - pytest は 7.x 系を前提
+
+詳細は `requirements.txt` を参照してください。
+
+### WSL環境での注意
+
 WSL環境では、出力キャプチャの問題により、テスト結果が正しく表示されない場合があります。
 その場合は、`test_results/` ディレクトリのレポートファイルを直接確認してください。
 

@@ -22,7 +22,7 @@ import re
 import json
 import uuid
 import time
-import gradio as gr
+# Gradio は lazy import（launch_gradio_ui() 内でのみ import）で UI 依存を分離
 from typing import Dict, List, Optional, Any, Set, Callable, Tuple, Generator
 from datetime import datetime
 
@@ -62,7 +62,7 @@ class RequirementAgent(BaseAgent):
 
     def _get_initial_state(self) -> Dict[str, Any]:
         return { "session_id": str(uuid.uuid4()), "history": [], "state": "INIT" }
-    
+
     def generate_final_spec(self, history: List[Dict]) -> Dict[str, Any]:
         last_user_msg = next((h['content'] for h in reversed(history) if h['role'] == 'user'), "No user input.")
         return {"summary": "Final Specification", "details": last_user_msg}
@@ -105,8 +105,21 @@ Ensure the response is strictly valid JSON with filled arrays (no empty strings)
         return data
 
     def launch_gradio_ui(self, share: bool = False) -> Dict[str, Any]:
+        """
+        Gradio UI を起動して要件定義を行う。
+
+        Note: Gradio はこのメソッド内でのみ import される（lazy import）。
+        これにより、RequirementAgent を import しても Gradio が読み込まれない。
+        """
         if not self.use_ui:
             self.logger.info("RequirementAgent running in headless mode.")
+            return self.analyze_requirement(self._initial_requirement)
+
+        # Lazy import: Gradio はこのメソッド内でのみ import
+        try:
+            import gradio as gr
+        except ImportError:
+            self.logger.warning("Gradio is not installed. Falling back to headless mode.")
             return self.analyze_requirement(self._initial_requirement)
 
         fsm = StateMachine(self)
@@ -147,14 +160,14 @@ Ensure the response is strictly valid JSON with filled arrays (no empty strings)
                     gr.update(interactive=False), gr.update(visible=False),
                     gr.update(visible=False), gr.update(visible=False)
                 )
-                
+
                 time.sleep(1)
                 responses = fsm.transition(user_input=user_message)
-                
+
                 for _, assistant_a in responses:
                     history.append({"role": "assistant", "content": assistant_a})
                     fsm.state["history"].append({"role": "assistant", "content": assistant_a})
-                
+
                 suggestion_buttons_update = gr.update(visible=(fsm.state["state"] == "SUGGESTING"))
                 yield (
                     history, self.text["status_ready"], gr.update(interactive=True),
@@ -171,14 +184,14 @@ Ensure the response is strictly valid JSON with filled arrays (no empty strings)
                 return final_json_str, self.text["status_finished"]
 
             demo.load(on_ui_load, outputs=[chatbot, status_bar])
-            
+
             send_button.click(on_user_submit, inputs=[msg_input, chatbot], outputs=[chatbot, status_bar, msg_input, send_button, yes_btn, no_btn, suggest_btn])
             msg_input.submit(on_user_submit, inputs=[msg_input, chatbot], outputs=[chatbot, status_bar, msg_input, send_button, yes_btn, no_btn, suggest_btn])
             finish_button.click(on_finish_click, outputs=[final_output, status_bar])
 
         print(self.text["boot_msg"])
         demo.queue().launch(server_name="127.0.0.1", server_port=7860, share=share)
-        
+
         return self.final_requirements or {}
 
 if __name__ == "__main__":
