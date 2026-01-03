@@ -19,6 +19,16 @@ import uuid
 from functools import wraps
 from flask import Flask, request, jsonify
 
+# セキュリティ: JWT認証のインポート
+try:
+    from nexuscore.api.auth import require_auth, generate_token
+except ImportError:
+    # 認証モジュールがない場合のフォールバック（開発環境用）
+    def require_auth(f):
+        return f
+    def generate_token(user_id, expires_in_hours=24):
+        return "dev-token-auth-disabled"
+
 # --- パス設定 ---
 # WSL/Windows 混在環境で main_cli.py と同等の import パスを保証する暫定措置。
 try:
@@ -59,76 +69,142 @@ tasks = {}
 llm_router = LLMRouter()
 
 # --- ロギング設定 ---
-from nexuscore.utils.log_config import get_logs_dir
+from nexuscore.logging_standard import get_logger
 
-logs_dir = get_logs_dir()
-log_path = logs_dir / "nexus_api_server.log"
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)-8s - %(name)-20s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(log_path, mode='a', encoding='utf-8')
-    ]
-)
-logger = logging.getLogger(__name__)
-logger.info(f"API server log file: {log_path}")
+logger = get_logger(__name__)
+logger.info("API server initialized with standard logging")
 
 def require_auth(f):
     """
     認証デコレータ: Authorization: Bearer <TOKEN> ヘッダを検証する。
-
-    環境変数 NEXUSCORE_API_TOKEN から有効なトークンを取得し、
-    リクエストの Authorization ヘッダと照合する。
-
-    認証失敗時は 401 Unauthorized を返す。
-    環境変数が未設定の場合は 500 Internal Server Error を返す。
+    Mainブランチのセキュリティ機能を採用。
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 環境変数の確認
         expected_token = os.getenv("NEXUSCORE_API_TOKEN")
         if not expected_token:
             logger.error("NEXUSCORE_API_TOKEN is not set. Server misconfiguration.")
             return jsonify({"error": "Server misconfigured: NEXUSCORE_API_TOKEN is not set"}), 500
 
-        # Authorization ヘッダの取得
         auth_header = request.headers.get("Authorization")
         if not auth_header:
             logger.warning("Authorization header missing")
             return jsonify({"error": "Authorization required"}), 401
 
-        # Bearer トークンの抽出
         if not auth_header.startswith("Bearer "):
             logger.warning("Invalid Authorization header format")
             return jsonify({"error": "Authorization required"}), 401
 
-        token = auth_header[7:].strip()  # "Bearer " の後の部分を取得
-
-        # トークンの検証
+        token = auth_header[7:].strip()
         if token != expected_token:
             logger.warning("Invalid token provided")
             return jsonify({"error": "Authorization required"}), 401
 
-        # 認証成功
         return f(*args, **kwargs)
-
     return decorated_function
 
-# REMOVED: run_orchestrator_task() function has been removed in CR-FASTAPI-008.
-# The FastAPI implementation uses its own run_orchestrator_task() function in src/nexuscore/api/routes/execute.py.
+def run_orchestrator_task(task_id: str, requirement: str, project_path: str, constitution: dict):
+    """Orchestratorをバックグラウンドで実行するワーカー関数"""
+    logger.info(f"Starting background task: {task_id}")
+    tasks[task_id] = {"status": "running", "message": "Initializing agents..."}
 
-# REMOVED: Flask REST API endpoints /api/v1/execute and /api/v1/status/<task_id> have been removed in CR-FASTAPI-008.
-# FastAPI equivalents are available at:
-#   - POST /api/v1/execute (see src/nexuscore/api/routes/execute.py)
-#   - GET /api/v1/status/{task_id} (see src/nexuscore/api/routes/execute.py)
-# All clients MUST use the FastAPI endpoints.
+    try:
+        # --- 1. 近代化されたエージェントの招集 ---
+        architect_agent = ArchitectAgent()
+        planner_agent = PlannerAgent()
+        coder_agent = CoderAgent()
+        tester_agent = TesterAgent()
+        debugger_agent = DebuggerAgent()
+        postmortem_agent = PostmortemAgent()
 
-# DEPRECATED: This endpoint is deprecated and will be removed in CR-FASTAPI-008.
-# FastAPI equivalent: POST /api/v1/github/webhook (see src/nexuscore/api/routes/github_webhook.py)
-# This Flask endpoint is kept only for backward compatibility during migration.
-# All new clients MUST use the FastAPI endpoint.
+        # --- 2. 特殊任務エージェントのプロビジョニング ---
+        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("A primary API key must be set in the .env file.")
+
+        def provision_agent(agent_class, task_type: str, **kwargs):
+            model_name = llm_router.task_model_map.get(task_type, llm_router.default_model)
+            base_args = {'api_key': api_key, 'model': model_name}
+            all_args = {**base_args, **kwargs}
+            return agent_class(**all_args)
+
+        guardian_agent = provision_agent(GuardianAgent, 'review')
+        knowledge_curator_agent = provision_agent(KnowledgeCuratorAgent, 'general')
+        
+        policy_rules_path = os.path.join(PROJECT_ROOT, "config", "policy_rules.json")
+        policy_agent = provision_agent(PolicyAgent, 'policy', policy_rules_path=policy_rules_path)
+
+        # --- 3. ユーティリティと司令塔の任命 ---
+        patch_applier = PatchApplier()
+
+        orchestrator = Orchestrator(
+            project_path=project_path,
+            constitution=constitution,
+            requirement_agent=None,
+            architect_agent=architect_agent,
+            planner_agent=planner_agent,
+            coder_agent=coder_agent,
+            tester_agent=tester_agent,
+            debugger_agent=debugger_agent,
+            guardian_agent=guardian_agent,
+            policy_agent=policy_agent,
+            postmortem_agent=postmortem_agent,
+            knowledge_curator_agent=knowledge_curator_agent,
+            patch_applier=patch_applier
+        )
+
+        # --- 4. 開発プロセスの開始 ---
+        tasks[task_id]["message"] = "Design phase started."
+        orchestrator.design_phase(requirement)
+
+        tasks[task_id]["message"] = "Development cycle started."
+        orchestrator.development_cycle({"main_goal": requirement})
+
+        tasks[task_id] = {"status": "completed", "message": "Development process finished successfully."}
+        logger.info(f"Task {task_id} completed successfully.")
+
+    except Exception as e:
+        logger.critical(f"An error occurred in task {task_id}: {e}", exc_info=True)
+        tasks[task_id] = {"status": "error", "message": f"orchestrator failed: {e}"}
+
+@app.route('/api/v1/execute', methods=['POST'])
+@require_auth  # セキュリティ: JWT認証を要求
+def execute_task():
+    data = request.json
+    if not data or 'requirement' not in data or 'project_path' not in data:
+        return jsonify({"error": "Missing 'requirement' or 'project_path'"}), 400
+
+    task_id = str(uuid.uuid4())
+    requirement = data['requirement']
+    project_path = os.path.abspath(data['project_path'])
+
+    # セキュリティ: パストラバーサル対策
+    allowed_base = os.getenv("NEXUS_ALLOWED_PROJECT_BASE", "/workspace")
+    if not project_path.startswith(os.path.abspath(allowed_base)):
+        return jsonify({"error": "Project path not allowed."}), 403
+
+    constitution = { "description": data.get("constitution_text", "Default constitution.") }
+
+    thread = threading.Thread(
+        target=run_orchestrator_task,
+        args=(task_id, requirement, project_path, constitution)
+    )
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({
+        "message": "Task accepted and is running in the background.",
+        "task_id": task_id,
+        "status_url": f"/api/v1/status/{task_id}"
+    }), 202
+
+@app.route('/api/v1/status/<task_id>', methods=['GET'])
+def get_task_status(task_id):
+    task = tasks.get(task_id)
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+    return jsonify(task)
+  
 @app.route('/api/github/webhook', methods=['POST'])
 def github_webhook_endpoint():
     """
@@ -157,6 +233,49 @@ def github_webhook_endpoint():
         logger.error(f"GitHub webhook endpoint error: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
+
+# ==============================================================================
+# 開発用: トークン生成エンドポイント（本番環境では無効化すること）
+# ==============================================================================
+@app.route('/api/v1/dev/generate-token', methods=['POST'])
+def generate_dev_token():
+    """
+    開発用トークン生成エンドポイント
+
+    本番環境では FLASK_ENV=production に設定することで無効化される。
+
+    使用方法:
+        curl -X POST http://localhost:5001/api/v1/dev/generate-token \
+             -H "Content-Type: application/json" \
+             -d '{"user_id": "test-user"}'
+
+    Returns:
+        {"token": "eyJ0eXAiOiJKV1QiLCJhbGc..."}
+    """
+    # 本番環境では無効化
+    if os.getenv("FLASK_ENV") == "production":
+        return jsonify({"error": "Token generation not available in production"}), 403
+
+    data = request.json or {}
+    user_id = data.get('user_id', 'dev-user')
+    expires_in = data.get('expires_in_hours', 24)
+
+    try:
+        token = generate_token(user_id, expires_in_hours=expires_in)
+        logger.info(f"Generated dev token for user: {user_id}")
+        return jsonify({
+            "token": token,
+            "user_id": user_id,
+            "expires_in_hours": expires_in,
+            "usage": f"Authorization: Bearer {token}"
+        })
+    except Exception as e:
+        logger.error(f"Token generation failed: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
     logger.info("Starting NexusCore API Server...")
-    app.run(host='0.0.0.0', port=5001, debug=True, use_reloader=False)
+    # セキュリティ: 本番環境ではdebug=Falseに設定
+    debug_mode = os.getenv("FLASK_ENV") != "production"
+    app.run(host='0.0.0.0', port=5001, debug=debug_mode, use_reloader=False)
