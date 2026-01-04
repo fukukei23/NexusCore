@@ -76,11 +76,10 @@ class TestGuardianAutoReviewer:
     def test_review_except_pass_reject(self):
         """例外握りつぶしは REJECT"""
         diff = """+++ b/src/example.py
-@@ -0,0 +1,3 @@
+@@ -0,0 +1,2 @@
 +try:
-+    pass
-+except:
-+    pass
++    do_something()
++except: pass
 """
         reviewer = GuardianAutoReviewer(project_name="nexuscore")
         result = reviewer.review_unified_diff(diff)
