@@ -795,3 +795,174 @@ class TestIntegrationScenarios:
 
         assert len(budget_calls) == 3
         assert budget_calls == ["step1", "step2", "step3"]
+
+
+class TestGuardianAdvancedEdgeCases:
+    """より深いエッジケースと統合シナリオ"""
+
+    @patch.object(GuardianAgent, "execute_llm_task")
+    @patch('nexuscore.agents.guardian_agent.ReviewDecision')
+    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
+    def test_review_unified_diff_with_malformed_diff(
+        self, mock_auto_reviewer_class, mock_review_decision, mock_execute, guardian
+    ):
+        """不正な形式のdiffテキストの処理"""
+        from enum import Enum
+
+        class MockReviewDecision(Enum):
+            APPROVE = "APPROVE"
+            REJECT = "REJECT"
+            MANUAL_REVIEW = "MANUAL_REVIEW"
+
+        mock_review_decision.MANUAL_REVIEW = MockReviewDecision.MANUAL_REVIEW
+        mock_auto_reviewer = MagicMock()
+        mock_auto_reviewer_class.return_value = mock_auto_reviewer
+        mock_auto_result = MagicMock()
+        mock_auto_result.decision = MockReviewDecision.MANUAL_REVIEW
+        mock_auto_result.reason = "Malformed diff requires manual review"
+        mock_auto_reviewer.review_diff.return_value = mock_auto_result
+
+        # LLMのモック設定
+        mock_execute.return_value = json.dumps({
+            "decision": "MANUAL_REVIEW",
+            "reason": "Malformed diff format"
+        })
+
+        # 不正な形式のdiff（diffヘッダーが欠けている）
+        malformed_diff = """
+some random text
++++ added line
+--- removed line
+this is not a proper diff
+"""
+
+        result = guardian.review_unified_diff(malformed_diff, "test_project")
+
+        # エラーなく処理され、何らかの決定が返る
+        assert "decision" in result
+        assert "reason" in result
+
+    @patch.object(GuardianAgent, "execute_llm_task")
+    @patch('nexuscore.agents.guardian_agent.ReviewDecision')
+    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
+    def test_review_unified_diff_with_very_large_diff(
+        self, mock_auto_reviewer_class, mock_review_decision, mock_execute, guardian
+    ):
+        """非常に大きなdiffの処理（50行以上）"""
+        from enum import Enum
+
+        class MockReviewDecision(Enum):
+            APPROVE = "APPROVE"
+            REJECT = "REJECT"
+            MANUAL_REVIEW = "MANUAL_REVIEW"
+
+        mock_review_decision.MANUAL_REVIEW = MockReviewDecision.MANUAL_REVIEW
+        mock_auto_reviewer = MagicMock()
+        mock_auto_reviewer_class.return_value = mock_auto_reviewer
+        mock_auto_result = MagicMock()
+        mock_auto_result.decision = MockReviewDecision.MANUAL_REVIEW
+        mock_auto_result.reason = "Large diff requires manual review"
+        mock_auto_reviewer.review_diff.return_value = mock_auto_result
+
+        # LLMのモック設定
+        mock_execute.return_value = json.dumps({
+            "decision": "APPROVE",
+            "reason": "Changes look good despite size"
+        })
+
+        # 100行以上の大きなdiffを作成
+        large_diff = "diff --git a/test.py b/test.py\n"
+        large_diff += "+++ b/test.py\n"
+        large_diff += "--- a/test.py\n"
+        for i in range(100):
+            large_diff += f"+added line {i}\n"
+
+        result = guardian.review_unified_diff(large_diff, "test_project")
+
+        # 大きなdiffでも処理される（要約される）
+        assert "decision" in result
+        # LLMが呼び出される（大きなdiffなので）
+        assert mock_execute.called
+
+    @patch.object(GuardianAgent, "execute_llm_task")
+    @patch('nexuscore.agents.guardian_agent.ReviewDecision')
+    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
+    def test_review_unified_diff_with_multiple_file_types(
+        self, mock_auto_reviewer_class, mock_review_decision, mock_execute, guardian
+    ):
+        """複数のファイルタイプを含むdiffの処理"""
+        from enum import Enum
+
+        class MockReviewDecision(Enum):
+            APPROVE = "APPROVE"
+            REJECT = "REJECT"
+            MANUAL_REVIEW = "MANUAL_REVIEW"
+
+        mock_review_decision.APPROVE = MockReviewDecision.APPROVE
+        mock_auto_reviewer = MagicMock()
+        mock_auto_reviewer_class.return_value = mock_auto_reviewer
+        mock_auto_result = MagicMock()
+        mock_auto_result.decision = MockReviewDecision.APPROVE
+        mock_auto_result.reason = "All changes are safe"
+        mock_auto_reviewer.review_diff.return_value = mock_auto_result
+
+        # LLMのモック設定
+        mock_execute.return_value = json.dumps({
+            "decision": "APPROVE",
+            "reason": "All file types processed successfully"
+        })
+
+        # Python, JavaScript, JSONファイルを含むdiff
+        multi_type_diff = """diff --git a/app.py b/app.py
++++ b/app.py
+--- a/app.py
++def new_function():
++    return True
+
+diff --git a/config.json b/config.json
++++ b/config.json
+--- a/config.json
++  "new_setting": true
+
+diff --git a/script.js b/script.js
++++ b/script.js
+--- a/script.js
++function newFunc() { return true; }
+"""
+
+        result = guardian.review_unified_diff(multi_type_diff, "test_project")
+
+        # 複数のファイルタイプでも処理できる
+        assert "decision" in result
+        assert result["decision"] == "APPROVE"
+
+    def test_generate_diff_summary_with_empty_code(self, guardian):
+        """空のコードでのdiff要約生成"""
+        result = guardian.generate_diff_summary(
+            before_code="",
+            after_code="def new_func():\n    pass",
+            file_diffs={},
+            semantic_diffs={},
+            model="test-model"
+        )
+
+        # 空のbeforeでも処理できる
+        assert "summary" in result or isinstance(result, str)
+
+    @patch.object(GuardianAgent, "execute_llm_task")
+    def test_review_with_llm_error_handling(self, mock_execute, guardian):
+        """LLMレビュー中のエラー処理"""
+        # LLMが不正なJSONを返すケース
+        mock_execute.return_value = "This is not valid JSON"
+
+        diff_summary = {"changes": "test changes"}
+        auto_review = {"decision": "MANUAL_REVIEW", "reason": "Test"}
+
+        # エラーが発生してもクラッシュしない
+        try:
+            result = guardian._review_with_llm(diff_summary, auto_review)
+            # 何らかの結果が返る（デフォルト値またはエラー情報）
+            assert result is not None
+        except Exception as e:
+            # 例外が発生しても適切に処理される
+            assert "JSON" in str(e) or "parse" in str(e).lower()

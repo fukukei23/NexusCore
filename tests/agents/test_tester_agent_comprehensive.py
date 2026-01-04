@@ -631,3 +631,129 @@ def test_async():
             assert cov_before == 0.0
             assert cov_after == 0.0
 
+class TestTesterAgentAdvancedScenarios:
+    """より深い統合シナリオとエッジケース"""
+
+    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
+    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
+    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
+    @patch('nexuscore.agents.base_agent.LLMRouter')
+    def test_write_or_merge_test_file_with_existing_content_merge(
+        self, mock_router_class, tmp_path
+    ):
+        """既存のテストファイルとの内容マージ"""
+        agent = TesterAgent(project_root=str(tmp_path))
+
+        # 既存のテストファイルを作成
+        test_file_path = tmp_path / "tests" / "test_merge.py"
+        test_file_path.parent.mkdir(parents=True, exist_ok=True)
+        existing_content = "def test_existing():\n    assert True\n"
+        test_file_path.write_text(existing_content)
+
+        # 新しいテストコードを追加
+        new_test_code = "def test_new():\n    assert False\n"
+        agent._write_or_merge_test_file(test_file_path, new_test_code)
+
+        # ファイルが更新されている
+        final_content = test_file_path.read_text()
+        assert "test_new" in final_content
+
+    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
+    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
+    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
+    @patch('nexuscore.agents.base_agent.LLMRouter')
+    def test_count_test_functions_with_class_based_tests(
+        self, mock_router_class, tmp_path
+    ):
+        """クラスベースのテスト関数カウント"""
+        agent = TesterAgent(project_root=str(tmp_path))
+
+        test_code = """
+class TestExample:
+    def test_method1(self):
+        pass
+
+    def test_method2(self):
+        pass
+
+def test_function():
+    pass
+"""
+        count = agent._count_test_functions(test_code)
+        # クラスメソッド2つ + 関数1つ = 3
+        assert count == 3
+
+    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
+    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
+    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
+    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch('subprocess.run')
+    def test_run_tests_with_coverage_success(
+        self, mock_subprocess, mock_router_class, tmp_path
+    ):
+        """カバレッジ成功時のテスト実行"""
+        # pytest成功とカバレッジ出力をシミュレート
+        mock_subprocess.return_value = Mock(
+            returncode=0,
+            stderr="test_module.py::test_example PASSED\nCoverage: 85%"
+        )
+
+        agent = TesterAgent(project_root=str(tmp_path))
+        test_file_path = tmp_path / "tests" / "test_module.py"
+        coverage = agent._run_tests_and_get_coverage("test_module", test_file_path)
+
+        # カバレッジが0.0（実際の解析なし）
+        assert coverage == 0.0
+
+    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
+    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
+    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
+    @patch('nexuscore.agents.base_agent.LLMRouter')
+    def test_infer_module_name_with_complex_path(
+        self, mock_router_class, tmp_path
+    ):
+        """複雑なパスからのモジュール名推論"""
+        agent = TesterAgent(project_root=str(tmp_path))
+
+        # 深いネストパス
+        complex_path = "src/nexuscore/agents/helpers/utils/file_handler.py"
+        module_name = agent._infer_module_name_from_path(complex_path)
+
+        # 実装は path.stem を返すので "file_handler"
+        assert module_name == "file_handler"
+
+    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
+    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
+    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
+    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch('subprocess.run')
+    def test_apply_generated_test_code_with_multiple_tests(
+        self, mock_subprocess, mock_router_class, tmp_path
+    ):
+        """複数のテスト関数を含むコードの適用"""
+        agent = TesterAgent(project_root=str(tmp_path))
+
+        mock_subprocess.return_value = Mock(returncode=0, stderr="")
+
+        test_code = """
+def test_one():
+    assert True
+
+def test_two():
+    assert True
+
+def test_three():
+    assert True
+"""
+        target_file = "src/nexuscore/multi.py"
+
+        test_file_path, test_count, cov_before, cov_after = agent._apply_generated_test_code(
+            "nexuscore.multi",
+            test_code,
+            target_file
+        )
+
+        # 3つのテスト関数がカウントされる
+        assert test_count == 3
+        assert "test_multi.py" in test_file_path
+
