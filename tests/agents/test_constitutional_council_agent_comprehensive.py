@@ -133,9 +133,8 @@ class TestLoadPolicies:
         assert policies[0]["id"] == "P001"
         assert policies[0]["category"] == "testing"
 
-    @pytest.mark.skip(reason="API signature mismatch")
     def test_load_policies_invalid_json(self, tmp_path):
-        """無効なJSONファイルの処理"""
+        """無効なJSONファイルの処理 - RuntimeErrorを発生"""
         policy_path = tmp_path / "invalid.json"
         policy_path.write_text("This is not JSON")
 
@@ -144,7 +143,9 @@ class TestLoadPolicies:
             amendments_dir=str(tmp_path / "amendments"),
         )
 
-        assert agent._load_policies() == []
+        # 現在の実装はRuntimeErrorを発生させる
+        with pytest.raises(RuntimeError, match="Failed to load current policies"):
+            agent._load_policies()
 
     def test_load_policies_file_not_found(self, tmp_path):
         """ファイルが見つからない場合"""
@@ -203,41 +204,36 @@ class TestSavePolicies:
 
 
 class TestValidateAmendment:
-    @pytest.mark.skip(reason="API signature mismatch - implementation uses different amendment structure")
     def test_validate_amendment_valid(self, agent):
-        """有効な修正案の検証"""
+        """有効な修正案の検証 - 現在のAPI構造"""
+        # 現在の実装が期待する構造: policy_id, description, rules
         proposal = {
-            "action": "add",
-            "policy": {
-                "id": "P002",
-                "category": "testing",
-                "rule": "Test all edge cases",
-                "severity": "high",
-            },
-            "rationale": "Improve test coverage",
+            "policy_id": "P002",
+            "description": "Test all edge cases",
+            "rules": ["Always write tests", "Check edge cases"],
         }
 
         is_valid = agent._validate_amendment(proposal)
 
         assert is_valid is True
 
-    def test_validate_amendment_missing_action(self, agent):
-        """actionフィールドが欠けている修正案"""
+    def test_validate_amendment_unknown_keys(self, agent):
+        """未知のキーを含む修正案"""
         proposal = {
-            "policy": {"id": "P002", "rule": "Some rule"},
-            "rationale": "Some reason",
+            "policy_id": "P002",
+            "description": "Test",
+            "unknown_key": "invalid",  # 許可されていないキー
         }
 
         is_valid = agent._validate_amendment(proposal)
 
         assert is_valid is False
 
-    def test_validate_amendment_invalid_action(self, agent):
-        """無効なaction値"""
+    def test_validate_amendment_delete_with_other_keys(self, agent):
+        """delete_policy_idと他のキーが混在"""
         proposal = {
-            "action": "invalid_action",
-            "policy": {"id": "P002"},
-            "rationale": "reason",
+            "delete_policy_id": "P002",
+            "description": "Should not be here",  # delete時は他のキー不可
         }
 
         is_valid = agent._validate_amendment(proposal)
