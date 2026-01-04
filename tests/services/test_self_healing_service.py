@@ -1,9 +1,14 @@
 """self_healing_service.py のテスト"""
+import sys
+from unittest.mock import MagicMock, patch
+
+# patchモジュールをモック化（import前に実行）
+sys.modules['patch'] = MagicMock()
+
 import os
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
