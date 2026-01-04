@@ -555,7 +555,6 @@ class TestRequirementAgentEdgeCases:
         assert state1 in ["INIT", "FINALIZING", "SUGGESTING"]
         assert state2 in ["INIT", "FINALIZING", "SUGGESTING"]
 
-
 class TestRequirementAgentAdvancedScenarios:
     """より深い統合シナリオとエッジケース"""
 
@@ -661,4 +660,3 @@ class TestRequirementAgentAdvancedScenarios:
         # 長いテキストでも処理される
         assert "summary" in result
         assert mock_execute.called
-
