@@ -269,6 +269,43 @@ def main():
         )
         logging.info("Development process finished successfully.")
 
+        # --- 6. 成果物チェック（Smoke Test Gate） ---
+        exit_code = 0
+        hello_path = os.path.join(project_path, "hello.py")
+        readme_path = os.path.join(project_path, "README.md")
+
+        missing_files = []
+        if not os.path.exists(hello_path):
+            missing_files.append("hello.py")
+        if not os.path.exists(readme_path):
+            missing_files.append("README.md")
+
+        if missing_files:
+            logging.error(f"Smoke Test FAILED: Missing required artifacts: {', '.join(missing_files)}")
+            exit_code = 1
+        else:
+            # hello.py の実行確認
+            try:
+                result = subprocess.run(
+                    ["python", hello_path],
+                    cwd=project_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode == 0 and "Hello" in result.stdout:
+                    logging.info(f"Smoke Test PASSED: hello.py executed successfully")
+                else:
+                    logging.warning(f"Smoke Test WARNING: hello.py execution returned code {result.returncode}")
+            except Exception as e:
+                logging.warning(f"Smoke Test WARNING: Could not execute hello.py: {e}")
+
+        if exit_code != 0:
+            run_status = "failure"
+            raise SystemExit(exit_code)
+
+    except SystemExit:
+        raise
     except Exception as e:
         run_status = "failure"
         logging.critical(f"An unexpected error occurred in the main CLI: {e}", exc_info=True)

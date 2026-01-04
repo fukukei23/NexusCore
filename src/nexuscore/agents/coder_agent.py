@@ -8,6 +8,7 @@
 from .base_agent import BaseAgent
 import ast
 import logging
+import re
 
 class CoderAgent(BaseAgent):
     SYSTEM_PROMPT = "あなたは、クリーンで効率的なコードを書くことを得意とする、世界クラスのPython開発者です。あなたの唯一の仕事は、与えられた指示に基づき、完全に動作するPythonコードを生成することです。"
@@ -21,33 +22,6 @@ class CoderAgent(BaseAgent):
         """
         super().__init__()
     # ★★★★★ ここまで ★★★★★
-
-    def implement_code(self, task_description: str, existing_code: str) -> str:
-        prompt = f"""
-# 既存のコード
-```python
-{existing_code}
-```
-
-# あなたへの指示
-上記の既存コードに対して、以下のタスクを実装してください。
-
-## タスク内容
-「{task_description}」
-
-# 重要：
-もしタスク内容に `[Orchestratorからの具体的指示]` や `[Guardianからのフィードバック]` が含まれている場合は、元のタスクよりも、そのフィードバックの内容を解決することを最優先してください。
-
-# 絶対的な出力ルール
-- **修正後の完全なPythonコードのみ**を出力してください。
-- コードの前に前置きや言い訳、後に結びの言葉や要約など、**コード以外のテキストは一切含めないでください。**
-- あなたの思考プロセスや解釈を、Pythonのコメント（`#`）以外でコードに含めてはなりません。
-- 出力は、そのまま `.py` ファイルとして保存できる、純粋なPythonコードでなければなりません。
-"""
-        # ★★★★★ ここからが最重要修正点 (2/2) ★★★★★
-        # 古い_call_llmから、新しいexecute_llm_taskメソッドに変更
-        return self.execute_llm_task(prompt)
-        # ★★★★★ ここまで ★★★★★
 
     # ------------------------------------------------------------------
     # AST 構文検査 + 簡易リトライ
@@ -88,7 +62,9 @@ class CoderAgent(BaseAgent):
 """
         last_error = ""
         for attempt in range(self.RETRY_LIMIT):
-            code = self.execute_llm_task(prompt, task_type="code_generate")
+            raw_response = self.execute_llm_task(prompt, task_type="code_generate")
+            # マークダウンコードブロックからコードを抽出
+            code = self._extract_code_from_response(raw_response, code_language)
             ok, err = self._validate_code(code_language, code)
             if ok:
                 return code
@@ -100,6 +76,54 @@ class CoderAgent(BaseAgent):
             # フィードバックをプロンプトに追記して再試行
             prompt += f"\n# AST検査フィードバック: {err}\n# 構文エラーを必ず修正してください。"
         return code
+
+    def _extract_code_from_response(self, response: str, language: str = "python") -> str:
+        """
+        LLMレスポンスからコードを抽出する。
+        マークダウンコードブロック（```python ... ```）からコードを抽出し、
+        コードブロックが見つからない場合はレスポンス全体を返す。
+        """
+        # マークダウンコードブロックを抽出
+        # パターン: ```python\n...\n``` または ```python\n...\n``` または ```\n...\n```
+        code_block_pattern = re.compile(
+            r'```(?:\w+)?\s*\n(.*?)```',
+            re.DOTALL | re.MULTILINE
+        )
+        matches = code_block_pattern.findall(response)
+
+        if matches:
+            # 最初のコードブロックを使用
+            extracted = matches[0].strip()
+            # 先頭の説明文やコメント行を除去（「以下はコードです」などの前置きを削除）
+            lines = extracted.split('\n')
+            # Pythonコードとして妥当な行から開始（import, def, class, # から始まる行など）
+            start_idx = 0
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                if stripped and (
+                    stripped.startswith(('import ', 'from ', 'def ', 'class ', '#', '"', "'"))
+                    or stripped.startswith(('print', 'if ', 'for ', 'while ', 'return ', '='))
+                ):
+                    start_idx = i
+                    break
+            return '\n'.join(lines[start_idx:]).strip()
+
+        # コードブロックが見つからない場合は、レスポンス全体から不要な前置きを削除
+        lines = response.split('\n')
+        cleaned_lines = []
+        code_started = False
+        for line in lines:
+            stripped = line.strip()
+            # コードらしい行が見つかったら開始
+            if not code_started and stripped and (
+                stripped.startswith(('import ', 'from ', 'def ', 'class ', 'print', '#'))
+                or stripped.startswith(('if ', 'for ', 'while ', 'return '))
+            ):
+                code_started = True
+            if code_started or stripped.startswith('#') or stripped.startswith('"""'):
+                cleaned_lines.append(line)
+
+        return '\n'.join(cleaned_lines).strip()
 
     def _validate_code(self, language: str, code: str) -> tuple[bool, str]:
         lang = (language or "python").lower()
