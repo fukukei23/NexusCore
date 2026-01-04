@@ -622,3 +622,92 @@ class TestIntegrationScenarios:
         assert success is True
         assert len(agent._load_policies()) == 2
         assert agent._load_policies()[1]["policy_id"] == "P002"
+
+
+class TestAdvancedEdgeCases:
+    """より深いエッジケースと統合シナリオ"""
+
+    def test_validate_amendment_empty_dict(self, agent):
+        """空のdictは「変更なし」として許可される"""
+        proposal = {}
+        is_valid = agent._validate_amendment(proposal)
+        assert is_valid is True
+
+    def test_validate_amendment_with_both_policy_id_and_delete(self, agent):
+        """policy_idとdelete_policy_idの両方がある場合は無効"""
+        proposal = {"policy_id": "P001", "delete_policy_id": "P002"}
+        is_valid = agent._validate_amendment(proposal)
+        assert is_valid is False
+
+    @patch.object(ConstitutionalCouncilAgent, "execute_llm_task")
+    def test_review_and_amend_with_code_block_wrapped_json(
+        self, mock_execute, agent, temp_policy_dir
+    ):
+        """コードブロックでラップされたJSONを含む提案の処理"""
+        # LLMが```json ... ```で囲まれた提案を返すケース
+        mock_execute.return_value = """```json
+{
+    "policy_id": "P003",
+    "description": "Code block wrapped policy",
+    "rules": ["Rule 1", "Rule 2"]
+}
+```"""
+        postmortem_report = {"incident": "Test failure", "root_cause": "Missing validation"}
+        knowledge_brief = {"lesson": "Add comprehensive validation"}
+
+        agent.review_and_amend(postmortem_report, knowledge_brief)
+
+        # LLMが呼び出されたことを確認（コードブロック付きJSONが処理される）
+        assert mock_execute.called
+
+    @patch.object(ConstitutionalCouncilAgent, "execute_llm_task")
+    def test_review_and_amend_with_multiple_policy_updates(
+        self, mock_execute, agent, temp_policy_dir
+    ):
+        """複数のポリシー更新を含む提案の処理"""
+        # LLMが複雑な提案を返すケース
+        mock_execute.return_value = json.dumps({
+            "policy_id": "P001",
+            "description": "Enhanced test coverage policy with strict requirements",
+            "rules": [
+                "All code must have tests",
+                "Minimum 90% coverage required",
+                "Integration tests mandatory",
+                "E2E tests for critical paths",
+            ]
+        })
+
+        postmortem_report = {"incident": "Production bug", "root_cause": "Insufficient testing"}
+        knowledge_brief = {"lesson": "Improve test requirements"}
+
+        agent.review_and_amend(postmortem_report, knowledge_brief)
+
+        # LLMが呼び出され、提案が保存されたことを確認
+        assert mock_execute.called
+        # 提案ファイルが作成される
+        amendments_dir = Path(temp_policy_dir["amendments_dir"])
+        pending_files = list(amendments_dir.glob("pending_*.json"))
+        assert len(pending_files) >= 1
+
+    def test_archive_amendment_with_special_characters_in_filename(
+        self, agent, temp_policy_dir
+    ):
+        """ファイル名に特殊文字を含む修正案のアーカイブ"""
+        amendments_dir = Path(temp_policy_dir["amendments_dir"])
+        archived_dir = amendments_dir / "archived"
+
+        # pending_* 形式のファイル名で特殊文字を含むファイルを作成
+        special_file = amendments_dir / "pending_特殊文字.json"
+        proposal = {"policy_id": "P999", "description": "Special chars", "rules": []}
+        special_file.write_text(json.dumps(proposal, indent=2))
+
+        # アーカイブ実行（enacted）
+        success = agent._archive_amendment(special_file, "enacted")
+
+        # 特殊文字を含むファイル名でもアーカイブされる
+        assert success is True
+        assert not special_file.exists()
+        # enacted_*.json ファイルがamendments_dirに作成される
+        enacted_files = list(amendments_dir.glob("enacted_*.json"))
+        assert len(enacted_files) == 1
+        assert "特殊文字" in enacted_files[0].name
