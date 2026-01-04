@@ -15,8 +15,22 @@ from unittest.mock import MagicMock, Mock, patch, PropertyMock
 
 import pytest
 
-# Gradioをモック
-sys.modules['gradio'] = MagicMock()
+
+@pytest.fixture(autouse=True)
+def mock_gradio():
+    """各テストの前後でgradioをモック化/復元（テスト分離のため）"""
+    # テスト前：元の状態を保存してモック化
+    original_gradio = sys.modules.get('gradio')
+    sys.modules['gradio'] = MagicMock()
+
+    yield  # ← ここでテストが実行される
+
+    # テスト後：元の状態に復元
+    if original_gradio is None:
+        sys.modules.pop('gradio', None)
+    else:
+        sys.modules['gradio'] = original_gradio
+
 
 try:
     from nexuscore.agents.policy_interface import PolicyInterface, GRADIO_AVAILABLE
