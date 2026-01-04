@@ -23,7 +23,7 @@ class PolicyInterface:
         self.result_queue = queue.Queue()
         self.interface = None
     
-    def create_gradio_interface(self) -> gr.Blocks:
+    def create_gradio_interface(self) -> "gr.Blocks":
         """Gradio UIインターフェースを作成"""
         if not GRADIO_AVAILABLE:
             raise ImportError("Gradio がインストールされていません")
