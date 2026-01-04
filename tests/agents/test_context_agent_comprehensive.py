@@ -25,9 +25,28 @@ from unittest.mock import MagicMock, Mock, patch, mock_open
 
 import pytest
 
-# 依存モジュールをモック
-sys.modules['nexuscore.agents.context_analyzer'] = MagicMock()
-sys.modules['nexuscore.agents.policy_interface'] = MagicMock()
+
+@pytest.fixture(autouse=True)
+def mock_dependencies():
+    """各テストの前後で依存モジュールをモック化/復元（テスト分離のため）"""
+    # テスト前：元の状態を保存してモック化
+    original_modules = {
+        'nexuscore.agents.context_analyzer': sys.modules.get('nexuscore.agents.context_analyzer'),
+        'nexuscore.agents.policy_interface': sys.modules.get('nexuscore.agents.policy_interface'),
+    }
+
+    sys.modules['nexuscore.agents.context_analyzer'] = MagicMock()
+    sys.modules['nexuscore.agents.policy_interface'] = MagicMock()
+
+    yield  # ← ここでテストが実行される
+
+    # テスト後：元の状態に復元
+    for module_name, original_module in original_modules.items():
+        if original_module is None:
+            sys.modules.pop(module_name, None)
+        else:
+            sys.modules[module_name] = original_module
+
 
 try:
     from nexuscore.agents.context_agent import ContextAgent
