@@ -1,7 +1,12 @@
 {
   "session_id": "self_healing_default",
   "status": "running",
-  "last_phase": "after_patch_generated",
-  "last_updated": 1764691572.9839592,
-  "metadata": {}
+  "last_phase": "start",
+  "last_updated": 1767546281.257069,
+  "metadata": {
+    "run_id": "sh-1767546281-1-test",
+    "repo": "user/repo",
+    "pr_number": 1,
+    "head_sha": "test"
+  }
 }

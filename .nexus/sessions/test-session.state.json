@@ -2,9 +2,9 @@
   "session_id": "test-session",
   "status": "running",
   "last_phase": "start",
-  "last_updated": 1764691569.94987,
+  "last_updated": 1767546259.0800734,
   "metadata": {
-    "run_id": "sh-1764691569-123-abc123",
+    "run_id": "sh-1767546259-123-abc123",
     "repo": "owner/repo",
     "pr_number": 123,
     "head_sha": "abc123"
