@@ -21,7 +21,7 @@ class DummyLLM:
         self.executed = True
         self.args = args
         self.kwargs = kwargs
-        return "ok"
+        return '{"status": "ok"}'
 
 
 def test_execute_llm_task_with_json_guard(monkeypatch):
@@ -36,7 +36,7 @@ def test_execute_llm_task_with_json_guard(monkeypatch):
 
     result = agent.execute_llm_task("generate data", as_json=True)
 
-    assert result == "ok"
+    assert result == '{"status": "ok"}'
     assert llm.executed is True
     assert llm.kwargs["as_json"] is True
     system_prompt = llm.kwargs["system_prompt"]
