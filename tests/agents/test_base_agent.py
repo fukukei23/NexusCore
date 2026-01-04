@@ -37,7 +37,7 @@ def base_agent_cls(monkeypatch):
 
 
 def test_execute_llm_task_routes_and_appends_guard(monkeypatch, base_agent_cls):
-    dummy_llm = DummyLLM(response="structured")
+    dummy_llm = DummyLLM(response='{"result": "structured"}')
     router = DummyRouter(dummy_llm)
     monkeypatch.setattr(base_agent, "LLMRouter", lambda: router)
 
@@ -47,7 +47,7 @@ def test_execute_llm_task_routes_and_appends_guard(monkeypatch, base_agent_cls):
     agent = SampleAgent()
     result = agent.execute_llm_task("analyze", as_json=True, task_type="analysis", temperature=0.2)
 
-    assert result == "structured"
+    assert result == '{"result": "structured"}'
     assert router.calls == [("analyze", "analysis")]
     assert dummy_llm.captured_kwargs["prompt"] == "analyze"
     assert "Base prompt" in dummy_llm.captured_kwargs["system_prompt"]
