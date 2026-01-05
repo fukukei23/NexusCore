@@ -631,7 +631,6 @@ def test_async():
             assert cov_before == 0.0
             assert cov_after == 0.0
 
-
 class TestTesterAgentAdvancedScenarios:
     """より深い統合シナリオとエッジケース"""
 

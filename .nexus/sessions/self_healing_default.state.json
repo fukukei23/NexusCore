@@ -2,9 +2,9 @@
   "session_id": "self_healing_default",
   "status": "running",
   "last_phase": "start",
-  "last_updated": 1767570410.1780522,
+  "last_updated": 1767546281.257069,
   "metadata": {
-    "run_id": "sh-1767570410-1-test",
+    "run_id": "sh-1767546281-1-test",
     "repo": "user/repo",
     "pr_number": 1,
     "head_sha": "test"
