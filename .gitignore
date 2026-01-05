@@ -117,3 +117,7 @@ minikube-linux-amd64
 # ローカルデータベース
 nexus_local.db
 coverage.json
+
+# Environment file backups
+*.env.bak
+.env.bak
