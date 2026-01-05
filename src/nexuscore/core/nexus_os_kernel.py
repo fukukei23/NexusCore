@@ -53,7 +53,7 @@ class NexusOSKernel:
         # OSが管理する、信頼できる共有サービスをここに登録します。
         # アプリケーションは、get_service()を通じてこれらのサービスを利用します。
         self._services = {
-            "Google Search_tool": self._initialize_Google Search(),
+            "Google Search_tool": self._initialize_google_search(),
             "default_llm_client": self._initialize_default_llm(),
             # 将来的にデータベース接続などもここに追加できます。
             # "database_connection": self._initialize_database()
@@ -78,10 +78,10 @@ class NexusOSKernel:
         logger.info(f"Kernel is providing service '{service_name}' to an application.")
         return service
 
-    def _initialize_Google Search(self):
+    def _initialize_google_search(self):
         """（プレースホルダー）本物のGoogle Search APIクライアントを初期化します。"""
         logger.debug("Initializing Google Search service...")
-        # from your_actual_Google Search_library import GoogleSearchClient
+        # from your_actual_google_search_library import GoogleSearchClient
         # return GoogleSearchClient(api_key=os.getenv("GOOGLE_API_KEY"))
         class DummySearchTool:
             def search(self, queries):
