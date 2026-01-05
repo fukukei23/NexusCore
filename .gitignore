@@ -116,3 +116,4 @@ minikube-linux-amd64
 
 # ローカルデータベース
 nexus_local.db
+coverage.json
