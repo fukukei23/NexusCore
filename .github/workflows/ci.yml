@@ -11,40 +11,40 @@ on:
 
 jobs:
   # ============================================================================
-  # セキュリティスキャン（Bandit）
+  # Security Scan (Bandit) / セキュリティスキャン（Bandit）
   # ============================================================================
   security-scan:
-    name: セキュリティ脆弱性スキャン
+    name: Security Vulnerability Scan
     runs-on: ubuntu-latest
 
     steps:
-      - name: リポジトリをチェックアウト
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Python環境のセットアップ
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Banditのインストール
+      - name: Install Bandit
         run: |
           python -m pip install --upgrade pip
           pip install bandit[toml]
 
-      - name: Banditセキュリティスキャンを実行
+      - name: Run Bandit security scan
         run: |
-          # src/ ディレクトリをスキャン
-          # -r: 再帰的にスキャン
-          # -f json: JSON形式でレポート生成
-          # -o: 出力ファイル指定
-          # -ll: Low以上の問題を報告
+          # Scan src/ directory recursively
+          # -r: recursive scan
+          # -f json: generate JSON report
+          # -o: output file
+          # -ll: report Low+ severity issues
           bandit -r src/ -f json -o bandit-report.json -ll || true
 
-          # ターミナル表示用にテキスト形式でも出力
-          echo "=== Banditセキュリティスキャン結果 ==="
+          # Display results in terminal
+          echo "=== Bandit Security Scan Results ==="
           bandit -r src/ -ll
 
-      - name: Banditレポートをアーティファクトとしてアップロード
+      - name: Upload Bandit report as artifact
         if: always()
         uses: actions/upload-artifact@v3
         with:
@@ -52,82 +52,82 @@ jobs:
           path: bandit-report.json
           retention-days: 30
 
-      - name: 重大な脆弱性をチェック
+      - name: Check for critical vulnerabilities
         run: |
-          # High/Medium の問題がある場合はCIを失敗させる
+          # Fail CI if High/Medium severity issues are found
           bandit -r src/ -lll -f json -o bandit-critical.json
 
-          # 問題数をカウント
+          # Count issues
           ISSUE_COUNT=$(python -c "import json; data=json.load(open('bandit-critical.json')); print(len(data.get('results', [])))")
 
           if [ "$ISSUE_COUNT" -gt 0 ]; then
-            echo "❌ $ISSUE_COUNT 件の重大なセキュリティ問題が検出されました"
+            echo "❌ Found $ISSUE_COUNT critical security issues"
             bandit -r src/ -lll
             exit 1
           else
-            echo "✅ 重大なセキュリティ問題は検出されませんでした"
+            echo "✅ No critical security issues found"
           fi
 
   # ============================================================================
-  # テスト実行とカバレッジ測定
+  # Test and Coverage / テスト実行とカバレッジ測定
   # ============================================================================
   test:
-    name: テスト実行
+    name: Run Tests
     runs-on: ubuntu-latest
     env:
-      # OpenAIクライアントのインポート時エラーを回避するためのダミーキー
+      # Dummy key to avoid import-time errors when tests instantiate OpenAI clients
       OPENAI_API_KEY: dummy-key-for-tests
 
     strategy:
       matrix:
-        # 開発環境に合わせてPython 3.9〜3.12をテスト
+        # Test on Python 3.9-3.12 to match development environment
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
-      - name: リポジトリをチェックアウト
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Python ${{ matrix.python-version }} 環境のセットアップ
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: システム依存関係のインストール（音声処理用）
+      - name: Install system dependencies (audio)
         run: |
           sudo apt-get update
           sudo apt-get install -y libportaudio2
 
-      - name: Python依存関係のインストール
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # 開発用依存関係をインストール（pytest-cov を含む）
+          # Install dev dependencies (includes pytest-cov)
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
 
-      - name: テスト実行とカバレッジレポート生成
+      - name: Run tests and generate coverage report
         run: |
-          # --cov=src で srcフォルダ全体のカバレッジを測定
-          # --cov-report=xml で Codecov用のXMLレポート生成
-          # --cov-report=term-missing で欠けている行を表示
+          # --cov=src measures coverage for entire src folder
+          # --cov-report=xml generates XML report for Codecov
+          # --cov-report=term-missing shows missing lines
           python -m pytest --cov=src --cov-report=xml --cov-report=term-missing
 
-      - name: Webapp UIスモークテストの実行
+      - name: Run webapp UI smoke tests
         run: |
           pytest -q tests/webapp/
 
-      - name: Phase3カバレッジレポートの生成
+      - name: Generate Phase3 coverage report
         run: |
           # graph_builder / unified_analyzer / test_generator / tree_sitter_checker
           make coverage-phase3
 
-      - name: Phase3カバレッジサマリーをPRにコメント
+      - name: Comment Phase3 coverage summary on PR
         if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: phase3-coverage
           path: docs/coverage_phase3_summary_ci.md
 
-      - name: カバレッジレポートをCodecovにアップロード
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
