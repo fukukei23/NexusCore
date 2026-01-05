@@ -82,3 +82,31 @@
 **Related Spec**: N/A (再発防止ルール固定)
 
 ---
+
+### 2025-01-05: Phase 2.5 Review – CR-NEXUS-051 Error Classification
+
+**Context**: CR-NEXUS-051 に基づくエラー分類仕様について、実装前の Phase 2.5 独立レビューを実施した。
+
+**Decision**: 本仕様は現時点では **Reject** とする。
+
+**Rationale**:
+- Retry/backoff 戦略が仕様として未定義
+- 分類不能エラー発生時の最終挙動が定義されていない
+- 将来の分類拡張時に条件分岐が肥大化するリスクがある
+
+**Alternatives Considered**:
+- 現状のまま実装進行 → 却下（安全性リスクが高い）
+- 仕様修正後に再レビュー → 採用（本判定の前提）
+
+**Review Result**: Reject (Phase 2.5 Independent Review)
+
+**Related Spec**:
+- `docs/spec/CR-NEXUS-051_ERROR_CLASSIFICATION_SPECIFICATION.md`
+- Review Packet: `GOVERNANCE/review_packets/RP-NEXUS-051_PHASE25_INDEPENDENT_REVIEW.md`
+
+**Consequence**:
+- 本 Spec は修正が必要
+- 修正後、再度 Phase 2.5 Review を実施すること
+- 修正が完了するまで実装フェーズへ進行しない
+
+---
