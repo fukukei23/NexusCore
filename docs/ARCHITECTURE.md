@@ -1,5 +1,15 @@
 # NexusCore Architecture
 
+> **SSOT (Single Source of Truth) 入口**: このドキュメントは NexusCore のアーキテクチャの SSOT です。開発タスク開始前に必ず参照してください。
+
+## Gate（参照強制）
+
+開発タスク開始前に必ず参照する：
+- このドキュメント（`docs/ARCHITECTURE.md`）
+- [Project Profile](../PROJECT_PROFILES/PROJECT_PROFILE_NEXUSCORE.md)
+- [Governance](../GOVERNANCE/README.md)
+- 変更対象に関連する Spec（`docs/spec/` または `GOVERNANCE/spec/`）
+
 ## System Overview
 
 NexusCore is a multi-agent AI development framework with integrated quality gates, LLM routing, and constitutional governance.
@@ -9,11 +19,11 @@ NexusCore is a multi-agent AI development framework with integrated quality gate
 ```mermaid
 graph TB
     User[User/Developer] --> Orchestrator[Orchestrator]
-    
+
     Orchestrator --> AgentLayer[Agent Layer]
     AgentLayer --> LLMRouter[LLM Router]
     AgentLayer --> QualityGates[Quality Gates]
-    
+
     subgraph "Agent Layer"
         ArchitectAgent[Architect Agent]
         CoderAgent[Coder Agent]
@@ -26,31 +36,31 @@ graph TB
         PolicyAgent[Policy Agent]
         CouncilAgent[Constitutional Council]
     end
-    
+
     subgraph "LLM Router"
         TaskRouter[Task-based Routing]
         ModelPool[Model Pool]
         BudgetManager[Budget Manager]
     end
-    
+
     subgraph "Quality Gates"
         Tier1[Tier 1: Code Quality]
         Tier2[Tier 2: Mutation Testing]
     end
-    
+
     ModelPool --> OpenAI[OpenAI GPT]
     ModelPool --> Anthropic[Anthropic Claude]
     ModelPool --> DeepSeek[DeepSeek]
     ModelPool --> Gemini[Google Gemini]
     ModelPool --> Kimi[Kimi]
-    
+
     Tier1 --> Coverage[Coverage Analysis]
     Tier1 --> Pylint[Pylint]
     Tier1 --> Mypy[Type Checking]
     Tier1 --> Bandit[Security Scan]
-    
+
     Tier2 --> MutationTest[Mutation Testing]
-    
+
     GuardianAgent --> QualityGates
     CouncilAgent --> PolicyStore[Policy Store]
 ```
@@ -237,28 +247,28 @@ sequenceDiagram
     participant CoderAgent
     participant GuardianAgent
     participant LLMRouter
-    
+
     User->>Orchestrator: Submit requirement
     Orchestrator->>RequirementAgent: Analyze requirement
     RequirementAgent->>LLMRouter: Execute LLM task (requirement)
     LLMRouter-->>RequirementAgent: Structured requirement
     RequirementAgent-->>Orchestrator: Analyzed requirement
-    
+
     Orchestrator->>ArchitectAgent: Design structure
     ArchitectAgent->>LLMRouter: Execute LLM task (arch_design)
     LLMRouter-->>ArchitectAgent: Project structure
     ArchitectAgent-->>Orchestrator: Design document
-    
+
     Orchestrator->>CoderAgent: Implement code
     CoderAgent->>LLMRouter: Execute LLM task (code_generate)
     LLMRouter-->>CoderAgent: Generated code
     CoderAgent-->>Orchestrator: Implementation
-    
+
     Orchestrator->>GuardianAgent: Review code
     GuardianAgent->>GuardianAgent: Run Tier 1 Quality Gates
     GuardianAgent->>GuardianAgent: Run Tier 2 Mutation Tests
     GuardianAgent-->>Orchestrator: Approval/Rejection
-    
+
     Orchestrator-->>User: Final result
 ```
 
@@ -268,25 +278,25 @@ sequenceDiagram
 graph LR
     Code[Code Changes] --> Guardian[Guardian Agent]
     Guardian --> Tier1[Tier 1 Gates]
-    
+
     Tier1 --> Coverage{Coverage >= 80%?}
     Tier1 --> Pylint{Pylint >= 8.0?}
     Tier1 --> Mypy{Mypy Pass?}
     Tier1 --> Bandit{No Security Issues?}
-    
+
     Coverage -->|Yes| Tier1Pass[Tier 1 Pass]
     Pylint -->|Yes| Tier1Pass
     Mypy -->|Yes| Tier1Pass
     Bandit -->|Yes| Tier1Pass
-    
+
     Coverage -->|No| Tier1Fail[Tier 1 Fail]
     Pylint -->|No| Tier1Fail
     Mypy -->|No| Tier1Fail
     Bandit -->|No| Tier1Fail
-    
+
     Tier1Pass --> Tier2[Tier 2: Mutation Testing]
     Tier2 --> MutationScore{Mutation Score >= 70%?}
-    
+
     MutationScore -->|Yes| Approved[✅ Approved]
     MutationScore -->|No| Rejected[❌ Rejected]
     Tier1Fail --> Rejected
