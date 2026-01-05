@@ -1,0 +1,15 @@
+# ==============================================================================
+# NexusCore ConfigMap
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nexuscore-config
+  namespace: nexuscore
+data:
+  # Redis connection strings (adjust hostname if using external Redis)
+  # Assuming Redis is reachable at 'redis.nexuscore.svc.cluster.local' if deployed in cluster,
+  # but for minikube without a Redis pod yet, we might need a placeholder or update to point to minikube host.
+  # For now, using standard service DNS name assuming Redis will be deployed.
+  celery_broker_url: "redis://redis.nexuscore.svc.cluster.local:6379/0"
+  celery_result_backend: "redis://redis.nexuscore.svc.cluster.local:6379/0"
