@@ -1,65 +1,87 @@
 # NexusCore Architecture
+> **Gate / SSOT Entrypoint**
 
-> **Gate / SSOT Entrypoint**: This file is the **Single Source of Truth (SSOT) entry point** for NexusCore architecture. Development tasks must reference this file before starting.
+本ドキュメントは **NexusCore におけるアーキテクチャ情報の唯一の入口（SSOT Entry Point）** である。
+開発・修正・レビュー・AI実装を行う前に、必ず本ファイルを参照すること。
 
-## Purpose
+---
 
-This document serves as the **Gate** for architectural information. It provides:
-- High-level overview of NexusCore
-- Links to canonical architecture design
-- References to STIT+IRG governance documents
+## 1. Purpose（このドキュメントの役割）
 
-For detailed architectural design, see the [Canonical Architecture Document](architecture/ARCHITECTURE_CORE.md).
+- アーキテクチャ情報の **参照ゲート（Gate）** を提供する
+- 詳細設計の所在を明示し、重複・分散を防ぐ
+- STIT+IRG ガバナンスとの接続点を定義する
 
-## System Overview
+※ 本ファイル自体には **詳細設計・実装仕様を記載しない**
 
-NexusCore is a multi-agent AI development framework with integrated quality gates, LLM routing, and constitutional governance.
+---
 
-The system orchestrates multiple specialized AI agents to support the complete software development lifecycle: requirement analysis, architecture design, code generation, testing, quality assurance, and governance.
+## 2. Canonical Architecture（正本設計）
 
-## Gate（参照強制）
+NexusCore の詳細なアーキテクチャ設計は、以下の **Canonical Design** に集約されている。
 
-開発タスク開始前に必ず参照する：
-- このドキュメント（`docs/ARCHITECTURE.md`）
-- [Canonical Architecture Design](architecture/ARCHITECTURE_CORE.md) - 詳細なアーキテクチャ設計
-- [Project Profile](../../PROJECT_PROFILES/PROJECT_PROFILE_NEXUSCORE.md) - 制約宣言
-- [Governance](../../GOVERNANCE/README.md) - ガバナンス資産
-- [Master Protocol](../../GOVERNANCE/MASTER_PROTOCOL_TEMPLATE.md) - プロトコル
-- 変更対象に関連する Spec（`docs/spec/` または `GOVERNANCE/spec/`）
+- **Canonical Design**
+  - `docs/architecture/ARCHITECTURE_CORE.md`
 
-## Architecture Documents
+本リポジトリ内で「設計内容そのもの」を参照する場合は、必ず上記ファイルを参照すること。
 
-### Canonical Design
-- **[ARCHITECTURE_CORE.md](architecture/ARCHITECTURE_CORE.md)**: Complete detailed architectural design
-  - Component details
-  - Data flow diagrams
-  - Design patterns
-  - Technology stack
-  - Extension points
+---
 
-### Related Documents
-- `docs/archive/ARCHITECTURE_PHASE3.md` - Historical phase 3 architecture
-- `docs/archive/ARCHITECTURE_PHASE4.md` - Historical phase 4 architecture
+## 3. Gate（参照強制ルール）
 
-## STIT+IRG Governance
+開発タスク開始前に、必ず以下を参照すること：
 
-NexusCore follows **STIT+IRG** (Spec & Test Driven Iteration + Independent Review Gate) governance:
+1. 本ドキュメント
+   - `docs/ARCHITECTURE.md`（Gate / SSOT Entrypoint）
+2. Canonical Architecture
+   - `docs/architecture/ARCHITECTURE_CORE.md`
+3. Project Constraints
+   - `PROJECT_PROFILES/PROJECT_PROFILE_NEXUSCORE.md`
+4. Governance Assets
+   - `GOVERNANCE/README.md`
+   - `GOVERNANCE/MASTER_PROTOCOL_TEMPLATE.md`
+5. 変更対象に関連する Spec
+   - `GOVERNANCE/spec/` または `docs/spec/`
 
-- **Spec-driven development**: Specifications are written before implementation
-- **Independent review**: Reviews are conducted in separate contexts (Phase 2.5)
-- **Decision logging**: Important decisions are recorded in [Decision Log](../../DECISION_LOGS/DECISION_LOG.md)
+これらを参照せずに行われた実装・修正・提案は、Gate 未通過として扱う。
 
-For governance details, see:
-- [Project Profile](../../PROJECT_PROFILES/PROJECT_PROFILE_NEXUSCORE.md)
-- [Governance README](../../GOVERNANCE/README.md)
-- [Master Protocol Template](../../GOVERNANCE/MASTER_PROTOCOL_TEMPLATE.md)
+---
 
-## Quick Reference
+## 4. STIT+IRG Governance
 
-**Key Components:**
-- **Agent Layer**: Specialized AI agents (Architect, Coder, Debugger, Tester, Guardian, etc.)
-- **LLM Router**: Task-based model routing with budget management
-- **Quality Gates**: Multi-tier validation (Tier 1: Static, Tier 2: Mutation Testing)
-- **Policy & Governance**: Constitutional AI with amendment system
+NexusCore は以下のガバナンスモデルに従う：
 
-**For detailed information**, see [ARCHITECTURE_CORE.md](architecture/ARCHITECTURE_CORE.md).
+- **STIT**: Spec & Test Driven Iteration
+- **IRG（Phase 2.5）**: Independent Review Gate
+
+重要な判断・却下・方針変更は、必ず以下に記録する：
+
+- `DECISION_LOGS/DECISION_LOG.md`
+
+---
+
+## 5. Scope of This File（明示的に含まないもの）
+
+以下は **本ファイルには含めない**：
+
+- コンポーネント詳細
+- データフロー図
+- Mermaid 図
+- API / クラス / 関数仕様
+- 実装例・コードブロック
+
+それらはすべて **Canonical Architecture** 側に記載する。
+
+---
+
+## 6. Change Policy（変更ポリシー）
+
+- 本ファイルは **Gate と導線のみ** を扱う
+- 設計変更が発生した場合：
+  1. Canonical Architecture を更新
+  2. 必要に応じて本ファイルのリンク・参照先のみ調整
+  3. Decision Log に記録（append-only）
+
+---
+
+End of Gate Document.
