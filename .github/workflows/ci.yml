@@ -10,63 +10,127 @@ on:
       - main
 
 jobs:
+  # ============================================================================
+  # セキュリティスキャン（Bandit）
+  # ============================================================================
+  security-scan:
+    name: セキュリティ脆弱性スキャン
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python環境のセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Banditのインストール
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit[toml]
+
+      - name: Banditセキュリティスキャンを実行
+        run: |
+          # src/ ディレクトリをスキャン
+          # -r: 再帰的にスキャン
+          # -f json: JSON形式でレポート生成
+          # -o: 出力ファイル指定
+          # -ll: Low以上の問題を報告
+          bandit -r src/ -f json -o bandit-report.json -ll || true
+
+          # ターミナル表示用にテキスト形式でも出力
+          echo "=== Banditセキュリティスキャン結果 ==="
+          bandit -r src/ -ll
+
+      - name: Banditレポートをアーティファクトとしてアップロード
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+          retention-days: 30
+
+      - name: 重大な脆弱性をチェック
+        run: |
+          # High/Medium の問題がある場合はCIを失敗させる
+          bandit -r src/ -lll -f json -o bandit-critical.json
+
+          # 問題数をカウント
+          ISSUE_COUNT=$(python -c "import json; data=json.load(open('bandit-critical.json')); print(len(data.get('results', [])))")
+
+          if [ "$ISSUE_COUNT" -gt 0 ]; then
+            echo "❌ $ISSUE_COUNT 件の重大なセキュリティ問題が検出されました"
+            bandit -r src/ -lll
+            exit 1
+          else
+            echo "✅ 重大なセキュリティ問題は検出されませんでした"
+          fi
+
+  # ============================================================================
+  # テスト実行とカバレッジ測定
+  # ============================================================================
   test:
+    name: テスト実行
     runs-on: ubuntu-latest
     env:
-      OPENAI_API_KEY: dummy-key-for-tests # avoid import-time errors when tests instantiate OpenAI clients
+      # OpenAIクライアントのインポート時エラーを回避するためのダミーキー
+      OPENAI_API_KEY: dummy-key-for-tests
 
     strategy:
       matrix:
-        # ★★★ 修正点: 開発環境に合わせて3.12を追加 ★★★
+        # 開発環境に合わせてPython 3.9〜3.12をテスト
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Python ${{ matrix.python-version }} 環境のセットアップ
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install system deps (audio)
+      - name: システム依存関係のインストール（音声処理用）
         run: |
           sudo apt-get update
           sudo apt-get install -y libportaudio2
 
-      - name: Install dependencies
+      - name: Python依存関係のインストール
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           # 開発用依存関係をインストール（pytest-cov を含む）
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
 
-      - name: Run tests and generate coverage report
+      - name: テスト実行とカバレッジレポート生成
         run: |
-          # --cov=src で、srcフォルダ全体のカバレッジを測定
+          # --cov=src で srcフォルダ全体のカバレッジを測定
+          # --cov-report=xml で Codecov用のXMLレポート生成
+          # --cov-report=term-missing で欠けている行を表示
           python -m pytest --cov=src --cov-report=xml --cov-report=term-missing
 
-      - name: Run webapp UI smoke tests
+      - name: Webapp UIスモークテストの実行
         run: |
           pytest -q tests/webapp/
 
-      # === Phase3 coverage (graph_builder / unified_analyzer / test_generator / tree_sitter_checker) ===
-      - name: Run Phase3 coverage report
+      - name: Phase3カバレッジレポートの生成
         run: |
+          # graph_builder / unified_analyzer / test_generator / tree_sitter_checker
           make coverage-phase3
 
-      # === Comment Phase3 coverage summary on PR ===
-      - name: Comment Phase3 coverage summary on PR
+      - name: Phase3カバレッジサマリーをPRにコメント
         if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: phase3-coverage
           path: docs/coverage_phase3_summary_ci.md
 
-      - name: Upload coverage to Codecov
+      - name: カバレッジレポートをCodecovにアップロード
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          # 以下も素晴らしい設定です。
           file: ./coverage.xml
           flags: unittests
           name: codecov-umbrella
