@@ -80,6 +80,7 @@ output/*
 .coverage
 .coverage-phase3
 coverage.xml
+coverage.json
 htmlcov/
 .pytest_cache/
 .mypy_cache/
@@ -116,3 +117,8 @@ minikube-linux-amd64
 
 # ローカルデータベース
 nexus_local.db
+coverage.json
+
+# Environment file backups
+*.env.bak
+.env.bak

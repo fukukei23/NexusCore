@@ -379,3 +379,286 @@ class TestIntegrationScenarios:
 
         # 状態が更新される
         assert fsm.state["state"] == "FINALIZING"
+
+
+# ============================================================================
+# Additional Tests: Edge Cases and Uncovered Paths
+# ============================================================================
+
+
+class TestRequirementAgentEdgeCases:
+    """未カバーのコードパスとエッジケースをテスト"""
+
+    @patch.object(RequirementAgent, "execute_llm_task")
+    def test_analyze_requirement_with_special_characters(self, mock_execute):
+        """特殊文字を含む要件の分析"""
+        mock_execute.return_value = json.dumps({
+            "summary": "特殊文字テスト: <>\"'&",
+            "features": ["機能<1>", "機能\"2\""],
+            "constraints": ["制約's"],
+            "acceptance_criteria": ["基準&1"]
+        })
+
+        agent = RequirementAgent()
+        result = agent.analyze_requirement("特殊文字を含む要件: <>\"'&")
+
+        assert "特殊文字テスト" in result["summary"]
+        assert len(result["features"]) == 2
+        assert result["features"][0] == "機能<1>"
+
+    @patch.object(RequirementAgent, "execute_llm_task")
+    def test_analyze_requirement_with_very_long_text(self, mock_execute):
+        """非常に長い要件テキストの処理"""
+        long_requirement = "要件" * 1000  # 3000文字
+        mock_execute.return_value = json.dumps({
+            "summary": long_requirement[:80],
+            "features": ["機能1"],
+            "constraints": [],
+            "acceptance_criteria": []
+        })
+
+        agent = RequirementAgent()
+        result = agent.analyze_requirement(long_requirement)
+
+        assert "要件" in result["summary"]
+        assert len(result["summary"]) <= 100
+
+    @patch.object(RequirementAgent, "execute_llm_task")
+    @patch("nexuscore.agents.requirement_agent.sanitize_json_like")
+    def test_analyze_requirement_json_parse_error_recovery(self, mock_sanitize, mock_execute):
+        """JSON解析エラーからの回復"""
+        # 無効なJSONを返す
+        mock_execute.return_value = "{ invalid json }"
+
+        agent = RequirementAgent()
+        result = agent.analyze_requirement("テスト要件")
+
+        # フォールバックの自動生成された仕様が返される
+        assert "summary" in result
+        assert "Auto-generated" in result["features"][0]
+        assert result["constraints"] == []
+
+    def test_generate_final_spec_with_complex_history(self):
+        """複雑な履歴パターンでの最終仕様生成"""
+        history = [
+            {"role": "assistant", "content": "質問1"},
+            {"role": "user", "content": "回答1"},
+            {"role": "assistant", "content": "質問2"},
+            {"role": "user", "content": "回答2"},
+            {"role": "user", "content": "最終要件"},
+        ]
+
+        agent = RequirementAgent()
+        result = agent.generate_final_spec(history)
+
+        # 最後のユーザーメッセージが使用される
+        assert "最終要件" in result["details"]
+
+    def test_generate_final_spec_with_only_assistant_messages(self):
+        """アシスタントメッセージのみの履歴"""
+        history = [
+            {"role": "assistant", "content": "メッセージ1"},
+            {"role": "assistant", "content": "メッセージ2"},
+        ]
+
+        agent = RequirementAgent()
+        result = agent.generate_final_spec(history)
+
+        # デフォルトメッセージが使用される
+        assert "No user input" in result["details"]
+
+    @patch.object(RequirementAgent, "execute_llm_task")
+    def test_analyze_requirement_with_unicode_characters(self, mock_execute):
+        """Unicode文字を含む要件の処理"""
+        mock_execute.return_value = json.dumps({
+            "summary": "絵文字テスト 🎉 📱 ✨",
+            "features": ["機能①", "機能②"],
+            "constraints": ["日本語制約"],
+            "acceptance_criteria": ["基準✓"]
+        })
+
+        agent = RequirementAgent()
+        result = agent.analyze_requirement("絵文字を含む要件 🎉")
+
+        assert "🎉" in result["summary"]
+        assert len(result["features"]) == 2
+
+    def test_initial_requirement_cascading_usage(self):
+        """initial_requirementの連鎖的な使用"""
+        agent = RequirementAgent()
+
+        # 最初の設定
+        agent.set_initial_requirement("要件1")
+        assert agent._initial_requirement == "要件1"
+
+        # 上書き
+        agent.set_initial_requirement("要件2")
+        assert agent._initial_requirement == "要件2"
+
+        # 空文字列での上書き
+        agent.set_initial_requirement("")
+        assert agent._initial_requirement == ""
+
+    def test_text_localization_with_empty_language(self):
+        """空の言語コードでのTextLocalization"""
+        text = TextLocalization(language="")
+
+        # 空の言語コードは英語にフォールバック
+        assert "Interactive" in text["title"] or "対話型" in text["title"]
+
+    @patch.object(RequirementAgent, "execute_llm_task")
+    def test_multiple_requirement_updates_workflow(self, mock_execute):
+        """複数回の要件更新ワークフロー"""
+        agent = RequirementAgent(use_ui=False)
+
+        # 1回目の要件設定
+        agent.set_initial_requirement("要件v1")
+        mock_execute.return_value = json.dumps({
+            "summary": "v1",
+            "features": ["機能1"],
+            "constraints": [],
+            "acceptance_criteria": []
+        })
+        result1 = agent.analyze_requirement("")
+        assert result1["summary"] == "v1"
+
+        # 2回目の要件設定（上書き）
+        agent.set_initial_requirement("要件v2")
+        mock_execute.return_value = json.dumps({
+            "summary": "v2",
+            "features": ["機能2"],
+            "constraints": [],
+            "acceptance_criteria": []
+        })
+        result2 = agent.analyze_requirement("")
+        assert result2["summary"] == "v2"
+        # final_requirementsが更新される
+        assert agent.final_requirements["summary"] == "v2"
+
+    def test_state_machine_multiple_transitions(self):
+        """StateMachineの複数回遷移"""
+        agent = RequirementAgent()
+        fsm = StateMachine(agent)
+
+        # 初期状態
+        assert fsm.state["state"] == "INIT"
+
+        # 1回目の遷移
+        fsm.transition("入力1")
+        state1 = fsm.state["state"]
+
+        # 2回目の遷移（状態は変わらない可能性があるが、エラーにならない）
+        fsm.transition("入力2")
+        state2 = fsm.state["state"]
+
+        # どちらも有効な状態
+        assert state1 in ["INIT", "FINALIZING", "SUGGESTING"]
+        assert state2 in ["INIT", "FINALIZING", "SUGGESTING"]
+
+
+class TestRequirementAgentAdvancedScenarios:
+    """より深い統合シナリオとエッジケース"""
+
+    @patch.object(RequirementAgent, "execute_llm_task")
+    def test_analyze_requirement_with_nested_json_in_text(self, mock_execute):
+        """ネストされたJSON構造を含む要件テキストの処理"""
+        mock_execute.return_value = json.dumps({
+            "summary": "Nested JSON handling",
+            "features": ["Parse nested data", "Validate structure"],
+            "constraints": ["Must handle depth > 5"],
+            "acceptance_criteria": ["All nested keys accessible"]
+        })
+
+        agent = RequirementAgent()
+        result = agent.analyze_requirement(
+            '要件: {"user": {"profile": {"settings": {"theme": "dark"}}}}'
+        )
+
+        assert "summary" in result
+        assert len(result["features"]) > 0
+
+    @patch.object(RequirementAgent, "execute_llm_task")
+    def test_generate_final_spec_with_conflicting_history(self, mock_execute):
+        """矛盾する履歴からの最終仕様生成"""
+        mock_execute.return_value = json.dumps({
+            "summary": "Resolved conflicts",
+            "features": ["Final feature set"],
+            "constraints": ["Latest constraints"],
+            "acceptance_criteria": ["Criteria after resolution"]
+        })
+
+        agent = RequirementAgent()
+        conflicting_history = [
+            {"role": "user", "content": "Add feature X"},
+            {"role": "assistant", "content": "OK"},
+            {"role": "user", "content": "Remove feature X"},  # 矛盾
+            {"role": "assistant", "content": "OK"},
+        ]
+
+        result = agent.generate_final_spec(conflicting_history)
+
+        # 矛盾していても最終仕様が生成される
+        assert "summary" in result
+
+    def test_set_initial_requirement_with_multiline_text(self):
+        """複数行テキストの初期要件設定"""
+        agent = RequirementAgent()
+        multiline_req = """
+要件1: ユーザー認証機能
+要件2: データ暗号化
+要件3: ログ記録
+詳細:
+- セキュアな実装
+- 高速な処理
+        """
+
+        agent.set_initial_requirement(multiline_req)
+        state = agent._get_initial_state()
+
+        # 複数行でも保存される
+        assert "session_id" in state
+        assert state["state"] == "INIT"
+
+    @patch.object(RequirementAgent, "execute_llm_task")
+    def test_analyze_requirement_with_llm_timeout_simulation(self, mock_execute):
+        """LLMタイムアウトシミュレーション（遅延レスポンス）"""
+        import time
+
+        def slow_response(*args, **kwargs):
+            time.sleep(0.1)  # 小さい遅延をシミュレート
+            return json.dumps({
+                "summary": "Slow response",
+                "features": ["Feature after delay"],
+                "constraints": [],
+                "acceptance_criteria": []
+            })
+
+        mock_execute.side_effect = slow_response
+
+        agent = RequirementAgent()
+        result = agent.analyze_requirement("遅延テスト要件")
+
+        # 遅延があっても結果が返る
+        assert "summary" in result
+        assert result["summary"] == "Slow response"
+
+    @patch.object(RequirementAgent, "execute_llm_task")
+    def test_analyze_requirement_with_extremely_long_text(self, mock_execute):
+        """極端に長いテキストの要件分析"""
+        mock_execute.return_value = json.dumps({
+            "summary": "Long text processed",
+            "features": ["Handle large inputs"],
+            "constraints": ["Memory efficient"],
+            "acceptance_criteria": ["No truncation"]
+        })
+
+        agent = RequirementAgent()
+        # 10000文字の長いテキスト
+        long_text = "要件: " + "a" * 10000
+
+        result = agent.analyze_requirement(long_text)
+
+        # 長いテキストでも処理される
+        assert "summary" in result
+        assert mock_execute.called
+
