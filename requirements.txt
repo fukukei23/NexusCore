@@ -51,6 +51,7 @@ httpx>=0.25.0,<1.0.0
 httpcore>=1.0.0,<2.0.0
 requests>=2.31.0,<3.0.0  # For Slack notifications
 python-dotenv>=1.0.0,<2.0.0
+psutil>=5.9.0,<6.0.0  # System monitoring and resource management
 
 termcolor>=2.4.0,<3.0.0
 pyyaml>=6.0.0,<7.0.0  # For test strategy config and constitution file

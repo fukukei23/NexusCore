@@ -10,51 +10,116 @@ on:
       - main
 
 jobs:
+  # ============================================================================
+  # Security Scan (Bandit) / セキュリティスキャン（Bandit）
+  # ============================================================================
+  security-scan:
+    name: Security Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Bandit
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit[toml]
+
+      - name: Run Bandit security scan
+        run: |
+          # Scan src/ directory recursively
+          # -r: recursive scan
+          # -f json: generate JSON report
+          # -o: output file
+          # -ll: report Low+ severity issues
+          bandit -r src/ -f json -o bandit-report.json -ll || true
+
+          # Display results in terminal
+          echo "=== Bandit Security Scan Results ==="
+          bandit -r src/ -ll
+
+      - name: Upload Bandit report as artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+          retention-days: 30
+
+      - name: Check for critical vulnerabilities
+        run: |
+          # Fail CI if High/Medium severity issues are found
+          bandit -r src/ -lll -f json -o bandit-critical.json
+
+          # Count issues
+          ISSUE_COUNT=$(python -c "import json; data=json.load(open('bandit-critical.json')); print(len(data.get('results', [])))")
+
+          if [ "$ISSUE_COUNT" -gt 0 ]; then
+            echo "❌ Found $ISSUE_COUNT critical security issues"
+            bandit -r src/ -lll
+            exit 1
+          else
+            echo "✅ No critical security issues found"
+          fi
+
+  # ============================================================================
+  # Test and Coverage / テスト実行とカバレッジ測定
+  # ============================================================================
   test:
+    name: Run Tests
     runs-on: ubuntu-latest
     env:
-      OPENAI_API_KEY: dummy-key-for-tests # avoid import-time errors when tests instantiate OpenAI clients
+      # Dummy key to avoid import-time errors when tests instantiate OpenAI clients
+      OPENAI_API_KEY: dummy-key-for-tests
 
     strategy:
       matrix:
-        # ★★★ 修正点: 開発環境に合わせて3.12を追加 ★★★
+        # Test on Python 3.9-3.12 to match development environment
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install system deps (audio)
+      - name: Install system dependencies (audio)
         run: |
           sudo apt-get update
           sudo apt-get install -y libportaudio2
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # 開発用依存関係をインストール（pytest-cov を含む）
+          # Install dev dependencies (includes pytest-cov)
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
 
       - name: Run tests and generate coverage report
         run: |
-          # --cov=src で、srcフォルダ全体のカバレッジを測定
+          # --cov=src measures coverage for entire src folder
+          # --cov-report=xml generates XML report for Codecov
+          # --cov-report=term-missing shows missing lines
           python -m pytest --cov=src --cov-report=xml --cov-report=term-missing
 
       - name: Run webapp UI smoke tests
         run: |
           pytest -q tests/webapp/
 
-      # === Phase3 coverage (graph_builder / unified_analyzer / test_generator / tree_sitter_checker) ===
-      - name: Run Phase3 coverage report
+      - name: Generate Phase3 coverage report
         run: |
+          # graph_builder / unified_analyzer / test_generator / tree_sitter_checker
           make coverage-phase3
 
-      # === Comment Phase3 coverage summary on PR ===
       - name: Comment Phase3 coverage summary on PR
         if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
@@ -66,7 +131,6 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          # 以下も素晴らしい設定です。
           file: ./coverage.xml
           flags: unittests
           name: codecov-umbrella
