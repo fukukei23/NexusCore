@@ -8,10 +8,16 @@ Comprehensive Tests for guardian_agent.py
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
+import sys
+from unittest.mock import MagicMock
+
+# git モジュールをモック化（import 前に実行）
+sys.modules['git'] = MagicMock()
+
 import pytest
 import json
 import os
-from unittest.mock import Mock, patch, MagicMock, call
+from unittest.mock import Mock, patch, call
 from pathlib import Path
 
 from nexuscore.agents.guardian_agent import GuardianAgent
@@ -508,14 +514,176 @@ class TestGenerateCommitMessage:
 
 
 class TestReviewUnifiedDiff:
-    @pytest.mark.skip(reason="API signature mismatch - implementation uses different parameters")
     @patch.object(GuardianAgent, '_review_with_llm')
     @patch.object(GuardianAgent, '_summarize_diff_for_llm')
+    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
     def test_review_unified_diff_approve(
-        self, mock_summarize, mock_review_llm, guardian
+        self, mock_auto_reviewer_class, mock_summarize, mock_review_llm, guardian
     ):
         """ユニファイド差分のレビュー承認"""
-        pass
+        # 自動レビューのモック（APPROVE）
+        mock_auto_reviewer = Mock()
+        mock_auto_result = Mock()
+        mock_auto_result.decision.value = "APPROVE"
+        mock_auto_result.summary.return_value = "自動レビュー：問題なし"
+        mock_auto_result.has_errors = False
+        mock_auto_result.has_warnings = False
+        mock_auto_result.issues = []
+        mock_auto_reviewer.review_unified_diff.return_value = mock_auto_result
+        mock_auto_reviewer_class.return_value = mock_auto_reviewer
+
+        # diff要約のモック
+        mock_summarize.return_value = "変更ファイル数: 1\n変更ブロック数: 2"
+
+        # LLMレビューのモック（APPROVE）
+        mock_review_llm.return_value = {"decision": "APPROVE", "reason": "良好なコード"}
+
+        diff_text = """--- a/test.py
++++ b/test.py
+@@ -1,1 +1,2 @@
+-old line
++new line 1
++new line 2"""
+
+        result = guardian.review_unified_diff(diff_text)
+
+        assert result["decision"] == "APPROVE"
+        assert "auto_review" in result
+        mock_auto_reviewer_class.assert_called_once_with(project_name="nexuscore")
+        mock_summarize.assert_called_once()
+        mock_review_llm.assert_called_once()
+
+    @patch('nexuscore.agents.guardian_agent.ReviewDecision')
+    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
+    def test_review_unified_diff_auto_reject(
+        self, mock_auto_reviewer_class, mock_review_decision, guardian
+    ):
+        """自動レビューでREJECTされる場合"""
+        # ReviewDecisionをモック
+        from enum import Enum
+        class MockReviewDecision(Enum):
+            APPROVE = "APPROVE"
+            REJECT = "REJECT"
+            MANUAL_REVIEW = "MANUAL_REVIEW"
+
+        # ReviewDecision.REJECT を MockReviewDecision.REJECT に設定
+        mock_review_decision.REJECT = MockReviewDecision.REJECT
+        mock_review_decision.MANUAL_REVIEW = MockReviewDecision.MANUAL_REVIEW
+
+        # 自動レビューのモック（REJECT）
+        mock_auto_reviewer = Mock()
+        mock_auto_result = Mock()
+
+        mock_auto_result.decision = MockReviewDecision.REJECT
+        mock_auto_result.summary.return_value = "致命的なエラー検出"
+        mock_auto_result.has_errors = True
+        mock_auto_result.has_warnings = False
+        mock_auto_result.issues = [{"type": "error", "message": "Test error"}]
+        mock_auto_reviewer.review_unified_diff.return_value = mock_auto_result
+        mock_auto_reviewer_class.return_value = mock_auto_reviewer
+
+        diff_text = "--- a/test.py\n+++ b/test.py\n@@ -1 +1 @@\n-old\n+new"
+
+        result = guardian.review_unified_diff(diff_text)
+
+        assert result["decision"] == "REJECT"
+        assert "自動レビューで拒否" in result["reason"]
+
+    @patch.object(GuardianAgent, '_review_with_llm')
+    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
+    def test_review_unified_diff_manual_review(
+        self, mock_auto_reviewer_class, mock_review_llm, guardian
+    ):
+        """自動レビューでMANUAL_REVIEWになる場合"""
+        # 自動レビューのモック（MANUAL_REVIEW）
+        mock_auto_reviewer = Mock()
+        mock_auto_result = Mock()
+
+        from enum import Enum
+        class MockReviewDecision(Enum):
+            APPROVE = "APPROVE"
+            REJECT = "REJECT"
+            MANUAL_REVIEW = "MANUAL_REVIEW"
+
+        # decision を Enum 値として設定（valueは自動的に "MANUAL_REVIEW" になる）
+        mock_auto_result.decision = MockReviewDecision.MANUAL_REVIEW
+        mock_auto_result.summary.return_value = "警告あり"
+        mock_auto_result.has_errors = False
+        mock_auto_result.has_warnings = True
+        mock_auto_result.issues = []
+        mock_auto_reviewer.review_unified_diff.return_value = mock_auto_result
+        mock_auto_reviewer_class.return_value = mock_auto_reviewer
+
+        # LLMレビューのモック（MANUAL_REVIEW）
+        mock_review_llm.return_value = {"decision": "MANUAL_REVIEW", "reason": "要確認"}
+
+        diff_text = "--- a/test.py\n+++ b/test.py\n@@ -1 +1 @@\n-old\n+new"
+
+        result = guardian.review_unified_diff(diff_text)
+
+        assert result["decision"] == "MANUAL_REVIEW"
+
+    def test_summarize_diff_for_llm_short(self, guardian):
+        """短いdiffの要約"""
+        diff_text = """--- a/test.py
++++ b/test.py
+@@ -1,3 +1,4 @@
+ def func():
++    # New comment
+     return 1"""
+
+        summary = guardian._summarize_diff_for_llm(diff_text)
+
+        assert "変更ファイル数: 1" in summary
+        assert "変更ブロック数: 1" in summary
+        assert "Diff プレビュー" in summary
+
+    def test_summarize_diff_for_llm_long(self, guardian):
+        """長いdiff（50行超）の要約"""
+        # 60行のdiffを生成
+        diff_lines = ["--- a/test.py", "+++ b/test.py"]
+        for i in range(60):
+            diff_lines.append(f"+新しい行 {i}")
+
+        diff_text = "\n".join(diff_lines)
+        summary = guardian._summarize_diff_for_llm(diff_text)
+
+        assert "変更ファイル数: 1" in summary
+        assert "残り 12 行" in summary  # 62行 - 50行 = 12行
+
+    @patch.object(GuardianAgent, 'execute_llm_task')
+    def test_review_with_llm_success(self, mock_llm, guardian):
+        """LLMレビュー成功"""
+        mock_llm.return_value = json.dumps({
+            "decision": "APPROVE",
+            "reason": "コード品質良好"
+        })
+
+        diff_summary = "変更ファイル数: 1"
+        result = guardian._review_with_llm(diff_summary)
+
+        assert result["decision"] == "APPROVE"
+        assert result["reason"] == "コード品質良好"
+        mock_llm.assert_called_once()
+
+    @patch.object(GuardianAgent, 'execute_llm_task')
+    def test_review_with_llm_error(self, mock_llm, guardian):
+        """LLMレビュー失敗時のエラーハンドリング"""
+        mock_llm.side_effect = Exception("LLM API error")
+
+        diff_summary = "変更ファイル数: 1"
+        result = guardian._review_with_llm(diff_summary)
+
+        assert result["decision"] == "MANUAL_REVIEW"
+        assert "LLM レビューエラー" in result["reason"]
+
+    def test_generate_diff_summary_missing_params(self, guardian):
+        """パラメータ不足時のエラー処理"""
+        # before_codeのみ指定（after_codeなし）
+        result = guardian.generate_diff_summary(before_code="old code")
+
+        assert "失敗" in result
+        assert "before_code または after_code が指定されていません" in result
 
 
 # ============================================================================
@@ -524,20 +692,45 @@ class TestReviewUnifiedDiff:
 
 
 class TestGenerateDiffSummary:
-    @pytest.mark.skip(reason="API signature mismatch - implementation uses different parameters")
-    @patch('nexuscore.agents.guardian_agent.GitController')
-    def test_generate_diff_summary_single_file(self, mock_git_class, guardian):
+    @patch.object(GuardianAgent, 'execute_llm_task')
+    def test_generate_diff_summary_single_file(self, mock_llm, guardian):
         """単一ファイル差分のサマリー生成"""
-        pass
+        mock_llm.return_value = "- コードが簡潔化されました\n- 可読性が向上しました"
 
-    @pytest.mark.skip(reason="API signature mismatch - implementation uses different parameters")
-    @patch('nexuscore.agents.guardian_agent.GitController')
+        before_code = "def old_func(): return 1"
+        after_code = "def new_func():\n    return 1"
+
+        result = guardian.generate_diff_summary(
+            before_code=before_code,
+            after_code=after_code,
+            model="gpt-4.1"
+        )
+
+        assert isinstance(result, str)
+        assert "簡潔化" in result
+        mock_llm.assert_called_once()
+
     @patch.object(GuardianAgent, '_generate_multi_file_diff_summary')
     def test_generate_diff_summary_multi_file(
-        self, mock_multi, mock_git_class, guardian
+        self, mock_multi, guardian
     ):
         """複数ファイル差分のサマリー生成"""
-        pass
+        mock_multi.return_value = {
+            "file1.py": "- 改善点1",
+            "file2.py": "- 改善点2"
+        }
+
+        file_diffs = {
+            "file1.py": {"before": "old code 1", "after": "new code 1"},
+            "file2.py": {"before": "old code 2", "after": "new code 2"},
+        }
+
+        result = guardian.generate_diff_summary(file_diffs=file_diffs)
+
+        assert isinstance(result, dict)
+        assert "file1.py" in result
+        assert "file2.py" in result
+        mock_multi.assert_called_once_with(file_diffs, None, "gpt-4.1")
 
 
 # ============================================================================
@@ -602,3 +795,174 @@ class TestIntegrationScenarios:
 
         assert len(budget_calls) == 3
         assert budget_calls == ["step1", "step2", "step3"]
+
+
+class TestGuardianAdvancedEdgeCases:
+    """より深いエッジケースと統合シナリオ"""
+
+    @patch.object(GuardianAgent, "execute_llm_task")
+    @patch('nexuscore.agents.guardian_agent.ReviewDecision')
+    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
+    def test_review_unified_diff_with_malformed_diff(
+        self, mock_auto_reviewer_class, mock_review_decision, mock_execute, guardian
+    ):
+        """不正な形式のdiffテキストの処理"""
+        from enum import Enum
+
+        class MockReviewDecision(Enum):
+            APPROVE = "APPROVE"
+            REJECT = "REJECT"
+            MANUAL_REVIEW = "MANUAL_REVIEW"
+
+        mock_review_decision.MANUAL_REVIEW = MockReviewDecision.MANUAL_REVIEW
+        mock_auto_reviewer = MagicMock()
+        mock_auto_reviewer_class.return_value = mock_auto_reviewer
+        mock_auto_result = MagicMock()
+        mock_auto_result.decision = MockReviewDecision.MANUAL_REVIEW
+        mock_auto_result.reason = "Malformed diff requires manual review"
+        mock_auto_reviewer.review_diff.return_value = mock_auto_result
+
+        # LLMのモック設定
+        mock_execute.return_value = json.dumps({
+            "decision": "MANUAL_REVIEW",
+            "reason": "Malformed diff format"
+        })
+
+        # 不正な形式のdiff（diffヘッダーが欠けている）
+        malformed_diff = """
+some random text
++++ added line
+--- removed line
+this is not a proper diff
+"""
+
+        result = guardian.review_unified_diff(malformed_diff, "test_project")
+
+        # エラーなく処理され、何らかの決定が返る
+        assert "decision" in result
+        assert "reason" in result
+
+    @patch.object(GuardianAgent, "execute_llm_task")
+    @patch('nexuscore.agents.guardian_agent.ReviewDecision')
+    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
+    def test_review_unified_diff_with_very_large_diff(
+        self, mock_auto_reviewer_class, mock_review_decision, mock_execute, guardian
+    ):
+        """非常に大きなdiffの処理（50行以上）"""
+        from enum import Enum
+
+        class MockReviewDecision(Enum):
+            APPROVE = "APPROVE"
+            REJECT = "REJECT"
+            MANUAL_REVIEW = "MANUAL_REVIEW"
+
+        mock_review_decision.MANUAL_REVIEW = MockReviewDecision.MANUAL_REVIEW
+        mock_auto_reviewer = MagicMock()
+        mock_auto_reviewer_class.return_value = mock_auto_reviewer
+        mock_auto_result = MagicMock()
+        mock_auto_result.decision = MockReviewDecision.MANUAL_REVIEW
+        mock_auto_result.reason = "Large diff requires manual review"
+        mock_auto_reviewer.review_diff.return_value = mock_auto_result
+
+        # LLMのモック設定
+        mock_execute.return_value = json.dumps({
+            "decision": "APPROVE",
+            "reason": "Changes look good despite size"
+        })
+
+        # 100行以上の大きなdiffを作成
+        large_diff = "diff --git a/test.py b/test.py\n"
+        large_diff += "+++ b/test.py\n"
+        large_diff += "--- a/test.py\n"
+        for i in range(100):
+            large_diff += f"+added line {i}\n"
+
+        result = guardian.review_unified_diff(large_diff, "test_project")
+
+        # 大きなdiffでも処理される（要約される）
+        assert "decision" in result
+        # LLMが呼び出される（大きなdiffなので）
+        assert mock_execute.called
+
+    @patch.object(GuardianAgent, "execute_llm_task")
+    @patch('nexuscore.agents.guardian_agent.ReviewDecision')
+    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
+    def test_review_unified_diff_with_multiple_file_types(
+        self, mock_auto_reviewer_class, mock_review_decision, mock_execute, guardian
+    ):
+        """複数のファイルタイプを含むdiffの処理"""
+        from enum import Enum
+
+        class MockReviewDecision(Enum):
+            APPROVE = "APPROVE"
+            REJECT = "REJECT"
+            MANUAL_REVIEW = "MANUAL_REVIEW"
+
+        mock_review_decision.APPROVE = MockReviewDecision.APPROVE
+        mock_auto_reviewer = MagicMock()
+        mock_auto_reviewer_class.return_value = mock_auto_reviewer
+        mock_auto_result = MagicMock()
+        mock_auto_result.decision = MockReviewDecision.APPROVE
+        mock_auto_result.reason = "All changes are safe"
+        mock_auto_reviewer.review_diff.return_value = mock_auto_result
+
+        # LLMのモック設定
+        mock_execute.return_value = json.dumps({
+            "decision": "APPROVE",
+            "reason": "All file types processed successfully"
+        })
+
+        # Python, JavaScript, JSONファイルを含むdiff
+        multi_type_diff = """diff --git a/app.py b/app.py
++++ b/app.py
+--- a/app.py
++def new_function():
++    return True
+
+diff --git a/config.json b/config.json
++++ b/config.json
+--- a/config.json
++  "new_setting": true
+
+diff --git a/script.js b/script.js
++++ b/script.js
+--- a/script.js
++function newFunc() { return true; }
+"""
+
+        result = guardian.review_unified_diff(multi_type_diff, "test_project")
+
+        # 複数のファイルタイプでも処理できる
+        assert "decision" in result
+        assert result["decision"] == "APPROVE"
+
+    def test_generate_diff_summary_with_empty_code(self, guardian):
+        """空のコードでのdiff要約生成"""
+        result = guardian.generate_diff_summary(
+            before_code="",
+            after_code="def new_func():\n    pass",
+            file_diffs={},
+            semantic_diffs={},
+            model="test-model"
+        )
+
+        # 空のbeforeでも処理できる
+        assert "summary" in result or isinstance(result, str)
+
+    @patch.object(GuardianAgent, "execute_llm_task")
+    def test_review_with_llm_error_handling(self, mock_execute, guardian):
+        """LLMレビュー中のエラー処理"""
+        # LLMが不正なJSONを返すケース
+        mock_execute.return_value = "This is not valid JSON"
+
+        diff_summary = {"changes": "test changes"}
+        auto_review = {"decision": "MANUAL_REVIEW", "reason": "Test"}
+
+        # エラーが発生してもクラッシュしない
+        try:
+            result = guardian._review_with_llm(diff_summary, auto_review)
+            # 何らかの結果が返る（デフォルト値またはエラー情報）
+            assert result is not None
+        except Exception as e:
+            # 例外が発生しても適切に処理される
+            assert "JSON" in str(e) or "parse" in str(e).lower()

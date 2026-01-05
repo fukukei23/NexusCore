@@ -6,7 +6,7 @@ import logging
 import os
 from typing import Dict, Any
 
-import patch_ng as patch  # python-patch-ng ライブラリを使用
+import patch  # python-patch ライブラリを使用
 
 
 class PatchApplier:
