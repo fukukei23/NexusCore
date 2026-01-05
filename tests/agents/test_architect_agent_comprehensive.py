@@ -16,10 +16,30 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-# 依存モジュールをモック
-sys.modules['nexuscore.llm.llm_router'] = MagicMock()
-sys.modules['nexuscore.core.retry_utils'] = MagicMock()
-sys.modules['nexuscore.core.errors'] = MagicMock()
+
+@pytest.fixture(autouse=True)
+def mock_dependencies():
+    """各テストの前後で依存モジュールをモック化/復元（テスト分離のため）"""
+    # テスト前：元の状態を保存してモック化
+    original_modules = {
+        'nexuscore.llm.llm_router': sys.modules.get('nexuscore.llm.llm_router'),
+        'nexuscore.core.retry_utils': sys.modules.get('nexuscore.core.retry_utils'),
+        'nexuscore.core.errors': sys.modules.get('nexuscore.core.errors'),
+    }
+
+    sys.modules['nexuscore.llm.llm_router'] = MagicMock()
+    sys.modules['nexuscore.core.retry_utils'] = MagicMock()
+    sys.modules['nexuscore.core.errors'] = MagicMock()
+
+    yield  # ← ここでテストが実行される
+
+    # テスト後：元の状態に復元
+    for module_name, original_module in original_modules.items():
+        if original_module is None:
+            sys.modules.pop(module_name, None)
+        else:
+            sys.modules[module_name] = original_module
+
 
 try:
     from nexuscore.agents.architect_agent import ArchitectAgent

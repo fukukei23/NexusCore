@@ -8,11 +8,17 @@ Comprehensive Tests for constitutional_council_agent.py
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
+import sys
+from unittest.mock import MagicMock
+
+# Flask をモック化（import 前に実行）
+sys.modules['flask'] = MagicMock()
+
 import pytest
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock, mock_open, call
+from unittest.mock import Mock, patch, mock_open, call
 from typing import Dict, Any
 
 from nexuscore.agents.constitutional_council_agent import ConstitutionalCouncilAgent
@@ -30,13 +36,12 @@ def temp_policy_dir(tmp_path):
     amendments_dir = tmp_path / "amendments"
     amendments_dir.mkdir()
 
-    # 初期ポリシーを作成
+    # 初期ポリシーを作成（新API構造: policy_id/description/rules）
     initial_policies = [
         {
-            "id": "P001",
-            "category": "testing",
-            "rule": "All code must have tests",
-            "severity": "high",
+            "policy_id": "P001",
+            "description": "All code must have tests",
+            "rules": ["Write unit tests", "Maintain test coverage"],
         }
     ]
     policy_path.write_text(json.dumps(initial_policies, indent=2))
@@ -88,7 +93,7 @@ class TestConstitutionalCouncilAgentInit:
         # 実装では_load_policies()メソッドでポリシーを読み込む
         policies = agent._load_policies()
         assert len(policies) == 1
-        assert policies[0]["id"] == "P001"
+        assert policies[0]["policy_id"] == "P001"
 
     def test_init_creates_amendments_dir(self, tmp_path):
         """修正案ディレクトリが存在しない場合は作成"""
@@ -126,16 +131,15 @@ class TestConstitutionalCouncilAgentInit:
 
 class TestLoadPolicies:
     def test_load_policies_success(self, agent):
-        """ポリシーのロード成功"""
+        """ポリシーのロード成功 - 新API構造"""
         policies = agent._load_policies()
 
         assert len(policies) == 1
-        assert policies[0]["id"] == "P001"
-        assert policies[0]["category"] == "testing"
+        assert policies[0]["policy_id"] == "P001"
+        assert policies[0]["description"] == "All code must have tests"
 
-    @pytest.mark.skip(reason="API signature mismatch")
     def test_load_policies_invalid_json(self, tmp_path):
-        """無効なJSONファイルの処理"""
+        """無効なJSONファイルの処理 - RuntimeErrorを発生"""
         policy_path = tmp_path / "invalid.json"
         policy_path.write_text("This is not JSON")
 
@@ -144,7 +148,9 @@ class TestLoadPolicies:
             amendments_dir=str(tmp_path / "amendments"),
         )
 
-        assert agent._load_policies() == []
+        # 現在の実装はRuntimeErrorを発生させる
+        with pytest.raises(RuntimeError, match="Failed to load current policies"):
+            agent._load_policies()
 
     def test_load_policies_file_not_found(self, tmp_path):
         """ファイルが見つからない場合"""
@@ -203,41 +209,36 @@ class TestSavePolicies:
 
 
 class TestValidateAmendment:
-    @pytest.mark.skip(reason="API signature mismatch - implementation uses different amendment structure")
     def test_validate_amendment_valid(self, agent):
-        """有効な修正案の検証"""
+        """有効な修正案の検証 - 現在のAPI構造"""
+        # 現在の実装が期待する構造: policy_id, description, rules
         proposal = {
-            "action": "add",
-            "policy": {
-                "id": "P002",
-                "category": "testing",
-                "rule": "Test all edge cases",
-                "severity": "high",
-            },
-            "rationale": "Improve test coverage",
+            "policy_id": "P002",
+            "description": "Test all edge cases",
+            "rules": ["Always write tests", "Check edge cases"],
         }
 
         is_valid = agent._validate_amendment(proposal)
 
         assert is_valid is True
 
-    def test_validate_amendment_missing_action(self, agent):
-        """actionフィールドが欠けている修正案"""
+    def test_validate_amendment_unknown_keys(self, agent):
+        """未知のキーを含む修正案"""
         proposal = {
-            "policy": {"id": "P002", "rule": "Some rule"},
-            "rationale": "Some reason",
+            "policy_id": "P002",
+            "description": "Test",
+            "unknown_key": "invalid",  # 許可されていないキー
         }
 
         is_valid = agent._validate_amendment(proposal)
 
         assert is_valid is False
 
-    def test_validate_amendment_invalid_action(self, agent):
-        """無効なaction値"""
+    def test_validate_amendment_delete_with_other_keys(self, agent):
+        """delete_policy_idと他のキーが混在"""
         proposal = {
-            "action": "invalid_action",
-            "policy": {"id": "P002"},
-            "rationale": "reason",
+            "delete_policy_id": "P002",
+            "description": "Should not be here",  # delete時は他のキー不可
         }
 
         is_valid = agent._validate_amendment(proposal)
@@ -274,16 +275,15 @@ class TestValidateAmendment:
 
 
 class TestInvokeLLMWithRetry:
-    @pytest.mark.skip(reason="API signature mismatch - execute_llm_task uses as_json parameter")
     @patch.object(ConstitutionalCouncilAgent, 'execute_llm_task')
     def test_invoke_llm_success(self, mock_llm, agent):
-        """LLM呼び出し成功"""
+        """LLM呼び出し成功 - as_json=Falseパラメータ付き"""
         mock_llm.return_value = "LLM response"
 
         result = agent._invoke_llm_with_retry("test prompt")
 
         assert result == "LLM response"
-        mock_llm.assert_called_once_with("test prompt")
+        mock_llm.assert_called_once_with("test prompt", as_json=False)
 
     @patch.object(ConstitutionalCouncilAgent, 'execute_llm_task')
     @patch('time.sleep')
@@ -319,21 +319,15 @@ class TestInvokeLLMWithRetry:
 
 
 class TestReviewAndAmend:
-    @pytest.mark.skip(reason="API signature mismatch - amendment structure incompatible")
     @patch.object(ConstitutionalCouncilAgent, 'execute_llm_task')
     def test_review_and_amend_creates_proposal(
         self, mock_llm, agent, postmortem_report, knowledge_brief, temp_policy_dir
     ):
-        """修正案の作成"""
+        """修正案の作成 - 新API構造（policy_id/description/rules）"""
         proposal_json = json.dumps({
-            "action": "add",
-            "policy": {
-                "id": "P002",
-                "category": "testing",
-                "rule": "Test edge cases",
-                "severity": "high",
-            },
-            "rationale": "Based on postmortem findings",
+            "policy_id": "P002",
+            "description": "Test edge cases thoroughly",
+            "rules": ["Test all edge cases", "Use parametrized tests"],
         })
         mock_llm.return_value = proposal_json
 
@@ -377,22 +371,16 @@ class TestReviewAndAmend:
 
 
 class TestApproveAmendment:
-    @pytest.mark.skip(reason="API signature mismatch")
     def test_approve_amendment_add_policy(self, agent, temp_policy_dir):
-        """修正案の承認（ポリシー追加）"""
+        """修正案の承認（ポリシー追加） - 新API構造"""
         # 修正案ファイルを作成
         amendments_dir = Path(temp_policy_dir["amendments_dir"])
         pending_file = amendments_dir / "pending_test.json"
 
         proposal = {
-            "action": "add",
-            "policy": {
-                "id": "P002",
-                "category": "security",
-                "rule": "No hardcoded secrets",
-                "severity": "critical",
-            },
-            "rationale": "Security improvement",
+            "policy_id": "P002",
+            "description": "No hardcoded secrets",
+            "rules": ["Use environment variables", "No credentials in code"],
         }
         pending_file.write_text(json.dumps(proposal, indent=2))
 
@@ -401,30 +389,25 @@ class TestApproveAmendment:
 
         assert success is True
         assert len(agent._load_policies()) == 2
-        assert agent._load_policies()[1]["id"] == "P002"
+        assert agent._load_policies()[1]["policy_id"] == "P002"
 
         # pending ファイルが削除されたことを確認
         assert not pending_file.exists()
 
-        # approved ファイルが作成されたことを確認
-        approved_files = list(amendments_dir.glob("approved_*.json"))
-        assert len(approved_files) == 1
+        # enacted ファイルが作成されたことを確認
+        enacted_files = list(amendments_dir.glob("enacted_*.json"))
+        assert len(enacted_files) == 1
 
-    @pytest.mark.skip(reason="API signature mismatch")
     def test_approve_amendment_modify_policy(self, agent, temp_policy_dir):
-        """修正案の承認（ポリシー変更）"""
+        """修正案の承認（ポリシー変更） - 新API構造"""
         amendments_dir = Path(temp_policy_dir["amendments_dir"])
         pending_file = amendments_dir / "pending_test.json"
 
+        # 既存のP001を変更
         proposal = {
-            "action": "modify",
-            "policy": {
-                "id": "P001",
-                "category": "testing",
-                "rule": "All code must have comprehensive tests",
-                "severity": "critical",
-            },
-            "rationale": "Strengthen testing requirements",
+            "policy_id": "P001",
+            "description": "All code must have comprehensive tests",
+            "rules": ["Write unit tests", "Write integration tests", "Achieve 80% coverage"],
         }
         pending_file.write_text(json.dumps(proposal, indent=2))
 
@@ -432,19 +415,18 @@ class TestApproveAmendment:
         success = agent.approve_amendment(pending_file)
 
         assert success is True
-        assert agent._load_policies()[0]["rule"] == "All code must have comprehensive tests"
-        assert agent._load_policies()[0]["severity"] == "critical"
+        policies = agent._load_policies()
+        assert policies[0]["policy_id"] == "P001"
+        assert policies[0]["description"] == "All code must have comprehensive tests"
+        assert len(policies[0]["rules"]) == 3
 
-    @pytest.mark.skip(reason="API signature mismatch")
     def test_approve_amendment_remove_policy(self, agent, temp_policy_dir):
-        """修正案の承認（ポリシー削除）"""
+        """修正案の承認（ポリシー削除） - 新API構造（delete_policy_id）"""
         amendments_dir = Path(temp_policy_dir["amendments_dir"])
         pending_file = amendments_dir / "pending_test.json"
 
         proposal = {
-            "action": "remove",
-            "policy": {"id": "P001"},
-            "rationale": "Policy no longer needed",
+            "delete_policy_id": "P001",
         }
         pending_file.write_text(json.dumps(proposal, indent=2))
 
@@ -549,11 +531,10 @@ class TestArchiveAmendment:
 
 class TestIntegrationScenarios:
     @patch.object(ConstitutionalCouncilAgent, 'execute_llm_task')
-    @pytest.mark.skip(reason="API signature mismatch")
     def test_full_amendment_workflow(
         self, mock_llm, temp_policy_dir, postmortem_report, knowledge_brief
     ):
-        """完全な修正案ワークフロー"""
+        """完全な修正案ワークフロー - 新API構造"""
         agent = ConstitutionalCouncilAgent(
             policy_path=temp_policy_dir["policy_path"],
             amendments_dir=temp_policy_dir["amendments_dir"],
@@ -561,14 +542,9 @@ class TestIntegrationScenarios:
 
         # 1. 修正案を作成
         proposal = {
-            "action": "add",
-            "policy": {
-                "id": "P002",
-                "category": "testing",
-                "rule": "Add integration tests",
-                "severity": "high",
-            },
-            "rationale": "Improve test coverage",
+            "policy_id": "P002",
+            "description": "Add integration tests",
+            "rules": ["Write integration tests", "Test API endpoints", "Test database interactions"],
         }
         mock_llm.return_value = json.dumps(proposal)
 
@@ -585,24 +561,18 @@ class TestIntegrationScenarios:
 
         assert success is True
         assert len(agent._load_policies()) == 2
-        assert agent._load_policies()[1]["id"] == "P002"
+        assert agent._load_policies()[1]["policy_id"] == "P002"
 
-    @pytest.mark.skip(reason="API signature mismatch")
     def test_modify_existing_policy_workflow(self, agent, temp_policy_dir):
-        """既存ポリシーの変更ワークフロー"""
+        """既存ポリシーの変更ワークフロー - 新API構造"""
         amendments_dir = Path(temp_policy_dir["amendments_dir"])
 
         # 変更修正案を作成
         pending_file = amendments_dir / "pending_modify.json"
         proposal = {
-            "action": "modify",
-            "policy": {
-                "id": "P001",
-                "category": "testing",
-                "rule": "All code must have 100% test coverage",
-                "severity": "critical",
-            },
-            "rationale": "Increase quality bar",
+            "policy_id": "P001",
+            "description": "All code must have 100% test coverage",
+            "rules": ["Write comprehensive tests", "Achieve 100% line coverage", "Test all edge cases"],
         }
         pending_file.write_text(json.dumps(proposal, indent=2))
 
@@ -610,20 +580,21 @@ class TestIntegrationScenarios:
         success = agent.approve_amendment(pending_file)
 
         assert success is True
-        assert agent._load_policies()[0]["rule"] == "All code must have 100% test coverage"
-        assert agent._load_policies()[0]["severity"] == "critical"
+        policies = agent._load_policies()
+        assert policies[0]["policy_id"] == "P001"
+        assert policies[0]["description"] == "All code must have 100% test coverage"
+        assert "Achieve 100% line coverage" in policies[0]["rules"]
 
-    @pytest.mark.skip(reason="API signature mismatch")
     def test_reject_and_resubmit_workflow(self, agent, temp_policy_dir):
-        """拒否後の再提出ワークフロー"""
+        """拒否後の再提出ワークフロー - 新API構造"""
         amendments_dir = Path(temp_policy_dir["amendments_dir"])
 
-        # 最初の修正案
+        # 最初の修正案（不十分）
         pending_file1 = amendments_dir / "pending_v1.json"
         proposal1 = {
-            "action": "add",
-            "policy": {"id": "P002", "rule": "Insufficient rule"},
-            "rationale": "Weak rationale",
+            "policy_id": "P002",
+            "description": "Insufficient rule",
+            "rules": ["Write tests"],  # 不十分な内容
         }
         pending_file1.write_text(json.dumps(proposal1))
 
@@ -634,14 +605,14 @@ class TestIntegrationScenarios:
         # 改善された修正案を再提出
         pending_file2 = amendments_dir / "pending_v2.json"
         proposal2 = {
-            "action": "add",
-            "policy": {
-                "id": "P002",
-                "category": "testing",
-                "rule": "Comprehensive test coverage required",
-                "severity": "high",
-            },
-            "rationale": "Detailed rationale with evidence",
+            "policy_id": "P002",
+            "description": "Comprehensive test coverage required",
+            "rules": [
+                "Write unit tests for all functions",
+                "Write integration tests for workflows",
+                "Achieve minimum 80% coverage",
+                "Document test cases",
+            ],
         }
         pending_file2.write_text(json.dumps(proposal2, indent=2))
 
@@ -650,3 +621,93 @@ class TestIntegrationScenarios:
 
         assert success is True
         assert len(agent._load_policies()) == 2
+        assert agent._load_policies()[1]["policy_id"] == "P002"
+
+
+class TestAdvancedEdgeCases:
+    """より深いエッジケースと統合シナリオ"""
+
+    def test_validate_amendment_empty_dict(self, agent):
+        """空のdictは「変更なし」として許可される"""
+        proposal = {}
+        is_valid = agent._validate_amendment(proposal)
+        assert is_valid is True
+
+    def test_validate_amendment_with_both_policy_id_and_delete(self, agent):
+        """policy_idとdelete_policy_idの両方がある場合は無効"""
+        proposal = {"policy_id": "P001", "delete_policy_id": "P002"}
+        is_valid = agent._validate_amendment(proposal)
+        assert is_valid is False
+
+    @patch.object(ConstitutionalCouncilAgent, "execute_llm_task")
+    def test_review_and_amend_with_code_block_wrapped_json(
+        self, mock_execute, agent, temp_policy_dir
+    ):
+        """コードブロックでラップされたJSONを含む提案の処理"""
+        # LLMが```json ... ```で囲まれた提案を返すケース
+        mock_execute.return_value = """```json
+{
+    "policy_id": "P003",
+    "description": "Code block wrapped policy",
+    "rules": ["Rule 1", "Rule 2"]
+}
+```"""
+        postmortem_report = {"incident": "Test failure", "root_cause": "Missing validation"}
+        knowledge_brief = {"lesson": "Add comprehensive validation"}
+
+        agent.review_and_amend(postmortem_report, knowledge_brief)
+
+        # LLMが呼び出されたことを確認（コードブロック付きJSONが処理される）
+        assert mock_execute.called
+
+    @patch.object(ConstitutionalCouncilAgent, "execute_llm_task")
+    def test_review_and_amend_with_multiple_policy_updates(
+        self, mock_execute, agent, temp_policy_dir
+    ):
+        """複数のポリシー更新を含む提案の処理"""
+        # LLMが複雑な提案を返すケース
+        mock_execute.return_value = json.dumps({
+            "policy_id": "P001",
+            "description": "Enhanced test coverage policy with strict requirements",
+            "rules": [
+                "All code must have tests",
+                "Minimum 90% coverage required",
+                "Integration tests mandatory",
+                "E2E tests for critical paths",
+            ]
+        })
+
+        postmortem_report = {"incident": "Production bug", "root_cause": "Insufficient testing"}
+        knowledge_brief = {"lesson": "Improve test requirements"}
+
+        agent.review_and_amend(postmortem_report, knowledge_brief)
+
+        # LLMが呼び出され、提案が保存されたことを確認
+        assert mock_execute.called
+        # 提案ファイルが作成される
+        amendments_dir = Path(temp_policy_dir["amendments_dir"])
+        pending_files = list(amendments_dir.glob("pending_*.json"))
+        assert len(pending_files) >= 1
+
+    def test_archive_amendment_with_special_characters_in_filename(
+        self, agent, temp_policy_dir
+    ):
+        """ファイル名に特殊文字を含む修正案のアーカイブ"""
+        amendments_dir = Path(temp_policy_dir["amendments_dir"])
+        archived_dir = amendments_dir / "archived"
+
+        # pending_* 形式のファイル名で特殊文字を含むファイルを作成
+        special_file = amendments_dir / "pending_特殊文字.json"
+        proposal = {"policy_id": "P999", "description": "Special chars", "rules": []}
+        special_file.write_text(json.dumps(proposal, indent=2))
+
+        # アーカイブ実行（enacted）
+        success = agent._archive_amendment(special_file, "enacted")
+
+        # 特殊文字を含むファイル名でもアーカイブされる
+        assert success is True
+        assert not special_file.exists()
+        # enacted_*.json ファイルがamendments_dirに作成される
+        enacted_files = list(amendments_dir.glob("enacted_*.json"))
+        assert len(enacted_files) == 1
+        assert "特殊文字" in enacted_files[0].name
