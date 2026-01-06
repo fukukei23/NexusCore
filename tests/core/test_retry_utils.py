@@ -188,20 +188,21 @@ class TestRetryDecorator:
 
         assert call_count == 1  # リトライせず即座に失敗
 
-    def test_invalid_model_output_error_not_retried(self):
-        """InvalidModelOutputError はリトライされないテスト"""
+    def test_invalid_model_output_error_is_retried(self):
+        """InvalidModelOutputError はリトライ可能（Spec 3.3.1）"""
         call_count = 0
 
-        @retry(max_retries=3, base_delay=0.1)
+        @retry(max_retries=2, base_delay=0.1)
         def invalid_output():
             nonlocal call_count
             call_count += 1
-            raise InvalidModelOutputError("Model returned invalid JSON")
+            if call_count < 2:
+                raise InvalidModelOutputError("Model returned invalid JSON")
+            return "success"
 
-        with pytest.raises(InvalidModelOutputError):
-            invalid_output()
-
-        assert call_count == 1  # リトライせず即座に失敗
+        result = invalid_output()
+        assert result == "success"
+        assert call_count == 2  # リトライ後に成功
 
     def test_sandbox_error_not_retried(self):
         """SandboxExecutionError はリトライされないテスト"""
@@ -475,3 +476,174 @@ class TestEdgeCases:
         # 元の例外が保持されていることを確認
         assert exc_info.value.__cause__ is not None
         assert isinstance(exc_info.value.__cause__, ValueError)
+
+
+class TestSpec33RetryControlPolicy:
+    """Spec 3.3: Retry / Failure Control Policy のテスト"""
+
+    def test_retryable_rate_limit(self):
+        """rate_limit はリトライ可能（3.3.1）"""
+        call_count = 0
+
+        @retry(max_retries=2, base_delay=0.1)
+        def rate_limit_func():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise ModelRateLimitError("Rate limit exceeded")
+            return "success"
+
+        result = rate_limit_func()
+        assert result == "success"
+        assert call_count == 2
+
+    def test_retryable_timeout(self):
+        """timeout はリトライ可能（3.3.1）"""
+        call_count = 0
+
+        @retry(max_retries=2, base_delay=0.1)
+        def timeout_func():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise ModelTimeoutError("Timeout")
+            return "success"
+
+        result = timeout_func()
+        assert result == "success"
+        assert call_count == 2
+
+    def test_retryable_connection(self):
+        """connection はリトライ可能（3.3.1）"""
+        call_count = 0
+
+        @retry(max_retries=2, base_delay=0.1)
+        def connection_func():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise ModelConnectionError("Connection failed")
+            return "success"
+
+        result = connection_func()
+        assert result == "success"
+        assert call_count == 2
+
+    def test_retryable_invalid_output(self):
+        """invalid_output はリトライ可能（3.3.1）"""
+        call_count = 0
+
+        @retry(max_retries=2, base_delay=0.1)
+        def invalid_output_func():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise InvalidModelOutputError("Invalid JSON")
+            return "success"
+
+        result = invalid_output_func()
+        assert result == "success"
+        assert call_count == 2
+
+    def test_non_retryable_sandbox(self):
+        """sandbox はリトライ不可（3.3.1）"""
+        call_count = 0
+
+        @retry(max_retries=3, base_delay=0.1)
+        def sandbox_func():
+            nonlocal call_count
+            call_count += 1
+            raise SandboxExecutionError("Sandbox failed")
+
+        with pytest.raises(SandboxExecutionError):
+            sandbox_func()
+
+        assert call_count == 1  # リトライせず即座に失敗
+
+    def test_non_retryable_patch_apply(self):
+        """patch_apply はリトライ不可（3.3.1）"""
+        from nexuscore.core.errors import PatchApplyError
+
+        call_count = 0
+
+        @retry(max_retries=3, base_delay=0.1)
+        def patch_func():
+            nonlocal call_count
+            call_count += 1
+            raise PatchApplyError("Patch failed")
+
+        with pytest.raises(PatchApplyError):
+            patch_func()
+
+        assert call_count == 1  # リトライせず即座に失敗
+
+    def test_non_retryable_unexpected(self):
+        """unexpected はリトライ禁止（3.3.4）"""
+        from nexuscore.core.errors import UnexpectedSystemError
+
+        call_count = 0
+
+        @retry(max_retries=3, base_delay=0.1)
+        def unexpected_func():
+            nonlocal call_count
+            call_count += 1
+            raise UnexpectedSystemError("Unexpected error")
+
+        with pytest.raises(UnexpectedSystemError):
+            unexpected_func()
+
+        assert call_count == 1  # リトライせず即座に失敗
+
+    def test_retry_finiteness_guarantee(self):
+        """リトライの有限性保証（3.3.2 SHALL要件）"""
+        call_count = 0
+
+        @retry(max_retries=2, base_delay=0.1)
+        def always_fail():
+            nonlocal call_count
+            call_count += 1
+            raise ModelRateLimitError("Always fail")
+
+        with pytest.raises(ModelRateLimitError):
+            always_fail()
+
+        # max_retries=2 なので、初回 + 2回リトライ = 3回試行で終了
+        assert call_count == 3
+        # 無限ループに陥らないことを確認（有限回数で終了）
+
+    def test_backoff_strategy_semantic_level(self):
+        """Backoff 戦略は意味論レベル（3.3.3）"""
+        call_times = []
+
+        @retry(max_retries=2, base_delay=0.2)
+        def backoff_test():
+            call_times.append(time.time())
+            raise ModelRateLimitError("Rate limit")
+
+        with pytest.raises(ModelRateLimitError):
+            backoff_test()
+
+        # 増加型待機戦略: リトライ回数の増加に応じて待機時間が延長される
+        assert len(call_times) == 3
+        delay_1 = call_times[1] - call_times[0]
+        delay_2 = call_times[2] - call_times[1]
+
+        # 意味論レベル: delay_2 > delay_1（段階的に延長）
+        assert delay_2 > delay_1, f"Backoff should increase: {delay_1:.3f}s -> {delay_2:.3f}s"
+
+    def test_logger_none_safety(self):
+        """logger が None でも落ちない（実装要件）"""
+        call_count = 0
+
+        @retry(max_retries=2, base_delay=0.1, logger_instance=None)
+        def logger_test():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise ModelTimeoutError("Timeout")
+            return "success"
+
+        # logger_instance=None でも動作する（内部でデフォルトロガーを使用）
+        result = logger_test()
+        assert result == "success"
+        assert call_count == 2

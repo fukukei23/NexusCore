@@ -108,15 +108,44 @@ def retry_with_context(
             except Exception as e:
                 last_exception = e
 
-                # 再試行対象の例外かチェック
+                # 3.3.1: リトライ可否の判断ルール
                 should_retry = False
-                if isinstance(e, retry_on):
-                    should_retry = True
-                elif isinstance(e, NexusCoreError):
-                    # NexusCore カスタム例外の場合は classify_error で判定
-                    error_class = classify_error(e)
-                    if error_class in ("rate_limit", "timeout", "connection"):
+                try:
+                    if isinstance(e, retry_on):
                         should_retry = True
+                    elif isinstance(e, NexusCoreError):
+                        # NexusCore カスタム例外の場合は classify_error で判定
+                        error_class = classify_error(e)
+                        # 3.3.4: Unexpected エラーのリトライ禁止
+                        if error_class == "unexpected":
+                            should_retry = False
+                        # 3.3.1: retryable: rate_limit, timeout, connection, invalid_output
+                        elif error_class in ("rate_limit", "timeout", "connection", "invalid_output"):
+                            should_retry = True
+                        # 3.3.1: non-retryable: sandbox, patch_apply
+                        else:
+                            should_retry = False
+                    else:
+                        # 一般的な例外の場合も分類を試みる
+                        error_class = classify_error(e)
+                        # 3.3.4: Unexpected エラーのリトライ禁止
+                        if error_class == "unexpected":
+                            should_retry = False
+                        # 3.3.1: retryable: rate_limit, timeout, connection, invalid_output
+                        elif error_class in ("rate_limit", "timeout", "connection", "invalid_output"):
+                            should_retry = True
+                        else:
+                            should_retry = False
+                except Exception as classification_error:
+                    # 3.4.2: 分類不能エラー時のフォールバックフック
+                    if logger_instance is not None:
+                        logger_instance.warning(
+                            f"Error classification failed during retry decision. "
+                            f"Original error: {type(e).__name__} - {str(e)[:200]}. "
+                            f"Classification error: {type(classification_error).__name__} - {str(classification_error)}. "
+                            f"Treating as non-retryable (unexpected)."
+                        )
+                    should_retry = False
 
                 # context に記録
                 if context:
