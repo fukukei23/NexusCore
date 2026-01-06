@@ -110,3 +110,34 @@
 - 修正が完了するまで実装フェーズへ進行しない
 
 ---
+
+### 2025-01-06: Phase 2.5 Review (v2) – CR-NEXUS-051 Error Classification
+
+**Context**: CR-NEXUS-051 エラー分類仕様について、v1 レビューで Reject された事項を解消した改訂 Spec (v1.1) に対する Phase 2.5 再レビューを実施した。
+
+**Decision**: 本仕様（v1.1）は **Approve** とする。実装フェーズへ進行可能。
+
+**Rationale**:
+- v1 レビューで指摘された High Severity 事項（retry/backoff 戦略の未定義、分類不能エラー時の最終挙動未定義）がすべて解消された
+- セクション 3.3（Retry / Failure Control Policy）で、リトライ可否の判断ルール、有限性保証、backoff 戦略が意味論レベルで定義された
+- セクション 3.4（Unclassifiable / Unexpected Error Handling）で、分類不能エラー時の最終フォールバックが必須定義として記載された
+- リトライの有限性が SHALL 要件として保証され、無限リトライループのリスクが排除された
+- Unexpected エラーのリトライ禁止が明示され、安全性が確保された
+
+**Alternatives Considered**:
+- Conditional Approve → 却下（High Severity 事項はすべて解消されており、条件付き承認の必要はない）
+- Reject → 却下（実装進行を阻害する問題は残存していない）
+
+**Review Result**: Approve (Phase 2.5 Independent Review v2)
+
+**Related Spec**:
+- `docs/spec/CR-NEXUS-051_ERROR_CLASSIFICATION_SPECIFICATION.md` (v1.1)
+- Review Packet (v1): `GOVERNANCE/review_packets/RP-NEXUS-051_PHASE25_INDEPENDENT_REVIEW.md`
+- Review Packet (v2): `GOVERNANCE/review_packets/RP-NEXUS-051_PHASE25_INDEPENDENT_REVIEW_v2.md`
+
+**Consequence**:
+- 本 Spec (v1.1) は実装フェーズへ進行可能
+- v1 レビューで Reject された事項は解消済み
+- 実装時は、セクション 3.3 および 3.4 の要件を遵守すること
+
+---
