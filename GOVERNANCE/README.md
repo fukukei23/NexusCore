@@ -6,6 +6,8 @@
 
 このディレクトリには、NexusCore プロジェクトのガバナンス運用に必要なテンプレートとプロトコルを格納します。
 
+**STIT 正本（SSOT）**: 本リポジトリにおける STIT（Spec & Test Driven Iteration）の正本は **GOVERNANCE/SPEC_TEST_DRIVEN_ITERATION.md（v1.2）** である。開発タスク開始前に必ず参照すること。
+
 **注意**: 現在のファイルは Bootstrap Draft（初期ドラフト）です。テンプレートGit（STIT+IRG registry）から正式版を移植する予定です。
 
 ## ディレクトリ構成
