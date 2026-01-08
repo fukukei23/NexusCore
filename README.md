@@ -473,6 +473,166 @@ else:
 
 ---
 
+## 🛡️ NexusCore安全運用ガイド
+
+NexusCoreでは、Claude Codeを使用した開発時に破壊的操作を防止し、コード品質を保証するための安全設定を導入しています。
+
+### 📋 安全設定ファイル
+
+プロジェクトルートに `.claude/settings.local.json` が配置されており、以下の安全制御が有効化されています：
+
+#### 🟢 許可される操作（自動実行）
+
+**Git基本操作:**
+```bash
+git init / add / commit / status / diff / log / branch / checkout / show / reflog
+```
+
+**Python開発ツール:**
+```bash
+python / python3 / pytest / pip install / pip list
+coverage / black / ruff / mypy / bandit
+```
+
+**NexusCore特化ツール:**
+```bash
+uvicorn / fastapi / playwright / redis-cli / celery / httpx
+```
+
+**Docker/WSL（読み取りのみ）:**
+```bash
+docker ps / logs / inspect
+docker-compose config
+wsl --status / --list
+```
+
+#### 🟡 確認が必要な操作（実行前に確認）
+
+**Git高度な操作:**
+```bash
+git push / pull / merge / rebase / reset / clean / stash
+```
+
+**ファイル削除:**
+```bash
+rm *.py
+rm requirements.txt / pyproject.toml / pytest.ini
+```
+
+**Docker/WSL実行:**
+```bash
+docker run / build
+docker-compose up / down
+wsl --shutdown
+```
+
+**データベース削除:**
+```bash
+DROP TABLE / TRUNCATE / DELETE FROM
+redis-cli FLUSHALL / FLUSHDB
+```
+
+#### 🔴 常に拒否される操作
+
+**破壊的Git操作:**
+```bash
+git push -f / --force
+git reset --hard
+git clean -fd / -fdx
+```
+
+**危険なファイル操作:**
+```bash
+rm -rf src/ / tests/ / .git/
+sudo rm
+```
+
+### 🔐 環境変数ファイルの保護
+
+`.env`, `.env.local`, `.env.production` などの環境変数ファイルは**読み取り専用**に設定されています：
+
+```bash
+# ✅ 許可: 読み取り
+cat .env
+echo $OPENAI_API_KEY
+
+# ❌ 拒否: 書き込み
+echo "NEW_KEY=xxx" > .env
+rm .env
+```
+
+**⚠️ 重要:** APIキーや機密情報の変更は手動で行ってください。
+
+### 🌿 ブランチ命名規則
+
+NexusCore開発では以下のブランチ命名規則を推奨します：
+
+```
+claude/nexuscore-quality-*    # Claude Code作業ブランチ（推奨）
+feature/*                      # 新機能開発
+fix/*                          # バグ修正
+test/*                         # テスト追加
+```
+
+**例:**
+```bash
+git checkout -b claude/nexuscore-quality-api-tests
+git checkout -b feature/self-healing-v2
+git checkout -b fix/coverage-report-bug
+```
+
+### ✅ 品質チェック自動実行
+
+以下の品質チェックがコミット/プッシュ時に自動実行されます：
+
+**Pre-commit（コミット前）:**
+```bash
+ruff check src/              # Lintチェック
+black --check src/           # コードフォーマット確認
+pytest tests/ -v --maxfail=1 # テスト実行（1つ失敗で停止）
+```
+
+**Pre-push（プッシュ前）:**
+```bash
+pytest tests/ --cov=src/nexuscore --cov-report=term-missing  # カバレッジ測定
+bandit -r src/ -ll                                             # セキュリティスキャン
+```
+
+**最小品質基準:**
+- テストカバレッジ: 80%以上
+- Pylint: 8.0/10以上
+- セキュリティ問題: なし
+
+### 🚨 トラブルシューティング
+
+**問題: git push が実行できない**
+```bash
+# 解決: 確認プロンプトで "yes" を入力
+git push origin feature/my-branch
+# → "この操作を実行しますか？ (yes/no):" と表示されたら yes を入力
+```
+
+**問題: .env ファイルを変更したい**
+```bash
+# 解決: エディタで手動編集（Claude Codeは読み取り専用）
+code .env  # または nano .env
+```
+
+**問題: docker コマンドが実行できない**
+```bash
+# 解決: 読み取りコマンド（docker ps など）は自動実行、実行コマンドは確認が必要
+docker ps           # ✅ 自動実行
+docker-compose up   # 🟡 確認必要
+```
+
+### 📚 関連ドキュメント
+
+- [`.claude/settings.local.json`](.claude/settings.local.json) - 安全設定の詳細
+- [開発ガイドライン](#開発ガイドライン) - コード品質基準
+- [品質保証](#-品質保証) - Guardian Agentによる多層品質ゲート
+
+---
+
 ## 🤝 コントリビューション
 
 コントリビューションを歓迎します！
