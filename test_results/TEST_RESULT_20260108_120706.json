@@ -1,0 +1,15 @@
+{
+  "timestamp": "20260108_120706",
+  "executed_at": "2026-01-08T12:07:06.283370",
+  "test_target": "tests/core/test_retry_utils.py tests/core/test_errors.py",
+  "result": {
+    "total": 87,
+    "passed": 87,
+    "failed": 0,
+    "skipped": 0,
+    "errors": 0,
+    "failed_tests": [],
+    "error_tests": [],
+    "execution_time": 0.08
+  }
+}

@@ -4,7 +4,7 @@ Tests for error classification system
 エラー分類ロジックの正確性を保証するテスト群（リトライ戦略の基盤）
 """
 import pytest
-from src.nexuscore.core.errors import (
+from nexuscore.core.errors import (
     NexusCoreError,
     ModelRateLimitError,
     ModelTimeoutError,

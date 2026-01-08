@@ -6,6 +6,7 @@ Tests for retry utilities with exponential backoff
 import pytest
 import time
 from unittest.mock import Mock, patch
+import nexuscore.core.retry_utils as retry_utils_module
 from nexuscore.core.retry_utils import (
     retry,
     retry_with_context,
@@ -18,6 +19,17 @@ from nexuscore.core.errors import (
     InvalidModelOutputError,
     SandboxExecutionError,
 )
+
+
+@pytest.fixture(autouse=True)
+def _no_real_sleep(monkeypatch):
+    """
+    テストが実時間に依存しないように、retry_utils 内の time.sleep を常に無効化する。
+
+    - テスト品質ルール（time.sleep 禁止）遵守
+    - CI でのフレーク（タイミング依存）抑制
+    """
+    monkeypatch.setattr(retry_utils_module.time, "sleep", lambda _: None)
 
 
 class TestRetryContext:
@@ -153,25 +165,18 @@ class TestRetryDecorator:
         assert call_count == 3  # max_retries=2 なので計3回試行 (0, 1, 2)
 
     def test_exponential_backoff_delays(self):
-        """指数バックオフの遅延が正しいことを確認"""
-        call_times = []
+        """指数バックオフの遅延（sleep呼び出し）が正しいことを確認"""
+        with patch.object(retry_utils_module.time, "sleep") as sleep_mock:
+            @retry(max_retries=2, base_delay=0.2)
+            def timed_function():
+                raise ModelTimeoutError("Timeout")
 
-        @retry(max_retries=2, base_delay=0.2)
-        def timed_function():
-            call_times.append(time.time())
-            raise ModelTimeoutError("Timeout")
+            with pytest.raises(ModelTimeoutError):
+                timed_function()
 
-        with pytest.raises(ModelTimeoutError):
-            timed_function()
-
-        # 遅延の確認（0.2s、0.4s の指数バックオフ）
-        assert len(call_times) == 3
-        delay_1 = call_times[1] - call_times[0]
-        delay_2 = call_times[2] - call_times[1]
-
-        # 許容誤差を考慮して検証
-        assert 0.15 < delay_1 < 0.35, f"First delay should be ~0.2s, got {delay_1:.3f}s"
-        assert 0.30 < delay_2 < 0.60, f"Second delay should be ~0.4s, got {delay_2:.3f}s"
+            # max_retries=2 なので sleep は 2 回（0.2, 0.4）
+            delays = [c.args[0] for c in sleep_mock.call_args_list]
+            assert delays == [pytest.approx(0.2), pytest.approx(0.4)]
 
     def test_non_retryable_error_not_retried(self):
         """リトライ対象外のエラーでは即座に失敗するテスト"""
@@ -423,25 +428,24 @@ class TestEdgeCases:
         assert call_count == 1  # リトライなし、1回だけ試行
 
     def test_very_short_delay(self):
-        """非常に短い遅延のテスト"""
+        """非常に短い遅延でも、sleep呼び出しが正しいことを確認"""
         call_count = 0
 
-        @retry(max_retries=2, base_delay=0.01)
-        def fast_retry():
-            nonlocal call_count
-            call_count += 1
-            if call_count < 3:
-                raise ModelTimeoutError("Timeout")
-            return "success"
+        with patch.object(retry_utils_module.time, "sleep") as sleep_mock:
+            @retry(max_retries=2, base_delay=0.01)
+            def fast_retry():
+                nonlocal call_count
+                call_count += 1
+                if call_count < 3:
+                    raise ModelTimeoutError("Timeout")
+                return "success"
 
-        start = time.time()
-        result = fast_retry()
-        duration = time.time() - start
+            result = fast_retry()
 
-        assert result == "success"
-        assert call_count == 3
-        # 総遅延時間が短いことを確認 (0.01 + 0.02 = 0.03秒)
-        assert duration < 0.5
+            assert result == "success"
+            assert call_count == 3
+            delays = [c.args[0] for c in sleep_mock.call_args_list]
+            assert delays == [pytest.approx(0.01), pytest.approx(0.02)]
 
     def test_mixed_retryable_and_non_retryable_errors(self):
         """リトライ可能・不可能エラーの混在テスト"""
@@ -612,24 +616,45 @@ class TestSpec33RetryControlPolicy:
         # 無限ループに陥らないことを確認（有限回数で終了）
 
     def test_backoff_strategy_semantic_level(self):
-        """Backoff 戦略は意味論レベル（3.3.3）"""
-        call_times = []
+        """Backoff 戦略は意味論レベル（3.3.3）: sleep が段階的に増える"""
+        with patch.object(retry_utils_module.time, "sleep") as sleep_mock:
+            @retry(max_retries=2, base_delay=0.2)
+            def backoff_test():
+                raise ModelRateLimitError("Rate limit")
 
-        @retry(max_retries=2, base_delay=0.2)
-        def backoff_test():
-            call_times.append(time.time())
-            raise ModelRateLimitError("Rate limit")
+            with pytest.raises(ModelRateLimitError):
+                backoff_test()
 
-        with pytest.raises(ModelRateLimitError):
-            backoff_test()
+            delays = [c.args[0] for c in sleep_mock.call_args_list]
+            assert len(delays) == 2
+            assert delays[1] > delays[0]
 
-        # 増加型待機戦略: リトライ回数の増加に応じて待機時間が延長される
-        assert len(call_times) == 3
-        delay_1 = call_times[1] - call_times[0]
-        delay_2 = call_times[2] - call_times[1]
 
-        # 意味論レベル: delay_2 > delay_1（段階的に延長）
-        assert delay_2 > delay_1, f"Backoff should increase: {delay_1:.3f}s -> {delay_2:.3f}s"
+class TestClassificationFailureFallback:
+    """分類処理が壊れてもリトライが暴走しないことを固定するテスト"""
+
+    def test_classify_error_raises_treated_as_non_retryable(self, monkeypatch):
+        """classify_error が例外を投げても、非リトライ扱いで即座に失敗する"""
+        def _broken_classify_error(_exc):  # noqa: ANN001 - テスト用
+            raise RuntimeError("classification boom")
+
+        monkeypatch.setattr(retry_utils_module, "classify_error", _broken_classify_error)
+
+        def always_timeout():
+            raise ModelTimeoutError("Timeout")
+
+        wrapped = retry_with_context(
+            always_timeout,
+            max_retries=2,
+            base_delay=0.2,
+            retry_on=(),  # isinstance(e, retry_on) を必ず False にする
+            context=None,  # 失敗時ログ用 classify_error 呼び出しを避ける
+        )
+
+        with patch.object(retry_utils_module.time, "sleep") as sleep_mock:
+            with pytest.raises(ModelTimeoutError):
+                wrapped()
+            assert sleep_mock.call_count == 0
 
     def test_logger_none_safety(self):
         """logger が None でも落ちない（実装要件）"""
