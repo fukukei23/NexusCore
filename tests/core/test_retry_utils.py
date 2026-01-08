@@ -188,11 +188,12 @@ class TestRetryDecorator:
 
         assert call_count == 1  # リトライせず即座に失敗
 
-    def test_invalid_model_output_error_not_retried(self):
-        """InvalidModelOutputError はリトライされないテスト"""
+    def test_invalid_model_output_error_is_retried(self):
+        """InvalidModelOutputError はリトライされるテスト（Spec v1.1.1: invalid_output は retryable）"""
         call_count = 0
+        max_retries = 3
 
-        @retry(max_retries=3, base_delay=0.1)
+        @retry(max_retries=max_retries, base_delay=0.1)
         def invalid_output():
             nonlocal call_count
             call_count += 1
@@ -201,7 +202,7 @@ class TestRetryDecorator:
         with pytest.raises(InvalidModelOutputError):
             invalid_output()
 
-        assert call_count == 1  # リトライせず即座に失敗
+        assert call_count == max_retries + 1  # 最大リトライ回数まで実行される（Spec v1.1.1: invalid_output は retryable）
 
     def test_sandbox_error_not_retried(self):
         """SandboxExecutionError はリトライされないテスト"""
