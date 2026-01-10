@@ -407,7 +407,7 @@ def pytest_ignore_collect(collection_path, config):
 
     # Only apply these restrictions during mutation testing
     if not os.environ.get("MUTMUT_MUTATION"):
-        return False
+        return None  # 通常時はフックを無効化し、デフォルト挙動に委ねる
 
     path_str = str(collection_path)
     file_name = collection_path.name
