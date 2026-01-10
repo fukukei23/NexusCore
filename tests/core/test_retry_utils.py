@@ -647,3 +647,320 @@ class TestSpec33RetryControlPolicy:
         result = logger_test()
         assert result == "success"
         assert call_count == 2
+
+
+# ==============================================================================
+# Batch 0 Mini: Characterization Tests with Mock Sleep (Deterministic)
+# ==============================================================================
+
+class TestRetryCharacterizationDeterministic:
+    """
+    Characterization tests using mock_sleep fixture for deterministic testing.
+
+    Purpose:
+    - Record existing behavior (As-is)
+    - No real time.sleep execution
+    - Verify sleep call count and arguments
+    - Subject to replacement in future refactoring
+
+    Note: These tests document current behavior, not necessarily desired behavior.
+    """
+
+    @pytest.mark.characterization
+    def test_ch_retry_01_initial_success_no_retry(self, mock_sleep):
+        """
+        CH-RETRY-01: 初回成功ならretryしない
+
+        現状動作:
+        - attempt=1 で成功
+        - sleep呼び出し回数 = 0
+        - context.retry_count = 0
+
+        将来置換前提: retry メカニズムの変更時に更新する
+        """
+        call_count = 0
+        context = RetryContext()
+
+        def successful_func():
+            nonlocal call_count
+            call_count += 1
+            return "success"
+
+        wrapped = retry_with_context(
+            successful_func,
+            max_retries=2,
+            base_delay=1.0,
+            context=context
+        )
+        result = wrapped()
+
+        # 検証: 初回成功
+        assert result == "success"
+        assert call_count == 1
+
+        # 検証: sleep未呼び出し
+        assert mock_sleep.call_count == 0
+
+        # 検証: context記録
+        assert context.retry_count == 0
+        assert context.last_error_class is None
+
+    @pytest.mark.characterization
+    def test_ch_retry_02_one_failure_then_success(self, mock_sleep):
+        """
+        CH-RETRY-02: 1回失敗→次成功
+
+        現状動作:
+        - attempt=2 で成功（0回目失敗、1回目成功）
+        - sleep呼び出し回数 = 1
+        - sleep引数 = base_delay × 2^0 = 1.0
+        - context.retry_count = 1
+
+        将来置換前提: retry メカニズムの変更時に更新する
+        """
+        call_count = 0
+        context = RetryContext()
+
+        def flaky_func():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise ModelTimeoutError("Timeout on first attempt")
+            return "success"
+
+        wrapped = retry_with_context(
+            flaky_func,
+            max_retries=2,
+            base_delay=1.0,
+            context=context
+        )
+        result = wrapped()
+
+        # 検証: 2回目で成功
+        assert result == "success"
+        assert call_count == 2
+
+        # 検証: sleep呼び出し回数と引数
+        assert mock_sleep.call_count == 1
+        # sleep(1.0) が呼ばれる（attempt=0 なので delay=1.0×2^0=1.0）
+        assert mock_sleep.call_args_list[0][0][0] == 1.0
+
+        # 検証: context記録
+        assert context.retry_count == 1
+        assert context.last_error_class == "timeout"
+        assert len(context.error_summary) == 1
+
+    @pytest.mark.characterization
+    def test_ch_retry_03_max_retries_reached_failure_not_suppressed(self, mock_sleep):
+        """
+        CH-RETRY-03: 上限到達で停止し、失敗が握りつぶされない
+
+        現状動作:
+        - max_retries=2 → 計3回試行（attempt=0,1,2）
+        - sleep呼び出し回数 = 2（attempt=0,1 後）
+        - sleep引数 = [1.0, 2.0]（指数バックオフ）
+        - 最後の例外が re-raise される
+        - context.retry_count = 2
+
+        将来置換前提: retry メカニズムの変更時に更新する
+        """
+        call_count = 0
+        context = RetryContext()
+
+        def always_failing():
+            nonlocal call_count
+            call_count += 1
+            raise ModelRateLimitError(f"Rate limit on attempt {call_count}")
+
+        wrapped = retry_with_context(
+            always_failing,
+            max_retries=2,
+            base_delay=1.0,
+            context=context
+        )
+
+        # 検証: 例外が re-raise される
+        with pytest.raises(ModelRateLimitError) as exc_info:
+            wrapped()
+
+        # 検証: 3回試行
+        assert call_count == 3
+
+        # 検証: sleep呼び出し回数と引数（指数バックオフ）
+        assert mock_sleep.call_count == 2
+        # sleep(1.0) が呼ばれる（attempt=0 なので delay=1.0×2^0=1.0）
+        assert mock_sleep.call_args_list[0][0][0] == 1.0
+        # sleep(2.0) が呼ばれる（attempt=1 なので delay=1.0×2^1=2.0）
+        assert mock_sleep.call_args_list[1][0][0] == 2.0
+
+        # 検証: context記録
+        assert context.retry_count == 2
+        assert context.last_error_class == "rate_limit"
+        assert len(context.error_summary) == 3
+
+        # 検証: 例外メッセージが保持されている
+        assert "Rate limit" in str(exc_info.value)
+
+
+# ==============================================================================
+# Batch 0 Mini: Must Not Tests (Contract Enforcement)
+# ==============================================================================
+
+class TestRetryMustNotContracts:
+    """
+    Must Not tests enforcing critical invariants.
+
+    Purpose:
+    - Enforce MN-RETRY-01/02/03 invariants
+    - Prevent catastrophic failures (infinite loops, resource exhaustion)
+    - These are CONTRACT tests, not characterization tests
+    """
+
+    @pytest.mark.contract
+    def test_mn_retry_01_classifier_exception_stops_retry(self, mock_sleep):
+        """
+        MN-RETRY-01: classifierが例外を投げたらリトライ継続してはならない
+
+        契約:
+        - classify_error() が例外を投げた場合、should_retry = False
+        - sleep呼び出し = 0回
+        - 追加attempt = 0回（初回のみ）
+        - 元の例外が re-raise される
+
+        根拠: retry_utils.py:139-148（classifier例外の捕捉と should_retry=False 設定）
+        """
+        from unittest.mock import patch, Mock
+
+        call_count = 0
+        classify_error_call_count = 0
+
+        def flaky_func():
+            nonlocal call_count
+            call_count += 1
+            raise ValueError("Test error")
+
+        def broken_classifier(exc):
+            """分類処理中に例外を投げる classifier"""
+            nonlocal classify_error_call_count
+            classify_error_call_count += 1
+            raise RuntimeError("Classifier is broken")
+
+        # classify_error をモックして例外を投げる
+        with patch('nexuscore.core.retry_utils.classify_error', side_effect=broken_classifier):
+            wrapped = retry_with_context(
+                flaky_func,
+                max_retries=3,  # 最大3回リトライ可能だが...
+                base_delay=1.0
+            )
+
+            # 検証: 元の例外が re-raise される
+            with pytest.raises(ValueError) as exc_info:
+                wrapped()
+
+        # 検証: 初回のみ試行（リトライなし）
+        assert call_count == 1
+
+        # 検証: sleep未呼び出し（リトライしていない）
+        assert mock_sleep.call_count == 0
+
+        # 検証: classify_error が1回だけ呼ばれた（リトライ判定時）
+        assert classify_error_call_count == 1
+
+        # 検証: 元の例外が保持されている
+        assert "Test error" in str(exc_info.value)
+
+    @pytest.mark.contract
+    def test_mn_retry_02_max_retries_upper_bound_enforced(self, mock_sleep):
+        """
+        MN-RETRY-02: 最大試行上限を超えてattemptしてはならない
+
+        契約:
+        - max_retries=N → 最大 N+1 回試行
+        - 無限ループに陥らない
+        - 有限回数で終了する
+
+        根拠: retry_utils.py:101（ループ回数制限）, retry_utils.py:155（停止条件）
+        """
+        call_count = 0
+
+        def always_failing():
+            nonlocal call_count
+            call_count += 1
+            raise ModelTimeoutError(f"Attempt {call_count}")
+
+        wrapped = retry_with_context(
+            always_failing,
+            max_retries=5,  # 最大5回リトライ → 計6回試行
+            base_delay=1.0
+        )
+
+        with pytest.raises(ModelTimeoutError):
+            wrapped()
+
+        # 検証: 6回試行で停止（max_retries=5 なので 5+1=6）
+        assert call_count == 6
+
+        # 検証: sleep呼び出し回数 = 5回（attempt=0,1,2,3,4 後）
+        assert mock_sleep.call_count == 5
+
+    @pytest.mark.contract
+    def test_mn_retry_03_non_retryable_error_immediate_stop(self, mock_sleep):
+        """
+        MN-RETRY-03: non-retryable判定をリトライしてはならない
+
+        契約:
+        - classify_error() が "sandbox", "patch_apply", "unexpected" を返す場合
+        - または retry_on に含まれない例外の場合
+        - should_retry = False
+        - sleep呼び出し = 0回
+        - 即座に例外を re-raise
+
+        根拠: retry_utils.py:120-121, 126-127, 137-138（should_retry=False設定）
+        """
+        call_count = 0
+
+        # Case 1: SandboxExecutionError（non-retryable）
+        def sandbox_fail():
+            nonlocal call_count
+            call_count += 1
+            raise SandboxExecutionError("Sandbox failed")
+
+        wrapped = retry_with_context(
+            sandbox_fail,
+            max_retries=3,
+            base_delay=1.0
+        )
+
+        with pytest.raises(SandboxExecutionError):
+            wrapped()
+
+        # 検証: 初回のみ試行（リトライなし）
+        assert call_count == 1
+
+        # 検証: sleep未呼び出し
+        assert mock_sleep.call_count == 0
+
+        # Case 2: retry_on に含まれない一般的な例外（ValueError）
+        mock_sleep.reset_mock()  # モックをリセット
+        call_count = 0
+
+        def value_error_fail():
+            nonlocal call_count
+            call_count += 1
+            raise ValueError("Not retryable")
+
+        wrapped2 = retry_with_context(
+            value_error_fail,
+            max_retries=3,
+            base_delay=1.0,
+            retry_on=(ModelTimeoutError,)  # ValueError は含まれない
+        )
+
+        with pytest.raises(ValueError):
+            wrapped2()
+
+        # 検証: 初回のみ試行（リトライなし）
+        assert call_count == 1
+
+        # 検証: sleep未呼び出し
+        assert mock_sleep.call_count == 0
