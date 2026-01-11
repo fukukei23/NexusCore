@@ -1,29 +1,18 @@
 """
 webapp/models.py の高品質なテスト
 
-テスト対象:
-- User: GitHub OAuth ユーザーモデル
-- Project: プロジェクト/リポジトリモデル
-- Run: オーケストレーション実行記録
-- PatchRecord: パッチ適用記録
-- ExecutionLog: 構造化ログ
-- ApiKey: APIキー生成・検証
+注意: このテストファイルは Flask レガシー前提です。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
-from __future__ import annotations
-
-import hashlib
-import secrets
-from datetime import datetime
-
 import pytest
 
-from nexuscore.webapp.models import (
-    User,
-    Project,
-    Run,
-    PatchRecord,
-    ExecutionLog,
-    ApiKey,
+# CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask legacy models tests have been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
 )
 
 

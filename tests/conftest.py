@@ -397,9 +397,18 @@ def pytest_ignore_collect(collection_path, config):
     """
     Ignore test directories with missing dependencies for mutation testing.
 
-    Only allow tests/agents directory to be collected to avoid import errors
-    from missing dependencies in other test directories.
+    This hook is only active when NEXUS_MUTATION_TEST=1 is set.
+    Otherwise, it returns False to allow all tests to be collected normally.
+
+    When active (NEXUS_MUTATION_TEST=1), only allow tests/agents directory
+    to be collected to avoid import errors from missing dependencies in other
+    test directories.
     """
+    # 通常の pytest 実行時は何もしない（全テストを収集可能にする）
+    if os.getenv("NEXUS_MUTATION_TEST") != "1":
+        return False
+
+    # mutmut 実行時のみ、agents 限定収集を適用
     path_str = str(collection_path)
     file_name = collection_path.name
 
@@ -420,7 +429,7 @@ def pytest_ignore_collect(collection_path, config):
         # Allow all other test files in tests/agents
         return False
 
-    # Ignore all test directories outside of tests/agents
+    # Ignore all test directories outside of tests/agents (only when NEXUS_MUTATION_TEST=1)
     if "/tests/" in path_str and "/tests/agents/" not in path_str:
         return True
 

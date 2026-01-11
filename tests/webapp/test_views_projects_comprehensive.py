@@ -1,22 +1,19 @@
 """
 views_projects.py の包括的なテスト
 
-プロジェクトビューの全機能をテスト：
-- GET /projects/: プロジェクト一覧（カード形式、Self-Healingメトリクス）
-- GET /projects/<id>: プロジェクト詳細＋Run一覧
-- GET/POST /projects/new: 新規プロジェクト作成
-- POST /projects/<id>/run: Run実行トリガー（同期/非同期）
-- ヘルパー関数のテスト
+注意: このテストファイルは Flask レガシー前提です。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
-from __future__ import annotations
-
-import json
 import pytest
-from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
 
-from nexuscore.webapp import db
-from nexuscore.webapp.models import User, Project, Run, ExecutionLog
+# CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask legacy views_projects comprehensive tests have been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 # ============================================================================

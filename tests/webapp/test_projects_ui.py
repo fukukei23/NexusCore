@@ -1,17 +1,19 @@
 """
 4.5: Flask SaaS UI - プロジェクト一覧・詳細のスモークテスト（リファクタ版）
 
-HTTP 500 が出ないことと、Self-Healing メトリクス系の重要な文字列が必ず含まれていることを検証する。
-
-共通ヘルパーと UI キーワード表を使用して、保守性を向上。
+注意: このテストファイルは Flask レガシー前提です。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
-
-from __future__ import annotations
-
 import pytest
 
-from tests.webapp.helpers import assert_page_keywords, login_user
-from tests.webapp.ui_keywords import PROJECTS_PAGE_KEYWORDS, PROJECT_DETAIL_KEYWORDS
+# CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask legacy projects_ui tests have been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 def test_projects_index_renders_with_cards(client, app, test_user, test_project, test_run_with_metrics):

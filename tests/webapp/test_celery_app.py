@@ -1,17 +1,19 @@
 """
 webapp/celery_app.py の高品質なテスト
 
-テスト対象:
-- make_celery(): Flask アプリと連携した Celery インスタンスを作成
-- init_celery(): Celery worker 用の初期化
-- _register_tasks(): タスクを登録
-
-注意: Celery の実行環境依存が強いため、基本的な部分のみテスト
+注意: このテストファイルは Flask レガシー前提です。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
-from __future__ import annotations
-
-from unittest.mock import Mock, patch, MagicMock
 import pytest
+
+# CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask legacy celery_app tests have been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 @pytest.fixture(scope="function")
