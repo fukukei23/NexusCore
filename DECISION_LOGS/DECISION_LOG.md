@@ -181,3 +181,43 @@
 - **Branch**: `claude/cr-nexus-051-b-retry-policy`
 
 ---
+
+### 2026-01-13: Policy Template Standardization + Architecture Metadata
+
+**Context**: CR-NEXUS-052 として、CR-NEXUS-051-B を Golden Example として Policy 系の標準テンプレート群を追加し、NexusCore の運用を「再現可能な型」に昇格させる。
+
+**Decision**: Introduce standard templates for Policy work packages (Spec/DecisionTable/Tests/IRG/DecisionLog) and add ARCHITECTURE.md Metadata section.
+
+**Rationale**:
+- Reduce ambiguity: 051-B が示した「Decision Table を SSOT とする」「有限性保証」「Fallback Rule 明示」のパターンをテンプレート化することで、今後の Policy 系実装の品質を担保する
+- Enforce SSOT+finite guarantees: テンプレートに必須項目として明記することで、無限リトライや曖昧な判断ロジックの混入を防ぐ
+- Prevent Gate stalls: ARCHITECTURE.md に Metadata セクション（Version, LastUpdated, CommitHash）を追加することで、ドキュメントの出所と鮮度を追跡可能にし、Gate 停止を防ぐ
+
+**Rejected**:
+- Keeping templates informal (causes inconsistent outputs): テンプレートを非公式にすることは却下。一貫性のない成果物が生成されるリスクが高い
+- Editing 051-B retroactively (violates freeze): 051-B を遡及的に編集することは却下。成果物は凍結済みであり、参照のみ許可
+
+**Alternatives Considered**:
+- Policy 系テンプレートを別リポジトリに配置 → 却下（NexusCore リポジトリ内での一元管理が望ましい）
+- Metadata を ARCHITECTURE.md ではなく別ファイルに配置 → 却下（Gate 文書である ARCHITECTURE.md 自体に Metadata が必要）
+
+**Related Files**:
+- `docs/templates/policy/POLICY_SPEC_TEMPLATE.md` (新規)
+- `docs/templates/policy/DECISION_TABLE_TEMPLATE.md` (新規)
+- `docs/templates/policy/POLICY_TEST_TEMPLATE.md` (新規)
+- `docs/templates/policy/POLICY_IMPLEMENTATION_SKELETON.md` (新規)
+- `GOVERNANCE/templates/REVIEW_PACKET_PHASE25_TEMPLATE.md` (新規)
+- `GOVERNANCE/MASTER_PROTOCOL_TEMPLATE.md` (追記)
+- `GOVERNANCE/REVIEW_PACKET_TEMPLATE.md` (追記)
+
+**Consequence**:
+- Policy 系チケットは今後、POLICY_SPEC_TEMPLATE.md を準拠することが標準となる
+- Decision Table を SSOT として実装することが明文化された
+- 有限性保証と Fallback Rule が必須項目として明記された
+- 051-B が Golden Example として参照可能になった
+
+**Notes**:
+- Metadata values set to TBD initially; to be filled by maintainers when release process is defined.
+- ARCHITECTURE.md には既に Metadata が存在していたため、追加作業は不要だった
+
+---

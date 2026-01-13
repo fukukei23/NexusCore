@@ -15,3 +15,11 @@
 
 詳細は正式版移植後に更新します。
 
+### Policy Review (Phase 2.5) Checklist
+- SSOT: Decision Table が唯一の真実になっているか
+- Finite: 無限リトライが不可能か（上限が明示されテストされているか）
+- Fallback: 想定外/分類不能の最終挙動が一意か（安全側か）
+- No Implicit Specs: 実装が仕様にない判断をしていないか
+- No Scope Creep: ついで修正が混入していないか
+- Observability: decision と terminal reason が追跡可能か
+
