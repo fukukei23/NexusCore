@@ -1,20 +1,19 @@
 """
 db_logger.py の包括的なテスト
 
-DBログフックの全機能をテスト：
-- enhance_log_transaction()の動作
-- log_dataからの情報抽出
-- logging_service.log_execution_event()の呼び出し
-- importエラー時のスキップ
-- 各種eventタイプの処理
+注意: このテストファイルは Flask レガシー前提です。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
-from __future__ import annotations
-
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 
-from nexuscore.webapp import db
-from nexuscore.webapp.models import ExecutionLog, User, Project, Run
+# CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask legacy db_logger tests have been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 # ============================================================================

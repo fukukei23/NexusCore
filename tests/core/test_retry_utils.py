@@ -191,6 +191,7 @@ class TestRetryDecorator:
     def test_invalid_model_output_error_is_retried(self):
         """InvalidModelOutputError はリトライ可能（Spec 3.3.1）"""
         call_count = 0
+        max_retries = 3
 
         @retry(max_retries=2, base_delay=0.1)
         def invalid_output():

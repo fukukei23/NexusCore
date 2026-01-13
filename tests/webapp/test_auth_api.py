@@ -1,17 +1,19 @@
 """
 webapp/auth_api.py の高品質なテスト
 
-テスト対象:
-- _resolve_user_from_api_key(): API キーから User を解決
-- api_key_required(): API キー認証デコレータ
+注意: このテストファイルは Flask レガシー前提です。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側の認証テストは tests/api/test_fastapi_*.py を参照してください。
 """
-from __future__ import annotations
-
-from unittest.mock import patch
 import pytest
-from flask import Blueprint, g
 
-from nexuscore.webapp.models import User, ApiKey
+# CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
+# FastAPI 側の認証テストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask legacy auth_api tests have been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 @pytest.fixture(scope="function")

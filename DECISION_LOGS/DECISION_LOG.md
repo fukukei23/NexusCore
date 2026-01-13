@@ -141,3 +141,43 @@
 - 実装時は、セクション 3.3 および 3.4 の要件を遵守すること
 
 ---
+
+### 2026-01-12: Phase 2.5 Review – CR-NEXUS-051-B Retry Policy
+
+**Context**: CR-NEXUS-051-B Retry Policy 仕様について、実装前の Phase 2.5 独立レビューを実施した。本 Spec は 051-A Error Taxonomy を前提とし、各例外に対する Retry / Abort / Skip の判断ロジックを定義する。
+
+**Decision**: 本仕様（v1.0.0）は **Approve** とする。実装フェーズへ進行可能。
+
+**Rationale**:
+- **Decision Table**: 8つの例外クラスすべてに対して Action, Max Attempts, Backoff Strategy が明確に定義されている
+- **有限性保証**: Max Attempts が明示的に設定され（0, 3, 5）、無限リトライのリスクが排除されている
+- **Unexpected 処理**: UnexpectedSystemError および分類不能エラーは即座に Abort（Retry 禁止）が明記されている
+- **Backoff Strategy**: Exponential と Linear の具体的な計算式が提供されている
+- **観測性**: ログに記録すべき項目が明文化されている
+- **テスト要件**: Decision Table 検証、有限性検証、Unexpected 処理検証、Backoff 検証が明文化されている
+- **実装詳細の混入なし**: Spec は意味論レベルの定義に留まり、実装詳細（具体的な関数名・ファイル名）は例示のみ
+
+**Alternatives Considered**:
+- Conditional Approve → 却下（すべての Phase 2.5 評価基準を満たしており、条件付き承認の必要はない）
+- Reject → 却下（実装進行を阻害する問題は存在しない）
+
+**Review Result**: Approve (Phase 2.5 Independent Review)
+
+**Related Spec**:
+- `docs/spec/CR-NEXUS-051-B_RETRY_POLICY.md` (v1.0.0)
+- `docs/spec/CR-NEXUS-051-A_ERROR_TAXONOMY.md` (前提)
+- Review Packet: `GOVERNANCE/review_packets/RP-NEXUS-051-B_PHASE25_RETRY_POLICY.md`
+
+**Consequence**:
+- 本 Spec (v1.0.0) は実装フェーズへ進行済み（テスト 30 passed）
+- Decision Table を唯一の真実として実装すること
+- 051-A の例外クラスは変更しないこと（参照のみ）
+- 051-C（Orchestrator Integration）とは分離して扱うこと
+
+**Implementation Summary**:
+- **Spec**: `docs/spec/CR-NEXUS-051-B_RETRY_POLICY.md`
+- **Tests**: `tests/core/test_retry_policy.py` (30 tests, all passed)
+- **Implementation**: `src/nexuscore/core/retry_policy.py` (`decide_retry()` function)
+- **Branch**: `claude/cr-nexus-051-b-retry-policy`
+
+---

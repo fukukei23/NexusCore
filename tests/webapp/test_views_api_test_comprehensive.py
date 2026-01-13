@@ -1,19 +1,19 @@
 """
 views_api_test.py の包括的なテスト
 
-API Test UIの全機能をテスト：
-- GET /api-test/: フォーム表示
-- POST /api-test/: API実行とシミュレーション
-- プロジェクト一覧とAPIキー一覧の表示
-- エラーハンドリング
+注意: このテストファイルは Flask レガシー前提です。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
-from __future__ import annotations
-
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 
-from nexuscore.webapp import db
-from nexuscore.webapp.models import User, Project, ApiKey
+# CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask legacy views_api_test comprehensive tests have been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 # ============================================================================
