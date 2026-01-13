@@ -1,13 +1,13 @@
 # Run Report: test-run-1
 
-**Generated at:** 2025-11-30T23:55:46.410177 UTC
+**Generated at:** 2026-01-11T16:35:34.395960 UTC
 
 ---
 
 ## Project Information
 
 - **Project Name:** Test Project
-- **Repository:** <MagicMock name='Run.query.get().project.repo_url' id='134816948403040'>
+- **Repository:** <MagicMock name='Run.query.get().project.repo_url' id='137108416692400'>
 - **Local Path:** /tmp/test-project
 
 ---
@@ -16,8 +16,8 @@
 
 - **Run ID:** `test-run-1`
 - **Status:** `SUCCESS`
-- **Started At:** 2025-11-30T23:55:44.510399
-- **Finished At:** 2025-11-30T23:55:44.512489
+- **Started At:** 2026-01-11T16:35:34.012900
+- **Finished At:** 2026-01-11T16:35:34.017080
 - **Duration:** 0s
 - **Autonomy Level:** 1
 
@@ -54,8 +54,8 @@
 ## Observability Links
 
 - **Run Logs:** http://localhost:5000/logs/runs/test-run-1
-- **Project Logs:** http://localhost:5000/logs/projects/<MagicMock name='Run.query.get().project.id' id='134816950497456'>
-- **Project Dashboard:** http://localhost:5000/dashboard/projects/<MagicMock name='Run.query.get().project.id' id='134816950497456'>
+- **Project Logs:** http://localhost:5000/logs/projects/<MagicMock name='Run.query.get().project.id' id='137108420699072'>
+- **Project Dashboard:** http://localhost:5000/dashboard/projects/<MagicMock name='Run.query.get().project.id' id='137108420699072'>
 
 ---
 

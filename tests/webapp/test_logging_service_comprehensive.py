@@ -1,21 +1,19 @@
 """
 logging_service.py の包括的なテスト
 
-ExecutionLog書き込みサービスの全機能をテスト：
-- Flask app context内でのログ書き込み
-- Flask app context外でのスキップ動作
-- JSON変換とエラーハンドリング
-- DB commit失敗時のロールバック
+注意: このテストファイルは Flask レガシー前提です。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
-from __future__ import annotations
-
-import json
 import pytest
-from datetime import datetime
-from unittest.mock import Mock, patch, MagicMock
 
-from nexuscore.webapp import db
-from nexuscore.webapp.models import ExecutionLog, User, Project, Run
+# CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask legacy logging_service comprehensive tests have been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 # ============================================================================

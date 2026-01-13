@@ -426,6 +426,25 @@ def test_auto_generated_test_scaffold_parse_error():
     else:
         final_code = template
 
+    # your_module プレースホルダを正しい import パスに置換
+    if "your_module" in final_code:
+        # module_path が未決定の場合は file_path と project_root から導出
+        if module_path is None and file_path is not None and project_root is not None:
+            module_path = project_path_to_module_path(project_root, file_path)
+
+        if module_path:
+            # "from your_module import" を "from {module_path} import" に置換
+            final_code = final_code.replace("from your_module import", f"from {module_path} import")
+            # "import your_module" を "import {module_path}" に置換
+            final_code = final_code.replace("import your_module", f"import {module_path}")
+            # "your_module." を "{module_path}." に置換
+            final_code = final_code.replace("your_module.", f"{module_path}.")
+        else:
+            # module_path が決定できない場合は your_module を削除（コメントアウト）
+            final_code = final_code.replace("from your_module import", "# from your_module import  # module path not available")
+            final_code = final_code.replace("import your_module", "# import your_module  # module path not available")
+            final_code = final_code.replace("your_module.", "# your_module.  # module path not available")
+
     # 必ず何かしらのコードを返す（例外は投げない）
     return final_code
 
@@ -453,6 +472,25 @@ def generate_and_validate_test_code(
 
     # Markdown からコードを抽出
     test_code = extract_code_from_markdown(generated)
+
+    # your_module プレースホルダを正しい import パスに置換（generate_unit_tests で既に処理済みだが念のため）
+    if "your_module" in test_code:
+        # module_path が未決定の場合は file_path と project_root から導出
+        if module_path is None and file_path is not None and project_root is not None:
+            module_path = project_path_to_module_path(project_root, file_path)
+
+        if module_path:
+            # "from your_module import" を "from {module_path} import" に置換
+            test_code = test_code.replace("from your_module import", f"from {module_path} import")
+            # "import your_module" を "import {module_path}" に置換
+            test_code = test_code.replace("import your_module", f"import {module_path}")
+            # "your_module." を "{module_path}." に置換
+            test_code = test_code.replace("your_module.", f"{module_path}.")
+        else:
+            # module_path が決定できない場合は your_module を削除（コメントアウト）
+            test_code = test_code.replace("from your_module import", "# from your_module import  # module path not available")
+            test_code = test_code.replace("import your_module", "# import your_module  # module path not available")
+            test_code = test_code.replace("your_module.", "# your_module.  # module path not available")
 
     # 検証
     is_valid, error_message, warnings = validate_test_code(test_code)

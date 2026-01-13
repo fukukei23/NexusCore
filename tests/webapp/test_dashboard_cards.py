@@ -1,10 +1,19 @@
 """
 プロジェクトダッシュボードのカードレイアウトのテスト
+
+注意: このテストファイルは Flask レガシー前提です。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
 import pytest
-from unittest.mock import Mock, patch
 
-from nexuscore.webapp.views_dashboard import render_project_dashboard_html
+# CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask legacy dashboard_cards tests have been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 def test_render_project_dashboard_html_contains_sections():
