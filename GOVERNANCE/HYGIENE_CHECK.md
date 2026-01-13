@@ -45,3 +45,24 @@ done
 - `docs/` 配下の既存ドキュメントを自動置換しない
 - 衛生チェック対象は明示的に限定する
 
+## pytest 実行方法
+
+### 通常のテスト実行
+
+```bash
+# 全テストスイートを実行
+pytest -q
+
+# 特定のテストスイートを実行
+pytest -q tests/trace
+pytest -q tests/guard
+```
+
+### Mutation Testing 実行
+
+```bash
+# mutation testing 用の限定収集（tests/agents のみ）
+NEXUS_MUTATION_TEST=1 pytest -q tests/agents
+```
+
+**注意**: `NEXUS_MUTATION_TEST=1` が設定されている場合、`tests/conftest.py` と `tests/agents/conftest.py` が `tests/agents/` 以外のテストディレクトリを無視します。通常の開発時はこの環境変数を設定しないでください。

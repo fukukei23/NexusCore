@@ -1,14 +1,19 @@
 """
 NexusCore Webapp - trigger_run エンドポイントのテスト
 
-認証済みで /projects/<id>/run に POST → Run が1件増える & 状態が PENDING
-requirement 未指定なら 400
+注意: このテストファイルは Flask レガシー前提です。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
-from __future__ import annotations
-
 import pytest
-from nexuscore.webapp import create_app, db
-from nexuscore.webapp.models import Project, Run, User
+
+# CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask legacy trigger_run tests have been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 @pytest.fixture

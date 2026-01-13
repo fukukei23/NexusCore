@@ -1,19 +1,19 @@
 """
 api_badges.py の包括的なテスト
 
-バッジ生成APIの全機能をテスト：
-- project_success_rate_badge(): 成功率バッジJSON
-- project_last_run_badge(): 最新RunステータスバッジJSON
-- shields.io互換のJSON形式
-- カラーの決定ロジック
+注意: このテストファイルは Flask API (api_badges.py) を前提としています。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
-from __future__ import annotations
-
 import pytest
-from datetime import datetime, timedelta
 
-from nexuscore.webapp import db
-from nexuscore.webapp.models import User, Project, Run
+# CR-FASTAPI-010: Flask API (api_badges.py) は削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask API (api_badges.py) has been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 # ============================================================================

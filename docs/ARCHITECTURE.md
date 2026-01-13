@@ -1,6 +1,10 @@
 # NexusCore Architecture
 > **Gate / SSOT Entrypoint**
 
+**Version**: 7.25.0
+**LastUpdated**: 2026-01-12
+**CommitHash**: 4b3f6244b4d7abaa4dbce20b394c779b96691a55
+
 本ドキュメントは **NexusCore におけるアーキテクチャ情報の唯一の入口（SSOT Entry Point）** である。
 開発・修正・レビュー・AI実装を行う前に、必ず本ファイルを参照すること。
 

@@ -1,18 +1,19 @@
 """
 webapp/api_external.py の高品質なテスト
 
-テスト対象:
-- list_projects(): プロジェクト一覧を取得
-- external_trigger_run(): Self-Healing Run を発火
-- get_latest_run(): 最新の Run の概要を取得
+注意: このテストファイルは Flask API (api_external.py) を前提としています。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
-from __future__ import annotations
-
-import uuid
-from unittest.mock import Mock, patch
 import pytest
 
-from nexuscore.webapp.models import User, Project, Run, ApiKey
+# CR-FASTAPI-010: Flask API (api_external.py) は削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask API (api_external.py) has been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 @pytest.fixture(scope="function")

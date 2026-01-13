@@ -1,22 +1,19 @@
 """
 views_dashboard.py の包括的なテスト
 
-ダッシュボードビューの全機能をテスト：
-- GET /dashboard/: 全体ダッシュボード（統計、LLM使用状況）
-- GET /dashboard/projects/<id>: プロジェクトダッシュボード（カード形式）
-- GET /dashboard/gradio/<id>: Gradio UI統合
-- ヘルパー関数のテスト
-- HTML/JSONレスポンスの両方
+注意: このテストファイルは Flask レガシー前提です。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
-from __future__ import annotations
-
-import json
 import pytest
-from datetime import datetime, timedelta
-from unittest.mock import Mock, patch
 
-from nexuscore.webapp import db
-from nexuscore.webapp.models import User, Project, Run, ExecutionLog, PatchRecord
+# CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask legacy views_dashboard comprehensive tests have been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 # ============================================================================

@@ -429,7 +429,7 @@ def pytest_ignore_collect(collection_path, config):
         # Allow all other test files in tests/agents
         return False
 
-    # Ignore all test directories outside of tests/agents
+    # Ignore all test directories outside of tests/agents (only when NEXUS_MUTATION_TEST=1)
     if "/tests/" in path_str and "/tests/agents/" not in path_str:
         return True
 
