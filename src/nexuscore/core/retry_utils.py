@@ -230,39 +230,32 @@ def retry_with_context(
 
                 # 3.3.1: リトライ可否の判断ルール
                 should_retry = False
-                error_class = "unknown"
-
                 try:
-                    if isinstance(e, retry_on_tuple):
+                    if isinstance(e, retry_on):
                         should_retry = True
-                        # 例外クラスからエラー種別を推測
-                        from nexuscore.core.errors import (
-                            ModelRateLimitError,
-                            ModelTimeoutError,
-                            ModelConnectionError,
-                        )
-                        if isinstance(e, ModelRateLimitError):
-                            error_class = "rate_limit"
-                        elif isinstance(e, ModelTimeoutError):
-                            error_class = "timeout"
-                        elif isinstance(e, ModelConnectionError):
-                            error_class = "connection"
                     elif isinstance(e, NexusCoreError):
                         # NexusCore カスタム例外の場合は classify_error で判定
                         error_class = classify_error(e)
                         # 3.3.4: Unexpected エラーのリトライ禁止
                         if error_class == "unexpected":
                             should_retry = False
+                        # 3.3.1: retryable: rate_limit, timeout, connection, invalid_output
+                        elif error_class in ("rate_limit", "timeout", "connection", "invalid_output"):
+                            should_retry = True
+                        # 3.3.1: non-retryable: sandbox, patch_apply
                         else:
-                            should_retry = _is_retryable(error_class)
+                            should_retry = False
                     else:
                         # 一般的な例外の場合も分類を試みる
                         error_class = classify_error(e)
                         # 3.3.4: Unexpected エラーのリトライ禁止
                         if error_class == "unexpected":
                             should_retry = False
+                        # 3.3.1: retryable: rate_limit, timeout, connection, invalid_output
+                        elif error_class in ("rate_limit", "timeout", "connection", "invalid_output"):
+                            should_retry = True
                         else:
-                            should_retry = _is_retryable(error_class)
+                            should_retry = False
                 except Exception as classification_error:
                     # 3.4.2: 分類不能エラー時のフォールバックフック
                     if logger_instance is not None:
@@ -272,7 +265,6 @@ def retry_with_context(
                             f"Classification error: {type(classification_error).__name__} - {str(classification_error)}. "
                             f"Treating as non-retryable (unexpected)."
                         )
-                    error_class = "unexpected"
                     should_retry = False
 
                 # context に記録

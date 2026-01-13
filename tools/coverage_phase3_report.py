@@ -123,17 +123,17 @@ def collect_phase3_metrics(cov: coverage.Coverage) -> List[Tuple[str, int, int, 
             print(f"WARNING: Failed to analyze {path}: {e}")
             continue
 
-        # stmts はステートメント行番号のリストなので、len() でカウント
-        stmt_count = len(stmts)
+        # stmts と missing はリスト（行番号）なので len() で整数化
+        stmts_count = len(stmts)
         missed = len(missing)
-        covered = max(stmt_count - missed, 0)
-        percent = 0.0 if stmt_count == 0 else (covered / stmt_count) * 100.0
+        covered = max(stmts_count - missed, 0)
+        percent = 0.0 if stmts_count == 0 else (covered / stmts_count) * 100.0
 
         # 表示用モジュール名は "analyzer.unified_analyzer" のように揃える
         rel = path.relative_to(ROOT / "src" / "nexuscore")
         module_label = ".".join(rel.with_suffix("").parts)
 
-        results.append((module_label, stmt_count, missed, percent))
+        results.append((module_label, stmts_count, missed, percent))
 
     # カバレッジ降順で並べる
     results.sort(key=lambda x: x[3], reverse=True)

@@ -188,8 +188,15 @@ def convert_http_error_to_nexus_error(exc: Exception) -> NexusCoreError:
     """
     try:
         error_class = classify_error(exc)
-        error_str = str(exc) if exc is not None else "None"
-        error_type = type(exc).__name__ if exc is not None else "NoneType"
+        try:
+            error_str = str(exc) if exc is not None else "None"
+        except Exception:
+            # エラーオブジェクトの文字列化に失敗した場合
+            error_str = f"<unstringifiable {type(exc).__name__ if exc is not None else 'None'}>"
+        try:
+            error_type = type(exc).__name__ if exc is not None else "NoneType"
+        except Exception:
+            error_type = "Unknown"
 
         if error_class == "rate_limit":
             return ModelRateLimitError(f"Rate limit error: {error_str}")
@@ -217,6 +224,12 @@ def convert_http_error_to_nexus_error(exc: Exception) -> NexusCoreError:
             exc_info=True
         )
         # Step 3: 安全な例外として伝播（3.4.2 Step 3）
-        error_str = str(exc) if exc is not None else "None"
-        error_type = type(exc).__name__ if exc is not None else "NoneType"
+        try:
+            error_str = str(exc) if exc is not None else "None"
+        except Exception:
+            error_str = f"<unstringifiable {type(exc).__name__ if exc is not None else 'None'}>"
+        try:
+            error_type = type(exc).__name__ if exc is not None else "NoneType"
+        except Exception:
+            error_type = "Unknown"
         return UnexpectedSystemError(f"Unclassifiable error ({error_type}): {error_str}")
