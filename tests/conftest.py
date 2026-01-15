@@ -399,16 +399,7 @@ def pytest_ignore_collect(collection_path, config):
 
     Only allow tests/agents directory to be collected to avoid import errors
     from missing dependencies in other test directories.
-
-    Note: This is only active when MUTMUT_MUTATION environment variable is set
-    (i.e., during mutation testing). For normal pytest runs, all tests are collected.
     """
-    import os
-
-    # Only apply these restrictions during mutation testing
-    if not os.environ.get("MUTMUT_MUTATION"):
-        return None  # 通常時はフックを無効化し、デフォルト挙動に委ねる
-
     path_str = str(collection_path)
     file_name = collection_path.name
 
@@ -429,48 +420,8 @@ def pytest_ignore_collect(collection_path, config):
         # Allow all other test files in tests/agents
         return False
 
-    # Ignore all test directories outside of tests/agents (only when NEXUS_MUTATION_TEST=1)
+    # Ignore all test directories outside of tests/agents
     if "/tests/" in path_str and "/tests/agents/" not in path_str:
         return True
 
     return False
-
-
-# ======================================================================================
-# Batch 0 Mini: Mock Sleep Fixture for Deterministic Testing
-# ======================================================================================
-
-@pytest.fixture
-def mock_sleep():
-    """
-    実 time.sleep を無効化し、呼び出し回数と引数を観測可能にする fixture。
-
-    目的:
-    - 実sleep禁止（テスト決定性の確保）
-    - wall-clock依存のタイミング問題を排除
-    - sleep呼び出し回数と引数を検証可能にする
-
-    使用例:
-        def test_example(mock_sleep):
-            @retry(max_retries=2, base_delay=1.0)
-            def flaky_func():
-                raise ModelTimeoutError("Timeout")
-
-            with pytest.raises(ModelTimeoutError):
-                flaky_func()
-
-            # sleep呼び出し回数を検証
-            assert mock_sleep.call_count == 2
-            # sleep引数を検証（指数バックオフ: 1.0, 2.0）
-            assert mock_sleep.call_args_list[0][0][0] == 1.0
-            assert mock_sleep.call_args_list[1][0][0] == 2.0
-
-    Returns:
-        unittest.mock.Mock: time.sleep のモック（呼び出し回数と引数を記録）
-    """
-    from unittest.mock import patch, Mock
-
-    mock_sleep_obj = Mock()
-
-    with patch('time.sleep', mock_sleep_obj):
-        yield mock_sleep_obj
