@@ -1,0 +1,32 @@
+# Review Packet (IRG Phase 2.5) Template
+
+## Review Target
+- PR: [PR_LINK]
+- Scope: [SCOPE_SUMMARY]
+- Files: [LIST_OF_FILES]
+
+## Gate Checklist
+- [ ] Spec exists and is complete
+- [ ] Decision Table is SSOT and fully specified
+- [ ] Fallback rule is explicit (no ambiguity)
+- [ ] Finite guarantee is enforced (no infinite retry)
+- [ ] Tests cover the Decision Table (parametrize)
+- [ ] Implementation follows Spec (no implicit specs)
+- [ ] No unrelated changes (no "ついで修正")
+- [ ] Decision Log updated (append-only)
+
+## Findings
+### High
+- (none)
+
+### Medium
+- (none)
+
+### Low
+- (none)
+
+## Verdict
+- Approve / Reject
+
+## Notes
+- If Reject: specify exact remediation items

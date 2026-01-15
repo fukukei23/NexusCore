@@ -14,3 +14,14 @@
 
 詳細は正式版移植後に更新します。
 
+### Policy Work Package (Standard)
+Policy系チケットは以下を標準成果物セットとする（Spec→Test→Implementation→IRG→DecisionLog）。
+- Spec: docs/templates/policy/POLICY_SPEC_TEMPLATE.md 準拠（Decision Table を SSOT として明記）
+- Decision Table: docs/templates/policy/DECISION_TABLE_TEMPLATE.md 準拠
+- Tests: Decision Table を parametrize で検証し、有限性保証と Fallback を必須とする
+- IRG Phase 2.5: GOVERNANCE/templates/REVIEW_PACKET_PHASE25_TEMPLATE.md 準拠
+- Decision Log: append-only で主要判断を記録
+
+Golden Example:
+- CR-NEXUS-051-B（Retry Policy）を模範例として参照する。
+
