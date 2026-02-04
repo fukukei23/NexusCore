@@ -92,6 +92,16 @@
 
 ---
 
+### 仕様・CR・完了レポート系
+
+**Spec（仕様）・Change Request・完了レポートの保存先とルール**
+
+- [CR と実装計画の結果の保存先](CR_AND_REPORTS_SAVE_LOCATIONS.md) - Spec / 完了レポートの保存場所、完了レポートに含める項目、テスト必須ルール
+- **STIT（Spec & Test Driven Iteration）**: 仕様・テスト・実装の順序と Gate は [GOVERNANCE/SPEC_TEST_DRIVEN_ITERATION.md](../GOVERNANCE/SPEC_TEST_DRIVEN_ITERATION.md) を参照
+- **Phase 2.5（IRG）**: [docs/ARCHITECTURE.md](ARCHITECTURE.md) および [GOVERNANCE/templates/REVIEW_PACKET_PHASE25_TEMPLATE.md](../GOVERNANCE/templates/REVIEW_PACKET_PHASE25_TEMPLATE.md) を参照
+
+---
+
 ### テスト戦略・結果系
 
 **テストの設計、実行、結果レポート**

@@ -112,6 +112,10 @@ python -m dev_tools.test_result_generator <pytest_output_file> <test_target> [ou
 - [ ] テスト結果の可視化（グラフやチャート）
 - [ ] CI/CD連携（テスト結果をGitHub Actionsに投稿）
 
+## 完了レポートとの関係
+
+完了レポートを出す変更では、必ずテストを実行し、その結果をレポートに含める。ルールの詳細は [CR と実装計画の結果の保存先](CR_AND_REPORTS_SAVE_LOCATIONS.md) の「必ずテストするルール」「完了レポートに含める項目」を参照。
+
 ## 関連ファイル
 
 - `dev_tools/test_result_generator.py` - レポート生成ツール
