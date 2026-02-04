@@ -1,0 +1,292 @@
+name: STIT Test Pipeline
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, closed, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      stit_mode:
+        description: "STIT validation mode"
+        required: false
+        default: "full"
+        type: choice
+        options:
+          - full
+          - lightweight
+          - skip
+
+jobs:
+  stit-validation:
+    name: STIT Process Validation
+    runs-on: ubuntu-latest
+    outputs:
+      stit_mode: ${{ steps.validate-inputs.outputs.mode }}
+      has_spec: ${{ steps.check-spec.outputs.exists }}
+      has_test: ${{ steps.check-test.outputs.exists }}
+      branch_type: ${{ steps.check-branch.outputs.type }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Determine STIT mode
+        id: validate-inputs
+        env:
+          STIT_MODE: ${{ github.event.inputs.stit_mode || 'full' }}
+        run: |
+          BRANCH_NAME="${{ github.head_ref }}"
+          echo "Branch: $BRANCH_NAME"
+          echo "Input mode: $STIT_MODE"
+
+          # Determine mode based on branch type
+          if [[ "$BRANCH_NAME" == rescue/* ]]; then
+            MODE="lightweight"
+          elif [[ "$STIT_MODE" != "skip" ]]; then
+            MODE="$STIT_MODE"
+          else
+            MODE="skip"
+          fi
+
+          echo "mode=$MODE" >> $GITHUB_OUTPUT
+
+      - name: Check branch type
+        id: check-branch
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: |
+          if [[ "$BRANCH_NAME" == claude/* ]]; then
+            echo "type=ai" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH_NAME" == rescue/* ]]; then
+            echo "type=rescue" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH_NAME" == feature/* ]]; then
+            echo "type=feature" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH_NAME" == hotfix/* ]]; then
+            echo "type=hotfix" >> $GITHUB_OUTPUT
+          else
+            echo "type=unknown" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check spec files
+        id: check-spec
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: |
+          # Extract task ID
+          TASK_ID=$(echo "$BRANCH_NAME" | grep -oE 'cr-[0-9]{3}' | head -1 || echo "")
+          echo "Task ID: $TASK_ID"
+
+          # Check for spec files
+          SPEC_FOUND=0
+
+          # Check in docs/spec/
+          if ls docs/spec/${TASK_ID}*.md 2>/dev/null | grep -q .; then
+            SPEC_FOUND=1
+            echo "Found spec files in docs/spec/"
+          fi
+
+          # Check in GOVERNANCE/
+          if ls GOVERNANCE/${TASK_ID}*.md 2>/dev/null | grep -q .; then
+            SPEC_FOUND=1
+            echo "Found spec files in GOVERNANCE/"
+          fi
+
+          echo "exists=$SPEC_FOUND" >> $GITHUB_OUTPUT
+
+      - name: Check test files
+        id: check-test
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: |
+          # Extract task ID
+          TASK_ID=$(echo "$BRANCH_NAME" | grep -oE 'cr-[0-9]{3}' | head -1 || echo "")
+          echo "Task ID: $TASK_ID"
+
+          # Check for test files
+          TEST_FOUND=0
+
+          # Check in tests/
+          if ls tests/*${TASK_ID}*.py 2>/dev/null | grep -q .; then
+            TEST_FOUND=1
+            echo "Found test files in tests/"
+          fi
+
+          # Check for related test files
+          if ls tests/**/*.py 2>/dev/null | grep -q .; then
+            TEST_FOUND=1
+            echo "Found test files"
+          fi
+
+          echo "exists=$TEST_FOUND" >> $GITHUB_OUTPUT
+
+      - name: Generate STIT validation summary
+        run: |
+          echo "## STIT Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch Type**: \`${{ steps.check-branch.outputs.type }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**STIT Mode**: \`${{ steps.validate-inputs.outputs.mode }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Spec Files | ${{ steps.check-spec.outputs.exists == '1' && ':white_check_mark:' || ':x:' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Files | ${{ steps.check-test.outputs.exists == '1' && ':white_check_mark:' || ':x:' }} |" >> $GITHUB_STEP_SUMMARY
+
+  run-tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: stit-validation
+    if: needs.stit-validation.outputs.stit_mode != 'skip'
+
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        include:
+          - python-version: "3.11"
+            coverage: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libportaudio2
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+
+      - name: Run tests
+        run: |
+          echo "Running tests for Python ${{ matrix.python-version }}..."
+          python -m pytest --tb=short -v
+
+      - name: Upload coverage
+        if: matrix.coverage
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
+
+  stit-compliance-check:
+    name: STIT Compliance Check
+    runs-on: ubuntu-latest
+    needs: [stit-validation, run-tests]
+    if: needs.stit-validation.outputs.stit_mode == 'full'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check STIT compliance
+        id: compliance
+        run: |
+          echo "## STIT Compliance Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          COMPLIANT=true
+
+          # Check 1: Branch naming
+          BRANCH="${{ github.head_ref }}"
+          if [[ "$BRANCH" =~ ^(claude|rescue|feature|hotfix)/ ]]; then
+            echo ":white_check_mark: Branch naming: Valid" >> $GITHUB_STEP_SUMMARY
+          else
+            echo ":x: Branch naming: Invalid" >> $GITHUB_STEP_SUMMARY
+            COMPLIANT=false
+          fi
+
+          # Check 2: Spec files
+          if [[ "${{ needs.stit-validation.outputs.has_spec }}" == "1" ]]; then
+            echo ":white_check_mark: Spec files: Present" >> $GITHUB_STEP_SUMMARY
+          else
+            echo ":warning: Spec files: Not found (may be lightweight)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check 3: Test files
+          if [[ "${{ needs.stit-validation.outputs.has_test }}" == "1" ]]; then
+            echo ":white_check_mark: Test files: Present" >> $GITHUB_STEP_SUMMARY
+          else
+            echo ":x: Test files: Not found" >> $GITHUB_STEP_SUMMARY
+            COMPLIANT=false
+          fi
+
+          # Check 4: Decision Log (if needed)
+          DECISION_LOG="DECISION_LOGS/$(date +%Y%m%d)_STIT_COMPLIANCE.md"
+          if [ -f "$DECISION_LOG" ]; then
+            echo ":white_check_mark: Decision Log: Present" >> $GITHUB_STEP_SUMMARY
+          else
+            echo ":info: Decision Log: Not required for this change" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "$COMPLIANT" = true ]; then
+            echo "**Overall**: :white_check_mark: STIT Compliant" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Overall**: :x: Not STIT Compliant" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  update-stit-status:
+    name: Update STIT status
+    runs-on: ubuntu-latest
+    needs: [stit-validation, run-tests, stit-compliance-check]
+    if: always()
+
+    steps:
+      - name: Generate final report
+        run: |
+          echo "## STIT Pipeline Final Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Pipeline Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Checks" >> $GITHUB_STEP_SUMMARY
+          echo "- STIT Validation: ${{ needs.stit-validation.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: ${{ needs.run-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Compliance: ${{ needs.stit-compliance-check.result }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const branch = '${{ github.head_ref }}';
+
+            let emoji = status === 'success' ? ':white_check_mark:' : ':x:';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## STIT Pipeline Result ${emoji}\n\n` +
+                    `Branch: \`${branch}\`\n\n` +
+                    `All STIT checks have completed. Check the workflow run for details.`
+            });
