@@ -17,6 +17,7 @@
 # ==============================================================================
 
 import os
+import sys
 import json
 import re
 import logging
@@ -25,16 +26,54 @@ import difflib
 
 try:
     from .base_agent import BaseAgent
-    # ▼▼▼【Importパス修正】プロジェクトアーキテクチャに合わせて修正▼▼▼
-    from database.knowledge_base import knowledge_base
-    # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 except ImportError:
-    # 開発・テスト用のフォールバック
-    knowledge_base = None
+    BaseAgent = None
+
+# knowledge_base: プロジェクトルートの database/knowledge_base を参照。CWD に依存しないようリトライする。
+knowledge_base = None
+
+
+def _find_project_root_for_database() -> Optional[str]:
+    """database/knowledge_base.py が存在するディレクトリ（プロジェクトルート）を探す。"""
+    env_root = os.getenv("NEXUS_PROJECT_ROOT")
+    if env_root and os.path.isdir(env_root):
+        kb_path = os.path.join(env_root, "database", "knowledge_base.py")
+        if os.path.isfile(kb_path):
+            return env_root
+    try:
+        current = os.path.dirname(os.path.abspath(__file__))
+        for _ in range(6):
+            kb_path = os.path.join(current, "database", "knowledge_base.py")
+            if os.path.isfile(kb_path):
+                return current
+            parent = os.path.dirname(current)
+            if parent == current:
+                break
+            current = parent
+    except Exception:
+        pass
+    return None
+
+
+try:
+    from database.knowledge_base import knowledge_base
+except ImportError:
+    _root = _find_project_root_for_database()
+    if _root and _root not in sys.path:
+        sys.path.insert(0, _root)
+    try:
+        from database.knowledge_base import knowledge_base
+    except ImportError:
+        pass
+
+if BaseAgent is None:
     class BaseAgent:
         def __init__(self, *args, **kwargs):
             self.logger = logging.getLogger(self.__class__.__name__)
-        def execute_llm_task(self, prompt: str, as_json: bool = False) -> str: return ""
+
+        def execute_llm_task(self, prompt: str, as_json: bool = False) -> str:
+            return ""
+
         def _call_llm(self, prompt: str, system_prompt: str, as_json: bool = False) -> str:
             return self.execute_llm_task(prompt, as_json)
 

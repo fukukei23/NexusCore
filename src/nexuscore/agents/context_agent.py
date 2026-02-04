@@ -12,12 +12,6 @@ import time
 from typing import Dict, Optional, Any
 from datetime import datetime
 
-# パス問題の解決（simple版の成功要因を統合）
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.join(current_dir, "../../..")
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 # 安全なインポート
 try:
     from nexuscore.agents.context_analyzer import ContextAnalyzer
@@ -36,7 +30,7 @@ except ImportError:
 
 class ContextAgent:
     def __init__(self, project_root: str = None):
-        self.project_root = project_root or self._find_project_root()
+        self.project_root = project_root or os.getenv("NEXUS_PROJECT_ROOT", os.getcwd())
         self.context_cache_file = os.path.join(self.project_root, ".nexus_context.json")
         
         # 安全な初期化（simple版の安定性を採用）
@@ -51,15 +45,6 @@ class ContextAgent:
             self.policy_interface = None
         
         self.context_profile = self.load_or_create_context()
-
-    def _find_project_root(self) -> str:
-        """ .git フォルダまたは pyproject.toml を基準にプロジェクトルートを探索 """
-        path = os.path.abspath(os.path.dirname(__file__))
-        for _ in range(5): # 5階層上まで探索
-            if os.path.isdir(os.path.join(path, '.git')) or os.path.isfile(os.path.join(path, 'pyproject.toml')):
-                return path
-            path = os.path.dirname(path)
-        return os.getcwd() # 見つからない場合はカレントディレクトリ
 
     def load_or_create_context(self) -> Dict:
         """既存コンテキストをロードまたは新規作成"""
