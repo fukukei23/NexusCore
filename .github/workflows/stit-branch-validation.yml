@@ -1,0 +1,158 @@
+name: STIT Branch Validation
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".gitignore"
+      - "LICENSE"
+
+jobs:
+  validate-branch-name:
+    name: Validate branch name
+    runs-on: ubuntu-latest
+    outputs:
+      valid: ${{ steps.validate.outputs.valid }}
+      message: ${{ steps.validate.outputs.message }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install STIT Branch CLI
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Validate branch name
+        id: validate
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: |
+          echo "Validating branch: $BRANCH_NAME"
+          if python tools/stit_branch.py validate -b "$BRANCH_NAME" --verbose; then
+            echo "valid=true" >> $GITHUB_OUTPUT
+            echo "message=Branch name is valid" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "valid=false" >> $GITHUB_OUTPUT
+            echo "message=Branch name validation failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Add validation comment to PR
+        if: steps.validate.outputs.valid == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '## STIT Branch Validation Failed\n\n' +
+                    'Branch name: `${{ env.BRANCH_NAME }}`\n\n' +
+                    '**Error**: The branch name does not follow STIT naming conventions.\n\n' +
+                    '**Expected format**:\n' +
+                    '- `claude/cr-XXX-description` (AI development)\n' +
+                    '- `rescue/cr-XXX-date` (Rescue/WIP branch)\n' +
+                    '- `feature/feature-name` (Feature development)\n' +
+                    '- `hotfix/fix-description` (Hotfix)\n\n' +
+                    'Please rename your branch and update the PR.'
+            })
+
+  validate-stit-compliance:
+    name: Validate STIT compliance
+    runs-on: ubuntu-latest
+    needs: validate-branch-name
+    if: needs.validate-branch-name.outputs.valid == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check for STIT Gateway Issue
+        id: check-issue
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: |
+          echo "Checking for STIT Gateway Issue..."
+          # Extract task ID from branch name (e.g., cr-051 from claude/cr-051-description)
+          TASK_ID=$(echo "$BRANCH_NAME" | grep -oE 'cr-[0-9]{3}' | head -1)
+          if [ -n "$TASK_ID" ]; then
+            echo "Found task ID: $TASK_ID"
+            # Check if an issue exists with this task ID
+            gh issue list --repo ${{ github.repository }} --search "[STIT-GATE] $TASK_ID" --state all | grep -q "$TASK_ID"
+            if [ $? -eq 0 ]; then
+              echo "STIT Gateway Issue found!"
+              echo "exists=true" >> $GITHUB_OUTPUT
+            else
+              echo "STIT Gateway Issue not found (optional for lightweight modifications)"
+              echo "exists=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "Could not extract task ID from branch name"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check STIT files exist
+        id: check-files
+        run: |
+          echo "Checking for STIT-related files..."
+          FILES_CHECK=()
+
+          # Check for spec files
+          if ls docs/spec/CR-*${{ github.head_ref }}*.md 2>/dev/null; then
+            FILES_CHECK+=("spec")
+          fi
+
+          # Check for test files
+          if ls tests/*${{ github.head_ref }}*.py 2>/dev/null; then
+            FILES_CHECK+=("tests")
+          fi
+
+          if [ ${#FILES_CHECK[@]} -gt 0 ]; then
+            echo "Found STIT files: ${FILES_CHECK[*]}"
+            echo "stages=complete" >> $GITHUB_OUTPUT
+          else
+            echo "No specific STIT files found (may be lightweight modification)"
+            echo "stages=partial" >> $GITHUB_OUTPUT
+          fi
+
+  summary:
+    name: STIT Validation Summary
+    runs-on: ubuntu-latest
+    needs: [validate-branch-name, validate-stit-compliance]
+    if: always()
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## STIT Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          BRANCH_NAME="${{ github.head_ref }}"
+          echo "- **Branch**: \`$BRANCH_NAME\`" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.validate-branch-name.outputs.valid }}" == "true" ]; then
+            echo "- **Branch Name**: :white_check_mark: Valid" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Branch Name**: :x: Invalid" >> $GITHUB_STEP_SUMMARY
+            echo "- **Message**: ${{ needs.validate-branch-name.outputs.message }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "For more details, see [STIT Branch Automation](../docs/tools/STIT_BRANCH_README.md)." >> $GITHUB_STEP_SUMMARY

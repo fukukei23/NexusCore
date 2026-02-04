@@ -23,7 +23,6 @@ import json
 import logging
 import os
 import time
-from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -339,29 +338,7 @@ class LLMRouter:
         """
         起動時に利用可能なモデルを検出し、task model mapを更新する。
         ネットワーク失敗時は既存設定にフォールバック（警告ログのみ）。
-
-        キャッシュ機能：var/cache/model_catalog.json に24時間TTLで保存。
-        NEXUS_REFRESH_MODEL_CATALOG=1 環境変数で強制更新可能。
         """
-        # キャッシュ確認（将来用）
-        cache_path = Path("var/cache/model_catalog.json")
-        use_cache = os.getenv("NEXUS_REFRESH_MODEL_CATALOG", "0") != "1"
-        cache_data = None
-
-        if use_cache and cache_path.exists():
-            try:
-                cache_data = json.loads(cache_path.read_text(encoding="utf-8"))
-                cache_time = datetime.fromisoformat(cache_data.get("timestamp", "2000-01-01T00:00:00"))
-                if datetime.now() - cache_time < timedelta(hours=24):
-                    detected_models = cache_data.get("models", {"openai": [], "gemini": []})
-                    self.logger.info(f"[Model Detection] Using cached model catalog (age: {datetime.now() - cache_time})")
-                    self._apply_detected_models(detected_models)
-                    return
-                else:
-                    self.logger.info(f"[Model Detection] Cache expired (age: {datetime.now() - cache_time}), refreshing...")
-            except Exception as e:
-                self.logger.debug(f"[Model Detection] Cache read failed: {e}, will refresh")
-
         detected_models = {"openai": [], "gemini": []}
 
         # OpenAI モデル検出
@@ -413,20 +390,7 @@ class LLMRouter:
                     else:
                         self.logger.warning(f"[Model Detection] Gemini API returned status {resp.status_code}. Using static defaults.")
             except Exception as e:
-                self.logger.warning(f"[Model Detection] Gemini models.list failed: {e}. Using static defaults (fallback safe).")
-
-        # キャッシュ保存（検出成功時のみ）
-        if detected_models["openai"] or detected_models["gemini"]:
-            try:
-                cache_path.parent.mkdir(parents=True, exist_ok=True)
-                cache_data = {
-                    "timestamp": datetime.now().isoformat(),
-                    "models": detected_models
-                }
-                cache_path.write_text(json.dumps(cache_data, indent=2), encoding="utf-8")
-                self.logger.debug(f"[Model Detection] Cached model catalog to {cache_path}")
-            except Exception as e:
-                self.logger.debug(f"[Model Detection] Cache write failed: {e} (non-fatal)")
+                self.logger.warning(f"[Model Detection] Gemini models.list failed: {e}. Using static defaults.")
 
         # task model mapを検出結果に基づいて更新
         self._apply_detected_models(detected_models)
@@ -440,18 +404,14 @@ class LLMRouter:
         gemini_models = detected.get("gemini", [])
 
         # OpenAIモデルの優先順位（chat/completionsエンドポイントで使えるもののみ）
-        # 指示通り: gpt-5.2-chat-latest → gpt-5.2 → gpt-5 → gpt-4o
+        # codex系は除外（v1/chat/completionsで使えないため、検出結果にも含まれない）
         openai_chat_candidates = [
-            "gpt-5.2-chat-latest", "gpt-5.2", "gpt-5-chat-latest", "gpt-5",
+            "gpt-5.2-chat-latest", "gpt-5.1-chat-latest", "gpt-5-chat-latest",
             "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"
         ]
-        # code_generate用：codex系は除外し、chat系を優先（Smoke Test要件）
-        # codex系は chat/completions エンドポイントで使えないため除外
-        openai_codex_candidates = [
-            "gpt-5.2-chat-latest", "gpt-5.2", "gpt-5-chat-latest", "gpt-5",
-            "gpt-4o"
-        ]
-        openai_mini_candidates = ["gpt-5-nano", "gpt-5-mini", "gpt-5.1-mini", "gpt-4o-mini", "gpt-3.5-turbo"]
+        # code_generate用：codex系は除外し、chat系のみを使用（Smoke Test要件）
+        openai_codex_candidates = ["gpt-4o"]  # codex系は除外済み、chat系のみ
+        openai_mini_candidates = ["gpt-5-mini", "gpt-5.1-mini", "gpt-4o-mini", "gpt-3.5-turbo"]
 
         def find_available_model(candidates: List[str], available_list: List[str]) -> Optional[str]:
             """候補リストから実在する最初のモデルを返す"""
@@ -460,27 +420,20 @@ class LLMRouter:
                     return candidate
             return None
 
-        # general/requirement/planning/review/policy_check: chat対応モデル
+        # general/requirement/planning: chat対応モデル
         chat_model = find_available_model(openai_chat_candidates, openai_models)
         if not chat_model:
-            chat_model = "gpt-4o"  # フォールバック（最後の砦）
-            self.logger.warning(f"[Model Detection] No OpenAI chat model found in candidates. Using fallback: {chat_model}")
-        else:
-            self.logger.info(f"[Model Detection] OpenAI selected_primary_chat_model={chat_model}")
+            chat_model = "gpt-4o"  # フォールバック
 
-        # code_generate/test_generate/debug: chat系を優先（codex系はchat/completionsで使えない）
-        # codex系がchat/completions対応するまで、chat系を使用
+        # code_generate/test_generate/debug: Smoke Testではchat系に固定（codex系が存在しない場合）
+        # エンドポイント不一致を避けるため、chat/completionsで呼べるモデルのみ使用
         codex_model = find_available_model(openai_codex_candidates, openai_models)
         if not codex_model:
-            # codex候補が見つからない場合はchat系を使用
+            # codex系が存在しない場合はchat系を使用（Smoke Test要件）
             codex_model = chat_model
-            self.logger.info(f"[Model Detection] code_generate will use chat-compatible model: {codex_model}")
 
         # routing_classify: miniモデル
-        mini_model = find_available_model(openai_mini_candidates, openai_models)
-        if not mini_model:
-            mini_model = "gpt-4o-mini"  # フォールバック
-            self.logger.warning(f"[Model Detection] No OpenAI mini model found. Using fallback: {mini_model}")
+        mini_model = find_available_model(openai_mini_candidates, openai_models) or "gpt-4o-mini"
 
         # Gemini: gemini-2.5-pro/flash が存在する場合
         gemini_model = None
@@ -488,23 +441,14 @@ class LLMRouter:
             for candidate in ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro"]:
                 if candidate in gemini_models:
                     gemini_model = f"google:{candidate}"
-                    self.logger.info(f"[Model Detection] Gemini selected_gemini_generate_content_model={gemini_model}")
                     break
-            if not gemini_model:
-                self.logger.warning(f"[Model Detection] No preferred Gemini model found. Available: {gemini_models[:5]}")
 
         # task model mapを更新（provider:model形式）
         updates = {}
         if chat_model:
-            # requirements, planning, general, review, policy_check 系を更新（指示通り）
-            chat_tasks = [
-                "requirements", "requirement", "requirement_elicit",
-                "planning", "plan_generate",
-                "general",
-                "review", "code_review",
-                "policy_check", "policy",
-                "testing", "test"
-            ]
+            # general, requirement, planning, review, testing 系を更新（Smoke Test要件）
+            chat_tasks = ["general", "requirement", "requirement_elicit", "plan_generate", "planning",
+                         "code_review", "review", "testing", "test"]
             for task in chat_tasks:
                 if task in self.task_model_map:
                     current = self.task_model_map[task]
@@ -517,9 +461,8 @@ class LLMRouter:
                         updates[task] = {**current, "primary": chat_model_with_provider}
 
         if codex_model:
-            # code_generate, debugging, testing を更新（指示通り：原則gpt-5.2-chat-latest）
-            # codex系はchat/completionsで使えないため、chat系を使用
-            for task in ["code_generate", "test_generate", "debugging", "debug", "code_refactor"]:
+            # code_generate, test_generate, debug を更新（Smoke Testではchat系に固定）
+            for task in ["code_generate", "test_generate", "debug", "code_refactor"]:
                 if task in self.task_model_map:
                     current = self.task_model_map[task]
                     if isinstance(current, dict):
@@ -528,7 +471,7 @@ class LLMRouter:
                         else:
                             codex_model_with_provider = codex_model
                         updates[task] = {**current, "primary": codex_model_with_provider}
-                        self.logger.debug(f"[Model Detection] {task} will use {codex_model_with_provider} (chat-compatible, codex excluded until endpoint support)")
+                        self.logger.debug(f"[Model Detection] {task} will use {codex_model_with_provider} (chat-compatible for Smoke Test)")
 
         if mini_model:
             # routing_classify を更新

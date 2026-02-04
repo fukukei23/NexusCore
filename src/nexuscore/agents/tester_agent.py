@@ -22,6 +22,7 @@ import json
 import os
 import re
 import logging
+import subprocess
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -445,14 +446,40 @@ class TesterAgent(BaseAgent):
     def _get_coverage_for_module(self, module_name: str) -> float:
         """
         モジュールの現在のカバレッジを取得する。
+        既存の .coverage ファイルから読み取る。
 
         :param module_name: モジュール名
         :return: カバレッジ（%）。取得できない場合は 0.0
         """
-        # TODO: 既存のカバレッジ計測ユーティリティがあればそれを利用
-        # 現時点ではダミー実装
-        logger.debug(f"Coverage for module '{module_name}' is not available. Returning 0.0")
-        return 0.0
+        coverage_file = self.project_root / ".coverage"
+        if not coverage_file.exists():
+            logger.debug(f"No coverage file found for module '{module_name}'. Returning 0.0")
+            return 0.0
+
+        try:
+            # coverage json 出力から読み取り
+            result = subprocess.run(
+                ["coverage", "json", "-o", "-", "--include", f"*{module_name}*"],
+                cwd=str(self.project_root),
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode != 0:
+                logger.warning(f"Coverage command failed: {result.stderr}")
+                return 0.0
+
+            data = json.loads(result.stdout)
+            # モジュールのカバレッジを取得
+            for key, value in data.get("files", {}).items():
+                if module_name in key:
+                    return value.get("summary", {}).get("percent_covered", 0.0)
+
+            return 0.0
+
+        except Exception as e:
+            logger.debug(f"Failed to get coverage for module '{module_name}': {e}")
+            return 0.0
 
     def _run_tests_and_get_coverage(
         self,
@@ -466,19 +493,14 @@ class TesterAgent(BaseAgent):
         :param test_file_path: テストファイルのパス
         :return: カバレッジ（%）。取得できない場合は 0.0
         """
-        # TODO: 既存の pytest 実行ラッパ（例：gradio_test_runner.py）を利用
-        # 現時点ではテスト実行のみ行い、カバレッジは 0.0 を返す
-
-        import subprocess
-
         try:
-            # pytest を実行（カバレッジなし）
+            # coverage run + pytest を実行
             result = subprocess.run(
-                ["python", "-m", "pytest", str(test_file_path), "-v"],
+                ["coverage", "run", "-m", "pytest", str(test_file_path), "-v", "--tb=short"],
                 cwd=str(self.project_root),
                 capture_output=True,
                 text=True,
-                timeout=60,
+                timeout=120,
             )
 
             if result.returncode == 0:
@@ -486,12 +508,30 @@ class TesterAgent(BaseAgent):
             else:
                 logger.warning(f"Tests failed for {test_file_path}: {result.stderr}")
 
+            # coverage json 出力からカバレッジを取得
+            coverage_result = subprocess.run(
+                ["coverage", "json", "-o", "-"],
+                cwd=str(self.project_root),
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            if coverage_result.returncode != 0:
+                logger.warning(f"Coverage json command failed: {coverage_result.stderr}")
+                return 0.0
+
+            data = json.loads(coverage_result.stdout)
+            # 全体カバレッジを返す
+            total_coverage = data.get("totals", {}).get("percent_covered", 0.0)
+            logger.info(f"Coverage after tests: {total_coverage}%")
+            return total_coverage
+
         except subprocess.TimeoutExpired:
             logger.error(f"Test execution timeout for {test_file_path}")
         except Exception as e:
-            logger.error(f"Failed to run tests: {e}", exc_info=True)
+            logger.error(f"Failed to run tests or get coverage: {e}", exc_info=True)
 
-        # カバレッジは将来的に実装
         return 0.0
 
     def _apply_generated_test_code(

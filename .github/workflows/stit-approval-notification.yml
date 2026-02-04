@@ -1,0 +1,245 @@
+name: STIT Approval Notification
+
+on:
+  issues:
+    types: [opened, edited, closed]
+  pull_request:
+    types: [opened, closed, reopened]
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: "Approval Request ID"
+        required: false
+        type: string
+
+env:
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+jobs:
+  notify-stit-gate-issue:
+    name: Notify STIT Gateway Issue
+    runs-on: ubuntu-latest
+    if: |
+      github.event.issue.title.startsWith('[STIT-GATE]') ||
+      github.event.issue.title.startsWith('[STIT-SPEC]') ||
+      github.event.issue.title.startsWith('[STIT-DECISION]')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate notification
+        id: notification
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ACTION: ${{ github.event.action }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          python -c "
+          import os
+          import json
+
+          title = os.environ['ISSUE_TITLE']
+          number = os.environ['ISSUE_NUMBER']
+          url = os.environ['ISSUE_URL']
+          action = os.environ['ACTION']
+          actor = os.environ['ACTOR']
+
+          # Determine issue type
+          if '[STIT-GATE]' in title:
+            issue_type = 'STIT Gateway'
+            color = 'yellow'
+          elif '[STIT-SPEC]' in title:
+            issue_type = 'STIT Spec'
+            color = 'blue'
+          elif '[STIT-DECISION]' in title:
+            issue_type = 'STIT Decision'
+            color = 'purple'
+          else:
+            issue_type = 'STIT'
+            color = 'gray'
+
+          # Generate message
+          if action == 'opened':
+            message = f':new: New {issue_type} Issue Created'
+          elif action == 'closed':
+            message = f':white_check_mark: {issue_type} Issue Closed'
+          elif action == 'reopened':
+            message = f':arrows_counterclockwise: {issue_type} Issue Reopened'
+          else:
+            message = f':pencil: {issue_type} Issue Updated'
+
+          output = {
+            'title': title,
+            'number': number,
+            'url': url,
+            'action': action,
+            'actor': actor,
+            'message': message,
+            'issue_type': issue_type,
+            'color': color
+          }
+
+          with open('notification.json', 'w') as f:
+            json.dump(output, f, indent=2)
+          "
+
+      - name: Read notification
+        id: read-notification
+        run: |
+          cat notification.json
+
+      - name: Add PR comment
+        uses: actions/github-script@v7
+        if: github.event.action == 'opened'
+        with:
+          script: |
+            const fs = require('fs');
+            const notification = JSON.parse(fs.readFileSync('notification.json', 'utf8'));
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ${notification.message}\n\n` +
+                    `**Created by**: @${notification.actor}\n\n` +
+                    `**Actions Required**:\n` +
+                    `- [ ] Review the ${notification.issue_type} requirements\n` +
+                    `- [ ] Provide feedback if needed\n` +
+                    `- [ ] Approve or request changes\n\n` +
+                    `[View Issue](${notification.url})`
+            })
+
+      - name: Send Slack notification
+        uses: 8398a7/action-slack@v3
+        if: |
+          env.SLACK_WEBHOOK_URL != '' &&
+          github.event.action == 'opened'
+        with:
+          status: ${{ job.status }}
+          channel: "#development"
+          text: "New STIT Gateway Issue: ${{ github.event.issue.title }}"
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  notify-approval-status:
+    name: Notify approval status changes
+    runs-on: ubuntu-latest
+    if: |
+      github.event.issue.title.startsWith('[STIT-GATE]') &&
+      github.event.action == 'closed' &&
+      github.event.issue.state_reason == 'completed'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check approval status
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          echo "Checking approval status for Issue #$ISSUE_NUMBER"
+          # This would typically check the approval file or PR status
+          # For now, we'll just log the completion
+
+      - name: Comment on related PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const notification = JSON.parse(fs.readFileSync('notification.json', 'utf8'));
+
+            // Find related PRs
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+
+            // Post completion message
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: ':tada: **STIT Gateway Approved**\n\n' +
+                    'This STIT Gateway issue has been completed.\n\n' +
+                    'Related PRs should now proceed to the next phase.'
+            })
+
+  notify-pr-stit-status:
+    name: Notify PR STIT status
+    runs-on: ubuntu-latest
+    if: |
+      startsWith(github.head_ref, 'claude/') ||
+      startsWith(github.head_ref, 'rescue/') ||
+      startsWith(github.head_ref, 'feature/') ||
+      startsWith(github.head_ref, 'hotfix/')
+
+    steps:
+      - name: Generate PR notification
+        if: github.event.action == 'opened'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          echo "STIT Branch PR Created"
+          echo "Branch: $BRANCH"
+          echo "PR: #$PR_NUMBER - $PR_TITLE"
+
+      - name: Add STIT label
+        if: github.event.action == 'opened'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['stit', 'automated-branch']
+            })
+
+  daily-approval-summary:
+    name: Daily approval summary
+    runs-on: ubuntu-latest
+    schedule:
+      - cron: "0 9 * * 1-5" # Weekdays at 9 AM
+
+    if: false # Disabled by default, enable with workflow_dispatch or schedule
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check pending approvals
+        id: pending
+        run: |
+          echo "Checking for pending approval requests..."
+          # This would check .stit_approvals.json or GitHub Issues
+          # For now, we'll just note the check
+
+      - name: Generate summary
+        if: steps.pending.outputs.count > 0
+        run: |
+          echo "## Pending STIT Approvals" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "There are pending approval requests requiring review." >> $GITHUB_STEP_SUMMARY
