@@ -3,7 +3,10 @@
     "allow": [
       "Bash(ls:*)",
       "Bash(find:*)",
-      "WebFetch(domain:docs.z.ai)"
+      "WebFetch(domain:docs.z.ai)",
+      "mcp__Context7__get-library-docs",
+      "Bash(git -C \"/home/yn441611/NexusCore\" branch --show-current)",
+      "Bash(wsl:*)"
     ]
   }
 }
