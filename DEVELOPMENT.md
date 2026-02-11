@@ -1,0 +1,279 @@
+# NexusCore 開発ガイド（軽量版）
+
+このドキュメントは、NexusCore プロジェクトでの開発をスムーズに進めるためのガイドです。
+
+---
+
+## クイックスタート
+
+### プロジェクト識別
+
+すべてのメッセージはプロジェクトタグから開始してください：
+
+```
+#project: NexusCore
+```
+
+### 開発フローの選択
+
+タスクの種類によってフローが異なります：
+
+| タスクタイプ | フロー |
+|------------|--------|
+| **Tier 1**（認証、決済、公開API） | 簡易仕様確認 → 実装 |
+| **Tier 2**（バグ修正、小機能） | 直接実装開始 |
+
+詳しくは `.claude/workflows/development-flow.md` を参照
+
+---
+
+## Tier 1 タスク（重要）
+
+### 対象
+
+- 認証・認可
+- 決済処理
+- データ移行
+- 公開API設計
+- セキュリティ関連
+
+### フロー
+
+1. **簡易仕様確認**（3項目）
+   - 何を作るか（1-2文）
+   - 主要な制約
+   - 影響範囲
+
+2. **ユーザー確認**
+
+3. **実装開始**
+
+4. **重要な決定が必要なら** → Decision Recorder
+
+### 例
+
+```
+ユーザー: JWT認証機能を実装して
+
+Claude Code:
+このタスクは Tier 1（認証・認可）です。
+簡易仕様を確認させてください:
+
+1. 何を作るか: JWT 方式のユーザー認証機能
+2. 主要な制約:
+   - アクセストークン有効期限: 15分?
+   - リフレッシュトークン: あり/なし?
+3. 影響範囲: 新規ファイル作成 or 既存ファイル修正?
+
+ユーザー: 15分、リフレッシュあり、新規でOK
+
+Claude Code: [実装開始]
+```
+
+---
+
+## Tier 2 タスク（通常）
+
+### 対象
+
+- ビジネスロジック実装
+- UI実装
+- バグ修正
+- リファクタリング
+- テスト追加
+
+### フロー
+
+直接実装開始
+
+### 例
+
+```
+ユーザー: このバグを直して
+
+Claude Code: [直接実装開始]
+```
+
+---
+
+## 週次コードレビュー
+
+### 自動化
+
+Code Reviewer Agent が週次で自動実行されます：
+
+- 重大な指摘 → 即時修正
+- 軽微な指摘 → Issue化
+- 決定記録 → Decision Recorder
+
+### 手動実行
+
+```
+ユーザー: 今週レビューして
+
+Claude Code:
+Code Reviewer Agent を起動します。
+並列で複数ファイルを分析し、結果を報告します。
+```
+
+---
+
+## 開発速度の目安
+
+| タスクタイプ | 所要時間 |
+|------------|---------|
+| 小タスク（バグ修正） | 5分 |
+| 中タスク（API追加） | 55分 |
+| 大タスク（機能追加） | 3時間 |
+| 週次レビュー | 5分（自動実行） |
+
+**旧規約との比較**: 月間で約70%の時間短縮（28時間節約）
+
+---
+
+## 最小限のルール
+
+### 適用するルール
+
+- ✅ プロジェクトタグ必須（`#project: NexusCore`）
+- ✅ API アーキテクチャ（FastAPI, /api/v1）
+- ✅ 認証方式の一貫性
+- ✅ エラーコードカタログ
+
+### 廃止した規約
+
+- ❌ 2セクション構成（人間向け/Cursor向け分離）
+- ❌ CR完了レポートの7セクション構成
+- ❌ 小さな修正でのSpec必須化
+- ❌ unified diffのみ制約
+- ❌ SDK生成・TestPyPI公開手順の規約
+
+詳しくは `.claude/rules.md` を参照
+
+---
+
+## ディレクトリ構造
+
+```
+src/nexuscore/
+├── api/          # FastAPI アプリケーション
+├── ui/           # Gradio / UI コンポーネント
+├── services/      # ビジネスロジック
+├── core/         # オーケストレーター
+└── agents/       # AI エージェント実装
+
+tests/             # テストスイート
+docs/             # ドキュメント
+GOVERNANCE/        # ガバナンス
+.claude/           # Claude Code 設定
+```
+
+---
+
+## API 開発
+
+### 基本ルール
+
+- 新規外部APIは **FastAPI** 必須
+- Public API は **/api/v1** プレフィックス
+- Request/Response は **Pydantic BaseModel** 必須
+- エラーコードは `docs/api/ERROR_CODE_CATALOG.md` に定義
+
+### 例
+
+```python
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+from .schemas.projects import ProjectCreate, ProjectResponse
+
+router = APIRouter(prefix="/api/v1", tags=["projects"])
+
+@router.post("/projects", response_model=ProjectResponse)
+def create_project(
+    project: ProjectCreate,
+    current_user = Depends(get_current_user)
+):
+    # 実装
+    pass
+```
+
+---
+
+## エラーハンドリング
+
+### 標準フォーマット
+
+```json
+{
+  "error": {
+    "code": "SOME_CODE",
+    "message": "Human-readable message"
+  }
+}
+```
+
+### 実装例
+
+```python
+from nexuscore.api.utils.errors import make_error
+
+@router.get("/projects/{project_id}")
+def get_project(project_id: int):
+    project = get_project(project_id)
+    if not project:
+        raise make_error(
+            code="PROJECT_NOT_FOUND",
+            message=f"Project {project_id} not found",
+            status_code=404
+        )
+    return project
+```
+
+---
+
+## 参照ドキュメント
+
+### Claude Code 設定
+
+- **ルール**: `.claude/rules.md`
+- **ワークフロー**: `.claude/workflows/development-flow.md`
+- **スキル**:
+  - `.claude/skills/tier-check.md` (Tier 判定)
+  - `.claude/skills/quick-spec.md` (簡易仕様)
+- **エージェント**:
+  - `.claude/agents/code-reviewer.md`
+  - `.claude/agents/decision-recorder.md`
+
+### プロジェクトドキュメント
+
+- **アーキテクチャ**: `docs/ARCHITECTURE.md`
+- **カバレッジ**: `docs/reports/COVERAGE_SUMMARY.md`
+- **API**: `docs/api/README.md`
+- **開発セットアップ**: `docs/development_setup.md`
+
+---
+
+## よくある質問
+
+### Q: 小さな修正でもSpecが必要？
+
+**A**: Tier 2 タスク（バグ修正、タイポなど）は直接実装開始でOKです。SpecはTier 1 タスクのみ必要です。
+
+### Q: 週次レビューはどうやる？
+
+**A**: 「今週レビューして」と言うだけで、Code Reviewer Agent が自動で実行します。
+
+### Q: いつDecision Recorderを使う？
+
+**A**: 重要な設計判断（アーキテクチャ、技術選択、API設計など）が必要な場合に使用します。
+
+---
+
+## サポート
+
+開発中に問題があれば、以下を参照してください：
+
+- **アーキテクチャ**: `docs/ARCHITECTURE.md`
+- **API**: `docs/api/README.md`
+- **開発セットアップ**: `docs/development_setup.md`
+- **GitHub Issues**: プロジェクトのIssuesページ
