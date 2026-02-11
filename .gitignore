@@ -7,6 +7,8 @@
 !.env.template
 # secrets.py は追跡しない
 src/nexuscore/config/secrets.py
+# Claude Code settings (ローカル設定は追跡しない)
+.claude/settings.local.json
 
 # Kubernetes Secrets（機密情報を含むため除外）
 k8s/nexuscore-secrets.yaml
