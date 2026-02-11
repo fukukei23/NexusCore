@@ -85,6 +85,7 @@ docs/decisions/[決定ID]_[タイトル].md
 - 既存の類似決定があれば参照を含める
 
 ## NexusCore 特有の記録項目
+---
 
 - API バージョニングの方針（/api/v1 vs /api/v2）
 - 認証方式の統一（API Key vs JWT）
