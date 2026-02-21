@@ -2,8 +2,9 @@
 
 > **多層品質ゲートを備えた自律型マルチエージェントAI開発フレームワーク**
 
-[![Test Coverage](https://img.shields.io/badge/coverage-16.85%25-yellow)](docs/reports/COVERAGE_SUMMARY.md)
-[![Tests](https://img.shields.io/badge/tests-431%20passing-brightgreen)](tests/agents/)
+[![Test Coverage](https://img.shields.io/badge/coverage-33.17%25-yellow)](docs/FINAL_COMPREHENSIVE_TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-2086%20passing-brightgreen)](tests/)
+[![Core+LLM Coverage](https://img.shields.io/badge/core+llm-87.36%25-brightgreen)](docs/FINAL_COMPREHENSIVE_TEST_REPORT.md)
 [![Python](https://img.shields.io/badge/python-3.11+-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
