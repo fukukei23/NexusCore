@@ -399,7 +399,30 @@ def pytest_ignore_collect(collection_path, config):
 
     Only allow tests/agents directory to be collected to avoid import errors
     from missing dependencies in other test directories.
+
+    NOTE: This restriction only applies when MUTATION_TESTING env var is set.
+    For normal test runs, all test directories are collected.
     """
+    # Only apply mutation testing restrictions if explicitly enabled
+    mutation_testing_mode = os.environ.get("MUTATION_TESTING", "").lower() in ("1", "true", "yes")
+
+    if not mutation_testing_mode:
+        # Normal test mode: allow all tests except known problematic files
+        path_str = str(collection_path)
+        file_name = collection_path.name
+
+        # Files to ignore due to missing dependencies (in any mode)
+        ignore_files = [
+            "test_knowledge_curator_agent.py",
+            "test_knowledge_curator_agent_ultimate.py",
+            "test_patch_applier.py",
+        ]
+        if file_name in ignore_files:
+            return True
+
+        return False
+
+    # Mutation testing mode: only collect tests/agents
     path_str = str(collection_path)
     file_name = collection_path.name
 
