@@ -1,14 +1,19 @@
 """
 NexusCore Webapp - logs ビューのテスト
 
-/logs/projects/<id> が 200 & 自分のプロジェクト以外は 404
-/logs/runs/<run_id> が 200 & ownership チェック
+注意: このテストファイルは Flask レガシー前提です。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
-from __future__ import annotations
-
 import pytest
-from nexuscore.webapp import create_app, db
-from nexuscore.webapp.models import Project, Run, User, ExecutionLog
+
+# CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask legacy logs_views tests have been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 @pytest.fixture

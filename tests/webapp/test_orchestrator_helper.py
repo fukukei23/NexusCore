@@ -1,16 +1,19 @@
 """
 webapp/orchestrator_helper.py の高品質なテスト
 
-テスト対象:
-- create_orchestrator_instance(): Orchestrator インスタンスを作成
-- run_orchestrator_sync(): Orchestrator を同期的に実行
+注意: このテストファイルは Flask レガシー前提です。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
-from __future__ import annotations
-
-from unittest.mock import Mock, patch, MagicMock
 import pytest
-import tempfile
-import os
+
+# CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
+# FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask legacy orchestrator_helper tests have been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 class TestCreateOrchestratorInstance:

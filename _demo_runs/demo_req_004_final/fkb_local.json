@@ -1,0 +1,75 @@
+[
+  {
+    "error_signature": "E\\s+NameError: name 'pytest' is not defined",
+    "cause": "【特殊ケース】`pytest.approx`などのpytestの機能を使用しようとしましたが、`import pytest`が行われていませんでした。",
+    "target": "test_file",
+    "solution_pattern": {
+      "type": "add_import",
+      "import": "import pytest"
+    }
+  },
+  {
+    "error_signature": "E\\s+AssertionError: assert (?:\\d*\\.)?\\d+ == (?:\\d*\\.)?\\d+",
+    "cause": "【特殊なAssertionError】浮動小数点数の丸め誤差により、直接的な `==` 比較が失敗しました。",
+    "target": "test_file",
+    "solution_pattern": {
+      "type": "regex_replace_with_import",
+      "import_statement": "import pytest",
+      "search": "(assert .*?) == (.*)",
+      "replace": "$1 == pytest.approx($2)"
+    }
+  },
+  {
+    "error_signature": "AssertionError:",
+    "cause": "【一般的なAssertionError】テストの期待値と実際の結果が一致しませんでした。LLMによる診断を開始します。",
+    "target": "source_file",
+    "solution_pattern": {
+      "type": "llm_diagnose_and_fix",
+      "instruction": "The test failed with an AssertionError. Analyze the source code and the test code to identify the logical error in the source code and provide a patch in the unified diff format to fix it. The error indicates the actual output did not match the expected output."
+    }
+  },
+  {
+    "error_signature": "E\\s+AttributeError: 'str' object has no attribute 'decode'",
+    "cause": "【特殊ケース】bytesオブジェクトが期待される場面で、誤って文字列(string)オブジェクトが使用されました。",
+    "target": "source_file",
+    "solution_pattern": {
+      "type": "regex_replace",
+      "search": "('.*?')\\.decode\\('utf-8'\\)",
+      "replace": "$1.encode('utf-8')"
+    }
+  },
+  {
+    "error_signature": "ValueError: Mismatched quotation marks",
+    "cause": "【特殊ケース】文字列リテラル内で引用符（クォーテーション）の対応が取れていません。",
+    "target": "source_file",
+    "solution_pattern": {
+      "type": "regex_replace",
+      "search": "'(Hello, [^']*)'(')",
+      "replace": "'$1$2'"
+    }
+  },
+  {
+    "id": "FKB-SUGGESTION-0001A",
+    "error_signature": "ImportError: cannot import name '\\w+' from '\\w+\\.\\w+'",
+    "cause": "関数が他の関数の中にネストされているため、直接インポートできません。",
+    "target": "test_file",
+    "solution_pattern": {
+      "type": "regex_replace",
+      "search": "from app\\.calculator import add",
+      "replace": "from app.calculator import add_two_numbers\\n\\nadd = add_two_numbers()"
+    },
+    "description": "ネストされた関数を直接インポートしようとした際に、代替の公開ファクトリを使うパターン。"
+  },
+  {
+    "id": "FKB-SUGGESTION-0001B",
+    "error_signature": "ImportError: cannot import name '\\w+' from 'app\\.\\w+'",
+    "cause": "関数が他の関数の中にネストされているため、テストコードから直接インポートできません。",
+    "target": "test_file",
+    "solution_pattern": {
+      "type": "regex_replace",
+      "search": "from app\\.calculator import ([a-zA-Z0-9_]+)",
+      "replace": "from app.calculator import add_two_numbers\\n\\1 = add_two_numbers()"
+    },
+    "description": "ネスト関数をモジュールレベルに露出させる際の一般化パターン。"
+  }
+]

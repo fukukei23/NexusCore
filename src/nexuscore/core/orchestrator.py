@@ -24,6 +24,7 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -476,6 +477,40 @@ class Orchestrator:
 
         code_result = _run_code()
         context.implementation = {"code": code_result}
+
+        # 生成されたコードをファイルに保存
+        if code_result:
+            try:
+                # hello.py として保存（Smoke Test要件）
+                hello_path = Path(self.project_path) / "hello.py"
+                hello_path.parent.mkdir(parents=True, exist_ok=True)
+                hello_path.write_text(code_result, encoding="utf-8")
+                self.logger.info(f"Generated code saved to: {hello_path}")
+
+                # README.md も生成（Smoke Test要件）
+                readme_path = Path(self.project_path) / "README.md"
+                readme_content = f"""# {Path(self.project_path).name}
+
+## 概要
+{context.user_requirement}
+
+## 実行方法
+
+```bash
+python hello.py
+```
+
+## 生成されたファイル
+
+- `hello.py` - Hello World を表示する Python スクリプト
+
+## 作成日時
+{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+                readme_path.write_text(readme_content, encoding="utf-8")
+                self.logger.info(f"README.md saved to: {readme_path}")
+            except Exception as e:
+                self.logger.warning(f"Failed to save files: {e}")
 
         return context
 

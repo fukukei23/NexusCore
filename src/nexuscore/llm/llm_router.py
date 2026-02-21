@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
@@ -38,7 +39,7 @@ from nexuscore.llm.routing_policy import (
     TASK_MODEL_MAP_DEFAULT,
     model_family,
 )
-from nexuscore.llm.runtime import REQUEST_TIMEOUT
+from nexuscore.llm.runtime import REQUEST_TIMEOUT, HTTP_CLIENT_FACTORY, HTTP_CLIENT_FACTORY
 
 # ---- Budget / Logger import (v1/v2 後方互換) ------------------------------
 # (v2.2.1 既存)
@@ -176,13 +177,13 @@ class RoutedLLM(BaseLLM):
             in_tokens_real = u.get("prompt_tokens")
             if in_tokens_real:
                 in_tokens = int(in_tokens_real)
-            
+
             out_tokens_real = u.get("completion_tokens")
             if out_tokens_real:
                 out_tokens = int(out_tokens_real)
             else:
                 out_tokens = self._estimate_tokens(output_text) # out だけ推定
-        
+
         if out_tokens == 0: # _last_usage が無い (Gemini等) or 失敗
             out_tokens = self._estimate_tokens(output_text)
 
@@ -233,7 +234,7 @@ class LLMRouter:
     - 呼び出し側(BaseAgentなど)には RoutedLLM を返す
     """
 
-    CLASSIFIER_MODEL_DEFAULT = "openai:gpt-5.1-instant"
+    CLASSIFIER_MODEL_DEFAULT = "openai:gpt-4o-mini"
     CLASSIFIER_MODEL: str = CLASSIFIER_MODEL_DEFAULT
 
     LONG_THRESHOLD = 8000  # 文字数しきい値などでモデルを切り替えたい場合に使う
@@ -279,7 +280,10 @@ class LLMRouter:
         )
         self.logger.info("[Budget] API variant detected: %s", BUDGET_API)
 
-        # "タスク分類用" モデル（デフォルト: openai:gpt-5.1-instant）
+        # モデル検出とtask model mapの更新（Smoke Test対応）
+        self._detect_and_update_models()
+
+        # "タスク分類用" モデル（デフォルト: openai:gpt-4o-mini）
         classifier_model_name = (
             self.env.get("NEXUS_CLASSIFIER_MODEL")
             or (self.task_model_map.get("routing_classify") or {}).get("primary")
@@ -326,6 +330,177 @@ class LLMRouter:
                 self.cheap_model
             )
         # --- ★★★★★ v2.1.1 統合コード (ここまで) ★★★★★ ---
+
+    # -----------------------------------------------------------------
+    # 内部: モデル検出（Smoke Test対応）
+    # -----------------------------------------------------------------
+    def _detect_and_update_models(self) -> None:
+        """
+        起動時に利用可能なモデルを検出し、task model mapを更新する。
+        ネットワーク失敗時は既存設定にフォールバック（警告ログのみ）。
+        """
+        detected_models = {"openai": [], "gemini": []}
+
+        # OpenAI モデル検出
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if openai_key and HTTP_CLIENT_FACTORY.available:
+            try:
+                session = HTTP_CLIENT_FACTORY.create_session()
+                if session:
+                    url = "https://api.openai.com/v1/models"
+                    headers = {"Authorization": f"Bearer {openai_key}"}
+                    resp = session.get(url, headers=headers, timeout=10)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        all_models = [m["id"] for m in data.get("data", [])]
+                        # chat/completionsエンドポイントで使えるモデルのみを抽出
+                        # codex系やcompletions専用モデルを除外
+                        chat_compatible = [m for m in all_models if not m.endswith("-codex") and not m.endswith("-instruct")]
+                        detected_models["openai"] = chat_compatible
+                        self.logger.info(f"[Model Detection] OpenAI: Found {len(all_models)} total models, {len(chat_compatible)} chat-compatible models")
+                        if chat_compatible:
+                            self.logger.debug(f"[Model Detection] OpenAI chat-compatible models (first 10): {chat_compatible[:10]}")
+            except Exception as e:
+                self.logger.warning(f"[Model Detection] OpenAI models.list failed: {e}. Using static defaults.")
+
+        # Gemini モデル検出（403回避のためURLエンコーディング使用）
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        if gemini_key and HTTP_CLIENT_FACTORY.available:
+            try:
+                session = HTTP_CLIENT_FACTORY.create_session()
+                if session:
+                    url = "https://generativelanguage.googleapis.com/v1beta/models"
+                    # paramsを使用してURLエンコーディングを適切に処理（403回避）
+                    params = {"key": gemini_key}
+                    resp = session.get(url, params=params, timeout=10)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        models_list = data.get("models", [])
+                        # generateContent対応モデルのみ抽出
+                        for m in models_list:
+                            name = m.get("name", "")
+                            methods = m.get("supportedGenerationMethods", [])
+                            if "generateContent" in methods and name.startswith("models/"):
+                                # models/gemini-2.5-flash -> gemini-2.5-flash に変換
+                                pure_name = name.replace("models/", "")
+                                detected_models["gemini"].append(pure_name)
+                        self.logger.info(f"[Model Detection] Gemini: Found {len(detected_models['gemini'])} generateContent-compatible models")
+                    elif resp.status_code == 403:
+                        self.logger.warning(f"[Model Detection] Gemini API returned 403 (key/permission issue). Gemini will be disabled for this run.")
+                    else:
+                        self.logger.warning(f"[Model Detection] Gemini API returned status {resp.status_code}. Using static defaults.")
+            except Exception as e:
+                self.logger.warning(f"[Model Detection] Gemini models.list failed: {e}. Using static defaults.")
+
+        # task model mapを検出結果に基づいて更新
+        self._apply_detected_models(detected_models)
+
+    def _apply_detected_models(self, detected: Dict[str, List[str]]) -> None:
+        """
+        検出されたモデル一覧に基づいてtask model mapを更新する。
+        実在しないモデル名を実在するモデルに置き換える。
+        """
+        openai_models = detected.get("openai", [])
+        gemini_models = detected.get("gemini", [])
+
+        # OpenAIモデルの優先順位（chat/completionsエンドポイントで使えるもののみ）
+        # codex系は除外（v1/chat/completionsで使えないため、検出結果にも含まれない）
+        openai_chat_candidates = [
+            "gpt-5.2-chat-latest", "gpt-5.1-chat-latest", "gpt-5-chat-latest",
+            "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"
+        ]
+        # code_generate用：codex系は除外し、chat系のみを使用（Smoke Test要件）
+        openai_codex_candidates = ["gpt-4o"]  # codex系は除外済み、chat系のみ
+        openai_mini_candidates = ["gpt-5-mini", "gpt-5.1-mini", "gpt-4o-mini", "gpt-3.5-turbo"]
+
+        def find_available_model(candidates: List[str], available_list: List[str]) -> Optional[str]:
+            """候補リストから実在する最初のモデルを返す"""
+            for candidate in candidates:
+                if candidate in available_list:
+                    return candidate
+            return None
+
+        # general/requirement/planning: chat対応モデル
+        chat_model = find_available_model(openai_chat_candidates, openai_models)
+        if not chat_model:
+            chat_model = "gpt-4o"  # フォールバック
+
+        # code_generate/test_generate/debug: Smoke Testではchat系に固定（codex系が存在しない場合）
+        # エンドポイント不一致を避けるため、chat/completionsで呼べるモデルのみ使用
+        codex_model = find_available_model(openai_codex_candidates, openai_models)
+        if not codex_model:
+            # codex系が存在しない場合はchat系を使用（Smoke Test要件）
+            codex_model = chat_model
+
+        # routing_classify: miniモデル
+        mini_model = find_available_model(openai_mini_candidates, openai_models) or "gpt-4o-mini"
+
+        # Gemini: gemini-2.5-pro/flash が存在する場合
+        gemini_model = None
+        if gemini_models:
+            for candidate in ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro"]:
+                if candidate in gemini_models:
+                    gemini_model = f"google:{candidate}"
+                    break
+
+        # task model mapを更新（provider:model形式）
+        updates = {}
+        if chat_model:
+            # general, requirement, planning, review, testing 系を更新（Smoke Test要件）
+            chat_tasks = ["general", "requirement", "requirement_elicit", "plan_generate", "planning",
+                         "code_review", "review", "testing", "test"]
+            for task in chat_tasks:
+                if task in self.task_model_map:
+                    current = self.task_model_map[task]
+                    if isinstance(current, dict):
+                        # provider:model形式に変換
+                        if not chat_model.startswith("openai:"):
+                            chat_model_with_provider = f"openai:{chat_model}"
+                        else:
+                            chat_model_with_provider = chat_model
+                        updates[task] = {**current, "primary": chat_model_with_provider}
+
+        if codex_model:
+            # code_generate, test_generate, debug を更新（Smoke Testではchat系に固定）
+            for task in ["code_generate", "test_generate", "debug", "code_refactor"]:
+                if task in self.task_model_map:
+                    current = self.task_model_map[task]
+                    if isinstance(current, dict):
+                        if not codex_model.startswith("openai:"):
+                            codex_model_with_provider = f"openai:{codex_model}"
+                        else:
+                            codex_model_with_provider = codex_model
+                        updates[task] = {**current, "primary": codex_model_with_provider}
+                        self.logger.debug(f"[Model Detection] {task} will use {codex_model_with_provider} (chat-compatible for Smoke Test)")
+
+        if mini_model:
+            # routing_classify を更新
+            if "routing_classify" in self.task_model_map:
+                current = self.task_model_map["routing_classify"]
+                if isinstance(current, dict):
+                    if not mini_model.startswith("openai:"):
+                        mini_model_with_provider = f"openai:{mini_model}"
+                    else:
+                        mini_model_with_provider = mini_model
+                    updates["routing_classify"] = {**current, "primary": mini_model_with_provider}
+
+        if gemini_model:
+            # Gemini系タスクを更新
+            for task in ["analytical", "plan_generate", "catalog_enrich", "scraping_analyze"]:
+                if task in self.task_model_map:
+                    current = self.task_model_map[task]
+                    if isinstance(current, dict):
+                        updates[task] = {**current, "primary": gemini_model}
+
+        # 更新を適用
+        for task, new_config in updates.items():
+            self.task_model_map[task] = new_config
+            self.logger.info(f"[Model Detection] Updated {task}: {new_config.get('primary')}")
+
+        if updates:
+            self.logger.info(f"[Model Detection] Updated {len(updates)} task model mappings based on detected models")
+        else:
+            self.logger.info("[Model Detection] No model mappings updated (using static defaults)")
 
     # -----------------------------------------------------------------
     # 内部: タスク分類
@@ -517,8 +692,8 @@ if __name__ == "__main__":
     )
 
     print("--- LLMRouter Smoke Test (v2.3.5-robust) ---")
-    
-    router = None 
+
+    router = None
     try:
         # [AI提案] テスト時に環境変数をセットして実コールを試せます
         # $env:NEXUS_REAL_CALLS="1"
@@ -526,7 +701,7 @@ if __name__ == "__main__":
         # $env:NEXUSCORE_ENV_FILE="C:\Users\USER\tools\NexusCore\.env"
         # $env:NEXUS_REQUEST_TIMEOUT_SEC="60" # タイムアウトテスト
         #
-        # $env:OPENAI_API_KEY="sk-..." 
+        # $env:OPENAI_API_KEY="sk-..."
         # $env:DEEPSEEK_API_KEY="sk-..."
         # $env:KIMI_API_KEY="sk-..."
         # $env:GEMINI_API_KEY="AIzaSy..."
@@ -556,11 +731,11 @@ if __name__ == "__main__":
             "項目A:foo\n項目B:bar をJSONに"
         )
         print(f"\nSample Prompt (JSON): {sample_prompt_json[:80]}...")
-        llm_client_json = router.get_llm_for_task(sample_prompt_json) 
+        llm_client_json = router.get_llm_for_task(sample_prompt_json)
         print(f"--> Selected Client: {type(llm_client_json.inner).__name__}")
         print(f"    Model: {llm_client_json.model_name}")
         print(f"    Task Type (router classified): {llm_client_json.task_type}")
-        
+
         resp_json = llm_client_json.execute(
             prompt=sample_prompt_json,
             system_prompt="You output JSON only.",

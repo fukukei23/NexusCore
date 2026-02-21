@@ -1,20 +1,19 @@
 """
 webapp/auth.py の高品質なテスト
 
-テスト対象:
-- init_oauth(): OAuth クライアントの初期化
-- login_github(): GitHub OAuth ログイン開始
-- github_callback(): GitHub OAuth コールバック処理
-- logout(): ログアウト
-- get_current_user(): 現在のログインユーザーを取得
-- require_auth(): 認証必須デコレータ
+注意: このテストファイルは Flask レガシー前提です。
+CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
+FastAPI 側の認証テストは tests/api/test_fastapi_*.py を参照してください。
 """
-from __future__ import annotations
-
-from unittest.mock import Mock, patch, MagicMock
 import pytest
 
-from nexuscore.webapp.models import User
+# CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
+# FastAPI 側の認証テストは tests/api/test_fastapi_*.py を参照してください
+pytest.skip(
+    "Flask legacy auth tests have been removed in CR-FASTAPI-010. "
+    "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
+    allow_module_level=True
+)
 
 
 @pytest.fixture(scope="function")
