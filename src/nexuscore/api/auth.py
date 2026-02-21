@@ -6,9 +6,17 @@ JWTトークンベースの認証を提供する。
 from functools import wraps
 from flask import request, jsonify
 import os
-import jwt
 from datetime import datetime, timedelta
 from typing import Optional
+import logging
+
+try:
+    import jwt
+    HAS_JWT = True
+except Exception as e:
+    HAS_JWT = False
+    jwt = None  # type: ignore
+    logging.warning(f"PyJWT not available ({type(e).__name__}). JWT authentication will be disabled.")
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-in-production-INSECURE-DEFAULT")
 ALGORITHM = "HS256"
@@ -33,6 +41,9 @@ def require_auth(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        if not HAS_JWT:
+            return jsonify({"error": "JWT authentication not available. Install PyJWT."}), 503
+
         # Authorization ヘッダーからトークンを取得
         auth_header = request.headers.get('Authorization')
 
@@ -48,13 +59,16 @@ def require_auth(f):
 
         try:
             # トークンを検証
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])  # type: ignore
             # デコードされたペイロードを request にアタッチ（必要に応じて使用可能）
             request.auth_payload = payload
-        except jwt.ExpiredSignatureError:
-            return jsonify({"error": "Token has expired"}), 401
-        except jwt.InvalidTokenError as e:
-            return jsonify({"error": f"Invalid token: {str(e)}"}), 401
+        except Exception as e:
+            # jwt.ExpiredSignatureError, jwt.InvalidTokenError など
+            error_name = type(e).__name__
+            if "ExpiredSignature" in error_name:
+                return jsonify({"error": "Token has expired"}), 401
+            else:
+                return jsonify({"error": f"Invalid token: {str(e)}"}), 401
 
         return f(*args, **kwargs)
 
@@ -76,12 +90,15 @@ def generate_token(user_id: str, expires_in_hours: int = 24) -> str:
         >>> token = generate_token("admin-user", expires_in_hours=1)
         >>> # このトークンを Authorization: Bearer <token> で使用
     """
+    if not HAS_JWT:
+        raise ImportError("PyJWT not available. Install with: pip install pyjwt")
+
     payload = {
         'user_id': user_id,
         'exp': datetime.utcnow() + timedelta(hours=expires_in_hours),
         'iat': datetime.utcnow()
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)  # type: ignore
 
 
 def verify_token(token: str) -> Optional[dict]:
@@ -95,8 +112,13 @@ def verify_token(token: str) -> Optional[dict]:
         検証成功時: ペイロード辞書
         検証失敗時: None
     """
+    if not HAS_JWT:
+        logging.warning("PyJWT not available. Cannot verify token.")
+        return None
+
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])  # type: ignore
         return payload
-    except jwt.InvalidTokenError:
+    except Exception:
+        # jwt.InvalidTokenError など
         return None

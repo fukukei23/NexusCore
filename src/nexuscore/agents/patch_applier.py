@@ -6,7 +6,12 @@ import logging
 import os
 from typing import Dict, Any
 
-import patch  # python-patch ライブラリを使用
+try:
+    import patch  # python-patch ライブラリを使用
+    HAS_PATCH = True
+except ImportError:
+    HAS_PATCH = False
+    patch = None  # type: ignore
 
 
 class PatchApplier:
@@ -58,6 +63,11 @@ class PatchApplier:
             "reason": "",
             "error": None,
         }
+
+        if not HAS_PATCH:
+            result["reason"] = "python-patch library not available. Install with: pip install patch"
+            self.logger.error(result["reason"])
+            return result
 
         if not patch_text.strip():
             result["reason"] = "Empty patch text."
