@@ -1,0 +1,196 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schemas/2024-11-05/mcp/client-settings.schema.json",
+  "description": "NexusCore安全運用設定 - 破壊的操作を防止し、品質を保証",
+  "mcpServers": {},
+  "customInstructions": "You are working on NexusCore, an AI-powered self-healing development platform. Follow strict safety protocols to prevent data loss and maintain code quality.",
+  "rules": [
+    {
+      "name": "safe-git-operations",
+      "description": "Git操作の安全制御",
+      "allow": [
+        "git init",
+        "git add",
+        "git commit",
+        "git status",
+        "git diff",
+        "git log",
+        "git branch",
+        "git checkout",
+        "git show",
+        "git reflog"
+      ],
+      "askBeforeRunning": [
+        "git push",
+        "git pull",
+        "git merge",
+        "git rebase",
+        "git reset",
+        "git clean",
+        "git stash",
+        "rm *"
+      ],
+      "alwaysDeny": [
+        "git push -f",
+        "git push --force",
+        "git reset --hard",
+        "git clean -fd",
+        "git clean -fdx",
+        "rm -rf",
+        "sudo rm"
+      ]
+    },
+    {
+      "name": "branch-naming-convention",
+      "description": "NexusCore用ブランチ命名規則",
+      "pattern": "^(main|develop|claude/nexuscore-quality-.*|feature/.*|fix/.*|test/.*)$",
+      "message": "ブランチ名は claude/nexuscore-quality-* または feature/*/fix/*/test/* を使用してください"
+    },
+    {
+      "name": "python-development",
+      "description": "Python開発ツールの許可",
+      "allow": [
+        "python",
+        "python3",
+        "pytest",
+        "pip install",
+        "pip list",
+        "coverage",
+        "black",
+        "ruff",
+        "mypy",
+        "bandit"
+      ],
+      "askBeforeRunning": [
+        "pip uninstall"
+      ]
+    },
+    {
+      "name": "nexuscore-specific-tools",
+      "description": "NexusCore特化ツール（FastAPI/Playwright/Redis）",
+      "allow": [
+        "uvicorn",
+        "fastapi dev",
+        "playwright",
+        "redis-cli",
+        "celery",
+        "pytest-playwright",
+        "httpx"
+      ]
+    },
+    {
+      "name": "docker-wsl-safety",
+      "description": "Docker/WSLは読み取りとテスト実行のみ",
+      "allow": [
+        "docker ps",
+        "docker logs",
+        "docker inspect",
+        "docker-compose config",
+        "wsl --status",
+        "wsl --list"
+      ],
+      "askBeforeRunning": [
+        "docker run",
+        "docker build",
+        "docker-compose up",
+        "docker-compose down",
+        "wsl --shutdown"
+      ],
+      "alwaysDeny": [
+        "docker rm -f",
+        "docker rmi -f",
+        "docker system prune -af",
+        "wsl --unregister"
+      ]
+    },
+    {
+      "name": "env-file-protection",
+      "description": "環境変数ファイルの読み取り専用保護",
+      "readOnly": [
+        ".env",
+        ".env.local",
+        ".env.production",
+        "secrets.json",
+        "config/credentials.json"
+      ],
+      "alwaysDeny": [
+        "echo * > .env",
+        "cat * > .env",
+        "rm .env",
+        "mv .env"
+      ],
+      "message": "⚠️ .envファイルは読み取り専用です。変更は手動で行ってください。"
+    },
+    {
+      "name": "critical-files-protection",
+      "description": "重要ファイルの保護",
+      "askBeforeRunning": [
+        "rm requirements.txt",
+        "rm pyproject.toml",
+        "rm pytest.ini",
+        "rm .gitignore",
+        "rm README.md"
+      ],
+      "alwaysDeny": [
+        "rm -rf src/",
+        "rm -rf tests/",
+        "rm -rf .git/"
+      ]
+    },
+    {
+      "name": "database-safety",
+      "description": "データベース操作の安全性",
+      "askBeforeRunning": [
+        "DROP TABLE",
+        "TRUNCATE",
+        "DELETE FROM",
+        "redis-cli FLUSHALL",
+        "redis-cli FLUSHDB"
+      ],
+      "message": "⚠️ データ削除操作は慎重に確認してください"
+    },
+    {
+      "name": "test-coverage-enforcement",
+      "description": "テストカバレッジの強制",
+      "beforeCommit": [
+        "pytest tests/ --cov=src/nexuscore --cov-report=term-missing"
+      ],
+      "minimumCoverage": 80,
+      "message": "✓ カバレッジ80%以上を維持してください"
+    },
+    {
+      "name": "code-quality-checks",
+      "description": "コード品質チェック",
+      "beforeCommit": [
+        "ruff check src/",
+        "black --check src/",
+        "mypy src/nexuscore --ignore-missing-imports",
+        "bandit -r src/ -ll"
+      ],
+      "message": "✓ コード品質チェックに合格してください"
+    }
+  ],
+  "hooks": {
+    "pre-commit": {
+      "enabled": true,
+      "commands": [
+        "ruff check src/",
+        "black --check src/",
+        "pytest tests/ -v --maxfail=1"
+      ]
+    },
+    "pre-push": {
+      "enabled": true,
+      "commands": [
+        "pytest tests/ --cov=src/nexuscore --cov-report=term-missing",
+        "bandit -r src/ -ll"
+      ]
+    }
+  },
+  "notifications": {
+    "onDangerousOperation": true,
+    "onTestFailure": true,
+    "onCoverageDecrease": true
+  },
+  "autoSave": true,
+  "confirmBeforeExit": true
+}
