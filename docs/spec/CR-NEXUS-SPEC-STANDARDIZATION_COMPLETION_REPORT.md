@@ -1,5 +1,9 @@
 # CR-NEXUS-SPEC-STANDARDIZATION: Spec 管理の標準化・自動化 - 完了レポート
 
+> **SRS Traceability**
+> - Related SRS: docs/srs/NEXUSCORE_SRS.md
+> - This CR satisfies: NFR-1
+
 ## 実装日時
 
 2024年12月4日
