@@ -165,12 +165,12 @@ def test_status_endpoint_returns_404_for_nonexistent_task(client: TestClient, mo
     assert response.status_code == 404
     data = response.json()
     # FastAPIのHTTPExceptionは detail キーにエラー情報を入れる
-    assert "detail" in data
-    # ErrorResponse形式: {"detail": {"error": {"code": "...", "message": "..."}}}
-    if isinstance(data["detail"], dict) and "error" in data["detail"]:
-        assert "not found" in str(data["detail"]["error"]).lower()
-    elif isinstance(data["detail"], str):
-        assert "not found" in data["detail"].lower()
+    # CR-NEXUS-034: トップレベル error 形式（Option A）
+    assert "error" in data
+    assert "code" in data["error"]
+    assert data["error"]["code"] == "NOT_FOUND"
+    assert "not found" in data["error"]["message"].lower()
+    assert "detail" not in data
 
 
 def test_execute_and_status_are_documented_in_openapi(client: TestClient):

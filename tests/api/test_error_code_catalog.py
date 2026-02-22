@@ -38,7 +38,7 @@ def parse_error_code_catalog() -> Dict[str, Tuple[int, str]]:
 
     for line in catalog_content.split("\n"):
         # テーブルの開始を検出
-        if "| error.code" in line.lower() and "| HTTP Status" in line.lower():
+        if "| error.code" in line.lower() and "| http status" in line.lower():
             in_table = True
             table_started = True
             continue
@@ -47,7 +47,7 @@ def parse_error_code_catalog() -> Dict[str, Tuple[int, str]]:
             continue
 
         # テーブルの終了を検出（空行または別のセクション）
-        if table_started and (line.strip() == "" or line.startswith("##")):
+        if line.strip() == "" or line.startswith("##"):
             if table_started:
                 break
 

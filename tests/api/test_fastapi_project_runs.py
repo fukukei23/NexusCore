@@ -208,9 +208,10 @@ def test_trigger_project_run_project_not_found(mock_db_session):
 
         assert response.status_code == 404
         error_data = response.json()
-        assert "detail" in error_data
-        assert "error" in error_data["detail"]
-        assert error_data["detail"]["error"]["code"] == "NOT_FOUND"
+        # CR-NEXUS-034: トップレベル error 形式（Option A）
+        assert "error" in error_data
+        assert error_data["error"]["code"] == "NOT_FOUND"
+        assert "detail" not in error_data
 
 
 def test_trigger_project_run_missing_requirement(mock_db_session, mock_project):
@@ -236,7 +237,10 @@ def test_trigger_project_run_missing_requirement(mock_db_session, mock_project):
 
         assert response.status_code == 422
         error_data = response.json()
-        assert "detail" in error_data
+        # CR-NEXUS-034: トップレベル error 形式（Option A）
+        assert "error" in error_data
+        assert error_data["error"]["code"] == "VALIDATION_ERROR"
+        assert "detail" not in error_data
 
 
 def test_get_latest_run_success(mock_db_session, mock_project, mock_run):
@@ -329,9 +333,10 @@ def test_get_latest_run_project_not_found(mock_db_session):
 
         assert response.status_code == 404
         error_data = response.json()
-        assert "detail" in error_data
-        assert "error" in error_data["detail"]
-        assert error_data["detail"]["error"]["code"] == "NOT_FOUND"
+        # CR-NEXUS-034: トップレベル error 形式（Option A）
+        assert "error" in error_data
+        assert error_data["error"]["code"] == "NOT_FOUND"
+        assert "detail" not in error_data
 
 
 def test_trigger_project_run_requires_authentication(mock_db_session):
@@ -354,7 +359,10 @@ def test_trigger_project_run_requires_authentication(mock_db_session):
     # FastAPIの必須パラメータ（X-API-Key）が欠如しているため422が返る
     assert response.status_code == 422
     error_data = response.json()
-    assert "detail" in error_data
+    # CR-NEXUS-034: トップレベル error 形式（Option A）
+    assert "error" in error_data
+    assert error_data["error"]["code"] == "VALIDATION_ERROR"
+    assert "detail" not in error_data
 
 
 def test_get_latest_run_requires_authentication(mock_db_session):
@@ -370,5 +378,8 @@ def test_get_latest_run_requires_authentication(mock_db_session):
     # FastAPIの必須パラメータ（X-API-Key）が欠如しているため422が返る
     assert response.status_code == 422
     error_data = response.json()
-    assert "detail" in error_data
+    # CR-NEXUS-034: トップレベル error 形式（Option A）
+    assert "error" in error_data
+    assert error_data["error"]["code"] == "VALIDATION_ERROR"
+    assert "detail" not in error_data
 
