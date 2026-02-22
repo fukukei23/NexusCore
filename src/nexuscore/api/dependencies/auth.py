@@ -117,6 +117,13 @@ def get_current_user(
         HTTPException: 認証失敗時（401）またはサーバー設定エラー時（500）
     """
     try:
+        # CR-NEXUS-038: サーバー設定エラーを確実に検出するため、認証前に get_api_key() を呼ぶ
+        try:
+            get_api_key()
+        except Exception:
+            # get_api_key() が 500 を返す場合（サーバー設定エラー）はそのまま raise
+            raise
+
         from nexuscore.webapp.models import ApiKey, User
         from sqlalchemy.exc import SQLAlchemyError
 
