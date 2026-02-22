@@ -60,13 +60,14 @@ def test_not_found_error_format(client: TestClient, mock_api_key, monkeypatch):
 
         assert response.status_code == 404
         data = response.json()
-        # FastAPIのHTTPExceptionは detail キーにエラー情報を入れる
-        assert "detail" in data
-        assert "error" in data["detail"]
-        assert "code" in data["detail"]["error"]
-        assert "message" in data["detail"]["error"]
-        assert data["detail"]["error"]["code"] == "NOT_FOUND"
-        assert "not found" in data["detail"]["error"]["message"].lower()
+        # CR-NEXUS-034: トップレベル error 形式（Option A）
+        assert "error" in data
+        assert "code" in data["error"]
+        assert "message" in data["error"]
+        assert data["error"]["code"] == "NOT_FOUND"
+        assert "not found" in data["error"]["message"].lower()
+        # detail キーは存在しない（トップレベル error 形式）
+        assert "detail" not in data
 
 
 def test_unauthorized_error_format(client: TestClient):
@@ -132,9 +133,14 @@ def test_validation_error_format(client: TestClient, mock_api_key, monkeypatch):
 
         # FastAPI のバリデーションエラー（422）が返される
         assert response.status_code == 422
-        # FastAPI のデフォルトバリデーションエラー形式は異なるが、
-        # カスタムエラーハンドラーで統一された形式に変換される可能性がある
-        # ここでは、422 が返されることを確認
+        data = response.json()
+        # CR-NEXUS-034: トップレベル error 形式（Option A）
+        assert "error" in data
+        assert "code" in data["error"]
+        assert "message" in data["error"]
+        assert data["error"]["code"] == "VALIDATION_ERROR"
+        # detail キーは存在しない（トップレベル error 形式）
+        assert "detail" not in data
 
 
 def test_internal_error_format(client: TestClient, mock_api_key, monkeypatch):
@@ -171,12 +177,13 @@ def test_internal_error_format(client: TestClient, mock_api_key, monkeypatch):
 
         assert response.status_code == 500
         data = response.json()
-        # FastAPIのHTTPExceptionは detail キーにエラー情報を入れる
-        assert "detail" in data
-        assert "error" in data["detail"]
-        assert "code" in data["detail"]["error"]
-        assert "message" in data["detail"]["error"]
-        assert data["detail"]["error"]["code"] == "INTERNAL_ERROR"
+        # CR-NEXUS-034: トップレベル error 形式（Option A）
+        assert "error" in data
+        assert "code" in data["error"]
+        assert "message" in data["error"]
+        assert data["error"]["code"] == "INTERNAL_ERROR"
+        # detail キーは存在しない（トップレベル error 形式）
+        assert "detail" not in data
 
 
 def test_error_schemas_in_openapi(client: TestClient):
@@ -219,8 +226,8 @@ def test_all_endpoints_have_error_responses(client: TestClient):
     endpoints_to_check = [
         "/api/v1/projects",
         "/api/v1/projects/{project_id}",
-        "/api/v1/runs",
-        "/api/v1/runs/{run_id}",
+        "/api/v1/run-records",
+        "/api/v1/run-records/{run_id}",
         "/api/v1/execute",
         "/api/v1/status/{task_id}",
         "/api/v1/github/webhook",

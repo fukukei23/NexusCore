@@ -116,9 +116,10 @@ def test_project_success_rate_badge_project_not_found():
 
         assert response.status_code == 404
         error_data = response.json()
-        assert "detail" in error_data
-        assert "error" in error_data["detail"]
-        assert error_data["detail"]["error"]["code"] == "NOT_FOUND"
+        # CR-NEXUS-034: トップレベル error 形式（Option A）
+        assert "error" in error_data
+        assert error_data["error"]["code"] == "NOT_FOUND"
+        assert "detail" not in error_data
 
 
 def test_project_last_run_badge_success(mock_project, mock_latest_run):
@@ -227,9 +228,10 @@ def test_project_last_run_badge_project_not_found():
 
         assert response.status_code == 404
         error_data = response.json()
-        assert "detail" in error_data
-        assert "error" in error_data["detail"]
-        assert error_data["detail"]["error"]["code"] == "NOT_FOUND"
+        # CR-NEXUS-034: トップレベル error 形式（Option A）
+        assert "error" in error_data
+        assert error_data["error"]["code"] == "NOT_FOUND"
+        assert "detail" not in error_data
 
 
 def test_badge_endpoints_no_authentication_required(mock_project, mock_runs):

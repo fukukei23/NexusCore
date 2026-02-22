@@ -5,7 +5,7 @@ Flask SaaS UI のスモークテストで使用する共通フィクスチャを
 テスト結果自動保存機能も含む。
 """
 
-# from __future__ import annotations  # mutmut パーサーとの互換性のためコメントアウト
+from __future__ import annotations
 
 import pytest
 from datetime import datetime, timedelta
@@ -71,13 +71,43 @@ def test_user(app):
 
 
 @pytest.fixture
-def test_project(app, test_user):
+def test_user_id(app):
+    """
+    テスト用ユーザーID（int）を返す fixture
+
+    CR-NEXUS-035: DetachedInstanceError を回避するため、ORM インスタンスではなく
+    安定した int の user_id を返す。test_project などで使用する。
+
+    test_user fixture とは独立して User を作成し、id のみを返す。
+    """
+    if not HAS_WEBAPP:
+        pytest.skip("webapp modules not available")
+    with app.app_context():
+        # 既存の User が存在するかチェック（test_user fixture が先に実行される可能性がある）
+        existing_user = User.query.filter_by(github_id="123").first()
+        if existing_user:
+            return int(existing_user.id)
+
+        # 存在しない場合は新規作成
+        user = User(
+            github_id="123",
+            github_login="test_user",
+        )
+        db.session.add(user)
+        db.session.flush()  # id を確定させる
+        user_id = int(user.id)
+        db.session.commit()  # 永続化
+        return user_id
+
+
+@pytest.fixture
+def test_project(app, test_user_id):
     """テスト用プロジェクト"""
     if not HAS_WEBAPP:
         pytest.skip("webapp modules not available")
     with app.app_context():
         project = Project(
-            owner_id=test_user.id,
+            owner_id=test_user_id,
             name="Test Project",
             repo_url="https://github.com/example/repo",
             local_path="/tmp/test",
@@ -88,15 +118,45 @@ def test_project(app, test_user):
 
 
 @pytest.fixture
-def test_run_with_metrics(app, test_project, test_user):
+def test_project_id(app, test_user_id):
+    """
+    テスト用プロジェクトID（int）を返す fixture
+
+    CR-NEXUS-035: DetachedInstanceError を回避するため、ORM インスタンスではなく
+    安定した int の project_id を返す。test_run_with_metrics などで使用する。
+    """
+    if not HAS_WEBAPP:
+        pytest.skip("webapp modules not available")
+    with app.app_context():
+        # 既存の Project が存在するかチェック（test_project fixture が先に実行される可能性がある）
+        existing_project = Project.query.filter_by(name="Test Project", owner_id=test_user_id).first()
+        if existing_project:
+            return int(existing_project.id)
+
+        # 存在しない場合は新規作成
+        project = Project(
+            owner_id=test_user_id,
+            name="Test Project",
+            repo_url="https://github.com/example/repo",
+            local_path="/tmp/test",
+        )
+        db.session.add(project)
+        db.session.flush()  # id を確定させる
+        project_id = int(project.id)
+        db.session.commit()  # 永続化
+        return project_id
+
+
+@pytest.fixture
+def test_run_with_metrics(app, test_project_id, test_user_id):
     """テスト用 Run（メトリクス付き）"""
     if not HAS_WEBAPP:
         pytest.skip("webapp modules not available")
     with app.app_context():
         run = Run(
-            project_id=test_project.id,
+            project_id=test_project_id,
             run_id="test-run-123",
-            triggered_by=test_user.id,
+            triggered_by=test_user_id,
             status="SUCCESS",
             started_at=datetime.utcnow() - timedelta(seconds=30),
             finished_at=datetime.utcnow(),
@@ -135,7 +195,7 @@ def test_run_with_metrics(app, test_project, test_user):
 
 
 @pytest.fixture
-def test_run_with_self_healing_metrics(app, test_project, test_user):
+def test_run_with_self_healing_metrics(app, test_project_id, test_user_id):
     """
     テスト用 Run（Self-Healing メトリクス付き）
     ExecutionLog に retry_count, last_error_class, model を含める
@@ -144,9 +204,9 @@ def test_run_with_self_healing_metrics(app, test_project, test_user):
         pytest.skip("webapp modules not available")
     with app.app_context():
         run = Run(
-            project_id=test_project.id,
+            project_id=test_project_id,
             run_id="test-run-sh-123",
-            triggered_by=test_user.id,
+            triggered_by=test_user_id,
             status="SUCCESS",
             started_at=datetime.utcnow() - timedelta(seconds=30),
             finished_at=datetime.utcnow(),
@@ -205,7 +265,7 @@ def test_run_with_self_healing_metrics(app, test_project, test_user):
 
 
 @pytest.fixture
-def test_api_key(app, test_user):
+def test_api_key(app, test_user_id):
     """テスト用 API Key"""
     if not HAS_WEBAPP:
         pytest.skip("webapp modules not available")
@@ -214,7 +274,7 @@ def test_api_key(app, test_user):
         token_hash = ApiKey.hash_token(raw_token)
 
         api_key = ApiKey(
-            user_id=test_user.id,
+            user_id=test_user_id,
             token_hash=token_hash,
             name="Test API Key",
         )
@@ -388,63 +448,3 @@ def pytest_sessionfinish(session, exitstatus):
         sys.stderr.write(error_message)
         sys.stderr.flush()
 
-
-# ======================================================================================
-# Tier 2 Mutation Testing - Test Collection Control
-# ======================================================================================
-
-def pytest_ignore_collect(collection_path, config):
-    """
-    Ignore test directories with missing dependencies for mutation testing.
-
-    Only allow tests/agents directory to be collected to avoid import errors
-    from missing dependencies in other test directories.
-
-    NOTE: This restriction only applies when MUTATION_TESTING env var is set.
-    For normal test runs, all test directories are collected.
-    """
-    # Only apply mutation testing restrictions if explicitly enabled
-    mutation_testing_mode = os.environ.get("MUTATION_TESTING", "").lower() in ("1", "true", "yes")
-
-    if not mutation_testing_mode:
-        # Normal test mode: allow all tests except known problematic files
-        path_str = str(collection_path)
-        file_name = collection_path.name
-
-        # Files to ignore due to missing dependencies (in any mode)
-        ignore_files = [
-            "test_knowledge_curator_agent.py",
-            "test_knowledge_curator_agent_ultimate.py",
-            "test_patch_applier.py",
-        ]
-        if file_name in ignore_files:
-            return True
-
-        return False
-
-    # Mutation testing mode: only collect tests/agents
-    path_str = str(collection_path)
-    file_name = collection_path.name
-
-    # Always allow test_mutation_tester_agent.py (needed for mutmut)
-    if file_name == "test_mutation_tester_agent.py":
-        return False
-
-    # Check if this is in the agents directory
-    if "/tests/agents/" in path_str or "tests/agents/" in path_str:
-        # Files to ignore due to missing dependencies
-        ignore_files = [
-            "test_knowledge_curator_agent.py",
-            "test_knowledge_curator_agent_ultimate.py",
-            "test_patch_applier.py",
-        ]
-        if file_name in ignore_files:
-            return True
-        # Allow all other test files in tests/agents
-        return False
-
-    # Ignore all test directories outside of tests/agents
-    if "/tests/" in path_str and "/tests/agents/" not in path_str:
-        return True
-
-    return False
