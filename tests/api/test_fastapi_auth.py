@@ -78,12 +78,12 @@ def test_auth_invalid_api_key_returns_401(client: TestClient, mock_api_key):
     assert response.status_code == 401
     data = response.json()
     # FastAPIのHTTPExceptionは detail キーにエラー情報を入れる
-    assert "detail" in data
-    # ErrorResponse形式: {"detail": {"error": {"code": "...", "message": "..."}}}
-    if isinstance(data["detail"], dict) and "error" in data["detail"]:
-        assert "api key" in str(data["detail"]["error"]).lower()
-    elif isinstance(data["detail"], str):
-        assert "api key" in data["detail"].lower()
+    # CR-NEXUS-034: トップレベル error 形式（Option A）
+    assert "error" in data
+    assert "code" in data["error"]
+    assert data["error"]["code"] == "UNAUTHORIZED"
+    assert "api key" in data["error"]["message"].lower()
+    assert "detail" not in data
 
 
 def test_auth_valid_api_key_returns_200(client: TestClient, mock_api_key):
@@ -241,14 +241,12 @@ def test_auth_server_misconfigured_returns_500(client: TestClient, monkeypatch):
 
         assert response.status_code == 500
         data = response.json()
-        # FastAPIのHTTPExceptionは detail キーにエラー情報を入れる
-        assert "detail" in data
-        # ErrorResponse形式: {"detail": {"error": {"code": "...", "message": "..."}}}
-        if isinstance(data["detail"], dict) and "error" in data["detail"]:
-            error_message = str(data["detail"]["error"]).lower()
-            assert "misconfigured" in error_message or "not set" in error_message
-        elif isinstance(data["detail"], str):
-            assert "misconfigured" in data["detail"].lower() or "not set" in data["detail"].lower()
+        # CR-NEXUS-034: トップレベル error 形式（Option A）
+        assert "error" in data
+        assert "code" in data["error"]
+        error_message = data["error"]["message"].lower()
+        assert "misconfigured" in error_message or "not set" in error_message
+        assert "detail" not in data
 
 
 def test_auth_api_key_from_secrets_json(client: TestClient, tmp_path, monkeypatch):
@@ -353,10 +351,12 @@ def test_auth_database_error_returns_500_not_401(client: TestClient, mock_api_ke
         # DB アクセスエラーは 500 を返す（認証フェイルではない）
         assert response.status_code == 500
         data = response.json()
-        assert "detail" in data
-        # エラーメッセージに "database" または "connection" が含まれることを確認
-        error_str = str(data["detail"]).lower()
+        # CR-NEXUS-034: トップレベル error 形式（Option A）
+        assert "error" in data
+        assert "code" in data["error"]
+        error_str = data["error"]["message"].lower()
         assert "database" in error_str or "connection" in error_str
+        assert "detail" not in data
 
 
 def test_auth_invalid_api_key_returns_401_not_500(client: TestClient, mock_api_key):
@@ -383,10 +383,13 @@ def test_auth_invalid_api_key_returns_401_not_500(client: TestClient, mock_api_k
         # 無効な API Key は 401 を返す（500 ではない）
         assert response.status_code == 401
         data = response.json()
-        assert "detail" in data
-        # エラーメッセージに "api key" が含まれることを確認
-        error_str = str(data["detail"]).lower()
+        # CR-NEXUS-034: トップレベル error 形式（Option A）
+        assert "error" in data
+        assert "code" in data["error"]
+        assert data["error"]["code"] == "UNAUTHORIZED"
+        error_str = data["error"]["message"].lower()
         assert "api key" in error_str or "unauthorized" in error_str
+        assert "detail" not in data
 
 
 def test_auth_user_not_found_returns_401_not_500(client: TestClient, mock_api_key):
@@ -417,7 +420,10 @@ def test_auth_user_not_found_returns_401_not_500(client: TestClient, mock_api_ke
         # User が見つからない場合は 401 を返す（500 ではない）
         assert response.status_code == 401
         data = response.json()
-        assert "detail" in data
-        # エラーメッセージに "api key" が含まれることを確認
-        error_str = str(data["detail"]).lower()
+        # CR-NEXUS-034: トップレベル error 形式（Option A）
+        assert "error" in data
+        assert "code" in data["error"]
+        assert data["error"]["code"] == "UNAUTHORIZED"
+        error_str = data["error"]["message"].lower()
         assert "api key" in error_str or "unauthorized" in error_str
+        assert "detail" not in data

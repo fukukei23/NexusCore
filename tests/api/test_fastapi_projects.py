@@ -127,10 +127,13 @@ def test_list_projects_requires_authentication(client: TestClient, mock_api_key,
         # 無効な API Key は 401 を返す（500 ではない）
         assert response.status_code == 401
         data = response.json()
-        assert "detail" in data
-        # エラーメッセージに "api key" が含まれることを確認
-        error_str = str(data["detail"]).lower()
+        # CR-NEXUS-034: トップレベル error 形式（Option A）
+        assert "error" in data
+        assert "code" in data["error"]
+        assert data["error"]["code"] == "UNAUTHORIZED"
+        error_str = data["error"]["message"].lower()
         assert "api key" in error_str or "unauthorized" in error_str
+        assert "detail" not in data
     assert data["projects"][0]["id"] == 1
     assert data["projects"][0]["name"] == "Project 1"
 
@@ -284,12 +287,12 @@ def test_get_project_not_found(client: TestClient, mock_api_key, mock_db_models)
     assert response.status_code == 404
     data = response.json()
     # FastAPIのHTTPExceptionは detail キーにエラー情報を入れる
-    assert "detail" in data
-    # ErrorResponse形式: {"detail": {"error": {"code": "...", "message": "..."}}}
-    if isinstance(data["detail"], dict) and "error" in data["detail"]:
-        assert "not found" in str(data["detail"]["error"]).lower()
-    elif isinstance(data["detail"], str):
-        assert "not found" in data["detail"].lower()
+    # CR-NEXUS-034: トップレベル error 形式（Option A）
+    assert "error" in data
+    assert "code" in data["error"]
+    assert data["error"]["code"] == "NOT_FOUND"
+    assert "not found" in data["error"]["message"].lower()
+    assert "detail" not in data
 
 
 def test_projects_endpoints_are_documented_in_openapi(client: TestClient):
