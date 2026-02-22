@@ -11,9 +11,14 @@ NexusCore API の FastAPI ベース実装。
 - 認証依存関係は src/nexuscore/api/dependencies/ 配下に配置
 """
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException, status
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .routes import health, execute, github_webhook, projects, runs, plans, badges, api_keys
+from .routes import run_view
+from .schemas.error import ErrorResponse, ErrorDetail
 
 
 def create_app(test_db_path: str | None = None) -> FastAPI:
@@ -68,7 +73,7 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
     # Projects router をマウント
     app.include_router(projects.router, prefix="/api/v1")
 
-    # Runs router をマウント
+    # Run Records router をマウント（DBベースのRun管理、/api/v1/run-records）
     app.include_router(runs.router, prefix="/api/v1")
 
     # Plans router をマウント
@@ -79,6 +84,95 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
 
     # API Keys router をマウント（/api/v1 プレフィックス、認証必須）
     app.include_router(api_keys.router, prefix="/api/v1")
+
+    # RunView canonical router をマウント（/api/v1/runs, 認証必須）
+    app.include_router(run_view.canonical_router, prefix="/api/v1")
+
+    # RunView deprecated router をマウント（/api/v1/run-view/runs, OpenAPIから除外）
+    app.include_router(run_view.deprecated_router, prefix="/api/v1")
+
+    # CR-NEXUS-034: グローバル例外ハンドラでエラー応答をトップレベルerror形式に統一（Option A）
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        """
+        HTTPException をトップレベル error 形式に統一するハンドラ
+
+        FastAPI 標準の {"detail": ...} ではなく、{"error": {"code": ..., "message": ...}} 形式で返す。
+        """
+        # exc.detail が既に ErrorResponse 形式（{"error": ...}）の場合はそのまま使用
+        if isinstance(exc.detail, dict) and "error" in exc.detail:
+            error_detail = exc.detail["error"]
+            error_response = ErrorResponse(
+                error=ErrorDetail(
+                    code=error_detail.get("code", "UNKNOWN_ERROR"),
+                    message=error_detail.get("message", str(exc.detail))
+                )
+            )
+        else:
+            # exc.detail が文字列や他の形式の場合は、適切なエラーコードにマッピング
+            code_map = {
+                status.HTTP_400_BAD_REQUEST: "INVALID_REQUEST",
+                status.HTTP_401_UNAUTHORIZED: "UNAUTHORIZED",
+                status.HTTP_403_FORBIDDEN: "FORBIDDEN",
+                status.HTTP_404_NOT_FOUND: "NOT_FOUND",
+                status.HTTP_409_CONFLICT: "CONFLICT",
+                status.HTTP_422_UNPROCESSABLE_ENTITY: "VALIDATION_ERROR",
+                status.HTTP_500_INTERNAL_SERVER_ERROR: "INTERNAL_ERROR",
+            }
+            error_code = code_map.get(exc.status_code, "UNKNOWN_ERROR")
+            error_message = str(exc.detail) if exc.detail else "An error occurred"
+
+            error_response = ErrorResponse(
+                error=ErrorDetail(code=error_code, message=error_message)
+            )
+
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=error_response.model_dump()
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        """
+        RequestValidationError（422）をトップレベル error 形式に統一するハンドラ
+        """
+        errors = exc.errors()
+        # 最初のバリデーションエラーメッセージを使用
+        error_message = errors[0]["msg"] if errors else "Validation error"
+        if errors and "loc" in errors[0]:
+            field_path = " -> ".join(str(loc) for loc in errors[0]["loc"])
+            error_message = f"{error_message} (field: {field_path})"
+
+        error_response = ErrorResponse(
+            error=ErrorDetail(code="VALIDATION_ERROR", message=error_message)
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content=error_response.model_dump()
+        )
+
+    @app.exception_handler(Exception)
+    async def general_exception_handler(request: Request, exc: Exception):
+        """
+        その他の例外をトップレベル error 形式に統一するハンドラ
+        """
+        # HTTPException は既に http_exception_handler で処理されているため、ここには来ない
+        # ただし、念のため HTTPException は除外
+        if isinstance(exc, (HTTPException, StarletteHTTPException)):
+            raise exc
+
+        error_response = ErrorResponse(
+            error=ErrorDetail(
+                code="INTERNAL_ERROR",
+                message="Internal server error"
+            )
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content=error_response.model_dump()
+        )
 
     # 将来、以下のような router を追加予定:
     # app.include_router(auth.router, prefix="/api/v1")
