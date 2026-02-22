@@ -4,12 +4,15 @@ Policy Interface - 開発方針設定UI（安全性強化版）
 📁 C:\Users\USER\tools\NexusCore\src\nexuscore\agents\policy_interface.py
 """
 
+from __future__ import annotations
+
 # 安全性強化のためのインポート
 try:
     import gradio as gr
     GRADIO_AVAILABLE = True
 except ImportError:
     GRADIO_AVAILABLE = False
+    gr = None  # type: ignore
     print("⚠️ Gradio未インストール：コマンドライン版を使用します")
 
 from typing import Dict, Callable, Optional
@@ -23,7 +26,7 @@ class PolicyInterface:
         self.result_queue = queue.Queue()
         self.interface = None
 
-    def create_gradio_interface(self) -> gr.Blocks:
+    def create_gradio_interface(self) -> gr.Blocks:  # type: ignore
         """Gradio UIインターフェースを作成"""
         if not GRADIO_AVAILABLE:
             raise ImportError("Gradio がインストールされていません")
