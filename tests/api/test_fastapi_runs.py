@@ -93,7 +93,7 @@ def test_list_runs_success(client: TestClient, mock_api_key, mock_db_models):
         mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
 
         response = client.get(
-            "/api/v1/runs",
+            "/api/v1/run-records",
             headers={"X-API-Key": mock_api_key}
         )
 
@@ -149,8 +149,15 @@ def test_list_runs_with_project_filter(client: TestClient, mock_api_key, mock_db
 
         mock_db_models["Run"].query = mock_query
 
+        # CR-NEXUS-034: 認証のモックを設定（user_id を int 互換にする）
+        mock_api_key_obj = MagicMock()
+        mock_api_key_obj.user = mock_user
+        mock_api_key_obj.user_id = 1  # int として設定
+        mock_db_models["ApiKey"].hash_token.return_value = "hashed_key"
+        mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
+
         response = client.get(
-            "/api/v1/runs?project_id=1",
+            "/api/v1/run-records?project_id=1",
             headers={"X-API-Key": mock_api_key}
         )
 
@@ -165,7 +172,7 @@ def test_list_runs_requires_authentication(client: TestClient):
     """
     Run一覧取得は認証必須
     """
-    response = client.get("/api/v1/runs")
+    response = client.get("/api/v1/run-records")
     assert response.status_code == 422  # FastAPI のバリデーションエラー（必須ヘッダー欠如）
 
 
@@ -202,7 +209,7 @@ def test_get_run_success(client: TestClient, mock_api_key, mock_db_models):
     mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
 
     response = client.get(
-        "/api/v1/runs/run-123",
+        "/api/v1/run-records/run-123",
         headers={"X-API-Key": mock_api_key}
     )
 
@@ -238,19 +245,20 @@ def test_get_run_not_found(client: TestClient, mock_api_key, mock_db_models):
     mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
 
     response = client.get(
-        "/api/v1/runs/nonexistent-run-id",
+        "/api/v1/run-records/nonexistent-run-id",
         headers={"X-API-Key": mock_api_key}
     )
 
     assert response.status_code == 404
     data = response.json()
     # FastAPIのHTTPExceptionは detail キーにエラー情報を入れる
-    assert "detail" in data
-    # ErrorResponse形式: {"detail": {"error": {"code": "...", "message": "..."}}}
-    if isinstance(data["detail"], dict) and "error" in data["detail"]:
-        assert "not found" in str(data["detail"]["error"]).lower()
-    elif isinstance(data["detail"], str):
-        assert "not found" in data["detail"].lower()
+    # CR-NEXUS-034: トップレベル error 形式（Option A）
+    assert "error" in data
+    assert "code" in data["error"]
+    assert "message" in data["error"]
+    assert data["error"]["code"] == "NOT_FOUND"
+    assert "not found" in data["error"]["message"].lower()
+    assert "detail" not in data
 
 
 def test_runs_endpoints_are_documented_in_openapi(client: TestClient):
@@ -263,14 +271,14 @@ def test_runs_endpoints_are_documented_in_openapi(client: TestClient):
     openapi_schema = response.json()
     assert "paths" in openapi_schema
 
-    # /api/v1/runs の確認
-    assert "/api/v1/runs" in openapi_schema["paths"]
-    runs_path = openapi_schema["paths"]["/api/v1/runs"]
+    # /api/v1/run-records の確認
+    assert "/api/v1/run-records" in openapi_schema["paths"]
+    runs_path = openapi_schema["paths"]["/api/v1/run-records"]
     assert "get" in runs_path
 
-    # /api/v1/runs/{run_id} の確認
-    assert "/api/v1/runs/{run_id}" in openapi_schema["paths"]
-    run_detail_path = openapi_schema["paths"]["/api/v1/runs/{run_id}"]
+    # /api/v1/run-records/{run_id} の確認
+    assert "/api/v1/run-records/{run_id}" in openapi_schema["paths"]
+    run_detail_path = openapi_schema["paths"]["/api/v1/run-records/{run_id}"]
     assert "get" in run_detail_path
 
 
@@ -307,7 +315,7 @@ def test_runs_response_structure(client: TestClient, mock_api_key, mock_db_model
     mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
 
     response = client.get(
-        "/api/v1/runs/run-123",
+        "/api/v1/run-records/run-123",
         headers={"X-API-Key": mock_api_key}
     )
 

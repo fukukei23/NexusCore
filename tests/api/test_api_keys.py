@@ -163,14 +163,11 @@ def test_issue_api_key_limit_exceeded(client: TestClient, mock_api_key, mock_db_
     # 検証
     assert response.status_code == 403
     data = response.json()
-    # FastAPI の HTTPException は detail キーにエラー情報を入れる
-    if "detail" in data and isinstance(data["detail"], dict) and "error" in data["detail"]:
-        assert data["detail"]["error"]["code"] == "FORBIDDEN"
-        assert "limit exceeded" in data["detail"]["error"]["message"].lower()
-    else:
-        # フォールバック: エラーメッセージに "limit" が含まれることを確認
-        error_str = str(data).lower()
-        assert "limit" in error_str or "forbidden" in error_str
+    # CR-NEXUS-034: トップレベル error 形式（Option A）
+    assert "error" in data
+    assert data["error"]["code"] == "FORBIDDEN"
+    assert "limit exceeded" in data["error"]["message"].lower()
+    assert "detail" not in data
 
 
 def test_list_api_keys_success(client: TestClient, mock_api_key, mock_db_models):
@@ -348,13 +345,10 @@ def test_revoke_api_key_not_found(client: TestClient, mock_api_key, mock_db_mode
     # 検証
     assert response.status_code == 404
     data = response.json()
-    # FastAPI の HTTPException は detail キーにエラー情報を入れる
-    if "detail" in data and isinstance(data["detail"], dict) and "error" in data["detail"]:
-        assert data["detail"]["error"]["code"] == "NOT_FOUND"
-    else:
-        # フォールバック: エラーメッセージに "not found" が含まれることを確認
-        error_str = str(data).lower()
-        assert "not found" in error_str
+    # CR-NEXUS-034: トップレベル error 形式（Option A）
+    assert "error" in data
+    assert data["error"]["code"] == "NOT_FOUND"
+    assert "detail" not in data
 
 
 def test_revoke_api_key_forbidden(client: TestClient, mock_api_key, mock_db_models):
@@ -398,14 +392,11 @@ def test_revoke_api_key_forbidden(client: TestClient, mock_api_key, mock_db_mode
     # 検証
     assert response.status_code == 403
     data = response.json()
-    # FastAPI の HTTPException は detail キーにエラー情報を入れる
-    if "detail" in data and isinstance(data["detail"], dict) and "error" in data["detail"]:
-        assert data["detail"]["error"]["code"] == "FORBIDDEN"
-        assert "permission" in data["detail"]["error"]["message"].lower()
-    else:
-        # フォールバック: エラーメッセージに "permission" または "forbidden" が含まれることを確認
-        error_str = str(data).lower()
-        assert "permission" in error_str or "forbidden" in error_str
+    # CR-NEXUS-034: トップレベル error 形式（Option A）
+    assert "error" in data
+    assert data["error"]["code"] == "FORBIDDEN"
+    assert "permission" in data["error"]["message"].lower()
+    assert "detail" not in data
 
 
 def test_issue_api_key_default_name(client: TestClient, mock_api_key, mock_db_models):

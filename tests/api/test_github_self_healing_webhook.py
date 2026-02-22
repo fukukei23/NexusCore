@@ -247,3 +247,46 @@ def test_parse_pull_request_event_custom_label():
     result = parse_pull_request_event(payload, config)
     assert result is not None
 
+
+def test_build_pr_comment_does_not_include_self_healing_result_header():
+    """build_pr_comment() が Self-Healing Result ヘッダーを返さないことを検証"""
+    from nexuscore.integration.github_pr_comment import PRCommentContext, build_pr_comment
+
+    ctx = PRCommentContext(
+        project=None,
+        run=None,
+        guardian_review_markdown="_(no review content)_",
+        repo_full_name=None,
+        pr_number=None,
+        commit_sha=None,
+        change_summary=None,
+        diff_summary=None,
+        markdown_report=None,
+        details=None,
+        semantic_diffs=None,
+    )
+
+    result = build_pr_comment(ctx)
+
+    # build_pr_comment() は Self-Healing Result ヘッダーを含まない
+    assert "## Self-Healing Result" not in result
+
+
+def test_format_pr_comment_includes_self_healing_result_header_once():
+    """format_pr_comment() が Self-Healing Result ヘッダーを1回だけ含むことを検証"""
+    # CR-NEXUS-039 Follow-up-2: import 依存を排除するため、テスト関数内で明示的に import
+    from nexuscore.api.github_self_healing_webhook import format_pr_comment
+
+    result = {
+        "status": "fixed",
+        "summary": "Tests are now passing",
+        "run_id": "sh-123",
+        "session_id": "session-456",
+        "details": {},
+    }
+
+    comment = format_pr_comment(result)
+
+    # Self-Healing Result ヘッダーが1回だけ含まれる
+    assert comment.count("## Self-Healing Result") == 1
+    assert "## Self-Healing Result" in comment
