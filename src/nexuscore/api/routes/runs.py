@@ -1,7 +1,9 @@
 """
-Runs エンドポイント
+Run Records エンドポイント（DBベースのRun管理）
 
-Run管理用の FastAPI エンドポイント。
+CR-NEXUS-032: Moved from /api/v1/runs to /api/v1/run-records to avoid collision with RunView endpoints.
+
+Run管理用の FastAPI エンドポイント（DBベース）。
 既存の Flask 実装 (`src/nexuscore/webapp/api_external.py`) と互換性を保つ。
 """
 import logging
@@ -18,7 +20,7 @@ from ..utils.errors import (
     make_internal_error,
 )
 
-router = APIRouter(tags=["runs"])
+router = APIRouter(tags=["run-records"], prefix="/run-records")
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +50,9 @@ def _get_user_id_from_auth(current_user: AuthenticatedUser) -> int:
 
 
 @router.get(
-    "/runs",
+    "",
     response_model=RunListResponse,
-    summary="List runs",
+    summary="List run records",
     status_code=status.HTTP_200_OK,
     responses={
         401: {"model": ErrorResponse},
@@ -62,9 +64,9 @@ async def list_runs(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> RunListResponse:
     """
-    Run一覧を取得する
+    Run一覧を取得する（DBベース）
 
-    GET /api/v1/runs?project_id=1
+    GET /api/v1/run-records?project_id=1
 
     認証: X-API-Key ヘッダー必須
 
@@ -138,9 +140,9 @@ async def list_runs(
 
 
 @router.get(
-    "/runs/{run_id}",
+    "/{run_id}",
     response_model=RunResponse,
-    summary="Get run by ID",
+    summary="Get run record by ID",
     status_code=status.HTTP_200_OK,
     responses={
         401: {"model": ErrorResponse},
@@ -153,9 +155,9 @@ async def get_run(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> RunResponse:
     """
-    Run IDでRunを取得する
+    Run IDでRunを取得する（DBベース）
 
-    GET /api/v1/runs/{run_id}
+    GET /api/v1/run-records/{run_id}
 
     認証: X-API-Key ヘッダー必須
 

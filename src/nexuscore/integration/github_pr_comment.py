@@ -656,11 +656,16 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
     """
     PR コメント本文を組み立てる
 
+    CR-NEXUS-039 Follow-up: 責務境界の明文化
+    - この関数は Guardian/Diff/Links/MarkdownReport 等の付随セクションの組み立てに限定する
+    - "## Self-Healing Result" 見出しは出さない（上位の format_pr_comment() が固定で付与する）
+    - この関数が誤って Self-Healing Result を出すと二重化するため禁止
+
     Args:
         ctx: PR コメントコンテキスト
 
     Returns:
-        Markdown 形式の PR コメント本文
+        Markdown 形式の PR コメント本文（Self-Healing Result 見出しを含まない）
     """
     parts: list[str] = []
 
