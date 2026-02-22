@@ -33,6 +33,7 @@ Flask REST API（`/api/v1/*` 配下のエンドポイント）は **CR-FASTAPI-0
 - **目的**: 既存の Flask ベース API を全て棚卸しし、public / internal / 廃止候補を分類
 - **出力**: `docs/api/api_inventory.md`
 - **ステータス**: ✅ 完了
+- **完了レポート**: [CR-FASTAPI-000_COMPLETION_REPORT.md](./CR-FASTAPI-000_COMPLETION_REPORT.md)
 
 ### CR-FASTAPI-001: FastAPI Skeleton
 - **ファイル**: [CR-FASTAPI-001_PROMPT.md](./CR-FASTAPI-001_PROMPT.md)
@@ -124,6 +125,137 @@ Flask REST API（`/api/v1/*` 配下のエンドポイント）は **CR-FASTAPI-0
 - **ステータス**: ✅ 完了
 - **完了レポート**: [CR-NEXUS-011_COMPLETION_REPORT.md](./CR-NEXUS-011_COMPLETION_REPORT.md)
 - **関連ドキュメント**: [WEBAPP_UI_API_MAPPING.md](./WEBAPP_UI_API_MAPPING.md)
+
+### CR-NEXUS-032: API Endpoint Path Normalization
+- **ファイル**: プロンプトは CR-NEXUS-032 として実行
+- **目的**: RunView API のエンドポイントパスを正規化し、canonical `/api/v1/runs` を確立する
+- **出力**: パス正規化、テスト更新、TypeScript SDK 更新
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-032_COMPLETION_REPORT.md](./CR-NEXUS-032_COMPLETION_REPORT.md)
+
+### CR-NEXUS-035: DetachedInstanceError 解消
+- **ファイル**: プロンプトは CR-NEXUS-035 として実行
+- **目的**: `tests/api/test_external_api_smoke.py` で発生している DetachedInstanceError（setup error）を解消する
+- **出力**: test fixture の安定化、ERROR（setup error）0 件
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-035_COMPLETION_REPORT.md](./CR-NEXUS-035_COMPLETION_REPORT.md)
+
+### CR-NEXUS-036: Error Code Catalog 空問題の解消
+- **ファイル**: プロンプトは CR-NEXUS-036 として実行
+- **目的**: Error Code Catalog が空と判定される問題を解消し、`tests/api/test_error_code_catalog.py` の失敗を解消する
+- **出力**: Catalog パーサーの修正、テスト PASS
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-036_COMPLETION_REPORT.md](./CR-NEXUS-036_COMPLETION_REPORT.md)
+
+### CR-NEXUS-037: External API smoke の仕様整合
+- **ファイル**: プロンプトは CR-NEXUS-037 として実行
+- **目的**: `tests/api/test_external_api_smoke.py` の失敗を解消し、external_api_smoke テストが安定して PASS する状態にする
+- **出力**: モック不整合の解消、テスト PASS
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-037_COMPLETION_REPORT.md](./CR-NEXUS-037_COMPLETION_REPORT.md)
+
+### CR-NEXUS-038: FastAPI auth misconfigured: 202 vs 500
+- **ファイル**: プロンプトは CR-NEXUS-038 として実行
+- **目的**: 認証設定（API Key）不備を、確実に 500 として返すことを FastAPI の public API 契約として固定する
+- **出力**: 認証 dependency の修正、テスト PASS
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-038_COMPLETION_REPORT.md](./CR-NEXUS-038_COMPLETION_REPORT.md)
+
+### CR-NEXUS-039: PR コメント生成の責務境界の明文化
+- **ファイル**: プロンプトは CR-NEXUS-039 として実行
+- **目的**: PR コメント生成の責務境界を固定し、`format_pr_comment()` と `build_pr_comment()` の関係を明文化する
+- **出力**: DB/Flask 依存の排除、二重出力防止ガード、テスト追加
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-039_COMPLETION_REPORT.md](./CR-NEXUS-039_COMPLETION_REPORT.md)
+
+### CR-NEXUS-040: FastAPI Projects 契約化
+- **ファイル**: プロンプトは CR-NEXUS-040 として実行
+- **目的**: `/api/v1/projects` 配下のエンドポイントの Response Model を Pydantic で明示し、契約テストで固定する
+- **出力**: 契約テスト追加、契約ドキュメント追加
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-040_COMPLETION_REPORT.md](./CR-NEXUS-040_COMPLETION_REPORT.md)
+- **関連ドキュメント**: [PROJECTS_API_CONTRACT.md](./PROJECTS_API_CONTRACT.md)
+
+### CR-NEXUS-041: Completion Report ガバナンス強化（Option A）
+- **ファイル**: プロンプトは CR-NEXUS-041 として実行
+- **目的**: Completion Report 運用ルールの Single Source of Truth 化と、README と実ファイルの不整合をテストで検出可能にする
+- **出力**: ルール単一ソース化、存在チェックテスト追加、既存不整合是正
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-041_COMPLETION_REPORT.md](./CR-NEXUS-041_COMPLETION_REPORT.md)
+
+### CR-NEXUS-043: README 解析ロジックのテストヘルパー共通化
+- **ファイル**: プロンプトは CR-NEXUS-043 として実行
+- **目的**: README.md から「✅ 完了 CR-ID」を抽出するロジックをテスト専用ヘルパーとして単一化し、重複を排除する
+- **出力**: テスト専用ヘルパーモジュール追加、重複コード削除
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-043_COMPLETION_REPORT.md](./CR-NEXUS-043_COMPLETION_REPORT.md)
+
+### CR-NEXUS-044: Completion Report 内容品質ゲート（中身の妥当性検証）
+- **ファイル**: プロンプトは CR-NEXUS-044 として実行
+- **目的**: Completion Report の品質を「見出しがある」レベルから「中身が最低限成立している」レベルまで引き上げる
+- **出力**: 内容品質ゲートテスト追加
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-044_COMPLETION_REPORT.md](./CR-NEXUS-044_COMPLETION_REPORT.md)
+
+### CR-NEXUS-045: README CR ステータス品質ゲート（状態機械・整合性検証）
+- **ファイル**: プロンプトは CR-NEXUS-045 として実行
+- **目的**: docs/api/README.md の CR エントリに対して、ステータスの正当性を機械的に検証する
+- **出力**: ステータス品質ゲートテスト追加、ヘルパー関数拡張
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-045_COMPLETION_REPORT.md](./CR-NEXUS-045_COMPLETION_REPORT.md)
+
+### CR-NEXUS-046: README CR エントリ品質ゲート（項目欠落・フォーマットぶれ検証）
+- **ファイル**: プロンプトは CR-NEXUS-046 として実行
+- **目的**: docs/api/README.md の CR エントリの"項目欠落"と"フォーマットぶれ"を機械的に検出する
+- **出力**: エントリ品質ゲートテスト追加、ヘルパー関数拡張
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-046_COMPLETION_REPORT.md](./CR-NEXUS-046_COMPLETION_REPORT.md)
+
+### CR-NEXUS-047: Completion Report 解析ロジックのテストヘルパー共通化
+- **ファイル**: プロンプトは CR-NEXUS-047 として実行
+- **目的**: Completion Report のセクション抽出・空判定・証跡検出ロジックをテスト専用ヘルパーに切り出し、今後の品質ゲート拡張に備える
+- **出力**: Completion Report 解析専用ヘルパー追加、既存テストのリファクタ
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-047_COMPLETION_REPORT.md](./CR-NEXUS-047_COMPLETION_REPORT.md)
+
+
+### CR-NEXUS-048: README/Completion Report テンプレ自動生成（scaffold）
+- **ファイル**: プロンプトは CR-NEXUS-048 として実行
+- **目的**: README と Completion Report の作成を人手で行うと、フィールド漏れ・ステータス不整合・必須見出し・内容不足・ルールに合わせた雛形の書き方が毎回ブレる問題が発生する。CR を開始する時点で、README の CR エントリ雛形と Completion Report 雛形（必須見出し＋内容品質ゲートに通る最低限の骨格）を自動生成する scaffold を追加する
+- **出力**: `tools/scaffold_cr.py`, `tests/api/test_scaffold_cr.py`, `docs/api/CR-NEXUS-048_COMPLETION_REPORT.md`
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-048_COMPLETION_REPORT.md](./CR-NEXUS-048_COMPLETION_REPORT.md)
+
+
+
+### CR-NEXUS-049: CR ガバナンス定義（README / Completion Report / 品質ゲート / scaffold）の Single Source of Truth（SSoT）化
+- **ファイル**: プロンプトは CR-NEXUS-049 として実行
+- **目的**: CR ガバナンスに関する定義（Completion Report 必須セクション、README CR エントリ必須項目、CR ステータスと状態ルール、雛形テンプレート）が分散している状態を解消し、定義を 1 箇所に集約し、scaffold / 品質ゲート / helpers はその定義を参照するように修正する
+- **出力**: `src/nexuscore/governance/cr_spec.py`, `tests/api/test_cr_spec_single_source_of_truth.py`, `docs/api/CR-NEXUS-049_COMPLETION_REPORT.md`
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-049_COMPLETION_REPORT.md](./CR-NEXUS-049_COMPLETION_REPORT.md)
+
+### CR-NEXUS-050: SSoT(cr_spec) 変更検知の強制ゲート（CI FAIL → 更新ツールで解除）
+- **ファイル**: プロンプトは CR-NEXUS-050 として実行
+- **目的**: `src/nexuscore/governance/cr_spec.py`（SSoT）が変更されたら必ず pytest を FAIL させる。開発者が影響確認した上で、専用更新ツールを実行した場合のみ PASS する状態にする。「気づかないまま SSoT を変更して運用が壊れる事故」を防止する
+- **出力**: `docs/governance/CR_SPEC_FINGERPRINT.txt`, `tools/update_cr_spec_fingerprint.py`, `tests/governance/test_cr_spec_change_guard.py`, `docs/api/CR-NEXUS-050_COMPLETION_REPORT.md`
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-050_COMPLETION_REPORT.md](./CR-NEXUS-050_COMPLETION_REPORT.md)
+
+### CR-NEXUS-051: CI Safe 依存 Lock 化
+- **ファイル**: プロンプトは CR-NEXUS-051 として実行
+- **目的**: CI Safe テストの依存関係を lock 化し、再現性を最大化する。`requirements-ci-safe.lock` を導入し、pip-tools を使用してハッシュ付き lock ファイルを生成。
+- **出力**: `requirements-ci-safe.lock`, `.github/workflows/ci.yml`（Safe job 修正）, `docs/CI_SAFE_LOCK.md`, `docs/CI_TEST_STRATEGY.md`（更新）, `docs/api/CR-NEXUS-051_COMPLETION_REPORT.md`
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-051_COMPLETION_REPORT.md](./CR-NEXUS-051_COMPLETION_REPORT.md)
+
+### CR-NEXUS-052: CI Safe Lock Guard (txt/lock mismatch detection + update tool)
+- **ファイル**: プロンプトは CR-NEXUS-052 として実行
+- **目的**: `requirements-ci-safe.txt` と `requirements-ci-safe.lock` の不整合を CI 上で機械的に検知し、更新手順を単一コマンドに固定する仕組みを導入する。
+- **出力**: `tests/governance/test_ci_safe_lock_guard.py`, `tools/update_ci_safe_lock.py`, `docs/CI_SAFE_LOCK.md`（更新）, `docs/api/CR-NEXUS-052_COMPLETION_REPORT.md`
+- **ステータス**: ✅ 完了
+- **完了レポート**: [CR-NEXUS-052_COMPLETION_REPORT.md](./CR-NEXUS-052_COMPLETION_REPORT.md)
+
 
 ### CR-FASTAPI-012: SDK 自動生成導線の構築
 - **ファイル**: プロンプトは CR-FASTAPI-012 として実行
