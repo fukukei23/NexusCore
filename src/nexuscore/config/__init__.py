@@ -6,7 +6,7 @@ from .constitution_loader import (
     get_constitution,
     get_tier1_config,
     get_tier2_config,
-    reload_constitution
+    reload_constitution,
 )
 
 __all__ = [
@@ -14,5 +14,5 @@ __all__ = [
     "get_constitution",
     "get_tier1_config",
     "get_tier2_config",
-    "reload_constitution"
+    "reload_constitution",
 ]

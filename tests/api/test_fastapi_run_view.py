@@ -5,10 +5,10 @@ RunState-based RunView projection API endpoints のテスト。
 """
 
 import json
+from unittest.mock import MagicMock, patch
+
 import pytest
-from pathlib import Path
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
 from nexuscore.api.fastapi_app import app
 
@@ -31,9 +31,11 @@ def mock_api_key(monkeypatch):
 @pytest.fixture
 def mock_db_models():
     """データベースモデルをモック（認証用）"""
-    with patch("nexuscore.webapp.models.User") as mock_user, \
-         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.webapp.db") as mock_db:
+    with (
+        patch("nexuscore.webapp.models.User") as mock_user,
+        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.webapp.db") as mock_db,
+    ):
         # API Key認証のモック
         mock_user_obj = MagicMock()
         mock_user_obj.id = 1
@@ -79,7 +81,9 @@ def sample_run_state(isolated_state_dir):
     return run_id, state
 
 
-def test_get_run_view_not_found(client: TestClient, mock_api_key, mock_db_models, isolated_state_dir):
+def test_get_run_view_not_found(
+    client: TestClient, mock_api_key, mock_db_models, isolated_state_dir
+):
     """GET /api/v1/runs/{run_id} で RunState が見つからない場合は 404"""
     response = client.get(
         "/api/v1/runs/nonexistent-run-id",
@@ -124,6 +128,7 @@ def test_resume_run_view_conflict(
     # Create a minimal RunState for load_state to succeed
     state_file = isolated_state_dir / f"{run_id}.json"
     import json
+
     state = {
         "schema_version": "1.0",
         "run_id": run_id,
@@ -153,8 +158,10 @@ def test_resume_run_view_conflict(
             ),
         }
 
-    with patch("nexuscore.api.routes.run_view.get_orchestrator", side_effect=mock_get_orchestrator), \
-         patch("nexuscore.orchestrator.authority_runner.resume_run", side_effect=mock_resume_run):
+    with (
+        patch("nexuscore.api.routes.run_view.get_orchestrator", side_effect=mock_get_orchestrator),
+        patch("nexuscore.orchestrator.authority_runner.resume_run", side_effect=mock_resume_run),
+    ):
         response = client.post(
             f"/api/v1/runs/{run_id}/resume",
             headers={"X-API-Key": mock_api_key},
@@ -180,6 +187,7 @@ def test_resume_run_view_integrity_violation(
     # Create a minimal RunState for load_state to succeed
     state_file = isolated_state_dir / f"{run_id}.json"
     import json
+
     state = {
         "schema_version": "1.0",
         "run_id": run_id,
@@ -209,8 +217,10 @@ def test_resume_run_view_integrity_violation(
             ),
         }
 
-    with patch("nexuscore.api.routes.run_view.get_orchestrator", side_effect=mock_get_orchestrator), \
-         patch("nexuscore.orchestrator.authority_runner.resume_run", side_effect=mock_resume_run):
+    with (
+        patch("nexuscore.api.routes.run_view.get_orchestrator", side_effect=mock_get_orchestrator),
+        patch("nexuscore.orchestrator.authority_runner.resume_run", side_effect=mock_resume_run),
+    ):
         response = client.post(
             f"/api/v1/runs/{run_id}/resume",
             headers={"X-API-Key": mock_api_key},
@@ -249,8 +259,10 @@ def test_resume_run_view_not_found(
     def mock_load_state(run_id_param: str):
         raise FileNotFoundError(f"RunState not found: {run_id_param}")
 
-    with patch("nexuscore.orchestrator.authority_runner.resume_run", side_effect=mock_resume_run), \
-         patch("nexuscore.orchestrator.run_state_store.load_state", side_effect=mock_load_state):
+    with (
+        patch("nexuscore.orchestrator.authority_runner.resume_run", side_effect=mock_resume_run),
+        patch("nexuscore.orchestrator.run_state_store.load_state", side_effect=mock_load_state),
+    ):
         response = client.post(
             f"/api/v1/runs/{run_id}/resume",
             headers={"X-API-Key": mock_api_key},
@@ -287,8 +299,10 @@ def test_resume_run_view_success(
             "run_id": run_id_param,
         }
 
-    with patch("nexuscore.api.routes.run_view.get_orchestrator", side_effect=mock_get_orchestrator), \
-         patch("nexuscore.orchestrator.authority_runner.resume_run", side_effect=mock_resume_run):
+    with (
+        patch("nexuscore.api.routes.run_view.get_orchestrator", side_effect=mock_get_orchestrator),
+        patch("nexuscore.orchestrator.authority_runner.resume_run", side_effect=mock_resume_run),
+    ):
         response = client.post(
             f"/api/v1/runs/{run_id}/resume",
             headers={"X-API-Key": mock_api_key},
@@ -329,4 +343,3 @@ def test_run_view_openapi_documented(client: TestClient):
     # Deprecated /api/v1/run-view/runs が OpenAPI に含まれていないことを確認
     assert "/api/v1/run-view/runs/{run_id}" not in openapi_schema["paths"]
     assert "post" in resume_path
-

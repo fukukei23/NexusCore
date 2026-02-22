@@ -38,8 +38,12 @@ def test_readme_required_fields_are_defined_in_cr_spec():
     assert README_CR_REQUIRED_FIELDS, "必須フィールドが cr_spec に定義されていません"
 
     # 必須フィールドのリストに最低限のフィールドが含まれていることを確認
-    assert "目的" in README_CR_REQUIRED_FIELDS, "必須フィールド '目的' が cr_spec に定義されていません"
-    assert "出力" in README_CR_REQUIRED_FIELDS, "必須フィールド '出力' が cr_spec に定義されていません"
+    assert (
+        "目的" in README_CR_REQUIRED_FIELDS
+    ), "必須フィールド '目的' が cr_spec に定義されていません"
+    assert (
+        "出力" in README_CR_REQUIRED_FIELDS
+    ), "必須フィールド '出力' が cr_spec に定義されていません"
 
 
 def test_status_rules_are_defined_in_cr_spec():
@@ -55,11 +59,17 @@ def test_status_rules_are_defined_in_cr_spec():
     assert "❌ 中断" in STATUS_RULES, "ステータス '❌ 中断' のルールが cr_spec に定義されていません"
 
     # 「✅ 完了」は Completion Report 必須
-    assert STATUS_RULES["✅ 完了"]["completion_report_required"], "ステータス '✅ 完了' は Completion Report 必須である必要があります"
+    assert STATUS_RULES["✅ 完了"][
+        "completion_report_required"
+    ], "ステータス '✅ 完了' は Completion Report 必須である必要があります"
 
     # 「⏸ 保留」「❌ 中断」は理由必須
-    assert STATUS_RULES["⏸ 保留"]["reason_required"], "ステータス '⏸ 保留' は理由必須である必要があります"
-    assert STATUS_RULES["❌ 中断"]["reason_required"], "ステータス '❌ 中断' は理由必須である必要があります"
+    assert STATUS_RULES["⏸ 保留"][
+        "reason_required"
+    ], "ステータス '⏸ 保留' は理由必須である必要があります"
+    assert STATUS_RULES["❌ 中断"][
+        "reason_required"
+    ], "ステータス '❌ 中断' は理由必須である必要があります"
 
 
 def test_allowed_statuses_are_defined_in_cr_spec():
@@ -71,7 +81,9 @@ def test_allowed_statuses_are_defined_in_cr_spec():
 
     # 重要なステータスが含まれていることを確認
     assert "✅ 完了" in ALLOWED_STATUSES, "ステータス '✅ 完了' が許容ステータスに含まれていません"
-    assert "⏳ 進行中" in ALLOWED_STATUSES, "ステータス '⏳ 進行中' が許容ステータスに含まれていません"
+    assert (
+        "⏳ 進行中" in ALLOWED_STATUSES
+    ), "ステータス '⏳ 進行中' が許容ステータスに含まれていません"
 
 
 def test_scaffold_generated_completion_report_uses_cr_spec_sections(tmp_path):
@@ -125,4 +137,3 @@ def test_scaffold_generated_readme_entry_uses_cr_spec_fields(tmp_path):
             f"scaffold が生成した README エントリに必須フィールド '{field_name}' が含まれていません。"
             f"cr_spec の定義と一致していない可能性があります。"
         )
-

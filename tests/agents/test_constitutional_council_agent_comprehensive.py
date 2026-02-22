@@ -8,21 +8,20 @@ Comprehensive Tests for constitutional_council_agent.py
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
+
 import sys
 from unittest.mock import MagicMock
 
 # Flask をモック化（import 前に実行）
-sys.modules['flask'] = MagicMock()
+sys.modules["flask"] = MagicMock()
+
+import json
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
-import json
-import tempfile
-from pathlib import Path
-from unittest.mock import Mock, patch, mock_open, call
-from typing import Dict, Any
 
 from nexuscore.agents.constitutional_council_agent import ConstitutionalCouncilAgent
-
 
 # ============================================================================
 # Fixtures
@@ -275,7 +274,7 @@ class TestValidateAmendment:
 
 
 class TestInvokeLLMWithRetry:
-    @patch.object(ConstitutionalCouncilAgent, 'execute_llm_task')
+    @patch.object(ConstitutionalCouncilAgent, "execute_llm_task")
     def test_invoke_llm_success(self, mock_llm, agent):
         """LLM呼び出し成功 - as_json=Falseパラメータ付き"""
         mock_llm.return_value = "LLM response"
@@ -285,8 +284,8 @@ class TestInvokeLLMWithRetry:
         assert result == "LLM response"
         mock_llm.assert_called_once_with("test prompt", as_json=False)
 
-    @patch.object(ConstitutionalCouncilAgent, 'execute_llm_task')
-    @patch('time.sleep')
+    @patch.object(ConstitutionalCouncilAgent, "execute_llm_task")
+    @patch("time.sleep")
     def test_invoke_llm_retry_on_exception(self, mock_sleep, mock_llm, agent):
         """例外発生時のリトライ"""
         mock_llm.side_effect = [
@@ -301,8 +300,8 @@ class TestInvokeLLMWithRetry:
         assert mock_llm.call_count == 3
         assert mock_sleep.call_count == 2
 
-    @patch.object(ConstitutionalCouncilAgent, 'execute_llm_task')
-    @patch('time.sleep')
+    @patch.object(ConstitutionalCouncilAgent, "execute_llm_task")
+    @patch("time.sleep")
     def test_invoke_llm_all_retries_fail(self, mock_sleep, mock_llm, agent):
         """全てのリトライが失敗"""
         mock_llm.side_effect = Exception("Always fails")
@@ -319,16 +318,18 @@ class TestInvokeLLMWithRetry:
 
 
 class TestReviewAndAmend:
-    @patch.object(ConstitutionalCouncilAgent, 'execute_llm_task')
+    @patch.object(ConstitutionalCouncilAgent, "execute_llm_task")
     def test_review_and_amend_creates_proposal(
         self, mock_llm, agent, postmortem_report, knowledge_brief, temp_policy_dir
     ):
         """修正案の作成 - 新API構造（policy_id/description/rules）"""
-        proposal_json = json.dumps({
-            "policy_id": "P002",
-            "description": "Test edge cases thoroughly",
-            "rules": ["Test all edge cases", "Use parametrized tests"],
-        })
+        proposal_json = json.dumps(
+            {
+                "policy_id": "P002",
+                "description": "Test edge cases thoroughly",
+                "rules": ["Test all edge cases", "Use parametrized tests"],
+            }
+        )
         mock_llm.return_value = proposal_json
 
         agent.review_and_amend(postmortem_report, knowledge_brief)
@@ -339,22 +340,24 @@ class TestReviewAndAmend:
 
         assert len(pending_files) > 0
 
-    @patch.object(ConstitutionalCouncilAgent, 'execute_llm_task')
+    @patch.object(ConstitutionalCouncilAgent, "execute_llm_task")
     def test_review_and_amend_invalid_proposal(
         self, mock_llm, agent, postmortem_report, knowledge_brief
     ):
         """無効な修正案の処理"""
         # 無効な修正案（actionが欠けている）
-        proposal_json = json.dumps({
-            "policy": {"id": "P002", "rule": "Some rule"},
-            "rationale": "reason",
-        })
+        proposal_json = json.dumps(
+            {
+                "policy": {"id": "P002", "rule": "Some rule"},
+                "rationale": "reason",
+            }
+        )
         mock_llm.return_value = proposal_json
 
         # 例外が発生しないことを確認
         agent.review_and_amend(postmortem_report, knowledge_brief)
 
-    @patch.object(ConstitutionalCouncilAgent, 'execute_llm_task')
+    @patch.object(ConstitutionalCouncilAgent, "execute_llm_task")
     def test_review_and_amend_llm_failure(
         self, mock_llm, agent, postmortem_report, knowledge_brief
     ):
@@ -530,7 +533,7 @@ class TestArchiveAmendment:
 
 
 class TestIntegrationScenarios:
-    @patch.object(ConstitutionalCouncilAgent, 'execute_llm_task')
+    @patch.object(ConstitutionalCouncilAgent, "execute_llm_task")
     def test_full_amendment_workflow(
         self, mock_llm, temp_policy_dir, postmortem_report, knowledge_brief
     ):
@@ -544,7 +547,11 @@ class TestIntegrationScenarios:
         proposal = {
             "policy_id": "P002",
             "description": "Add integration tests",
-            "rules": ["Write integration tests", "Test API endpoints", "Test database interactions"],
+            "rules": [
+                "Write integration tests",
+                "Test API endpoints",
+                "Test database interactions",
+            ],
         }
         mock_llm.return_value = json.dumps(proposal)
 
@@ -572,7 +579,11 @@ class TestIntegrationScenarios:
         proposal = {
             "policy_id": "P001",
             "description": "All code must have 100% test coverage",
-            "rules": ["Write comprehensive tests", "Achieve 100% line coverage", "Test all edge cases"],
+            "rules": [
+                "Write comprehensive tests",
+                "Achieve 100% line coverage",
+                "Test all edge cases",
+            ],
         }
         pending_file.write_text(json.dumps(proposal, indent=2))
 
@@ -666,16 +677,18 @@ class TestAdvancedEdgeCases:
     ):
         """複数のポリシー更新を含む提案の処理"""
         # LLMが複雑な提案を返すケース
-        mock_execute.return_value = json.dumps({
-            "policy_id": "P001",
-            "description": "Enhanced test coverage policy with strict requirements",
-            "rules": [
-                "All code must have tests",
-                "Minimum 90% coverage required",
-                "Integration tests mandatory",
-                "E2E tests for critical paths",
-            ]
-        })
+        mock_execute.return_value = json.dumps(
+            {
+                "policy_id": "P001",
+                "description": "Enhanced test coverage policy with strict requirements",
+                "rules": [
+                    "All code must have tests",
+                    "Minimum 90% coverage required",
+                    "Integration tests mandatory",
+                    "E2E tests for critical paths",
+                ],
+            }
+        )
 
         postmortem_report = {"incident": "Production bug", "root_cause": "Insufficient testing"}
         knowledge_brief = {"lesson": "Improve test requirements"}
@@ -689,9 +702,7 @@ class TestAdvancedEdgeCases:
         pending_files = list(amendments_dir.glob("pending_*.json"))
         assert len(pending_files) >= 1
 
-    def test_archive_amendment_with_special_characters_in_filename(
-        self, agent, temp_policy_dir
-    ):
+    def test_archive_amendment_with_special_characters_in_filename(self, agent, temp_policy_dir):
         """ファイル名に特殊文字を含む修正案のアーカイブ"""
         amendments_dir = Path(temp_policy_dir["amendments_dir"])
         archived_dir = amendments_dir / "archived"

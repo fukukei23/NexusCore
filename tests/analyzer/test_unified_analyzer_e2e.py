@@ -8,12 +8,17 @@ unified_analyzer の軽量 E2E テスト
 
 from __future__ import annotations
 
-import pytest
 import time
-from pathlib import Path
+
+import pytest
 
 try:
-    from nexuscore.analyzer.unified_analyzer import TreeSitterEngine, AnalysisResult, UnifiedAnalyzer
+    from nexuscore.analyzer.unified_analyzer import (
+        AnalysisResult,
+        TreeSitterEngine,
+        UnifiedAnalyzer,
+    )
+
     HAS_ANALYZER = True
 except ImportError:
     HAS_ANALYZER = False
@@ -53,7 +58,9 @@ def test_unified_analyzer_runs_on_sample_project(sample_project_dir):
 
         # 成功した場合、file_path が含まれていることを確認
         if result.get("success"):
-            assert "file_path" in result or "data" in result, f"Missing file_path or data in result: {result.keys()}"
+            assert (
+                "file_path" in result or "data" in result
+            ), f"Missing file_path or data in result: {result.keys()}"
 
 
 @pytest.mark.skipif(not HAS_ANALYZER, reason="Analyzer modules not available")
@@ -163,4 +170,3 @@ def test_unified_analyzer_cache_performance(sample_project_dir):
 
     # 統計情報を確認
     assert result2["stats"]["cached_files"] > 0, "Some files should be cached"
-

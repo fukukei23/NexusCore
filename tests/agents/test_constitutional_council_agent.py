@@ -1,7 +1,6 @@
 import json
 import time
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -21,7 +20,9 @@ def test_load_policies_existing_file(tmp_path):
     policies = [{"policy_id": "P-1", "description": "Test policy"}]
     policy_path.write_text(json.dumps(policies), encoding="utf-8")
 
-    agent = ConstitutionalCouncilAgent(policy_path=policy_path, amendments_dir=tmp_path / "amendments")
+    agent = ConstitutionalCouncilAgent(
+        policy_path=policy_path, amendments_dir=tmp_path / "amendments"
+    )
     loaded = agent._load_policies()
 
     assert loaded == policies
@@ -31,7 +32,9 @@ def test_load_policies_invalid_json(tmp_path):
     policy_path = tmp_path / "policy.json"
     policy_path.write_text("invalid json", encoding="utf-8")
 
-    agent = ConstitutionalCouncilAgent(policy_path=policy_path, amendments_dir=tmp_path / "amendments")
+    agent = ConstitutionalCouncilAgent(
+        policy_path=policy_path, amendments_dir=tmp_path / "amendments"
+    )
 
     with pytest.raises(RuntimeError):
         agent._load_policies()
@@ -40,7 +43,9 @@ def test_load_policies_invalid_json(tmp_path):
 def test_save_policies_creates_backup(tmp_path, monkeypatch):
     policy_path = tmp_path / "policy.json"
     policy_path.write_text("[]", encoding="utf-8")
-    agent = ConstitutionalCouncilAgent(policy_path=policy_path, amendments_dir=tmp_path / "amendments")
+    agent = ConstitutionalCouncilAgent(
+        policy_path=policy_path, amendments_dir=tmp_path / "amendments"
+    )
 
     monkeypatch.setattr(time, "time", lambda: 1234567890)
 
@@ -53,7 +58,9 @@ def test_save_policies_creates_backup(tmp_path, monkeypatch):
 
 def test_save_policies_no_existing_file(tmp_path):
     policy_path = tmp_path / "policy.json"
-    agent = ConstitutionalCouncilAgent(policy_path=policy_path, amendments_dir=tmp_path / "amendments")
+    agent = ConstitutionalCouncilAgent(
+        policy_path=policy_path, amendments_dir=tmp_path / "amendments"
+    )
 
     agent._save_policies([{"policy_id": "P-1"}])
 
@@ -86,7 +93,9 @@ def test_validate_amendment_not_dict():
 
 
 def test_invoke_llm_with_retry_success(tmp_path, monkeypatch):
-    agent = ConstitutionalCouncilAgent(policy_path=tmp_path / "policy.json", amendments_dir=tmp_path / "amendments")
+    agent = ConstitutionalCouncilAgent(
+        policy_path=tmp_path / "policy.json", amendments_dir=tmp_path / "amendments"
+    )
 
     with patch.object(agent, "execute_llm_task", return_value="test response"):
         result = agent._invoke_llm_with_retry("test prompt", retries=2, delay=0.1)
@@ -94,9 +103,12 @@ def test_invoke_llm_with_retry_success(tmp_path, monkeypatch):
 
 
 def test_invoke_llm_with_retry_failure_retry(tmp_path, monkeypatch):
-    agent = ConstitutionalCouncilAgent(policy_path=tmp_path / "policy.json", amendments_dir=tmp_path / "amendments")
+    agent = ConstitutionalCouncilAgent(
+        policy_path=tmp_path / "policy.json", amendments_dir=tmp_path / "amendments"
+    )
 
     call_count = 0
+
     def mock_execute(*args, **kwargs):
         nonlocal call_count
         call_count += 1
@@ -111,7 +123,9 @@ def test_invoke_llm_with_retry_failure_retry(tmp_path, monkeypatch):
 
 
 def test_invoke_llm_with_retry_all_failures(tmp_path, monkeypatch):
-    agent = ConstitutionalCouncilAgent(policy_path=tmp_path / "policy.json", amendments_dir=tmp_path / "amendments")
+    agent = ConstitutionalCouncilAgent(
+        policy_path=tmp_path / "policy.json", amendments_dir=tmp_path / "amendments"
+    )
 
     with patch.object(agent, "execute_llm_task", side_effect=Exception("Always fails")):
         result = agent._invoke_llm_with_retry("test prompt", retries=2, delay=0.1)
@@ -119,7 +133,9 @@ def test_invoke_llm_with_retry_all_failures(tmp_path, monkeypatch):
 
 
 def test_invoke_llm_with_retry_empty_response(tmp_path, monkeypatch):
-    agent = ConstitutionalCouncilAgent(policy_path=tmp_path / "policy.json", amendments_dir=tmp_path / "amendments")
+    agent = ConstitutionalCouncilAgent(
+        policy_path=tmp_path / "policy.json", amendments_dir=tmp_path / "amendments"
+    )
 
     with patch.object(agent, "execute_llm_task", return_value=""):
         result = agent._invoke_llm_with_retry("test prompt", retries=2, delay=0.1)

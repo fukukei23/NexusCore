@@ -12,23 +12,20 @@ This test suite achieves 2.0x+ test coverage by thoroughly testing:
 - Error handling and edge cases
 - Logging and telemetry
 """
+
 import json
-import logging
-import time
 import uuid
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, Mock, patch
+from typing import Any
+from unittest.mock import patch
 
 import pytest
 
 from nexuscore.ventures.vc_agent import (
     INVESTMENT_MEMO_KEYS,
-    InvestmentMemo,
     LLMClient,
     SearchTool,
     VentureCapitalistAgent,
 )
-
 
 # =============================================================================
 # Mock Classes and Fixtures
@@ -38,14 +35,14 @@ from nexuscore.ventures.vc_agent import (
 class MockSearchTool:
     """Mock search tool for testing."""
 
-    def __init__(self, responses: List[List[Dict[str, Any]]] = None, raise_error: bool = False):
+    def __init__(self, responses: list[list[dict[str, Any]]] = None, raise_error: bool = False):
         self.responses = responses or [[]]
         self.index = 0
         self.raise_error = raise_error
         self.call_count = 0
-        self.queries_received: List[List[str]] = []
+        self.queries_received: list[list[str]] = []
 
-    def search(self, queries: List[str]) -> List[Dict[str, Any]]:
+    def search(self, queries: list[str]) -> list[dict[str, Any]]:
         self.call_count += 1
         self.queries_received.append(queries)
 
@@ -66,8 +63,8 @@ class MockLLMClient:
     def __init__(self, response: str = "", raise_error: bool = False):
         self.response = response
         self.raise_error = raise_error
-        self.prompts: List[str] = []
-        self.kwargs_history: List[Dict[str, Any]] = []
+        self.prompts: list[str] = []
+        self.kwargs_history: list[dict[str, Any]] = []
 
     def invoke(self, prompt: str, **kwargs) -> str:
         self.prompts.append(prompt)
@@ -82,43 +79,47 @@ class MockLLMClient:
 @pytest.fixture
 def valid_memo_json() -> str:
     """Valid investment memo JSON."""
-    return json.dumps({
-        "ventureName": "AI Health Monitor",
-        "marketAnalysis": "Growing healthcare AI market with $10B TAM.",
-        "productThesis": "Real-time health monitoring using wearable AI.",
-        "strategicFit": "Aligns with our AI-first investment strategy.",
-        "resourceRequest": "$2M seed funding, 3 engineers, 18 months.",
-        "projectedROI": "3-year 10-15x return on investment.",
-    })
+    return json.dumps(
+        {
+            "ventureName": "AI Health Monitor",
+            "marketAnalysis": "Growing healthcare AI market with $10B TAM.",
+            "productThesis": "Real-time health monitoring using wearable AI.",
+            "strategicFit": "Aligns with our AI-first investment strategy.",
+            "resourceRequest": "$2M seed funding, 3 engineers, 18 months.",
+            "projectedROI": "3-year 10-15x return on investment.",
+        }
+    )
 
 
 @pytest.fixture
 def partial_memo_json() -> str:
     """Memo JSON missing required fields."""
-    return json.dumps({
-        "ventureName": "Incomplete Venture",
-        "marketAnalysis": "Some analysis",
-    })
+    return json.dumps(
+        {
+            "ventureName": "Incomplete Venture",
+            "marketAnalysis": "Some analysis",
+        }
+    )
 
 
 @pytest.fixture
-def search_results() -> List[Dict[str, Any]]:
+def search_results() -> list[dict[str, Any]]:
     """Sample search results."""
     return [
         {
             "title": "AI Healthcare Trends 2025",
             "snippet": "Healthcare AI is expected to reach $10B by 2025...",
-            "url": "https://example.com/1"
+            "url": "https://example.com/1",
         },
         {
             "title": "Top AI Startups",
             "snippet": "These AI startups are leading the innovation...",
-            "url": "https://example.com/2"
+            "url": "https://example.com/2",
         },
         {
             "title": "YC Request for Startups",
             "snippet": "Y Combinator is looking for AI healthcare solutions...",
-            "url": "https://example.com/3"
+            "url": "https://example.com/3",
         },
     ]
 
@@ -136,10 +137,7 @@ class TestVCAgentInitialization:
         llm = MockLLMClient()
         search = MockSearchTool()
 
-        agent = VentureCapitalistAgent(
-            llm_client=llm,
-            tools={"Google Search": search}
-        )
+        agent = VentureCapitalistAgent(llm_client=llm, tools={"Google Search": search})
 
         assert agent.llm_client is llm
         assert agent.market_scanner is search
@@ -234,7 +232,7 @@ class TestSearchWithRetry:
 
         assert result == []
 
-    @patch('time.sleep')
+    @patch("time.sleep")
     def test_search_exponential_backoff(self, mock_sleep):
         """Test exponential backoff delay between retries."""
         llm = MockLLMClient()
@@ -288,8 +286,9 @@ class TestSummarizeTrends:
         search = MockSearchTool()
         agent = VentureCapitalistAgent(llm_client=llm, tools={"Google Search": search})
 
-        items = [{"title": f"Trend {i}", "snippet": f"Snippet {i}", "url": f"url{i}"}
-                 for i in range(20)]
+        items = [
+            {"title": f"Trend {i}", "snippet": f"Snippet {i}", "url": f"url{i}"} for i in range(20)
+        ]
 
         result = agent._summarize_trends(items, top_k=5)
 
@@ -465,14 +464,16 @@ class TestParseMemo:
         search = MockSearchTool()
         agent = VentureCapitalistAgent(llm_client=llm, tools={"Google Search": search})
 
-        memo_with_spaces = json.dumps({
-            "ventureName": "  Spacey Name  ",
-            "marketAnalysis": "\n\nAnalysis\n\n",
-            "productThesis": "\tThesis\t",
-            "strategicFit": "  Fit  ",
-            "resourceRequest": " Request ",
-            "projectedROI": "  ROI  ",
-        })
+        memo_with_spaces = json.dumps(
+            {
+                "ventureName": "  Spacey Name  ",
+                "marketAnalysis": "\n\nAnalysis\n\n",
+                "productThesis": "\tThesis\t",
+                "strategicFit": "  Fit  ",
+                "resourceRequest": " Request ",
+                "projectedROI": "  ROI  ",
+            }
+        )
 
         memo = agent._parse_memo(memo_with_spaces)
 
@@ -485,14 +486,16 @@ class TestParseMemo:
         search = MockSearchTool()
         agent = VentureCapitalistAgent(llm_client=llm, tools={"Google Search": search})
 
-        memo_with_numbers = json.dumps({
-            "ventureName": 12345,
-            "marketAnalysis": "Analysis",
-            "productThesis": True,
-            "strategicFit": ["item1", "item2"],
-            "resourceRequest": None,
-            "projectedROI": 3.14,
-        })
+        memo_with_numbers = json.dumps(
+            {
+                "ventureName": 12345,
+                "marketAnalysis": "Analysis",
+                "productThesis": True,
+                "strategicFit": ["item1", "item2"],
+                "resourceRequest": None,
+                "projectedROI": 3.14,
+            }
+        )
 
         memo = agent._parse_memo(memo_with_numbers)
 
@@ -633,7 +636,7 @@ class TestTriggerSelfClone:
         policy = {"approved_by_human": True}
 
         # Capture logging to verify sandbox_id format
-        with patch('nexuscore.ventures.vc_agent.logger') as mock_logger:
+        with patch("nexuscore.ventures.vc_agent.logger") as mock_logger:
             agent.trigger_self_clone("Test Venture Name", policy)
 
             assert mock_logger.info.called
@@ -656,7 +659,7 @@ class TestLoggingAndTelemetry:
         search = MockSearchTool(responses=[search_results])
         agent = VentureCapitalistAgent(llm_client=llm, tools={"Google Search": search})
 
-        with patch('nexuscore.ventures.vc_agent.logger') as mock_logger:
+        with patch("nexuscore.ventures.vc_agent.logger") as mock_logger:
             agent._search_with_retry(["test"])
 
             assert mock_logger.info.called
@@ -680,7 +683,7 @@ class TestLoggingAndTelemetry:
 
         agent = VentureCapitalistAgent(llm_client=llm, tools={"Google Search": FailThenSucceed()})
 
-        with patch('nexuscore.ventures.vc_agent.logger') as mock_logger:
+        with patch("nexuscore.ventures.vc_agent.logger") as mock_logger:
             agent._search_with_retry(["test"], retries=1, delay=0.01)
 
             assert mock_logger.warning.called
@@ -691,7 +694,7 @@ class TestLoggingAndTelemetry:
         search = MockSearchTool(responses=[search_results])
         agent = VentureCapitalistAgent(llm_client=llm, tools={"Google Search": search})
 
-        with patch('nexuscore.ventures.vc_agent.logger') as mock_logger:
+        with patch("nexuscore.ventures.vc_agent.logger") as mock_logger:
             agent.scout_for_opportunities()
 
             # Check for start and success logs
@@ -707,7 +710,7 @@ class TestLoggingAndTelemetry:
         search = MockSearchTool(responses=[search_results])
         agent = VentureCapitalistAgent(llm_client=llm, tools={"Google Search": search})
 
-        with patch('nexuscore.ventures.vc_agent.logger') as mock_logger:
+        with patch("nexuscore.ventures.vc_agent.logger") as mock_logger:
             agent.scout_for_opportunities()
 
             assert mock_logger.error.called
@@ -735,14 +738,18 @@ class TestEdgeCasesAndIntegration:
 
     def test_agent_handles_unicode_in_trends(self):
         """Test agent handles Unicode characters in trends."""
-        llm = MockLLMClient(response=json.dumps({
-            "ventureName": "日本AI",
-            "marketAnalysis": "市場分析",
-            "productThesis": "製品thesis",
-            "strategicFit": "戦略fit",
-            "resourceRequest": "リソース",
-            "projectedROI": "ROI予測",
-        }))
+        llm = MockLLMClient(
+            response=json.dumps(
+                {
+                    "ventureName": "日本AI",
+                    "marketAnalysis": "市場分析",
+                    "productThesis": "製品thesis",
+                    "strategicFit": "戦略fit",
+                    "resourceRequest": "リソース",
+                    "projectedROI": "ROI予測",
+                }
+            )
+        )
         trends = [{"title": "日本のAIトレンド", "snippet": "概要"}]
         search = MockSearchTool(responses=[trends])
         agent = VentureCapitalistAgent(llm_client=llm, tools={"Google Search": search})
@@ -763,15 +770,21 @@ class TestEdgeCasesAndIntegration:
 
     def test_memo_keys_constant_matches_typeddict(self):
         """Test INVESTMENT_MEMO_KEYS matches InvestmentMemo TypedDict."""
-        expected_keys = {"ventureName", "marketAnalysis", "productThesis",
-                        "strategicFit", "resourceRequest", "projectedROI"}
+        expected_keys = {
+            "ventureName",
+            "marketAnalysis",
+            "productThesis",
+            "strategicFit",
+            "resourceRequest",
+            "projectedROI",
+        }
 
         assert INVESTMENT_MEMO_KEYS == expected_keys
 
     def test_protocol_classes_define_expected_methods(self):
         """Test Protocol classes define expected methods."""
         # SearchTool protocol
-        assert hasattr(SearchTool, 'search')
+        assert hasattr(SearchTool, "search")
 
         # LLMClient protocol
-        assert hasattr(LLMClient, 'invoke')
+        assert hasattr(LLMClient, "invoke")

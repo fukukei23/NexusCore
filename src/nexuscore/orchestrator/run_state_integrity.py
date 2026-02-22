@@ -12,8 +12,8 @@ import hashlib
 import hmac
 import json
 import os
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 
 def _get_hmac_secret() -> bytes:
@@ -30,7 +30,7 @@ def _get_hmac_secret() -> bytes:
     return secret.encode("utf-8")
 
 
-def _canonical_json(data: Dict[str, Any]) -> bytes:
+def _canonical_json(data: dict[str, Any]) -> bytes:
     """
     Generate canonical JSON representation (excluding integrity field).
 
@@ -39,10 +39,12 @@ def _canonical_json(data: Dict[str, Any]) -> bytes:
     # Exclude integrity field for signing
     signing_data = {k: v for k, v in data.items() if k != "integrity"}
     # Canonical JSON: sorted keys, no extra whitespace
-    return json.dumps(signing_data, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return json.dumps(
+        signing_data, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
 
 
-def sign_run_state(state: Dict[str, Any]) -> Dict[str, Any]:
+def sign_run_state(state: dict[str, Any]) -> dict[str, Any]:
     """
     Sign a RunState dictionary using HMAC-SHA256.
 
@@ -68,10 +70,9 @@ def sign_run_state(state: Dict[str, Any]) -> Dict[str, Any]:
     signature = hmac.new(secret, canonical, hashlib.sha256).hexdigest()
 
     # Build integrity block
-    from datetime import datetime, timezone
 
-    signed_at = datetime.now(timezone.utc).isoformat()
-    integrity_block: Dict[str, Any] = {
+    signed_at = datetime.now(UTC).isoformat()
+    integrity_block: dict[str, Any] = {
         "algorithm": "HMAC-SHA256",
         "key_id": "default",
         "signature": signature,
@@ -85,7 +86,7 @@ def sign_run_state(state: Dict[str, Any]) -> Dict[str, Any]:
     return signed_state
 
 
-def verify_integrity(state: Dict[str, Any]) -> Tuple[bool, Optional[str], Optional[str]]:
+def verify_integrity(state: dict[str, Any]) -> tuple[bool, str | None, str | None]:
     """
     Verify integrity of untrusted RunState using HMAC-SHA256.
 
@@ -126,7 +127,11 @@ def verify_integrity(state: Dict[str, Any]) -> Tuple[bool, Optional[str], Option
 
         # Compare signatures using constant-time comparison
         if not hmac.compare_digest(computed_signature, expected_signature):
-            return False, "STATE_INTEGRITY_VIOLATION", "RunState signature verification failed (possible tampering)"
+            return (
+                False,
+                "STATE_INTEGRITY_VIOLATION",
+                "RunState signature verification failed (possible tampering)",
+            )
 
         return True, None, None
 

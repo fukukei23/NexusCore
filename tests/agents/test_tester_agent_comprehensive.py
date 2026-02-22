@@ -17,22 +17,22 @@ tester_agent.py の包括的テスト
 
 import json
 import sys
-from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 # 依存モジュールをモック
-sys.modules['nexuscore.llm.llm_router'] = MagicMock()
-sys.modules['nexuscore.core.retry_utils'] = MagicMock()
-sys.modules['nexuscore.core.errors'] = MagicMock()
-sys.modules['nexuscore.agents.test_strategy'] = MagicMock()
-sys.modules['nexuscore.agents.test_generator_prompt'] = MagicMock()
-sys.modules['nexuscore.core.test_metrics'] = MagicMock()
+sys.modules["nexuscore.llm.llm_router"] = MagicMock()
+sys.modules["nexuscore.core.retry_utils"] = MagicMock()
+sys.modules["nexuscore.core.errors"] = MagicMock()
+sys.modules["nexuscore.agents.test_strategy"] = MagicMock()
+sys.modules["nexuscore.agents.test_generator_prompt"] = MagicMock()
+sys.modules["nexuscore.core.test_metrics"] = MagicMock()
 
 try:
-    from nexuscore.agents.tester_agent import TesterAgent
     from nexuscore.agents.base_agent import BaseAgent
+    from nexuscore.agents.tester_agent import TesterAgent
+
     HAS_TESTER_AGENT = True
 except ImportError:
     HAS_TESTER_AGENT = False
@@ -44,9 +44,9 @@ except ImportError:
 class TestTesterAgentInit:
     """TesterAgent 初期化のテスト"""
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_init_inherits_base_agent(self, mock_router_class):
         """BaseAgentを継承している"""
         mock_router_class.return_value = Mock()
@@ -54,13 +54,13 @@ class TestTesterAgentInit:
         agent = TesterAgent()
 
         assert isinstance(agent, BaseAgent)
-        assert hasattr(agent, 'llm_router')
-        assert hasattr(agent, 'logger')
-        assert hasattr(agent, 'project_root')
+        assert hasattr(agent, "llm_router")
+        assert hasattr(agent, "logger")
+        assert hasattr(agent, "project_root")
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_init_with_project_root(self, mock_router_class, tmp_path):
         """project_rootが設定される"""
         mock_router_class.return_value = Mock()
@@ -69,9 +69,9 @@ class TestTesterAgentInit:
 
         assert agent.project_root == tmp_path
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_init_without_strategy_manager(self, mock_router_class):
         """TestStrategyManagerなしでも初期化可能"""
         mock_router_class.return_value = Mock()
@@ -82,7 +82,7 @@ class TestTesterAgentInit:
 
     def test_system_prompt_defined(self):
         """SYSTEM_PROMPTが定義されている"""
-        assert hasattr(TesterAgent, 'SYSTEM_PROMPT')
+        assert hasattr(TesterAgent, "SYSTEM_PROMPT")
         assert "品質保証" in TesterAgent.SYSTEM_PROMPT or "QA" in TesterAgent.SYSTEM_PROMPT
 
 
@@ -90,15 +90,15 @@ class TestTesterAgentInit:
 class TestGenerateTestsAndTestimony:
     """TesterAgent.generate_tests_and_testimony() のテスト"""
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_generate_tests_and_testimony_basic(self, mock_router_class):
         """基本的なテスト生成"""
         test_result = {
             "test_code": "def test_hello():\n    assert hello() == 'Hello'",
-            "testimony": "Tests the hello function returns correct greeting"
+            "testimony": "Tests the hello function returns correct greeting",
         }
 
         mock_llm = Mock()
@@ -116,10 +116,10 @@ class TestGenerateTestsAndTestimony:
         assert "test_code" in parsed
         assert "testimony" in parsed
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_generate_tests_and_testimony_as_json(self, mock_router_class):
         """as_json=Trueで呼ばれる"""
         test_result = {"test_code": "# test", "testimony": "# testimony"}
@@ -135,17 +135,17 @@ class TestGenerateTestsAndTestimony:
         agent.generate_tests_and_testimony("def test(): pass")
 
         call_kwargs = mock_llm.execute.call_args[1]
-        assert call_kwargs['as_json'] is True
+        assert call_kwargs["as_json"] is True
 
 
 @pytest.mark.skipif(not HAS_TESTER_AGENT, reason="tester_agent module not available")
 class TestGenerateTestsFromPlan:
     """TesterAgent.generate_tests_from_plan() のテスト"""
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_generate_tests_from_plan_basic(self, mock_router_class):
         """計画からのテスト生成"""
         plan = {
@@ -156,7 +156,7 @@ class TestGenerateTestsFromPlan:
 
         test_result = {
             "test_code": "def test_add():\n    assert add(1, 2) == 3",
-            "testimony": "Tests the add function"
+            "testimony": "Tests the add function",
         }
 
         mock_llm = Mock()
@@ -173,10 +173,10 @@ class TestGenerateTestsFromPlan:
         assert "test_code" in parsed
         assert "testimony" in parsed
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_generate_tests_from_plan_includes_module_import(self, mock_router_class):
         """プロンプトにモジュールimport指示が含まれる"""
         plan = {"functions_to_implement": [{"name": "func"}]}
@@ -192,7 +192,7 @@ class TestGenerateTestsFromPlan:
         agent.generate_tests_from_plan(plan, "my.module.path")
 
         call_args = mock_llm.execute.call_args[1]
-        prompt = call_args['prompt']
+        prompt = call_args["prompt"]
         assert "my.module.path" in prompt
         assert "from my.module.path import" in prompt
 
@@ -201,15 +201,15 @@ class TestGenerateTestsFromPlan:
 class TestGenerateTests:
     """TesterAgent.generate_tests() のテスト"""
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_generate_tests_fallback(self, mock_router_class):
         """要求からのフォールバックテスト生成"""
         test_result = {
             "test_code": "def test_requirement():\n    pass",
-            "testimony": "Requirement test"
+            "testimony": "Requirement test",
         }
 
         mock_llm = Mock()
@@ -231,9 +231,9 @@ class TestGenerateTests:
 class TestExtractTestCodeFromResponse:
     """TesterAgent._extract_test_code_from_response() のテスト"""
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_extract_from_valid_json(self, mock_router_class):
         """有効なJSONからテストコード抽出"""
         mock_router_class.return_value = Mock()
@@ -245,9 +245,9 @@ class TestExtractTestCodeFromResponse:
 
         assert result == "def test_func(): pass"
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_extract_from_invalid_json(self, mock_router_class):
         """無効なJSONの場合はそのまま返す"""
         mock_router_class.return_value = Mock()
@@ -259,9 +259,9 @@ class TestExtractTestCodeFromResponse:
 
         assert result == "Not a JSON response"
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_extract_from_string_json(self, mock_router_class):
         """JSON文字列の場合"""
         mock_router_class.return_value = Mock()
@@ -278,9 +278,9 @@ class TestExtractTestCodeFromResponse:
 class TestResolveTestFilePath:
     """TesterAgent._resolve_test_file_path() のテスト"""
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_resolve_test_file_path_from_src(self, mock_router_class, tmp_path):
         """srcディレクトリからのパス解決"""
         mock_router_class.return_value = Mock()
@@ -291,9 +291,9 @@ class TestResolveTestFilePath:
         assert "tests" in str(test_path)
         assert "test_file_utils.py" in str(test_path)
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_resolve_test_file_path_adds_test_prefix(self, mock_router_class, tmp_path):
         """test_プレフィックスが追加される"""
         mock_router_class.return_value = Mock()
@@ -308,9 +308,9 @@ class TestResolveTestFilePath:
 class TestCountTestFunctions:
     """TesterAgent._count_test_functions() のテスト"""
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_count_test_functions_basic(self, mock_router_class):
         """テスト関数をカウント"""
         mock_router_class.return_value = Mock()
@@ -334,9 +334,9 @@ def test_three():
 
         assert count == 3
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_count_test_functions_empty(self, mock_router_class):
         """テスト関数がない場合"""
         mock_router_class.return_value = Mock()
@@ -351,10 +351,10 @@ def test_three():
 class TestEdgeCases:
     """エッジケースのテスト"""
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_empty_code_to_test(self, mock_router_class):
         """空のコードでもテスト生成可能"""
         mock_llm = Mock()
@@ -369,10 +369,10 @@ class TestEdgeCases:
 
         assert result == '{"test_code": "# empty test", "testimony": "# empty"}'
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_japanese_code(self, mock_router_class):
         """日本語コメントを含むコードのテスト生成"""
         code = "def 挨拶():\n    # 挨拶を返す\n    return 'こんにちは'"
@@ -389,10 +389,10 @@ class TestEdgeCases:
 
         assert result
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter', None)
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter", None)
     def test_no_llm_router_available(self):
         """LLMRouterが利用できない場合"""
         agent = TesterAgent()
@@ -411,10 +411,10 @@ class TestEdgeCases:
 class TestAdditionalCoverage:
     """未カバーのコードパスをテスト"""
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_write_or_merge_test_file_creates_directory(self, mock_router_class, tmp_path):
         """テストファイル書き込み時にディレクトリを作成"""
         mock_router = Mock()
@@ -433,10 +433,10 @@ class TestAdditionalCoverage:
         assert test_file_path.exists()
         assert "def test_example" in test_file_path.read_text()
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_write_or_merge_test_file_overwrites_existing(self, mock_router_class, tmp_path):
         """既存のテストファイルを上書き"""
         mock_router = Mock()
@@ -455,10 +455,10 @@ class TestAdditionalCoverage:
         assert "def test_new" in content
         assert "old content" not in content
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_count_test_functions_with_various_formats(self, mock_router_class):
         """様々な形式のテスト関数をカウント"""
         mock_router = Mock()
@@ -486,10 +486,10 @@ def test_async():
         # test_ で始まる関数: test_basic, test_with_params, test_indented, test_async
         assert count == 4
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_get_coverage_for_module_returns_zero(self, mock_router_class):
         """カバレッジ取得（現在はダミー実装）"""
         mock_router = Mock()
@@ -501,11 +501,11 @@ def test_async():
         # 現在の実装は常に 0.0 を返す
         assert coverage == 0.0
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
-    @patch('subprocess.run')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
+    @patch("subprocess.run")
     def test_run_tests_and_get_coverage_success(self, mock_subprocess, mock_router_class, tmp_path):
         """テスト実行成功時のカバレッジ取得"""
         mock_router = Mock()
@@ -524,11 +524,11 @@ def test_async():
         # カバレッジは現在 0.0（将来実装予定）
         assert coverage == 0.0
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
-    @patch('subprocess.run')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
+    @patch("subprocess.run")
     def test_run_tests_and_get_coverage_failure(self, mock_subprocess, mock_router_class, tmp_path):
         """テスト実行失敗時の処理"""
         mock_router = Mock()
@@ -546,11 +546,11 @@ def test_async():
         mock_subprocess.assert_called_once()
         assert coverage == 0.0
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
-    @patch('subprocess.run')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
+    @patch("subprocess.run")
     def test_run_tests_timeout_handling(self, mock_subprocess, mock_router_class, tmp_path):
         """テスト実行タイムアウトの処理"""
         from subprocess import TimeoutExpired
@@ -569,10 +569,10 @@ def test_async():
         # タイムアウトしてもエラーにならず、0.0 を返す
         assert coverage == 0.0
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_infer_module_name_from_path_standard(self, mock_router_class):
         """ファイルパスからモジュール名を推定（標準ケース）"""
         mock_router = Mock()
@@ -584,10 +584,10 @@ def test_async():
         module_name = agent._infer_module_name_from_path("src/nexuscore/utils/file_utils.py")
         assert module_name == "file_utils"
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_infer_module_name_from_path_edge_cases(self, mock_router_class):
         """ファイルパスからモジュール名を推定（エッジケース）"""
         mock_router = Mock()
@@ -599,10 +599,10 @@ def test_async():
         module_name = agent._infer_module_name_from_path("nexuscore/agents/base.py")
         assert module_name == "base"
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_apply_generated_test_code_full_workflow(self, mock_router_class, tmp_path):
         """テストコード適用の完全なワークフロー"""
         mock_router = Mock()
@@ -611,16 +611,14 @@ def test_async():
         agent = TesterAgent(project_root=str(tmp_path))
 
         # subprocess.run をモック（テスト実行をスキップ）
-        with patch('subprocess.run') as mock_subprocess:
+        with patch("subprocess.run") as mock_subprocess:
             mock_subprocess.return_value = Mock(returncode=0, stderr="")
 
             test_code = "def test_workflow():\n    assert True\n\ndef test_workflow2():\n    pass"
             target_file = "src/nexuscore/example.py"
 
             test_file_path, test_count, cov_before, cov_after = agent._apply_generated_test_code(
-                "nexuscore.example",
-                test_code,
-                target_file
+                "nexuscore.example", test_code, target_file
             )
 
             # テストファイルが作成される
@@ -635,10 +633,10 @@ def test_async():
 class TestTesterAgentAdvancedScenarios:
     """より深い統合シナリオとエッジケース"""
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_write_or_merge_test_file_with_existing_content_merge(
         self, mock_router_class, tmp_path
     ):
@@ -659,13 +657,11 @@ class TestTesterAgentAdvancedScenarios:
         final_content = test_file_path.read_text()
         assert "test_new" in final_content
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
-    def test_count_test_functions_with_class_based_tests(
-        self, mock_router_class, tmp_path
-    ):
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
+    def test_count_test_functions_with_class_based_tests(self, mock_router_class, tmp_path):
         """クラスベースのテスト関数カウント"""
         agent = TesterAgent(project_root=str(tmp_path))
 
@@ -684,19 +680,16 @@ def test_function():
         # クラスメソッド2つ + 関数1つ = 3
         assert count == 3
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
-    @patch('subprocess.run')
-    def test_run_tests_with_coverage_success(
-        self, mock_subprocess, mock_router_class, tmp_path
-    ):
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
+    @patch("subprocess.run")
+    def test_run_tests_with_coverage_success(self, mock_subprocess, mock_router_class, tmp_path):
         """カバレッジ成功時のテスト実行"""
         # pytest成功とカバレッジ出力をシミュレート
         mock_subprocess.return_value = Mock(
-            returncode=0,
-            stderr="test_module.py::test_example PASSED\nCoverage: 85%"
+            returncode=0, stderr="test_module.py::test_example PASSED\nCoverage: 85%"
         )
 
         agent = TesterAgent(project_root=str(tmp_path))
@@ -706,13 +699,11 @@ def test_function():
         # カバレッジが0.0（実際の解析なし）
         assert coverage == 0.0
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
-    def test_infer_module_name_with_complex_path(
-        self, mock_router_class, tmp_path
-    ):
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
+    def test_infer_module_name_with_complex_path(self, mock_router_class, tmp_path):
         """複雑なパスからのモジュール名推論"""
         agent = TesterAgent(project_root=str(tmp_path))
 
@@ -723,11 +714,11 @@ def test_function():
         # 実装は path.stem を返すので "file_handler"
         assert module_name == "file_handler"
 
-    @patch('nexuscore.agents.tester_agent.TestStrategyManager', None)
-    @patch('nexuscore.agents.tester_agent.TestMetricsCollector', None)
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
-    @patch('subprocess.run')
+    @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)
+    @patch("nexuscore.agents.tester_agent.TestMetricsCollector", None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
+    @patch("subprocess.run")
     def test_apply_generated_test_code_with_multiple_tests(
         self, mock_subprocess, mock_router_class, tmp_path
     ):
@@ -749,12 +740,9 @@ def test_three():
         target_file = "src/nexuscore/multi.py"
 
         test_file_path, test_count, cov_before, cov_after = agent._apply_generated_test_code(
-            "nexuscore.multi",
-            test_code,
-            target_file
+            "nexuscore.multi", test_code, target_file
         )
 
         # 3つのテスト関数がカウントされる
         assert test_count == 3
         assert "test_multi.py" in test_file_path
-

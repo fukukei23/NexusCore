@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Comprehensive tests for nexuscore.gradio_app.dashboard module.
 
@@ -9,22 +8,19 @@ visualization, UI components, and edge cases in the dashboard module.
 from __future__ import annotations
 
 import json
-import os
-from datetime import datetime, date, timedelta
+import sys
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock, call
-from typing import List, Dict, Any
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-import sys
 
 # Mock gradio and matplotlib before importing dashboard
-sys.modules['gradio'] = MagicMock()
-sys.modules['matplotlib'] = MagicMock()
-sys.modules['matplotlib.pyplot'] = MagicMock()
+sys.modules["gradio"] = MagicMock()
+sys.modules["matplotlib"] = MagicMock()
+sys.modules["matplotlib.pyplot"] = MagicMock()
 
 from nexuscore.gradio_app import dashboard
-
 
 # ============================================================================
 # Fixtures
@@ -46,38 +42,53 @@ def sample_patch_files(temp_patch_dir):
 
     # Success patch
     patch1 = temp_patch_dir / "patch_20250101_120000.json"
-    patch1.write_text(json.dumps({
-        "timestamp": "20250101_120000",
-        "status": "success",
-        "reason": "Fixed edge case for n=2",
-        "prompt": "Fix is_prime",
-        "code": "def is_prime(n): return n >= 2",
-        "test_log": "5 passed"
-    }), encoding="utf-8")
+    patch1.write_text(
+        json.dumps(
+            {
+                "timestamp": "20250101_120000",
+                "status": "success",
+                "reason": "Fixed edge case for n=2",
+                "prompt": "Fix is_prime",
+                "code": "def is_prime(n): return n >= 2",
+                "test_log": "5 passed",
+            }
+        ),
+        encoding="utf-8",
+    )
     files.append(patch1)
 
     # Attempt patch
     patch2 = temp_patch_dir / "patch_20250101_130000.json"
-    patch2.write_text(json.dumps({
-        "timestamp": "20250101_130000",
-        "status": "attempt_fail",
-        "reason": "Test failed",
-        "prompt": "Retry",
-        "code": "def test(): pass",
-        "test_log": "3 failed"
-    }), encoding="utf-8")
+    patch2.write_text(
+        json.dumps(
+            {
+                "timestamp": "20250101_130000",
+                "status": "attempt_fail",
+                "reason": "Test failed",
+                "prompt": "Retry",
+                "code": "def test(): pass",
+                "test_log": "3 failed",
+            }
+        ),
+        encoding="utf-8",
+    )
     files.append(patch2)
 
     # Initial pass
     patch3 = temp_patch_dir / "patch_20250102_100000.json"
-    patch3.write_text(json.dumps({
-        "timestamp": "20250102_100000",
-        "status": "initial_pass",
-        "reason": "Spec compliant",
-        "prompt": "Implement spec",
-        "code": "def new_func(): pass",
-        "test_log": "10 passed"
-    }), encoding="utf-8")
+    patch3.write_text(
+        json.dumps(
+            {
+                "timestamp": "20250102_100000",
+                "status": "initial_pass",
+                "reason": "Spec compliant",
+                "prompt": "Implement spec",
+                "code": "def new_func(): pass",
+                "test_log": "10 passed",
+            }
+        ),
+        encoding="utf-8",
+    )
     files.append(patch3)
 
     return files
@@ -175,13 +186,16 @@ class TestParseTimestamp:
         dt = dashboard._parse_ts("2025")
         assert dt.year == 1970  # Falls back to epoch
 
-    @pytest.mark.parametrize("timestamp,expected_year", [
-        ("20250101_000000", 2025),
-        ("2024-12-31 23:59:59", 2024),
-        ("invalid", 1970),
-        ("", 1970),
-        ("20260215_120000", 2026),
-    ])
+    @pytest.mark.parametrize(
+        "timestamp,expected_year",
+        [
+            ("20250101_000000", 2025),
+            ("2024-12-31 23:59:59", 2024),
+            ("invalid", 1970),
+            ("", 1970),
+            ("20260215_120000", 2026),
+        ],
+    )
     def test_parse_ts_parametrized(self, timestamp, expected_year):
         """Parametrized tests for various timestamp formats."""
         dt = dashboard._parse_ts(timestamp)
@@ -248,13 +262,7 @@ class TestReadJson:
     def test_read_json_nested_structure(self, tmp_path):
         """Test reading JSON with nested structure."""
         json_file = tmp_path / "nested.json"
-        data = {
-            "level1": {
-                "level2": {
-                    "level3": "deep value"
-                }
-            }
-        }
+        data = {"level1": {"level2": {"level3": "deep value"}}}
         json_file.write_text(json.dumps(data), encoding="utf-8")
 
         result = dashboard._read_json(json_file)
@@ -377,12 +385,10 @@ class TestLoadItems:
         yesterday = (today - timedelta(days=1)).strftime("%Y%m%d_120000")
 
         (temp_patch_dir / f"patch_{ts_today}.json").write_text(
-            json.dumps({"timestamp": ts_today, "status": "success"}),
-            encoding="utf-8"
+            json.dumps({"timestamp": ts_today, "status": "success"}), encoding="utf-8"
         )
         (temp_patch_dir / f"patch_{yesterday}.json").write_text(
-            json.dumps({"timestamp": yesterday, "status": "success"}),
-            encoding="utf-8"
+            json.dumps({"timestamp": yesterday, "status": "success"}), encoding="utf-8"
         )
 
         monkeypatch.setattr(dashboard, "PATCH_HISTORY_DIRS", [temp_patch_dir])
@@ -390,10 +396,7 @@ class TestLoadItems:
         items = dashboard._load_items(limit=None, date_filter="today")
 
         # Should only include today's items
-        assert all(
-            dashboard._parse_ts(item["timestamp"]).date() == today.date()
-            for item in items
-        )
+        assert all(dashboard._parse_ts(item["timestamp"]).date() == today.date() for item in items)
 
     def test_load_items_7days_filter(self, temp_patch_dir, monkeypatch):
         """Test loading items with 7 days filter."""
@@ -402,12 +405,10 @@ class TestLoadItems:
         old = (now - timedelta(days=10)).strftime("%Y%m%d_120000")
 
         (temp_patch_dir / f"patch_{recent}.json").write_text(
-            json.dumps({"timestamp": recent, "status": "success"}),
-            encoding="utf-8"
+            json.dumps({"timestamp": recent, "status": "success"}), encoding="utf-8"
         )
         (temp_patch_dir / f"patch_{old}.json").write_text(
-            json.dumps({"timestamp": old, "status": "success"}),
-            encoding="utf-8"
+            json.dumps({"timestamp": old, "status": "success"}), encoding="utf-8"
         )
 
         monkeypatch.setattr(dashboard, "PATCH_HISTORY_DIRS", [temp_patch_dir])
@@ -425,12 +426,10 @@ class TestLoadItems:
         old = (now - timedelta(days=40)).strftime("%Y%m%d_120000")
 
         (temp_patch_dir / f"patch_{recent}.json").write_text(
-            json.dumps({"timestamp": recent, "status": "success"}),
-            encoding="utf-8"
+            json.dumps({"timestamp": recent, "status": "success"}), encoding="utf-8"
         )
         (temp_patch_dir / f"patch_{old}.json").write_text(
-            json.dumps({"timestamp": old, "status": "success"}),
-            encoding="utf-8"
+            json.dumps({"timestamp": old, "status": "success"}), encoding="utf-8"
         )
 
         monkeypatch.setattr(dashboard, "PATCH_HISTORY_DIRS", [temp_patch_dir])
@@ -444,8 +443,7 @@ class TestLoadItems:
         timestamps = ["20250101_120000", "20250103_120000", "20250102_120000"]
         for ts in timestamps:
             (temp_patch_dir / f"patch_{ts}.json").write_text(
-                json.dumps({"timestamp": ts, "status": "success"}),
-                encoding="utf-8"
+                json.dumps({"timestamp": ts, "status": "success"}), encoding="utf-8"
             )
 
         monkeypatch.setattr(dashboard, "PATCH_HISTORY_DIRS", [temp_patch_dir])
@@ -527,16 +525,19 @@ class TestCategorize:
         assert dashboard._categorize("Edge Case") == "境界値/特例"
         assert dashboard._categorize("edge case") == "境界値/特例"
 
-    @pytest.mark.parametrize("text,expected_category", [
-        ("Fix n=0 edge case", "境界値/特例"),
-        ("O(n log n) improvement", "アルゴリズム/計算量"),
-        ("Path separator fix", "I/O・パス・環境"),
-        ("pytest fixture", "テスト修正/品質"),
-        ("spec update", "設計/仕様"),
-        ("unknown reason", "不明"),
-        ("", "不明"),
-        (None, "不明"),
-    ])
+    @pytest.mark.parametrize(
+        "text,expected_category",
+        [
+            ("Fix n=0 edge case", "境界値/特例"),
+            ("O(n log n) improvement", "アルゴリズム/計算量"),
+            ("Path separator fix", "I/O・パス・環境"),
+            ("pytest fixture", "テスト修正/品質"),
+            ("spec update", "設計/仕様"),
+            ("unknown reason", "不明"),
+            ("", "不明"),
+            (None, "不明"),
+        ],
+    )
     def test_categorize_parametrized(self, text, expected_category):
         """Parametrized tests for various categorizations."""
         assert dashboard._categorize(text) == expected_category
@@ -772,8 +773,7 @@ class TestMakeDailyPlot:
     def test_make_daily_plot_multiple_days(self):
         """Test daily plot with multiple days."""
         by_day = {
-            date(2025, 1, i): {"success": i, "attempt": i * 2, "initial": 0}
-            for i in range(1, 8)
+            date(2025, 1, i): {"success": i, "attempt": i * 2, "initial": 0} for i in range(1, 8)
         }
 
         fig = dashboard._make_daily_plot(by_day)
@@ -845,11 +845,16 @@ class TestIntegration:
         for i in range(5):
             ts = (now - timedelta(days=i)).strftime("%Y%m%d_120000")
             patch_file = temp_patch_dir / f"patch_{ts}.json"
-            patch_file.write_text(json.dumps({
-                "timestamp": ts,
-                "status": "success" if i % 2 == 0 else "attempt_fail",
-                "reason": f"Fix {i}",
-            }), encoding="utf-8")
+            patch_file.write_text(
+                json.dumps(
+                    {
+                        "timestamp": ts,
+                        "status": "success" if i % 2 == 0 else "attempt_fail",
+                        "reason": f"Fix {i}",
+                    }
+                ),
+                encoding="utf-8",
+            )
 
         monkeypatch.setattr(dashboard, "PATCH_HISTORY_DIRS", [temp_patch_dir])
 
@@ -867,9 +872,21 @@ class TestIntegration:
         """Test metrics calculation with real categorization."""
         items = [
             {"timestamp": "20250101_000000", "status": "success", "reason": "Fix n=2 edge case"},
-            {"timestamp": "20250102_000000", "status": "attempt_fail", "reason": "Binary search failed"},
-            {"timestamp": "20250103_000000", "status": "success", "reason": "Path handling on Windows"},
-            {"timestamp": "20250104_000000", "status": "initial_pass", "reason": "pytest fixture added"},
+            {
+                "timestamp": "20250102_000000",
+                "status": "attempt_fail",
+                "reason": "Binary search failed",
+            },
+            {
+                "timestamp": "20250103_000000",
+                "status": "success",
+                "reason": "Path handling on Windows",
+            },
+            {
+                "timestamp": "20250104_000000",
+                "status": "initial_pass",
+                "reason": "pytest fixture added",
+            },
         ]
 
         stats = dashboard._metrics(items)

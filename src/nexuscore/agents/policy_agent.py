@@ -16,30 +16,37 @@
 
 import json
 import re
+
 from .base_agent import BaseAgent
+
 
 class PolicyAgent(BaseAgent):
     """
     コードが事前に定義されたポリシー（規約）に準拠しているかを監査するエージェント。
     LLMを呼び出さず、設定ファイルに基づいて機械的にチェックを行う。
     """
+
     # ▼▼▼【アーキテクチャ統一】ここから▼▼▼
     def __init__(self, policy_rules_path: str = "config/policy_rules.json"):
         """
         PolicyAgentを初期化する。
         """
-        super().__init__() # 引数なしで呼び出すのが正しい作法
+        super().__init__()  # 引数なしで呼び出すのが正しい作法
         # ▲▲▲【アーキテク-チャ統一】ここまで▲▲▲
-        
+
         try:
-            with open(policy_rules_path, 'r', encoding='utf-8') as f:
+            with open(policy_rules_path, encoding="utf-8") as f:
                 self.policies = json.load(f)
             self.logger.info(f"Loaded {len(self.policies)} policies from {policy_rules_path}")
         except FileNotFoundError:
-            self.logger.error(f"Policy rules file not found at: {policy_rules_path}. No policies will be enforced.")
+            self.logger.error(
+                f"Policy rules file not found at: {policy_rules_path}. No policies will be enforced."
+            )
             self.policies = []
         except json.JSONDecodeError:
-            self.logger.error(f"Failed to parse JSON from {policy_rules_path}. Check for syntax errors.")
+            self.logger.error(
+                f"Failed to parse JSON from {policy_rules_path}. Check for syntax errors."
+            )
             self.policies = []
 
     def audit(self, files_to_check: list) -> dict:
@@ -60,8 +67,13 @@ class PolicyAgent(BaseAgent):
                 continue
 
             for policy in self.policies:
-                if not all(k in policy for k in ["policy_id", "detection_pattern", "severity", "description"]):
-                    self.logger.warning(f"Skipping malformed policy: {policy.get('policy_id', 'N/A')}")
+                if not all(
+                    k in policy
+                    for k in ["policy_id", "detection_pattern", "severity", "description"]
+                ):
+                    self.logger.warning(
+                        f"Skipping malformed policy: {policy.get('policy_id', 'N/A')}"
+                    )
                     continue
 
                 if re.search(policy.get("target_file_pattern", ".*"), file_path):
@@ -73,16 +85,14 @@ class PolicyAgent(BaseAgent):
                                 "policy_id": policy["policy_id"],
                                 "severity": policy["severity"],
                                 "description": policy["description"],
-                                "suggestion": policy.get("suggestion", "No specific suggestion.")
+                                "suggestion": policy.get("suggestion", "No specific suggestion."),
                             }
                             all_violations.append(violation)
                             self.logger.warning(f"Policy violation found: {violation}")
 
         result = "APPROVED" if not all_violations else "REJECTED"
-        self.logger.info(f"Policy audit finished. Result: {result}, Violations: {len(all_violations)}")
-        
-        return {
-            "result": result,
-            "violations": all_violations
-        }
+        self.logger.info(
+            f"Policy audit finished. Result: {result}, Violations: {len(all_violations)}"
+        )
 
+        return {"result": result, "violations": all_violations}

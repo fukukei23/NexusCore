@@ -8,20 +8,20 @@ Comprehensive Tests for github_self_healing_webhook.py
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
-import pytest
+
 import os
 import tempfile
-from unittest.mock import Mock, patch, MagicMock, call
-from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pytest
 
 from nexuscore.api.github_self_healing_webhook import (
-    parse_pull_request_event,
-    format_pr_comment,
     _init_self_healing_service,
+    format_pr_comment,
     github_webhook,
+    parse_pull_request_event,
 )
 from nexuscore.config.self_healing_config import SelfHealingConfig
-
 
 # ============================================================================
 # Fixtures
@@ -281,11 +281,9 @@ class TestParsePullRequestEvent:
 
 
 class TestFormatPrComment:
-    @patch('nexuscore.api.github_self_healing_webhook.build_pr_comment')
-    @patch('nexuscore.api.github_self_healing_webhook.PRCommentContext')
-    def test_format_pr_comment_basic(
-        self, mock_context_class, mock_build, self_healing_result
-    ):
+    @patch("nexuscore.api.github_self_healing_webhook.build_pr_comment")
+    @patch("nexuscore.api.github_self_healing_webhook.PRCommentContext")
+    def test_format_pr_comment_basic(self, mock_context_class, mock_build, self_healing_result):
         """基本的なPRコメントのフォーマット"""
         mock_build.return_value = "Formatted comment"
 
@@ -294,8 +292,8 @@ class TestFormatPrComment:
         assert comment == "Formatted comment"
         mock_build.assert_called_once()
 
-    @patch('nexuscore.api.github_self_healing_webhook.build_pr_comment')
-    @patch('nexuscore.api.github_self_healing_webhook.PRCommentContext')
+    @patch("nexuscore.api.github_self_healing_webhook.build_pr_comment")
+    @patch("nexuscore.api.github_self_healing_webhook.PRCommentContext")
     def test_format_pr_comment_with_guardian_review(
         self, mock_context_class, mock_build, self_healing_result
     ):
@@ -310,11 +308,9 @@ class TestFormatPrComment:
         assert "approved" in context_call["guardian_review_markdown"]
         assert "Changes look good" in context_call["guardian_review_markdown"]
 
-    @patch('nexuscore.api.github_self_healing_webhook.build_pr_comment')
-    @patch('nexuscore.api.github_self_healing_webhook.PRCommentContext')
-    def test_format_pr_comment_without_guardian_review(
-        self, mock_context_class, mock_build
-    ):
+    @patch("nexuscore.api.github_self_healing_webhook.build_pr_comment")
+    @patch("nexuscore.api.github_self_healing_webhook.PRCommentContext")
+    def test_format_pr_comment_without_guardian_review(self, mock_context_class, mock_build):
         """Guardian レビューなしのPRコメント"""
         result = {
             "status": "fixed",
@@ -331,8 +327,8 @@ class TestFormatPrComment:
         assert "guardian_review_markdown" in context_call
         assert "no review content" in context_call["guardian_review_markdown"]
 
-    @patch('nexuscore.api.github_self_healing_webhook.build_pr_comment')
-    @patch('nexuscore.api.github_self_healing_webhook.PRCommentContext')
+    @patch("nexuscore.api.github_self_healing_webhook.build_pr_comment")
+    @patch("nexuscore.api.github_self_healing_webhook.PRCommentContext")
     def test_format_pr_comment_with_repo_and_pr_info(
         self, mock_context_class, mock_build, self_healing_result
     ):
@@ -349,11 +345,9 @@ class TestFormatPrComment:
         assert context_call["repo_full_name"] == "owner/repo"
         assert context_call["pr_number"] == 456
 
-    @patch('nexuscore.api.github_self_healing_webhook.build_pr_comment')
-    @patch('nexuscore.api.github_self_healing_webhook.PRCommentContext')
-    def test_format_pr_comment_with_diff_summary(
-        self, mock_context_class, mock_build
-    ):
+    @patch("nexuscore.api.github_self_healing_webhook.build_pr_comment")
+    @patch("nexuscore.api.github_self_healing_webhook.PRCommentContext")
+    def test_format_pr_comment_with_diff_summary(self, mock_context_class, mock_build):
         """差分サマリー付きPRコメント"""
         result = {
             "status": "fixed",
@@ -370,19 +364,15 @@ class TestFormatPrComment:
         context_call = mock_context_class.call_args[1]
         assert context_call["diff_summary"] == "Changed 3 files"
 
-    @patch('nexuscore.api.github_self_healing_webhook.build_pr_comment')
-    @patch('nexuscore.api.github_self_healing_webhook.PRCommentContext')
-    def test_format_pr_comment_with_semantic_diffs(
-        self, mock_context_class, mock_build
-    ):
+    @patch("nexuscore.api.github_self_healing_webhook.build_pr_comment")
+    @patch("nexuscore.api.github_self_healing_webhook.PRCommentContext")
+    def test_format_pr_comment_with_semantic_diffs(self, mock_context_class, mock_build):
         """セマンティック差分付きPRコメント"""
         result = {
             "status": "fixed",
             "run_id": "test-123",
             "details": {
-                "semantic_diffs": [
-                    {"file": "test.py", "changes": "Fixed bug"}
-                ],
+                "semantic_diffs": [{"file": "test.py", "changes": "Fixed bug"}],
             },
         }
 
@@ -400,9 +390,9 @@ class TestFormatPrComment:
 
 
 class TestInitSelfHealingService:
-    @patch('nexuscore.api.github_self_healing_webhook.SelfHealingService')
-    @patch('nexuscore.api.github_self_healing_webhook.GuardianAgent')
-    @patch('nexuscore.api.github_self_healing_webhook.DebuggerAgent')
+    @patch("nexuscore.api.github_self_healing_webhook.SelfHealingService")
+    @patch("nexuscore.api.github_self_healing_webhook.GuardianAgent")
+    @patch("nexuscore.api.github_self_healing_webhook.DebuggerAgent")
     def test_init_service_success(
         self, mock_debugger_class, mock_guardian_class, mock_service_class
     ):
@@ -419,9 +409,9 @@ class TestInitSelfHealingService:
             mock_debugger_class.assert_called_once()
             mock_guardian_class.assert_called_once()
 
-    @patch('nexuscore.api.github_self_healing_webhook.SelfHealingService')
-    @patch('nexuscore.api.github_self_healing_webhook.GuardianAgent')
-    @patch('nexuscore.api.github_self_healing_webhook.DebuggerAgent')
+    @patch("nexuscore.api.github_self_healing_webhook.SelfHealingService")
+    @patch("nexuscore.api.github_self_healing_webhook.GuardianAgent")
+    @patch("nexuscore.api.github_self_healing_webhook.DebuggerAgent")
     def test_init_service_debugger_failure(
         self, mock_debugger_class, mock_guardian_class, mock_service_class
     ):
@@ -435,9 +425,9 @@ class TestInitSelfHealingService:
             # SelfHealingService は初期化される（debugger=None）
             mock_service_class.assert_called_once()
 
-    @patch('nexuscore.api.github_self_healing_webhook.SelfHealingService')
-    @patch('nexuscore.api.github_self_healing_webhook.GuardianAgent')
-    @patch('nexuscore.api.github_self_healing_webhook.DebuggerAgent')
+    @patch("nexuscore.api.github_self_healing_webhook.SelfHealingService")
+    @patch("nexuscore.api.github_self_healing_webhook.GuardianAgent")
+    @patch("nexuscore.api.github_self_healing_webhook.DebuggerAgent")
     def test_init_service_guardian_failure(
         self, mock_debugger_class, mock_guardian_class, mock_service_class
     ):
@@ -451,7 +441,7 @@ class TestInitSelfHealingService:
             # SelfHealingService は初期化される（guardian=None）
             mock_service_class.assert_called_once()
 
-    @patch('nexuscore.api.github_self_healing_webhook.SelfHealingService', None)
+    @patch("nexuscore.api.github_self_healing_webhook.SelfHealingService", None)
     def test_init_service_not_available(self):
         """SelfHealingService が利用できない場合"""
         config = SelfHealingConfig(label="self-healing")
@@ -467,8 +457,8 @@ class TestInitSelfHealingService:
 
 
 class TestGithubWebhook:
-    @patch('nexuscore.api.github_self_healing_webhook._init_self_healing_service')
-    @patch('nexuscore.api.github_self_healing_webhook.SelfHealingConfig')
+    @patch("nexuscore.api.github_self_healing_webhook._init_self_healing_service")
+    @patch("nexuscore.api.github_self_healing_webhook.SelfHealingConfig")
     def test_github_webhook_skipped_without_label(
         self, mock_config_class, mock_init_service, pr_payload
     ):
@@ -482,17 +472,15 @@ class TestGithubWebhook:
 
         result = github_webhook(payload)
 
-        assert result['status'] == 'skipped'
-        assert 'does not meet criteria' in result['summary']
+        assert result["status"] == "skipped"
+        assert "does not meet criteria" in result["summary"]
 
         # SelfHealingService は初期化されない
         mock_init_service.assert_not_called()
 
-    @patch('nexuscore.api.github_self_healing_webhook._init_self_healing_service')
-    @patch('nexuscore.api.github_self_healing_webhook.SelfHealingConfig')
-    def test_github_webhook_success(
-        self, mock_config_class, mock_init_service, pr_payload
-    ):
+    @patch("nexuscore.api.github_self_healing_webhook._init_self_healing_service")
+    @patch("nexuscore.api.github_self_healing_webhook.SelfHealingConfig")
+    def test_github_webhook_success(self, mock_config_class, mock_init_service, pr_payload):
         """Self-Healing 成功"""
         config = SelfHealingConfig(label="self-healing")
         mock_config_class.load.return_value = config
@@ -508,8 +496,8 @@ class TestGithubWebhook:
 
         result = github_webhook(payload=pr_payload, event="pull_request")
 
-        assert result['status'] == 'fixed'
-        assert result['summary'] == 'Tests passing'
+        assert result["status"] == "fixed"
+        assert result["summary"] == "Tests passing"
 
         # run_for_pull_request が呼ばれる
         mock_service.run_for_pull_request.assert_called_once_with(
@@ -518,8 +506,8 @@ class TestGithubWebhook:
             head_sha="abc123def456",
         )
 
-    @patch('nexuscore.api.github_self_healing_webhook._init_self_healing_service')
-    @patch('nexuscore.api.github_self_healing_webhook.SelfHealingConfig')
+    @patch("nexuscore.api.github_self_healing_webhook._init_self_healing_service")
+    @patch("nexuscore.api.github_self_healing_webhook.SelfHealingConfig")
     def test_github_webhook_with_guardian_review(
         self, mock_config_class, mock_init_service, pr_payload
     ):
@@ -546,11 +534,11 @@ class TestGithubWebhook:
         result = github_webhook(payload=pr_payload)
 
         # Guardian レビューが統合される
-        assert result['details']['guardian_status'] == 'approved'
-        assert result['details']['guardian_comment'] == 'Looks good'
+        assert result["details"]["guardian_status"] == "approved"
+        assert result["details"]["guardian_comment"] == "Looks good"
 
-    @patch('nexuscore.api.github_self_healing_webhook._init_self_healing_service')
-    @patch('nexuscore.api.github_self_healing_webhook.SelfHealingConfig')
+    @patch("nexuscore.api.github_self_healing_webhook._init_self_healing_service")
+    @patch("nexuscore.api.github_self_healing_webhook.SelfHealingConfig")
     def test_github_webhook_guardian_override_status(
         self, mock_config_class, mock_init_service, pr_payload
     ):
@@ -577,10 +565,10 @@ class TestGithubWebhook:
         result = github_webhook(payload=pr_payload)
 
         # status が上書きされる
-        assert result['status'] == 'needs_manual_review'
+        assert result["status"] == "needs_manual_review"
 
-    @patch('nexuscore.api.github_self_healing_webhook._init_self_healing_service')
-    @patch('nexuscore.api.github_self_healing_webhook.SelfHealingConfig')
+    @patch("nexuscore.api.github_self_healing_webhook._init_self_healing_service")
+    @patch("nexuscore.api.github_self_healing_webhook.SelfHealingConfig")
     def test_github_webhook_guardian_review_exception(
         self, mock_config_class, mock_init_service, pr_payload
     ):
@@ -603,10 +591,10 @@ class TestGithubWebhook:
         result = github_webhook(payload=pr_payload)
 
         # エラーでも結果は返される
-        assert result['status'] == 'fixed'
+        assert result["status"] == "fixed"
 
-    @patch('nexuscore.api.github_self_healing_webhook._init_self_healing_service')
-    @patch('nexuscore.api.github_self_healing_webhook.SelfHealingConfig')
+    @patch("nexuscore.api.github_self_healing_webhook._init_self_healing_service")
+    @patch("nexuscore.api.github_self_healing_webhook.SelfHealingConfig")
     def test_github_webhook_service_exception(
         self, mock_config_class, mock_init_service, pr_payload
     ):
@@ -620,12 +608,12 @@ class TestGithubWebhook:
 
         result = github_webhook(payload=pr_payload)
 
-        assert result['status'] == 'error'
-        assert 'failed' in result['summary']
+        assert result["status"] == "error"
+        assert "failed" in result["summary"]
 
-    @patch('nexuscore.api.github_self_healing_webhook._init_self_healing_service')
-    @patch('nexuscore.api.github_self_healing_webhook.SelfHealingConfig')
-    @patch.dict(os.environ, {'NEXUS_PROJECT_ROOT': '/custom/project'})
+    @patch("nexuscore.api.github_self_healing_webhook._init_self_healing_service")
+    @patch("nexuscore.api.github_self_healing_webhook.SelfHealingConfig")
+    @patch.dict(os.environ, {"NEXUS_PROJECT_ROOT": "/custom/project"})
     def test_github_webhook_custom_project_root(
         self, mock_config_class, mock_init_service, pr_payload
     ):
@@ -640,15 +628,13 @@ class TestGithubWebhook:
         github_webhook(payload=pr_payload)
 
         # カスタムパスで初期化される
-        mock_config_class.load.assert_called_once_with('/custom/project')
+        mock_config_class.load.assert_called_once_with("/custom/project")
         mock_init_service.assert_called_once()
-        assert mock_init_service.call_args[0][0] == '/custom/project'
+        assert mock_init_service.call_args[0][0] == "/custom/project"
 
-    @patch('nexuscore.api.github_self_healing_webhook._init_self_healing_service')
-    @patch('nexuscore.api.github_self_healing_webhook.SelfHealingConfig')
-    def test_github_webhook_with_model_name(
-        self, mock_config_class, mock_init_service, pr_payload
-    ):
+    @patch("nexuscore.api.github_self_healing_webhook._init_self_healing_service")
+    @patch("nexuscore.api.github_self_healing_webhook.SelfHealingConfig")
+    def test_github_webhook_with_model_name(self, mock_config_class, mock_init_service, pr_payload):
         """Guardian のモデル名が result に追加される"""
         config = SelfHealingConfig(label="self-healing")
         mock_config_class.load.return_value = config
@@ -667,7 +653,7 @@ class TestGithubWebhook:
 
         result = github_webhook(payload=pr_payload)
 
-        assert result['details']['model_name'] == 'gpt-4'
+        assert result["details"]["model_name"] == "gpt-4"
 
 
 # ============================================================================
@@ -676,11 +662,9 @@ class TestGithubWebhook:
 
 
 class TestIntegrationScenarios:
-    @patch('nexuscore.api.github_self_healing_webhook._init_self_healing_service')
-    @patch('nexuscore.api.github_self_healing_webhook.SelfHealingConfig')
-    def test_full_self_healing_workflow(
-        self, mock_config_class, mock_init_service, pr_payload
-    ):
+    @patch("nexuscore.api.github_self_healing_webhook._init_self_healing_service")
+    @patch("nexuscore.api.github_self_healing_webhook.SelfHealingConfig")
+    def test_full_self_healing_workflow(self, mock_config_class, mock_init_service, pr_payload):
         """完全な Self-Healing ワークフロー"""
         config = SelfHealingConfig(label="self-healing")
         mock_config_class.load.return_value = config
@@ -716,14 +700,14 @@ class TestIntegrationScenarios:
         )
 
         # 結果の検証
-        assert result['status'] == 'fixed'
-        assert result['summary'] == 'All tests passing'
-        assert result['run_id'] == 'sh-workflow-123'
+        assert result["status"] == "fixed"
+        assert result["summary"] == "All tests passing"
+        assert result["run_id"] == "sh-workflow-123"
 
         # Guardian レビューが統合されている
-        assert result['details']['guardian_status'] == 'approved'
-        assert result['details']['guardian_comment'] == 'All changes validated'
-        assert result['details']['model_name'] == 'gpt-4'
+        assert result["details"]["guardian_status"] == "approved"
+        assert result["details"]["guardian_comment"] == "All changes validated"
+        assert result["details"]["model_name"] == "gpt-4"
 
         # PR コメントをフォーマットできる
         comment = format_pr_comment(

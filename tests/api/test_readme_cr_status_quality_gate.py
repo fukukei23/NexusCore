@@ -6,8 +6,6 @@ docs/api/README.md の CR エントリに対して、ステータスの正当性
 
 from pathlib import Path
 
-import pytest
-
 from tests.api._readme_cr_helpers import extract_cr_blocks, extract_cr_reason, extract_cr_status
 
 # プロジェクトルートのパス
@@ -39,9 +37,8 @@ def test_readme_all_crs_have_status():
         if status is None:
             failures.append({"cr_id": cr_id, "reason": "ステータスが記載されていない"})
 
-    assert not failures, (
-        f"CR blocks missing status:\n"
-        + "\n".join(f"  - CR-ID: {f['cr_id']}\n    Reason: {f['reason']}" for f in failures)
+    assert not failures, "CR blocks missing status:\n" + "\n".join(
+        f"  - CR-ID: {f['cr_id']}\n    Reason: {f['reason']}" for f in failures
     )
 
 
@@ -73,7 +70,7 @@ def test_readme_cr_statuses_are_valid():
             )
 
     assert not failures, (
-        f"CR blocks with invalid status:\n"
+        "CR blocks with invalid status:\n"
         + "\n".join(
             f"  - CR-ID: {f['cr_id']}\n    Status: {f['status']}\n    Reason: {f['reason']}"
             for f in failures
@@ -111,12 +108,9 @@ def test_completed_crs_have_completion_reports():
                     }
                 )
 
-    assert not failures, (
-        f"Completed CRs missing completion reports:\n"
-        + "\n".join(
-            f"  - CR-ID: {f['cr_id']}\n    Expected file: {f['file_path']}\n    Reason: {f['reason']}"
-            for f in failures
-        )
+    assert not failures, "Completed CRs missing completion reports:\n" + "\n".join(
+        f"  - CR-ID: {f['cr_id']}\n    Expected file: {f['file_path']}\n    Reason: {f['reason']}"
+        for f in failures
     )
 
 
@@ -149,11 +143,10 @@ def test_paused_or_aborted_crs_have_reason():
                 )
 
     assert not failures, (
-        f"Paused or aborted CRs missing reason:\n"
+        "Paused or aborted CRs missing reason:\n"
         + "\n".join(
             f"  - CR-ID: {f['cr_id']}\n    Status: {f['status']}\n    Reason: {f['reason']}"
             for f in failures
         )
         + "\n\n保留/中断の CR には必ず理由を記載してください（- **理由**: ...）"
     )
-

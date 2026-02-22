@@ -6,9 +6,7 @@ PR コメント組み立てユーティリティのテスト。
 
 from __future__ import annotations
 
-import pytest
-
-from nexuscore.utils.pr_comments import summarize_patch, build_self_healing_pr_comment
+from nexuscore.utils.pr_comments import build_self_healing_pr_comment, summarize_patch
 
 
 class TestSummarizePatch:
@@ -186,4 +184,3 @@ class TestBuildSelfHealingPrComment:
         assert "🚫 Blocked Test Files" in comment
         assert "tests/test_example.py" in comment
         assert "tests/unit/test_foo.py" in comment
-

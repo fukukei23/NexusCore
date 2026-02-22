@@ -1,7 +1,5 @@
 import logging
 
-import pytest
-
 from nexuscore.llm import runtime
 from nexuscore.llm.config import LLMRouterConfig
 

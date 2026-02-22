@@ -5,6 +5,7 @@ webapp/celery_app.py の高品質なテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask legacy celery_app tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -44,6 +45,7 @@ def app():
 def db_session(app):
     """Database session for tests"""
     from nexuscore.webapp import db
+
     with app.app_context():
         yield db.session
 
@@ -55,12 +57,16 @@ class TestMakeCelery:
         """make_celery() が Celery インスタンスを作成する"""
         # celery_app モジュールをリロードして celery グローバル変数をクリア
         import nexuscore.webapp.celery_app as celery_module
+
         celery_module.celery = None
 
-        with patch.dict("os.environ", {
-            "CELERY_BROKER_URL": "redis://localhost:6379/0",
-            "CELERY_RESULT_BACKEND": "redis://localhost:6379/1",
-        }):
+        with patch.dict(
+            "os.environ",
+            {
+                "CELERY_BROKER_URL": "redis://localhost:6379/0",
+                "CELERY_RESULT_BACKEND": "redis://localhost:6379/1",
+            },
+        ):
             celery_instance = celery_module.make_celery(app)
 
             assert celery_instance is not None
@@ -83,6 +89,7 @@ class TestMakeCelery:
     def test_make_celery_registers_tasks(self, app):
         """make_celery() がタスクを登録する"""
         import nexuscore.webapp.celery_app as celery_module
+
         celery_module.celery = None
         celery_module.run_orchestrator_task = None
 
@@ -94,6 +101,7 @@ class TestMakeCelery:
     def test_make_celery_uses_context_task(self, app):
         """make_celery() が Flask アプリコンテキスト内でタスクを実行するカスタムタスククラスを使用する"""
         import nexuscore.webapp.celery_app as celery_module
+
         celery_module.celery = None
 
         celery_instance = celery_module.make_celery(app)
@@ -125,6 +133,7 @@ class TestRunOrchestratorTask:
     def test_run_orchestrator_task_is_registered(self, app):
         """run_orchestrator_task が登録されている"""
         import nexuscore.webapp.celery_app as celery_module
+
         celery_module.celery = None
         celery_module.run_orchestrator_task = None
 
@@ -136,6 +145,7 @@ class TestRunOrchestratorTask:
     def test_run_orchestrator_task_handles_missing_run(self, app, db_session):
         """run_orchestrator_task が存在しない Run を処理する"""
         import nexuscore.webapp.celery_app as celery_module
+
         celery_module.celery = None
 
         celery_instance = celery_module.make_celery(app)
@@ -153,8 +163,9 @@ class TestRunOrchestratorTask:
 
     def test_run_orchestrator_task_handles_empty_requirement(self, app, db_session):
         """run_orchestrator_task が空の requirement を処理する"""
-        from nexuscore.webapp.models import Run, Project, User
         import nexuscore.webapp.celery_app as celery_module
+        from nexuscore.webapp.models import Project, Run, User
+
         celery_module.celery = None
         celery_module.make_celery(app)
 
@@ -186,8 +197,9 @@ class TestRunOrchestratorTask:
 
     def test_run_orchestrator_task_updates_run_status_on_success(self, app, db_session):
         """run_orchestrator_task が成功時に Run ステータスを更新する"""
-        from nexuscore.webapp.models import Run, Project, User
         import nexuscore.webapp.celery_app as celery_module
+        from nexuscore.webapp.models import Project, Run, User
+
         celery_module.celery = None
         celery_module.make_celery(app)
 
@@ -225,8 +237,9 @@ class TestRunOrchestratorTask:
 
     def test_run_orchestrator_task_updates_run_status_on_failure(self, app, db_session):
         """run_orchestrator_task が失敗時に Run ステータスを更新する"""
-        from nexuscore.webapp.models import Run, Project, User
         import nexuscore.webapp.celery_app as celery_module
+        from nexuscore.webapp.models import Project, Run, User
+
         celery_module.celery = None
         celery_module.make_celery(app)
 

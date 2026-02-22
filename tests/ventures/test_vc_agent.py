@@ -1,17 +1,15 @@
 import json
-from typing import List, Dict, Any
-
-import pytest
+from typing import Any
 
 from nexuscore.ventures.vc_agent import VentureCapitalistAgent
 
 
 class DummySearch:
-    def __init__(self, responses: List[List[Dict[str, Any]]]):
+    def __init__(self, responses: list[list[dict[str, Any]]]):
         self.responses = responses
         self.index = 0
 
-    def search(self, queries: List[str]):
+    def search(self, queries: list[str]):
         resp = self.responses[self.index]
         self.index += 1
         return resp
@@ -78,6 +76,9 @@ def test_scout_for_opportunities_handles_failure(monkeypatch):
         def invoke(self, prompt, **kwargs):
             return "not-json"
 
-    agent = VentureCapitalistAgent(llm_client=FailLLM(), tools={"Google Search": DummySearch([[{"title": "t", "snippet": "s"}]])})
+    agent = VentureCapitalistAgent(
+        llm_client=FailLLM(),
+        tools={"Google Search": DummySearch([[{"title": "t", "snippet": "s"}]])},
+    )
     memo = agent.scout_for_opportunities()
     assert memo is None

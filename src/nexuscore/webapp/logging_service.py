@@ -6,11 +6,12 @@ Orchestrator / NPE / SandboxExecutor から直接 DB を触らずに、
 
 既存の CLI 実行は挙動を変えない（has_app_context() チェックで分岐）。
 """
+
 from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from flask import has_app_context
 
@@ -40,11 +41,11 @@ def _to_json(payload: Any) -> str:
 
 def log_execution_event(
     *,
-    run_id: Optional[int],
+    run_id: int | None,
     source: str,
     level: str,
     message: str,
-    payload: Optional[dict[str, Any]] = None,
+    payload: dict[str, Any] | None = None,
 ) -> None:
     """
     ExecutionLog に1行追加する。
@@ -77,4 +78,3 @@ def log_execution_event(
         db.session.commit()
     except Exception:
         db.session.rollback()
-

@@ -5,14 +5,14 @@ T1-T14相当のテストケースを実装（外部依存なし）
 """
 
 import pytest
+
 from nexuscore.guard.policy_engine import (
+    DiffInput,
+    EvalInput,
     GuardDecision,
     GuardInput,
-    GuardResult,
-    EvalInput,
-    TestInput,
-    DiffInput,
     SecurityInput,
+    TestInput,
     evaluate_guard_policy,
 )
 
@@ -23,8 +23,7 @@ class TestSecurityRule:
     def test_secret_found_blocks(self):
         """secret_found=true で BLOCK（R4.1）"""
         input_data = GuardInput(
-            environment="production",
-            security=SecurityInput(secret_found=True, check_status="PASS")
+            environment="production", security=SecurityInput(secret_found=True, check_status="PASS")
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.BLOCK
@@ -35,7 +34,7 @@ class TestSecurityRule:
         input_data = GuardInput(
             environment="production",
             security=SecurityInput(secret_found=False, check_status="PASS"),
-            eval=EvalInput(verdict="NO")
+            eval=EvalInput(verdict="NO"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.BLOCK
@@ -45,7 +44,7 @@ class TestSecurityRule:
         """production × UNKNOWN → HOLD（R4.2）"""
         input_data = GuardInput(
             environment="production",
-            security=SecurityInput(secret_found=False, check_status="UNKNOWN")
+            security=SecurityInput(secret_found=False, check_status="UNKNOWN"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.HOLD
@@ -57,7 +56,7 @@ class TestSecurityRule:
         """production × NOT_RUN → HOLD（R4.2）"""
         input_data = GuardInput(
             environment="production",
-            security=SecurityInput(secret_found=False, check_status="NOT_RUN")
+            security=SecurityInput(secret_found=False, check_status="NOT_RUN"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.HOLD
@@ -69,7 +68,7 @@ class TestSecurityRule:
         """staging × UNKNOWN → 次判定へ（条件が揃えば ALLOW）"""
         input_data = GuardInput(
             environment="staging",
-            security=SecurityInput(secret_found=False, check_status="UNKNOWN")
+            security=SecurityInput(secret_found=False, check_status="UNKNOWN"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.ALLOW
@@ -78,8 +77,7 @@ class TestSecurityRule:
     def test_poc_not_run_continues(self):
         """poc × NOT_RUN → 次判定へ（条件が揃えば ALLOW）"""
         input_data = GuardInput(
-            environment="poc",
-            security=SecurityInput(secret_found=False, check_status="NOT_RUN")
+            environment="poc", security=SecurityInput(secret_found=False, check_status="NOT_RUN")
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.ALLOW
@@ -89,8 +87,7 @@ class TestSecurityRule:
         """all env × PASS → 次判定へ（R4.3）"""
         for env in ["production", "staging", "poc"]:
             input_data = GuardInput(
-                environment=env,
-                security=SecurityInput(secret_found=False, check_status="PASS")
+                environment=env, security=SecurityInput(secret_found=False, check_status="PASS")
             )
             result = evaluate_guard_policy(input_data)
             assert result.decision == GuardDecision.ALLOW
@@ -102,7 +99,7 @@ class TestSecurityRule:
             for env in ["production", "staging", "poc"]:
                 input_data = GuardInput(
                     environment=env,
-                    security=SecurityInput(secret_found=True, check_status=check_status)
+                    security=SecurityInput(secret_found=True, check_status=check_status),
                 )
                 result = evaluate_guard_policy(input_data)
                 assert result.decision == GuardDecision.BLOCK
@@ -117,7 +114,7 @@ class TestEvalRule:
         input_data = GuardInput(
             environment="production",
             security=SecurityInput(check_status="PASS", secret_found=False),
-            eval=EvalInput(verdict="NO")
+            eval=EvalInput(verdict="NO"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.BLOCK
@@ -128,7 +125,7 @@ class TestEvalRule:
         input_data = GuardInput(
             environment="production",
             security=SecurityInput(check_status="PASS", secret_found=False),
-            eval=EvalInput(verdict="CONDITIONAL_GO")
+            eval=EvalInput(verdict="CONDITIONAL_GO"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.HOLD
@@ -139,7 +136,7 @@ class TestEvalRule:
         input_data = GuardInput(
             environment="production",
             security=SecurityInput(check_status="PASS", secret_found=False),
-            eval=EvalInput(verdict="GO")
+            eval=EvalInput(verdict="GO"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.ALLOW
@@ -149,7 +146,7 @@ class TestEvalRule:
         """eval 未指定は次判定へ"""
         input_data = GuardInput(
             environment="production",
-            security=SecurityInput(check_status="PASS", secret_found=False)
+            security=SecurityInput(check_status="PASS", secret_found=False),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.ALLOW
@@ -163,7 +160,7 @@ class TestTestRule:
         input_data = GuardInput(
             environment="production",
             security=SecurityInput(check_status="PASS", secret_found=False),
-            test=TestInput(status="FAIL")
+            test=TestInput(status="FAIL"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.BLOCK
@@ -174,7 +171,7 @@ class TestTestRule:
         input_data = GuardInput(
             environment="production",
             security=SecurityInput(check_status="PASS", secret_found=False),
-            test=TestInput(status="UNKNOWN")
+            test=TestInput(status="UNKNOWN"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.HOLD
@@ -185,7 +182,7 @@ class TestTestRule:
         input_data = GuardInput(
             environment="production",
             security=SecurityInput(check_status="PASS", secret_found=False),
-            test=TestInput(status="PASS")
+            test=TestInput(status="PASS"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.ALLOW
@@ -195,7 +192,7 @@ class TestTestRule:
         """test 未指定は次判定へ"""
         input_data = GuardInput(
             environment="production",
-            security=SecurityInput(check_status="PASS", secret_found=False)
+            security=SecurityInput(check_status="PASS", secret_found=False),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.ALLOW
@@ -209,7 +206,7 @@ class TestDiffRule:
         input_data = GuardInput(
             environment="production",
             security=SecurityInput(check_status="PASS", secret_found=False),
-            diff=DiffInput(high_risk=True)
+            diff=DiffInput(high_risk=True),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.HOLD
@@ -220,7 +217,7 @@ class TestDiffRule:
         input_data = GuardInput(
             environment="production",
             security=SecurityInput(check_status="PASS", secret_found=False),
-            diff=DiffInput(high_risk=False)
+            diff=DiffInput(high_risk=False),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.ALLOW
@@ -230,7 +227,7 @@ class TestDiffRule:
         """diff 未指定は次判定へ"""
         input_data = GuardInput(
             environment="production",
-            security=SecurityInput(check_status="PASS", secret_found=False)
+            security=SecurityInput(check_status="PASS", secret_found=False),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.ALLOW
@@ -244,7 +241,7 @@ class TestPriorityOrder:
         input_data = GuardInput(
             environment="production",
             security=SecurityInput(secret_found=True, check_status="PASS"),
-            eval=EvalInput(verdict="NO")
+            eval=EvalInput(verdict="NO"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.BLOCK
@@ -255,7 +252,7 @@ class TestPriorityOrder:
         input_data = GuardInput(
             environment="production",
             security=SecurityInput(secret_found=False, check_status="UNKNOWN"),
-            eval=EvalInput(verdict="NO")
+            eval=EvalInput(verdict="NO"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.HOLD
@@ -267,7 +264,7 @@ class TestPriorityOrder:
             environment="production",
             security=SecurityInput(check_status="PASS", secret_found=False),
             eval=EvalInput(verdict="NO"),
-            test=TestInput(status="FAIL")
+            test=TestInput(status="FAIL"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.BLOCK
@@ -279,7 +276,7 @@ class TestPriorityOrder:
             environment="production",
             security=SecurityInput(check_status="PASS", secret_found=False),
             eval=EvalInput(verdict="CONDITIONAL_GO"),
-            test=TestInput(status="FAIL")
+            test=TestInput(status="FAIL"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.BLOCK
@@ -291,7 +288,7 @@ class TestPriorityOrder:
             environment="production",
             security=SecurityInput(check_status="PASS", secret_found=False),
             eval=EvalInput(verdict="CONDITIONAL_GO"),
-            test=TestInput(status="UNKNOWN")
+            test=TestInput(status="UNKNOWN"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.HOLD
@@ -303,7 +300,7 @@ class TestPriorityOrder:
             environment="production",
             security=SecurityInput(check_status="PASS", secret_found=False),
             test=TestInput(status="UNKNOWN"),
-            diff=DiffInput(high_risk=True)
+            diff=DiffInput(high_risk=True),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.HOLD
@@ -320,7 +317,7 @@ class TestAllowCase:
             eval=EvalInput(verdict="GO"),
             test=TestInput(status="PASS"),
             diff=DiffInput(high_risk=False),
-            security=SecurityInput(secret_found=False, check_status="PASS")
+            security=SecurityInput(secret_found=False, check_status="PASS"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.ALLOW
@@ -330,7 +327,7 @@ class TestAllowCase:
         """すべて未指定で ALLOW（security は必須だが、check_status=PASS なら次判定へ）"""
         input_data = GuardInput(
             environment="production",
-            security=SecurityInput(check_status="PASS", secret_found=False)
+            security=SecurityInput(check_status="PASS", secret_found=False),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.ALLOW
@@ -341,7 +338,7 @@ class TestAllowCase:
         input_data = GuardInput(
             environment="production",
             security=SecurityInput(check_status="PASS", secret_found=False),
-            eval=EvalInput(verdict="GO")
+            eval=EvalInput(verdict="GO"),
         )
         result = evaluate_guard_policy(input_data)
         assert result.decision == GuardDecision.ALLOW
@@ -353,8 +350,7 @@ class TestReasonsOutput:
     def test_reasons_always_present(self):
         """reasons は常に出力される"""
         input_data = GuardInput(
-            environment="production",
-            security=SecurityInput(check_status="PASS", secret_found=True)
+            environment="production", security=SecurityInput(check_status="PASS", secret_found=True)
         )
         result = evaluate_guard_policy(input_data)
         assert len(result.reasons) > 0
@@ -368,14 +364,67 @@ class TestReasonsOutput:
     def test_reasons_contain_rule_id(self):
         """reasons にルールIDが含まれる"""
         test_cases = [
-            (GuardInput(environment="production", security=SecurityInput(secret_found=True, check_status="PASS")), "GUARD-RULE-001"),
-            (GuardInput(environment="production", security=SecurityInput(secret_found=False, check_status="UNKNOWN")), "GUARD-RULE-001B"),
-            (GuardInput(environment="production", security=SecurityInput(check_status="PASS", secret_found=False), eval=EvalInput(verdict="NO")), "GUARD-RULE-002"),
-            (GuardInput(environment="production", security=SecurityInput(check_status="PASS", secret_found=False), test=TestInput(status="FAIL")), "GUARD-RULE-003"),
-            (GuardInput(environment="production", security=SecurityInput(check_status="PASS", secret_found=False), eval=EvalInput(verdict="CONDITIONAL_GO")), "GUARD-RULE-004"),
-            (GuardInput(environment="production", security=SecurityInput(check_status="PASS", secret_found=False), test=TestInput(status="UNKNOWN")), "GUARD-RULE-005"),
-            (GuardInput(environment="production", security=SecurityInput(check_status="PASS", secret_found=False), diff=DiffInput(high_risk=True)), "GUARD-RULE-006"),
-            (GuardInput(environment="production", security=SecurityInput(check_status="PASS", secret_found=False)), "GUARD-RULE-007"),
+            (
+                GuardInput(
+                    environment="production",
+                    security=SecurityInput(secret_found=True, check_status="PASS"),
+                ),
+                "GUARD-RULE-001",
+            ),
+            (
+                GuardInput(
+                    environment="production",
+                    security=SecurityInput(secret_found=False, check_status="UNKNOWN"),
+                ),
+                "GUARD-RULE-001B",
+            ),
+            (
+                GuardInput(
+                    environment="production",
+                    security=SecurityInput(check_status="PASS", secret_found=False),
+                    eval=EvalInput(verdict="NO"),
+                ),
+                "GUARD-RULE-002",
+            ),
+            (
+                GuardInput(
+                    environment="production",
+                    security=SecurityInput(check_status="PASS", secret_found=False),
+                    test=TestInput(status="FAIL"),
+                ),
+                "GUARD-RULE-003",
+            ),
+            (
+                GuardInput(
+                    environment="production",
+                    security=SecurityInput(check_status="PASS", secret_found=False),
+                    eval=EvalInput(verdict="CONDITIONAL_GO"),
+                ),
+                "GUARD-RULE-004",
+            ),
+            (
+                GuardInput(
+                    environment="production",
+                    security=SecurityInput(check_status="PASS", secret_found=False),
+                    test=TestInput(status="UNKNOWN"),
+                ),
+                "GUARD-RULE-005",
+            ),
+            (
+                GuardInput(
+                    environment="production",
+                    security=SecurityInput(check_status="PASS", secret_found=False),
+                    diff=DiffInput(high_risk=True),
+                ),
+                "GUARD-RULE-006",
+            ),
+            (
+                GuardInput(
+                    environment="production",
+                    security=SecurityInput(check_status="PASS", secret_found=False),
+                ),
+                "GUARD-RULE-007",
+            ),
         ]
         for input_data, expected_rule in test_cases:
             result = evaluate_guard_policy(input_data)

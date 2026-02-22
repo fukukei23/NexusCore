@@ -15,19 +15,20 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 @dataclass
 class SessionState:
     """セッションの現在状態を表すシンプルなデータクラス。"""
+
     session_id: str
-    status: str          # "running" | "paused" | "stopped"
-    last_phase: str      # 例: "requirement", "planning", "coding", ...
+    status: str  # "running" | "paused" | "stopped"
+    last_phase: str  # 例: "requirement", "planning", "coding", ...
     last_updated: float  # Unix time
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 class SessionController:
@@ -93,7 +94,7 @@ class SessionController:
         except Exception:
             pass
 
-    def checkpoint(self, phase: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def checkpoint(self, phase: str, metadata: dict[str, Any] | None = None) -> None:
         """
         現在のフェーズとメタデータを state.json に保存する。
 
@@ -115,12 +116,12 @@ class SessionController:
     # ---------------------------------------------------------------------
     # 内部ユーティリティ (ファイル I/O)
     # ---------------------------------------------------------------------
-    def _write_control(self, data: Dict[str, Any]) -> None:
+    def _write_control(self, data: dict[str, Any]) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
         with self.control_file.open("w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
-    def _read_control(self) -> Dict[str, Any]:
+    def _read_control(self) -> dict[str, Any]:
         if not self.control_file.exists():
             return {}
         try:
@@ -130,7 +131,7 @@ class SessionController:
             # 破損していても全システムを止めない
             return {}
 
-    def _read_state(self) -> Dict[str, Any]:
+    def _read_state(self) -> dict[str, Any]:
         if not self.state_file.exists():
             return {}
         try:
@@ -139,8 +140,7 @@ class SessionController:
         except Exception:
             return {}
 
-    def _write_state(self, data: Dict[str, Any]) -> None:
+    def _write_state(self, data: dict[str, Any]) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
         with self.state_file.open("w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-

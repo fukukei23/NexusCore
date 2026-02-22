@@ -1,9 +1,6 @@
-from pathlib import Path
 
-import pytest
 
-from nexuscore.utils import file_utils
-from nexuscore.utils import tree_sitter_checker
+from nexuscore.utils import file_utils, tree_sitter_checker
 
 
 def test_create_project_structure_builds_files(tmp_path):

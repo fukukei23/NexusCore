@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 from nexuscore.gradio_app import auto_revision_runner as arr
 
@@ -45,7 +44,9 @@ def test_main_handles_attempt_error(monkeypatch, tmp_path):
     monkeypatch.setattr(arr, "run_pytest_once", lambda: (False, "log"))
     monkeypatch.setattr(arr, "snapshot_sandbox_files", lambda: {})
     monkeypatch.setattr(arr, "build_unified_diff", lambda *a, **k: "diff")
-    monkeypatch.setattr(arr, "attempt_auto_fix", lambda prev: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(
+        arr, "attempt_auto_fix", lambda prev: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
     monkeypatch.setattr(arr, "write_legacy_log", lambda *a, **k: None)
     monkeypatch.setattr(arr, "append_legacy_history_line", lambda *a, **k: None)
 

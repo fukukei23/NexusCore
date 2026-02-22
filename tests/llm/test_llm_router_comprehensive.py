@@ -1,5 +1,5 @@
 """llm_router.py の包括的なテスト（カバレッジ向上用）"""
-import json
+
 import os
 import tempfile
 from pathlib import Path
@@ -45,7 +45,7 @@ def test_llm_router_initialization_custom_params(tmp_path):
     router = LLMRouter(
         task_model_map={"test": {"primary": "openai:gpt-4", "fallbacks": []}},
         daily_limit_usd=10.0,
-        log_dir=str(tmp_path / "logs")
+        log_dir=str(tmp_path / "logs"),
     )
 
     assert router.task_model_map["test"]["primary"] == "openai:gpt-4"
@@ -201,7 +201,7 @@ def test_llm_router_get_llm_for_task_fallback_chain():
         task_model_map={
             "test": {
                 "primary": "openai:fail-model",
-                "fallbacks": ["openai:backup-model", "local:final-model"]
+                "fallbacks": ["openai:backup-model", "local:final-model"],
             }
         }
     )
@@ -226,12 +226,7 @@ def test_llm_router_get_llm_for_task_fallback_chain():
 def test_llm_router_get_llm_for_task_all_failures():
     """すべてのフォールバックが失敗した場合のテスト"""
     router = LLMRouter(
-        task_model_map={
-            "test": {
-                "primary": "openai:fail1",
-                "fallbacks": ["openai:fail2"]
-            }
-        }
+        task_model_map={"test": {"primary": "openai:fail1", "fallbacks": ["openai:fail2"]}}
     )
 
     router._make_client = MagicMock(side_effect=ValueError("All failed"))
@@ -271,16 +266,16 @@ def test_llm_router_complete_method_success():
     """complete()メソッドの成功ケーステスト"""
     router = LLMRouter()
 
-    with patch.object(router, "get_llm_for_task", return_value=MagicMock(
-        execute=MagicMock(return_value="Test response"),
-        inner=MockLLM("test-model"),
-        task_type="general"
-    )):
-        result = router.complete(
-            system_prompt="System",
-            user_prompt="User prompt",
-            task="general"
-        )
+    with patch.object(
+        router,
+        "get_llm_for_task",
+        return_value=MagicMock(
+            execute=MagicMock(return_value="Test response"),
+            inner=MockLLM("test-model"),
+            task_type="general",
+        ),
+    ):
+        result = router.complete(system_prompt="System", user_prompt="User prompt", task="general")
 
         assert result["ok"] is True
         assert result["content"] == "Test response"
@@ -294,9 +289,7 @@ def test_llm_router_complete_method_with_model():
 
     with patch.object(router, "_make_client", return_value=MockLLM("specified-model")):
         result = router.complete(
-            model="openai:gpt-4",
-            system_prompt="System",
-            user_prompt="User prompt"
+            model="openai:gpt-4", system_prompt="System", user_prompt="User prompt"
         )
 
         assert result["ok"] is True
@@ -313,11 +306,7 @@ def test_llm_router_complete_method_with_json():
     mock_routed.task_type = "general"
 
     with patch.object(router, "get_llm_for_task", return_value=mock_routed):
-        result = router.complete(
-            system_prompt="System",
-            user_prompt="User prompt",
-            as_json=True
-        )
+        result = router.complete(system_prompt="System", user_prompt="User prompt", as_json=True)
 
         assert result["ok"] is True
 
@@ -327,10 +316,7 @@ def test_llm_router_complete_method_error_handling():
     router = LLMRouter()
 
     with patch.object(router, "get_llm_for_task", side_effect=RuntimeError("Test error")):
-        result = router.complete(
-            system_prompt="System",
-            user_prompt="User prompt"
-        )
+        result = router.complete(system_prompt="System", user_prompt="User prompt")
 
         assert result["ok"] is False
         assert "error" in result["reason"].lower()
@@ -381,7 +367,7 @@ def test_routed_llm_execute_temperature_override():
                 routed.execute("Test prompt", "System prompt", temperature=0.2)
 
                 # モックのexecuteが呼ばれたことを確認
-                assert mock_inner.execute.called if hasattr(mock_inner.execute, 'called') else True
+                assert mock_inner.execute.called if hasattr(mock_inner.execute, "called") else True
 
 
 def test_routed_llm_execute_token_estimation():
@@ -440,12 +426,7 @@ def test_routed_llm_estimate_tokens():
 def test_llm_router_get_llm_for_task_resolve_from_dict():
     """辞書形式のtask_model_mapから解決するテスト"""
     router = LLMRouter(
-        task_model_map={
-            "test_task": {
-                "primary": "openai:model1",
-                "fallbacks": ["openai:model2"]
-            }
-        }
+        task_model_map={"test_task": {"primary": "openai:model1", "fallbacks": ["openai:model2"]}}
     )
 
     with patch.object(router, "_make_client", return_value=MockLLM("model1")):
@@ -456,11 +437,7 @@ def test_llm_router_get_llm_for_task_resolve_from_dict():
 
 def test_llm_router_get_llm_for_task_resolve_from_string():
     """文字列形式のtask_model_mapから解決するテスト"""
-    router = LLMRouter(
-        task_model_map={
-            "test_task": "openai:model1"
-        }
-    )
+    router = LLMRouter(task_model_map={"test_task": "openai:model1"})
 
     with patch.object(router, "_make_client", return_value=MockLLM("model1")):
         routed = router.get_llm_for_task("test", task_type="test_task")
@@ -470,9 +447,7 @@ def test_llm_router_get_llm_for_task_resolve_from_string():
 def test_llm_router_get_llm_for_task_fallback_to_general():
     """存在しないタスクタイプでgeneralにフォールバックするテスト"""
     router = LLMRouter(
-        task_model_map={
-            "general": {"primary": "openai:general-model", "fallbacks": []}
-        }
+        task_model_map={"general": {"primary": "openai:general-model", "fallbacks": []}}
     )
 
     with patch.object(router, "_make_client", return_value=MockLLM("general-model")):
@@ -524,11 +499,7 @@ def test_llm_router_complete_with_as_json():
     mock_routed.task_type = "general"
 
     with patch.object(router, "get_llm_for_task", return_value=mock_routed):
-        result = router.complete(
-            system_prompt="System",
-            user_prompt="User prompt",
-            as_json=True
-        )
+        result = router.complete(system_prompt="System", user_prompt="User prompt", as_json=True)
 
         assert result["ok"] is True
         assert result["content"] is not None
@@ -544,10 +515,7 @@ def test_llm_router_complete_task_type_inference():
     mock_routed.task_type = "code_generate"
 
     with patch.object(router, "get_llm_for_task", return_value=mock_routed) as mock_get:
-        result = router.complete(
-            system_prompt="System",
-            user_prompt="Write a function"
-        )
+        result = router.complete(system_prompt="System", user_prompt="Write a function")
 
         assert result["ok"] is True
         # タスクタイプが推論されることを確認
@@ -566,10 +534,7 @@ def test_llm_router_complete_with_usage_tracking():
     mock_routed.task_type = "general"
 
     with patch.object(router, "get_llm_for_task", return_value=mock_routed):
-        result = router.complete(
-            system_prompt="System",
-            user_prompt="User prompt"
-        )
+        result = router.complete(system_prompt="System", user_prompt="User prompt")
 
         assert result["ok"] is True
         assert result["usage"]["prompt_tokens"] == 50
@@ -588,10 +553,7 @@ def test_llm_router_complete_with_estimated_tokens():
     mock_routed.task_type = "general"
 
     with patch.object(router, "get_llm_for_task", return_value=mock_routed):
-        result = router.complete(
-            system_prompt="System prompt",
-            user_prompt="User prompt"
-        )
+        result = router.complete(system_prompt="System prompt", user_prompt="User prompt")
 
         assert result["ok"] is True
         # 推定トークンが使用されることを確認
@@ -609,10 +571,7 @@ def test_llm_router_complete_error_handling_execute_failure():
     mock_routed.task_type = "general"
 
     with patch.object(router, "get_llm_for_task", return_value=mock_routed):
-        result = router.complete(
-            system_prompt="System",
-            user_prompt="User prompt"
-        )
+        result = router.complete(system_prompt="System", user_prompt="User prompt")
 
         assert result["ok"] is False
         assert "error" in result["reason"].lower() or "failed" in result["reason"].lower()
@@ -632,10 +591,7 @@ def test_llm_router_complete_mode_tracking():
     mock_routed.task_type = "general"
 
     with patch.object(router, "get_llm_for_task", return_value=mock_routed):
-        result = router.complete(
-            system_prompt="System",
-            user_prompt="User prompt"
-        )
+        result = router.complete(system_prompt="System", user_prompt="User prompt")
 
         assert result["ok"] is True
         assert result["mode"] == "real"
@@ -656,10 +612,7 @@ def test_llm_router_complete_mode_fallback():
     mock_routed.last_call_mode = "stub"
 
     with patch.object(router, "get_llm_for_task", return_value=mock_routed):
-        result = router.complete(
-            system_prompt="System",
-            user_prompt="User prompt"
-        )
+        result = router.complete(system_prompt="System", user_prompt="User prompt")
 
         assert result["ok"] is True
         assert result["mode"] in ["stub", "real", "error"]
@@ -714,7 +667,7 @@ def test_routed_llm_execute_temperature_override_from_router():
                 routed.execute("Test prompt", "System prompt")
 
                 # 温度上書きが適用されることを確認（execute内でkwargsに追加される）
-                assert mock_inner.execute.called if hasattr(mock_inner.execute, 'called') else True
+                assert mock_inner.execute.called if hasattr(mock_inner.execute, "called") else True
 
 
 def test_routed_llm_execute_last_usage_reset():
@@ -763,7 +716,9 @@ def test_routed_llm_execute_output_tokens_estimation():
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.0) as mock_track:
             with patch("nexuscore.llm.llm_router.log_transaction"):
-                routed.execute("Test prompt", "System prompt", **{"output": "Long response text" * 10})
+                routed.execute(
+                    "Test prompt", "System prompt", **{"output": "Long response text" * 10}
+                )
 
                 # 出力トークンが推定されることを確認
                 assert mock_track.called
@@ -914,7 +869,7 @@ def test_llm_router_classifier_model_from_task_map():
     router = LLMRouter(
         task_model_map={
             "routing_classify": {"primary": "openai:custom-classifier", "fallbacks": []},
-            "general": {"primary": "openai:gpt-4", "fallbacks": []}
+            "general": {"primary": "openai:gpt-4", "fallbacks": []},
         }
     )
 
@@ -932,7 +887,7 @@ def test_llm_router_last_mode_initialization():
 
 def test_llm_router_log_dir_creation():
     """log_dirの作成テスト"""
-    import tempfile
+
     with tempfile.TemporaryDirectory() as tmpdir:
         log_dir = os.path.join(tmpdir, "custom_logs")
         router = LLMRouter(log_dir=log_dir)
@@ -967,6 +922,7 @@ def test_llm_router_get_llm_for_task_cheap_mode_fallback(monkeypatch):
 # ==============================================================================
 # 未カバー箇所のテスト（カバレッジ 74.64% → 80%+ を目指す）
 # ==============================================================================
+
 
 def test_routed_llm_execute_with_no_last_usage():
     """_last_usageがNoneの場合のトークン推定テスト"""
@@ -1007,8 +963,8 @@ def test_routed_llm_execute_with_partial_usage_data():
                 # 推定トークンが使用される（_last_usageがリセットされるため）
                 assert mock_track.called
                 call_args = mock_track.call_args
-                assert call_args[1]["input_tokens"] > 0   # 推定値
-                assert call_args[1]["output_tokens"] > 0   # 推定値
+                assert call_args[1]["input_tokens"] > 0  # 推定値
+                assert call_args[1]["output_tokens"] > 0  # 推定値
 
 
 def test_routed_llm_execute_with_zero_output_tokens():
@@ -1037,9 +993,7 @@ def test_llm_router_complete_with_empty_prompt():
 
     with patch.object(router, "_make_client", return_value=MockLLM()):
         result = router.complete(
-            system_prompt="System",
-            user_prompt="",  # 空のプロンプト
-            task="general"
+            system_prompt="System", user_prompt="", task="general"  # 空のプロンプト
         )
 
         assert result["ok"] is True
@@ -1053,10 +1007,7 @@ def test_llm_router_complete_with_model_and_task():
 
     with patch.object(router, "_make_client", return_value=MockLLM("custom-model")):
         result = router.complete(
-            model="openai:gpt-4",
-            system_prompt="System",
-            user_prompt="Test",
-            task="general"
+            model="openai:gpt-4", system_prompt="System", user_prompt="Test", task="general"
         )
 
         assert result["ok"] is True
@@ -1065,12 +1016,11 @@ def test_llm_router_complete_with_model_and_task():
 
 def test_llm_router_get_llm_for_task_all_candidates_fail():
     """全候補モデルが失敗する場合のテスト"""
-    router = LLMRouter(task_model_map={
-        "test_task": {
-            "primary": "fake:model-1",
-            "fallbacks": ["fake:model-2", "fake:model-3"]
+    router = LLMRouter(
+        task_model_map={
+            "test_task": {"primary": "fake:model-1", "fallbacks": ["fake:model-2", "fake:model-3"]}
         }
-    })
+    )
 
     # すべてのモデルが初期化に失敗
     def mock_make_client_fail(model_name):
@@ -1086,7 +1036,9 @@ def test_llm_router_classify_task_type_with_exception():
     router = LLMRouter()
 
     # 分類器が例外を発生
-    with patch.object(router._classifier, "classify", side_effect=RuntimeError("Classification error")):
+    with patch.object(
+        router._classifier, "classify", side_effect=RuntimeError("Classification error")
+    ):
         task_type = router._classify_task_type("Test prompt")
 
         # 例外時は "general" にフォールバック
@@ -1120,9 +1072,9 @@ def test_routed_llm_execute_budget_exceeded():
 
 def test_llm_router_get_llm_for_task_with_force_cheap_override():
     """FORCE_CHEAP_FOR_TASKSでモデルが上書きされるテスト"""
-    router = LLMRouter(task_model_map={
-        "code_generate": {"primary": "openai:gpt-4", "fallbacks": []}
-    })
+    router = LLMRouter(
+        task_model_map={"code_generate": {"primary": "openai:gpt-4", "fallbacks": []}}
+    )
     router.force_tasks = {"code_generate"}
     router.cheap_model = "openai:gpt-3.5-turbo"
 
@@ -1159,10 +1111,7 @@ def test_llm_router_complete_with_inner_last_usage():
 
     with patch.object(router, "_make_client", return_value=mock_llm):
         result = router.complete(
-            model="openai:gpt-4",
-            system_prompt="System",
-            user_prompt="Test",
-            task="general"
+            model="openai:gpt-4", system_prompt="System", user_prompt="Test", task="general"
         )
 
         # MockLLMはデフォルトで_last_usageを返すので実測トークンが使用される

@@ -6,16 +6,16 @@ API Key 認証（X-API-Key ヘッダー）を実装。
 
 将来 JWT 方式を追加できる拡張性のための抽象構造を提供。
 """
+
 import json
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional
 
-from fastapi import Depends, Header, status
+from fastapi import Header
 from pydantic import BaseModel
 
-from ..utils.errors import make_unauthorized_error, make_internal_error
+from ..utils.errors import make_internal_error, make_unauthorized_error
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +28,12 @@ class AuthenticatedUser(BaseModel):
         user_id: ユーザーID
         roles: ユーザーのロール一覧（将来の拡張用）
     """
+
     user_id: str
-    roles: List[str] = []
+    roles: list[str] = []
 
 
-def load_api_key() -> Optional[str]:
+def load_api_key() -> str | None:
     """
     API Key を階層的に読み込む
 
@@ -60,7 +61,7 @@ def load_api_key() -> Optional[str]:
         secrets_path = project_root / "secrets.json"
 
         if secrets_path.exists():
-            with open(secrets_path, "r", encoding="utf-8") as f:
+            with open(secrets_path, encoding="utf-8") as f:
                 secrets = json.load(f)
                 api_key = secrets.get("NEXUSCORE_API_KEY")
                 if api_key:
@@ -73,7 +74,7 @@ def load_api_key() -> Optional[str]:
 
 
 # API Key をキャッシュ（起動時に一度だけ読み込む）
-_cached_api_key: Optional[str] = None
+_cached_api_key: str | None = None
 
 
 def get_api_key() -> str:
@@ -124,8 +125,9 @@ def get_current_user(
             # get_api_key() が 500 を返す場合（サーバー設定エラー）はそのまま raise
             raise
 
-        from nexuscore.webapp.models import ApiKey, User
         from sqlalchemy.exc import SQLAlchemyError
+
+        from nexuscore.webapp.models import ApiKey, User
 
         # API Key からユーザーを解決（既存のFlask実装と同じロジック）
         try:
@@ -208,7 +210,7 @@ def get_current_user(
         # 環境変数ベースの認証にフォールバック
         try:
             expected_api_key = get_api_key()
-        except Exception as e:
+        except Exception:
             # get_api_key() が 500 を返す場合（サーバー設定エラー）
             # これは認証フェイルではなく、サーバー側の問題なので 500 をそのまま返す
             raise
@@ -224,13 +226,18 @@ def get_current_user(
             raise
         # この時点で到達するのは、予期しない例外のみ
         # 認証フェイルではないことを明示
-        logger.error(f"Unexpected error during authentication (not an authentication failure): {e}", exc_info=True)
+        logger.error(
+            f"Unexpected error during authentication (not an authentication failure): {e}",
+            exc_info=True,
+        )
         raise make_internal_error("Unexpected server error during authentication")
 
 
 def get_current_user_optional(
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key", description="API Key for authentication (optional)")
-) -> Optional[AuthenticatedUser]:
+    x_api_key: str | None = Header(
+        None, alias="X-API-Key", description="API Key for authentication (optional)"
+    )
+) -> AuthenticatedUser | None:
     """
     オプショナルな認証 Dependency
 

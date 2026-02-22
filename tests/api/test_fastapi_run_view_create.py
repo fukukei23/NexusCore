@@ -4,11 +4,10 @@ FastAPI RunView API エンドポイントのテスト (CR-NEXUS-029).
 POST /api/v1/run-view/runs エンドポイントのテスト。
 """
 
-import json
+from unittest.mock import MagicMock, patch
+
 import pytest
-from pathlib import Path
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
 from nexuscore.api.fastapi_app import app
 
@@ -31,9 +30,11 @@ def mock_api_key(monkeypatch):
 @pytest.fixture
 def mock_db_models():
     """データベースモデルをモック（認証用）"""
-    with patch("nexuscore.webapp.models.User") as mock_user, \
-         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.webapp.db") as mock_db:
+    with (
+        patch("nexuscore.webapp.models.User") as mock_user,
+        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.webapp.db") as mock_db,
+    ):
         # API Key認証のモック
         mock_user_obj = MagicMock()
         mock_user_obj.id = 1
@@ -66,6 +67,7 @@ def test_create_run_view_success(
     client: TestClient, mock_api_key, mock_db_models, isolated_state_dir, monkeypatch
 ):
     """POST /api/v1/runs で正常にRunを作成できる"""
+
     # Mock get_orchestrator to return a fake orchestrator
     class FakeOrchestrator:
         def __init__(self):
@@ -88,8 +90,13 @@ def test_create_run_view_success(
             "next_phase": "implementation",
         }
 
-    with patch("nexuscore.api.routes.run_view.get_orchestrator", side_effect=mock_get_orchestrator), \
-         patch("nexuscore.orchestrator.authority_runner.run_with_authority", side_effect=mock_run_with_authority):
+    with (
+        patch("nexuscore.api.routes.run_view.get_orchestrator", side_effect=mock_get_orchestrator),
+        patch(
+            "nexuscore.orchestrator.authority_runner.run_with_authority",
+            side_effect=mock_run_with_authority,
+        ),
+    ):
         response = client.post(
             "/api/v1/runs",
             headers={"X-API-Key": mock_api_key},
@@ -108,4 +115,3 @@ def test_create_run_view_success(
         # RunState raw JSON を返さない
         assert "schema_version" not in data
         assert "integrity" not in data
-

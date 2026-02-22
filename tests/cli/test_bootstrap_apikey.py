@@ -3,18 +3,18 @@ API Key ブートストラップ CLI のテスト
 
 CR-FASTAPI-021 で作成された bootstrap_apikey CLI のテスト。
 """
+
 import io
 import sys
-from typing import Iterable
 
 import pytest
 
-from nexuscore.webapp import create_app, db
-from nexuscore.webapp.models import User, ApiKey
 from nexuscore.cli.bootstrap_apikey import (
     bootstrap_apikey_for_app,
     bootstrap_apikey_main,
 )
+from nexuscore.webapp import create_app, db
+from nexuscore.webapp.models import ApiKey, User
 
 
 @pytest.fixture
@@ -60,8 +60,8 @@ def test_bootstrap_apikey_first_time_creates_user_and_key(app):
     with app.app_context():
         assert User.query.count() == 1
         u = User.query.filter_by(github_login="dev").one()
-            # bootstrap_apikey_for_app から返されたオブジェクトは expunge されているので、
-            # 直接属性にアクセスできる
+        # bootstrap_apikey_for_app から返されたオブジェクトは expunge されているので、
+        # 直接属性にアクセスできる
         assert u.id == user.id
 
         keys = ApiKey.query.filter_by(user_id=user.id).all()
@@ -90,8 +90,8 @@ def test_bootstrap_apikey_second_time_reuses_user(app):
         key_name="Key2",
     )
 
-            # bootstrap_apikey_for_app から返されたオブジェクトは expunge されているので、
-            # 直接属性にアクセスできる
+    # bootstrap_apikey_for_app から返されたオブジェクトは expunge されているので、
+    # 直接属性にアクセスできる
     assert user1.id == user2.id
     assert api_key1.id != api_key2.id
     assert token1 != token2

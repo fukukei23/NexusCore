@@ -4,8 +4,6 @@ Factory helpers that map model names to provider classes.
 
 from __future__ import annotations
 
-from typing import Dict, Type
-
 from nexuscore.llm.providers import (
     AnthropicLLM,
     BaseLLM,
@@ -17,8 +15,7 @@ from nexuscore.llm.providers import (
 )
 from nexuscore.llm.routing_policy import model_family, split_provider
 
-
-PROVIDER_CLASSES: Dict[str, Type[BaseLLM]] = {
+PROVIDER_CLASSES: dict[str, type[BaseLLM]] = {
     "openai": OpenAILLM,
     "gemini": GeminiLLM,
     "kimi": MoonshotLLM,
@@ -28,7 +25,7 @@ PROVIDER_CLASSES: Dict[str, Type[BaseLLM]] = {
 }
 
 
-def get_provider_class(family: str) -> Type[BaseLLM]:
+def get_provider_class(family: str) -> type[BaseLLM]:
     try:
         return PROVIDER_CLASSES[family]
     except KeyError:

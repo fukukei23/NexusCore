@@ -1,8 +1,5 @@
 """Tests for nexuscore.utils.vcs"""
-import os
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+
 import pytest
 
 from nexuscore.utils import vcs
@@ -12,6 +9,7 @@ def test_git_controller_init_success(tmp_path, monkeypatch):
     """GitControllerの正常な初期化テスト"""
     # 一時ディレクトリをGitリポジトリとして初期化
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
 
     controller = vcs.GitController(repo_path=str(tmp_path))
@@ -30,6 +28,7 @@ def test_git_controller_init_invalid_repo(tmp_path):
 def test_git_controller_commit_changes_success(tmp_path, monkeypatch):
     """コミット成功のテスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -67,6 +66,7 @@ def test_git_controller_commit_changes_success(tmp_path, monkeypatch):
 def test_git_controller_commit_no_changes(tmp_path, monkeypatch, capsys):
     """変更がない場合のコミットテスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -90,6 +90,7 @@ def test_git_controller_commit_no_changes(tmp_path, monkeypatch, capsys):
 def test_git_controller_commit_error_handling(tmp_path, monkeypatch, capsys):
     """コミットエラーハンドリングのテスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -109,6 +110,7 @@ def test_git_controller_commit_error_handling(tmp_path, monkeypatch, capsys):
 def test_git_controller_commit_multiple_files(tmp_path, monkeypatch):
     """複数ファイルのコミットテスト（is_dirtyの制限により調整）"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -143,6 +145,7 @@ def test_git_controller_commit_multiple_files(tmp_path, monkeypatch):
 def test_git_controller_commit_message_validation(tmp_path, monkeypatch):
     """コミットメッセージの検証テスト（is_dirtyの制限により調整）"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -177,6 +180,7 @@ def test_git_controller_commit_message_validation(tmp_path, monkeypatch):
 def test_git_controller_repo_initialization_message(tmp_path, capsys):
     """リポジトリ初期化時のメッセージテスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
 
     controller = vcs.GitController(repo_path=str(tmp_path))
@@ -188,6 +192,7 @@ def test_git_controller_repo_initialization_message(tmp_path, capsys):
 def test_git_controller_commit_empty_file_list(tmp_path, capsys):
     """空のファイルリストでのコミットテスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -205,6 +210,7 @@ def test_git_controller_commit_empty_file_list(tmp_path, capsys):
 def test_git_controller_commit_with_subdirectory(tmp_path):
     """サブディレクトリ内のファイルのコミットテスト（is_dirtyの制限により調整）"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -234,6 +240,7 @@ def test_git_controller_commit_with_subdirectory(tmp_path):
 def test_git_controller_repo_working_dir(tmp_path):
     """リポジトリのworking_dirが正しく設定されるテスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
 
     controller = vcs.GitController(repo_path=str(tmp_path))
@@ -245,6 +252,7 @@ def test_git_controller_repo_working_dir(tmp_path):
 def test_git_controller_repo_attributes(tmp_path):
     """リポジトリの属性テスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
 
     controller = vcs.GitController(repo_path=str(tmp_path))
@@ -258,6 +266,7 @@ def test_git_controller_repo_attributes(tmp_path):
 def test_git_controller_commit_message_special_chars(tmp_path):
     """特殊文字を含むコミットメッセージのテスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -288,6 +297,7 @@ def test_git_controller_commit_message_special_chars(tmp_path):
 def test_git_controller_multiple_commits_sequence(tmp_path):
     """複数コミットの連続テスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -310,11 +320,14 @@ def test_git_controller_multiple_commits_sequence(tmp_path):
 def test_git_controller_repo_search_parent_directories(tmp_path):
     """親ディレクトリ検索のテスト"""
     import subprocess
+
     # 親ディレクトリにGitリポジトリを作成
     parent_repo = tmp_path / "parent"
     parent_repo.mkdir()
     subprocess.run(["git", "init"], cwd=str(parent_repo), check=True, capture_output=True)
-    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(parent_repo), check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"], cwd=str(parent_repo), check=True
+    )
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=str(parent_repo), check=True)
 
     # サブディレクトリから親リポジトリを検索
@@ -325,12 +338,15 @@ def test_git_controller_repo_search_parent_directories(tmp_path):
 
     # 親リポジトリが見つかることを確認
     assert controller.repo is not None
-    assert "parent" in controller.repo.working_dir or controller.repo.working_dir == str(parent_repo)
+    assert "parent" in controller.repo.working_dir or controller.repo.working_dir == str(
+        parent_repo
+    )
 
 
 def test_git_controller_commit_hash_format(tmp_path):
     """コミットハッシュの形式テスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -355,6 +371,7 @@ def test_git_controller_commit_hash_format(tmp_path):
 def test_git_controller_error_message_format(tmp_path, capsys):
     """エラーメッセージの形式テスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -380,6 +397,7 @@ def test_git_controller_repo_initialization_error_handling(tmp_path):
 def test_git_controller_commit_with_staged_changes(tmp_path):
     """ステージング済み変更のコミットテスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -406,6 +424,7 @@ def test_git_controller_commit_with_staged_changes(tmp_path):
 def test_git_controller_commit_hash_uniqueness(tmp_path):
     """コミットハッシュの一意性テスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -433,6 +452,7 @@ def test_git_controller_commit_hash_uniqueness(tmp_path):
 def test_git_controller_repo_state_consistency(tmp_path):
     """リポジトリ状態の一貫性テスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -447,6 +467,7 @@ def test_git_controller_repo_state_consistency(tmp_path):
 def test_git_controller_commit_with_deleted_file(tmp_path):
     """削除されたファイルのコミットテスト"""
     import subprocess
+
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
@@ -467,4 +488,3 @@ def test_git_controller_commit_with_deleted_file(tmp_path):
     # is_dirtyの制限により、結果はNoneの可能性がある
     if result is not None:
         assert isinstance(result, str)
-

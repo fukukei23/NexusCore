@@ -6,63 +6,66 @@
 # ==============================================================================
 
 import unittest
-from unittest.mock import patch, MagicMock
-import subprocess
-import tempfile
-import os
+from unittest.mock import MagicMock, patch
 
 try:
     import sandbox_executor
 except ImportError:
     sandbox_executor = None
 
+
 class TestSandboxExecutor(unittest.TestCase):
     """サンドボックス実行機能のテスト。"""
-    
+
     def setUp(self):
         """テスト実行前の初期化。"""
         self.sample_code = "print('Hello from sandbox!')"
         self.test_timeout = 5.0
-    
+
     def test_sandbox_executor_import(self):
         """サンドボックス実行モジュールのインポートテスト。"""
         try:
             import sandbox_executor as se
+
             self.assertIsNotNone(se)
         except ImportError:
             self.skipTest("サンドボックス実行モジュールのインポートに失敗")
-    
+
     def test_executor_functions(self):
         """実行関連関数のテスト。"""
         if sandbox_executor is None:
             self.skipTest("サンドボックス実行モジュールが利用できません")
-        
+
         # 期待される関数名
         executor_functions = [
-            'execute_code', 'run_sandbox', 'safe_execute',
-            'create_sandbox', 'cleanup_sandbox', 'execute_python'
+            "execute_code",
+            "run_sandbox",
+            "safe_execute",
+            "create_sandbox",
+            "cleanup_sandbox",
+            "execute_python",
         ]
-        
+
         for func_name in executor_functions:
             if hasattr(sandbox_executor, func_name):
                 func = getattr(sandbox_executor, func_name)
                 self.assertTrue(callable(func))
-    
-    @patch('subprocess.run')
+
+    @patch("subprocess.run")
     def test_code_execution(self, mock_subprocess):
         """コード実行機能のテスト。"""
         if sandbox_executor is None:
             self.skipTest("サンドボックス実行モジュールが利用できません")
-        
+
         # サブプロセス実行のモック設定
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "Hello from sandbox!"
         mock_result.stderr = ""
         mock_subprocess.return_value = mock_result
-        
-        execution_functions = ['execute_code', 'run_sandbox']
-        
+
+        execution_functions = ["execute_code", "run_sandbox"]
+
         for func_name in execution_functions:
             if hasattr(sandbox_executor, func_name):
                 with self.subTest(function=func_name):
@@ -75,5 +78,6 @@ class TestSandboxExecutor(unittest.TestCase):
                         # コード実行エラーは許容
                         pass
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main(verbosity=2)

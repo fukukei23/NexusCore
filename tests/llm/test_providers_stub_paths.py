@@ -2,13 +2,11 @@ import json
 import sys
 from types import SimpleNamespace
 
-import pytest
-
-from nexuscore.llm.providers.openai_provider import OpenAILLM
-from nexuscore.llm.providers.gemini_provider import GeminiLLM
-from nexuscore.llm.providers.deepseek_provider import DeepSeekLLM
-from nexuscore.llm.providers.moonshot_provider import MoonshotLLM
 from nexuscore.llm.providers.anthropic_provider import AnthropicLLM
+from nexuscore.llm.providers.deepseek_provider import DeepSeekLLM
+from nexuscore.llm.providers.gemini_provider import GeminiLLM
+from nexuscore.llm.providers.moonshot_provider import MoonshotLLM
+from nexuscore.llm.providers.openai_provider import OpenAILLM
 
 
 class FakeHTTPError(Exception):

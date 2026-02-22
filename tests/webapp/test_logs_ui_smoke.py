@@ -5,6 +5,7 @@
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,11 +13,13 @@ import pytest
 pytest.skip(
     "Flask legacy logs_ui_smoke tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
-def test_run_detail_shows_self_healing_metrics(client, app, test_user, test_project, test_run_with_self_healing_metrics):
+def test_run_detail_shows_self_healing_metrics(
+    client, app, test_user, test_project, test_run_with_self_healing_metrics
+):
     """Run 詳細ページ（/logs/runs/<run_id>）が 200 を返し、Self-Healing Metrics セクションが含まれることを確認"""
     with app.app_context():
         login_user(client, test_user)
@@ -24,7 +27,9 @@ def test_run_detail_shows_self_healing_metrics(client, app, test_user, test_proj
         assert_page_keywords(response, RUN_DETAIL_KEYWORDS)
 
 
-def test_run_detail_shows_guardian_review(client, app, test_user, test_project, test_run_with_self_healing_metrics):
+def test_run_detail_shows_guardian_review(
+    client, app, test_user, test_project, test_run_with_self_healing_metrics
+):
     """Run 詳細ページに Guardian Review セクションが含まれていることを確認"""
     with app.app_context():
         login_user(client, test_user)
@@ -32,7 +37,9 @@ def test_run_detail_shows_guardian_review(client, app, test_user, test_project, 
         assert_page_keywords(response, ["Guardian Review"])
 
 
-def test_run_detail_shows_ai_diff_summary(client, app, test_user, test_project, test_run_with_self_healing_metrics):
+def test_run_detail_shows_ai_diff_summary(
+    client, app, test_user, test_project, test_run_with_self_healing_metrics
+):
     """Run 詳細ページに AI Diff Summary セクションが含まれていることを確認"""
     with app.app_context():
         login_user(client, test_user)
@@ -43,7 +50,9 @@ def test_run_detail_shows_ai_diff_summary(client, app, test_user, test_project, 
         assert "AI Diff Summary" in html or "Observability" in html
 
 
-def test_run_detail_shows_observability_links(client, app, test_user, test_project, test_run_with_self_healing_metrics):
+def test_run_detail_shows_observability_links(
+    client, app, test_user, test_project, test_run_with_self_healing_metrics
+):
     """Run 詳細ページに Observability セクションとリンクが含まれていることを確認"""
     with app.app_context():
         login_user(client, test_user)
@@ -51,7 +60,9 @@ def test_run_detail_shows_observability_links(client, app, test_user, test_proje
         assert_page_keywords(response, ["Observability"])
 
 
-def test_run_detail_shows_retry_count(client, app, test_user, test_project, test_run_with_self_healing_metrics):
+def test_run_detail_shows_retry_count(
+    client, app, test_user, test_project, test_run_with_self_healing_metrics
+):
     """Run 詳細ページに Retry Count の数値が表示されることを確認"""
     with app.app_context():
         login_user(client, test_user)

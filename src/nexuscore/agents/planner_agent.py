@@ -13,31 +13,38 @@
 # ==============================================================================
 
 from __future__ import annotations
-import os
+
 import json
 import logging
-from typing import List, Dict, Any, Optional, Callable, Tuple # Tupleをインポート
-from pathlib import Path
+import os
+from typing import Any
 
 try:
-    from .base_agent import BaseAgent
     from ..utils.json_sanitizer import sanitize_json_like
+    from .base_agent import BaseAgent
 except ImportError:
     # --- フォールバック定義 ---
-    def sanitize_json_like(payload: Any) -> Any: return payload
+    def sanitize_json_like(payload: Any) -> Any:
+        return payload
+
     class BaseAgent:
         def __init__(self, *args, **kwargs):
             self.logger = logging.getLogger(self.__class__.__name__)
             print("警告: BaseAgentが見つかりません。（フォールバック）")
-        def execute_llm_task(self, prompt: str, as_json: bool = False) -> str: return "[]"
+
+        def execute_llm_task(self, prompt: str, as_json: bool = False) -> str:
+            return "[]"
+
         def _call_llm(self, prompt: str, system_prompt: str, as_json: bool = False) -> str:
             return self.execute_llm_task(prompt, as_json)
+
 
 class PlannerAgent(BaseAgent):
     """
     与えられた要件とファイルコンテキストに基づき、
     実装計画を詳細なタスクリストに分解するエージェント。
     """
+
     SYSTEM_PROMPT = """
 あなたは、複雑なソフトウェア要件を、実行可能なタスクの順序付きリストに分解することを専門とする、経験豊富なソフトウェアアーキテクトです。
 あなたの仕事は、ユーザーの要求と既存のコードを分析し、開発者が従うべき明確で具体的な実装計画を作成することです。
@@ -50,11 +57,15 @@ class PlannerAgent(BaseAgent):
         """
         super().__init__()
 
-    def generate_plan(self, user_requirement: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def generate_plan(
+        self, user_requirement: str, context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         ユーザー要求とコンテキストから実装計画を生成する。
         """
-        file_context_str = self._get_file_context(context.get("project_path", ".")) if context else ""
+        file_context_str = (
+            self._get_file_context(context.get("project_path", ".")) if context else ""
+        )
 
         prompt = f"""
 # 指示
@@ -94,18 +105,24 @@ class PlannerAgent(BaseAgent):
         response_str = self.execute_llm_task(prompt, as_json=True)
         llm_mode = getattr(getattr(self, "llm_router", None), "last_mode", "real")
         if llm_mode != "real":
-            self.logger.warning(f"PlannerAgent detected router mode='{llm_mode}'. Falling back to heuristic plan.")
+            self.logger.warning(
+                f"PlannerAgent detected router mode='{llm_mode}'. Falling back to heuristic plan."
+            )
             return self._fallback_plan(user_requirement, context)
         try:
             parsed = json.loads(response_str)
             if isinstance(parsed, dict):
                 mode = str(parsed.get("mode", "")).lower()
                 if "stub" in mode or "fallback" in mode:
-                    self.logger.warning("PlannerAgent detected stub response (%s); using fallback plan.", mode)
+                    self.logger.warning(
+                        "PlannerAgent detected stub response (%s); using fallback plan.", mode
+                    )
                     return self._fallback_plan(user_requirement, context)
             sanitized = sanitize_json_like(parsed)
             if not self._is_plan_valid(sanitized):
-                self.logger.warning(f"Generated plan is invalid or empty. Raw response: {response_str}")
+                self.logger.warning(
+                    f"Generated plan is invalid or empty. Raw response: {response_str}"
+                )
                 return self._fallback_plan(user_requirement, context)
             if len(sanitized.get("functions_to_implement", [])) < 3:
                 self.logger.info("Plan contained fewer than 3 tasks; merging with fallback tasks.")
@@ -118,7 +135,10 @@ class PlannerAgent(BaseAgent):
                 sanitized["functions_to_implement"] = existing
             return sanitized
         except Exception:
-            self.logger.error(f"Failed to decode or validate JSON plan. Raw response: {response_str}", exc_info=True)
+            self.logger.error(
+                f"Failed to decode or validate JSON plan. Raw response: {response_str}",
+                exc_info=True,
+            )
             return self._fallback_plan(user_requirement, context)
 
     def _get_file_context(self, project_path: str, max_files: int = 15) -> str:
@@ -130,56 +150,74 @@ class PlannerAgent(BaseAgent):
             if any(d in root for d in [".git", "__pycache__", ".venv", "node_modules"]):
                 continue
             for file in files:
-                if file.endswith(('.py', '.js', '.ts', '.html', '.css', '.md', '.json', 'Dockerfile', 'pyproject.toml')):
+                if file.endswith(
+                    (
+                        ".py",
+                        ".js",
+                        ".ts",
+                        ".html",
+                        ".css",
+                        ".md",
+                        ".json",
+                        "Dockerfile",
+                        "pyproject.toml",
+                    )
+                ):
                     filepaths.append(os.path.relpath(os.path.join(root, file), project_path))
 
         if not filepaths:
             return "プロジェクトにファイルが見つかりません。"
-        
+
         if len(filepaths) > max_files:
-            filepaths = sorted(filepaths, key=lambda p: (p.count('/'), len(p)))[:max_files]
+            filepaths = sorted(filepaths, key=lambda p: (p.count("/"), len(p)))[:max_files]
             context = "関連ファイル (一部抜粋):\n" + "\n".join(f"- {fp}" for fp in filepaths)
         else:
             context = "関連ファイル:\n" + "\n".join(f"- {fp}" for fp in filepaths)
         return context
 
     def _is_plan_valid(self, plan: Any) -> bool:
-        if not isinstance(plan, dict): return False
+        if not isinstance(plan, dict):
+            return False
         f = plan.get("functions_to_implement")
         return isinstance(f, list) and len(f) > 0
 
-    def _fallback_plan(self, user_requirement: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _fallback_plan(
+        self, user_requirement: str, context: dict[str, Any] | None
+    ) -> dict[str, Any]:
         base_name = self._to_snake_case(user_requirement) or "planned_function"
         core_steps = [
             ("spec_analysis", "要件をJSON仕様にまとめ、主要エンティティとユースケースを洗い出す"),
-            ("core_implementation", "アプリケーションの主要コマンド/機能を実装し、エラー処理を整備する"),
-            ("testing_and_docs", "pytest用のテストとREADME/使用手順を整備する")
+            (
+                "core_implementation",
+                "アプリケーションの主要コマンド/機能を実装し、エラー処理を整備する",
+            ),
+            ("testing_and_docs", "pytest用のテストとREADME/使用手順を整備する"),
         ]
 
         functions = []
         for idx, (suffix, description) in enumerate(core_steps, start=1):
-            functions.append({
-                "name": f"{base_name}_{suffix}",
-                "description": f"{description}（要求: {user_requirement[:60]}...）",
-                "args": [],
-                "returns": "None",
-                "dependencies": [] if idx == 1 else [functions[idx - 2]["name"]],
-                "tests": [
-                    "pytest が成功すること",
-                    "主要フローで例外が発生しないこと"
-                ],
-                "acceptance_criteria": [
-                    "要件で述べられたユースケースがCLI経由で実行できること",
-                    "主要コマンドに対するドキュメントが整備されていること"
-                ],
-                "priority": "P1" if idx == 1 else ("P0" if idx == 2 else "P2"),
-            })
+            functions.append(
+                {
+                    "name": f"{base_name}_{suffix}",
+                    "description": f"{description}（要求: {user_requirement[:60]}...）",
+                    "args": [],
+                    "returns": "None",
+                    "dependencies": [] if idx == 1 else [functions[idx - 2]["name"]],
+                    "tests": ["pytest が成功すること", "主要フローで例外が発生しないこと"],
+                    "acceptance_criteria": [
+                        "要件で述べられたユースケースがCLI経由で実行できること",
+                        "主要コマンドに対するドキュメントが整備されていること",
+                    ],
+                    "priority": "P1" if idx == 1 else ("P0" if idx == 2 else "P2"),
+                }
+            )
 
         return {"functions_to_implement": functions}
 
     @staticmethod
     def _to_snake_case(s: str) -> str:
         import re
+
         s = s.strip()
         s = re.sub(r"[^\w]+", "_", s)
         s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s)

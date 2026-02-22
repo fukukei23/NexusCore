@@ -5,17 +5,18 @@
 # バージョン: 1.0.0
 # ==============================================================================
 
-import unittest
 import sys
+import unittest
 from pathlib import Path
 
 # --- テスト対象のモジュールをインポートするためのパスを追加 ---
 current_dir = Path(__file__).parent
 project_root = current_dir.parent
-sys.path.insert(0, str(project_root / 'src'))
+sys.path.insert(0, str(project_root / "src"))
 
 from nexuscore.analyzer.graph_builder import DependencyGraphBuilder
 from nexuscore.analyzer.unified_analyzer import AnalysisResult
+
 
 class TestDependencyGraphBuilder(unittest.TestCase):
     """DependencyGraphBuilderのテストスイート"""
@@ -25,41 +26,42 @@ class TestDependencyGraphBuilder(unittest.TestCase):
         # --- 模擬的な解析結果を作成 ---
         # main.py の解析結果
         main_py_results = AnalysisResult(
-            success=True, file_path="main.py",
+            success=True,
+            file_path="main.py",
             semantic_info={
-                'definitions': [
-                    {'name': 'main', 'type': 'function'},
+                "definitions": [
+                    {"name": "main", "type": "function"},
                 ],
-                'calls': [
-                    {'name': 'MyProcessor', 'scope': 'main'},
-                    {'name': 'process', 'scope': 'main'}
-                ]
-            }
+                "calls": [
+                    {"name": "MyProcessor", "scope": "main"},
+                    {"name": "process", "scope": "main"},
+                ],
+            },
         )
-        
+
         # processor.py の解析結果
         processor_py_results = AnalysisResult(
-            success=True, file_path="processor.py",
+            success=True,
+            file_path="processor.py",
             semantic_info={
-                'definitions': [
-                    {'name': 'MyProcessor', 'type': 'class'},
-                    {'name': 'process', 'type': 'function'}, # method
+                "definitions": [
+                    {"name": "MyProcessor", "type": "class"},
+                    {"name": "process", "type": "function"},  # method
                 ],
-                'calls': [
-                    {'name': 'helper_function', 'scope': 'process'}
-                ]
-            }
+                "calls": [{"name": "helper_function", "scope": "process"}],
+            },
         )
-        
+
         # utils.py の解析結果
         utils_py_results = AnalysisResult(
-            success=True, file_path="utils.py",
+            success=True,
+            file_path="utils.py",
             semantic_info={
-                'definitions': [
-                    {'name': 'helper_function', 'type': 'function'},
+                "definitions": [
+                    {"name": "helper_function", "type": "function"},
                 ],
-                'calls': []
-            }
+                "calls": [],
+            },
         )
 
         # --- グラフを構築 ---
@@ -83,5 +85,6 @@ class TestDependencyGraphBuilder(unittest.TestCase):
         # process -> helper_function (関数呼び出し)
         self.assertTrue(graph.has_edge("processor.py::process", "utils.py::helper_function"))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -16,12 +16,9 @@ context_agent.py の包括的テスト
 """
 
 import json
-import os
 import sys
 import tempfile
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch, mock_open
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -31,12 +28,12 @@ def mock_dependencies():
     """各テストの前後で依存モジュールをモック化/復元（テスト分離のため）"""
     # テスト前：元の状態を保存してモック化
     original_modules = {
-        'nexuscore.agents.context_analyzer': sys.modules.get('nexuscore.agents.context_analyzer'),
-        'nexuscore.agents.policy_interface': sys.modules.get('nexuscore.agents.policy_interface'),
+        "nexuscore.agents.context_analyzer": sys.modules.get("nexuscore.agents.context_analyzer"),
+        "nexuscore.agents.policy_interface": sys.modules.get("nexuscore.agents.policy_interface"),
     }
 
-    sys.modules['nexuscore.agents.context_analyzer'] = MagicMock()
-    sys.modules['nexuscore.agents.policy_interface'] = MagicMock()
+    sys.modules["nexuscore.agents.context_analyzer"] = MagicMock()
+    sys.modules["nexuscore.agents.policy_interface"] = MagicMock()
 
     yield  # ← ここでテストが実行される
 
@@ -50,6 +47,7 @@ def mock_dependencies():
 
 try:
     from nexuscore.agents.context_agent import ContextAgent
+
     HAS_CONTEXT_AGENT = True
 except ImportError:
     HAS_CONTEXT_AGENT = False
@@ -60,8 +58,8 @@ except ImportError:
 class TestContextAgentInit:
     """ContextAgent 初期化のテスト"""
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_init_with_all_components(self, mock_policy_class, mock_analyzer_class):
         """ContextAnalyzerとPolicyInterfaceが正常に初期化される"""
         mock_analyzer_class.return_value = Mock()
@@ -75,9 +73,9 @@ class TestContextAgentInit:
             assert agent.policy_interface is not None
             assert agent.context_profile is not None
 
-    @patch('builtins.input', side_effect=['0', '0', '', ''])
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface', None)
+    @patch("builtins.input", side_effect=["0", "0", "", ""])
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface", None)
     def test_init_without_policy_interface(self, mock_analyzer_class, mock_input):
         """PolicyInterfaceが利用できない場合でも初期化成功"""
         mock_analyzer_class.return_value = Mock()
@@ -88,9 +86,9 @@ class TestContextAgentInit:
             assert agent.analyzer is not None
             assert agent.policy_interface is None
 
-    @patch('builtins.input', side_effect=['0', '0', '', ''])
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("builtins.input", side_effect=["0", "0", "", ""])
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_init_analyzer_failure(self, mock_policy_class, mock_analyzer_class, mock_input):
         """ContextAnalyzer初期化失敗時でも継続"""
         mock_analyzer_class.side_effect = Exception("Analyzer init failed")
@@ -107,8 +105,8 @@ class TestContextAgentInit:
 class TestFindProjectRoot:
     """ContextAgent._find_project_root() のテスト"""
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_find_project_root_with_git(self, mock_policy, mock_analyzer, tmp_path):
         """.gitフォルダが見つかる場合"""
         mock_analyzer.return_value = Mock()
@@ -117,9 +115,9 @@ class TestFindProjectRoot:
         # .gitディレクトリを作成
         (tmp_path / ".git").mkdir()
 
-        with patch('os.path.abspath', return_value=str(tmp_path / "src" / "nexuscore")):
-            with patch('os.path.isdir') as mock_isdir:
-                with patch('os.path.isfile', return_value=False):
+        with patch("os.path.abspath", return_value=str(tmp_path / "src" / "nexuscore")):
+            with patch("os.path.isdir") as mock_isdir:
+                with patch("os.path.isfile", return_value=False):
                     mock_isdir.side_effect = lambda p: p == str(tmp_path / ".git")
 
                     agent = ContextAgent()
@@ -128,8 +126,8 @@ class TestFindProjectRoot:
                     # ルートが見つかることを確認（階層を遡る）
                     assert root is not None
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_find_project_root_with_pyproject(self, mock_policy, mock_analyzer, tmp_path):
         """pyproject.tomlが見つかる場合"""
         mock_analyzer.return_value = Mock()
@@ -138,8 +136,8 @@ class TestFindProjectRoot:
         # pyproject.tomlを作成
         (tmp_path / "pyproject.toml").write_text("[tool.poetry]\n")
 
-        with patch('os.path.abspath', return_value=str(tmp_path / "src")):
-            with patch('os.path.isfile') as mock_isfile:
+        with patch("os.path.abspath", return_value=str(tmp_path / "src")):
+            with patch("os.path.isfile") as mock_isfile:
                 mock_isfile.side_effect = lambda p: "pyproject.toml" in p
 
                 agent = ContextAgent()
@@ -152,8 +150,8 @@ class TestFindProjectRoot:
 class TestLoadOrCreateContext:
     """ContextAgent.load_or_create_context() のテスト"""
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_load_existing_context(self, mock_policy, mock_analyzer, tmp_path):
         """既存のコンテキストファイルが存在する場合"""
         mock_analyzer.return_value = Mock()
@@ -161,10 +159,7 @@ class TestLoadOrCreateContext:
 
         # 既存のコンテキストファイルを作成
         context_file = tmp_path / ".nexus_context.json"
-        cached_context = {
-            "tech_stack": {"frameworks": ["gradio"]},
-            "version": "2.1-stable"
-        }
+        cached_context = {"tech_stack": {"frameworks": ["gradio"]}, "version": "2.1-stable"}
         context_file.write_text(json.dumps(cached_context))
 
         agent = ContextAgent(project_root=str(tmp_path))
@@ -172,10 +167,12 @@ class TestLoadOrCreateContext:
         assert agent.context_profile["tech_stack"]["frameworks"] == ["gradio"]
         assert agent.context_profile["version"] == "2.1-stable"
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
-    @patch('builtins.input', side_effect=['0', '0', '', ''])
-    def test_create_new_context_when_no_cache(self, mock_input, mock_policy, mock_analyzer, tmp_path):
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
+    @patch("builtins.input", side_effect=["0", "0", "", ""])
+    def test_create_new_context_when_no_cache(
+        self, mock_input, mock_policy, mock_analyzer, tmp_path
+    ):
         """キャッシュがない場合は新規作成"""
         mock_analyzer.return_value = Mock()
         mock_policy.return_value = Mock()
@@ -192,8 +189,8 @@ class TestLoadOrCreateContext:
 class TestCreateSafeBaseContext:
     """ContextAgent._create_safe_base_context() のテスト"""
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_safe_base_context_structure(self, mock_policy, mock_analyzer, tmp_path):
         """安全な基本コンテキストの構造が正しい"""
         mock_analyzer.return_value = Mock()
@@ -214,8 +211,8 @@ class TestCreateSafeBaseContext:
 class TestSafeDetectFrameworks:
     """ContextAgent._safe_detect_frameworks() のテスト"""
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_detect_frameworks_from_requirements(self, mock_policy, mock_analyzer, tmp_path):
         """requirements.txtからフレームワークを検出"""
         mock_analyzer.return_value = Mock()
@@ -232,8 +229,8 @@ class TestSafeDetectFrameworks:
         assert "openai" in frameworks
         assert "pytest" in frameworks
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_detect_frameworks_no_requirements_file(self, mock_policy, mock_analyzer, tmp_path):
         """requirements.txtがない場合"""
         mock_analyzer.return_value = Mock()
@@ -249,8 +246,8 @@ class TestSafeDetectFrameworks:
 class TestSafeCountFiles:
     """ContextAgent._safe_count_files() のテスト"""
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_safe_count_files_basic(self, mock_policy, mock_analyzer, tmp_path):
         """ファイル数を正しくカウント"""
         mock_analyzer.return_value = Mock()
@@ -267,9 +264,9 @@ class TestSafeCountFiles:
 
         assert count >= 3
 
-    @patch('builtins.input', side_effect=['0', '0', '', ''])
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("builtins.input", side_effect=["0", "0", "", ""])
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_safe_count_files_ignores_git(self, mock_policy, mock_analyzer, mock_input, tmp_path):
         """.gitディレクトリを無視"""
         mock_analyzer.return_value = Mock()
@@ -292,8 +289,8 @@ class TestSafeCountFiles:
 class TestGetErrorPreventionRules:
     """ContextAgent.get_error_prevention_rules() のテスト"""
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_get_error_prevention_rules_basic(self, mock_policy, mock_analyzer, tmp_path):
         """エラー予防ルールを取得"""
         mock_analyzer.return_value = Mock()
@@ -305,7 +302,7 @@ class TestGetErrorPreventionRules:
                 "test_import_policy": "関数を直接埋め込み",
                 "error_language": "日本語",
                 "quality_requirements": ["docstring必須", "エラーハンドリング必須"],
-                "security_policy": ["APIキー環境変数管理"]
+                "security_policy": ["APIキー環境変数管理"],
             }
         }
 
@@ -322,8 +319,8 @@ class TestGetErrorPreventionRules:
 class TestGenerateEnhancedTestPrompt:
     """ContextAgent.generate_enhanced_test_prompt() のテスト"""
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_generate_enhanced_test_prompt_structure(self, mock_policy, mock_analyzer, tmp_path):
         """プロンプトが正しい構造を持つ"""
         mock_analyzer.return_value = Mock()
@@ -342,8 +339,8 @@ class TestGenerateEnhancedTestPrompt:
 class TestUpdateContext:
     """ContextAgent.update_context() のテスト"""
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_update_context_updates_last_updated(self, mock_policy, mock_analyzer, tmp_path):
         """update_contextでlast_updatedが更新される"""
         mock_analyzer_instance = Mock()
@@ -356,6 +353,7 @@ class TestUpdateContext:
 
         # 少し待機
         import time
+
         time.sleep(0.1)
 
         updated_context = agent.update_context()
@@ -368,18 +366,15 @@ class TestUpdateContext:
 class TestEdgeCases:
     """エッジケースのテスト"""
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_save_and_load_context_roundtrip(self, mock_policy, mock_analyzer, tmp_path):
         """save → loadのラウンドトリップ"""
         mock_analyzer.return_value = Mock()
         mock_policy.return_value = Mock()
 
         agent = ContextAgent(project_root=str(tmp_path))
-        original_context = {
-            "tech_stack": {"frameworks": ["test"]},
-            "version": "test"
-        }
+        original_context = {"tech_stack": {"frameworks": ["test"]}, "version": "test"}
         agent.context_profile = original_context
         agent.save_context(original_context)
 
@@ -389,8 +384,8 @@ class TestEdgeCases:
 
         assert loaded_context["tech_stack"]["frameworks"] == ["test"]
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_analyze_code_request_basic(self, mock_policy, mock_analyzer, tmp_path):
         """コード要求を分析"""
         mock_analyzer.return_value = Mock()
@@ -402,7 +397,7 @@ class TestEdgeCases:
                 "test_import_policy": "関数を直接埋め込み",
                 "error_language": "日本語",
                 "quality_requirements": ["docstring必須"],
-                "security_policy": ["APIキー環境変数管理"]
+                "security_policy": ["APIキー環境変数管理"],
             }
         }
 
@@ -413,8 +408,8 @@ class TestEdgeCases:
         assert "recommendations" in analysis
         assert len(analysis["recommendations"]) > 0
 
-    @patch('nexuscore.agents.context_agent.ContextAnalyzer')
-    @patch('nexuscore.agents.context_agent.PolicyInterface')
+    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
+    @patch("nexuscore.agents.context_agent.PolicyInterface")
     def test_safe_count_python_files_limit(self, mock_policy, mock_analyzer, tmp_path):
         """Pythonファイル数カウントの制限"""
         mock_analyzer.return_value = Mock()

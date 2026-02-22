@@ -5,6 +5,7 @@ webapp/orchestrator_inline.py の高品質なテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask legacy orchestrator_inline tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -42,6 +43,7 @@ def app():
 def db_session(app):
     """Database session for tests"""
     from nexuscore.webapp import db
+
     with app.app_context():
         yield db.session
 
@@ -123,7 +125,9 @@ class TestRunOrchestratorInline:
                     fast_lane=True,
                 )
 
-    def test_run_orchestrator_inline_sets_run_to_success_on_completion(self, app, db_session, test_data):
+    def test_run_orchestrator_inline_sets_run_to_success_on_completion(
+        self, app, db_session, test_data
+    ):
         """run_orchestrator_inline() が成功時に Run を SUCCESS にする"""
         from nexuscore.webapp.orchestrator_inline import run_orchestrator_inline
 
@@ -164,7 +168,9 @@ class TestRunOrchestratorInline:
         assert run.status == "FAILED"
         assert run.finished_at is not None
 
-    def test_run_orchestrator_inline_sets_finished_at_in_finally_block(self, app, db_session, test_data):
+    def test_run_orchestrator_inline_sets_finished_at_in_finally_block(
+        self, app, db_session, test_data
+    ):
         """run_orchestrator_inline() が finally ブロックで finished_at を設定"""
         from nexuscore.webapp.orchestrator_inline import run_orchestrator_inline
 
@@ -188,7 +194,9 @@ class TestRunOrchestratorInline:
         db_session.refresh(run)
         assert run.finished_at is not None
 
-    def test_run_orchestrator_inline_sends_slack_notification_on_success(self, app, db_session, test_data):
+    def test_run_orchestrator_inline_sends_slack_notification_on_success(
+        self, app, db_session, test_data
+    ):
         """run_orchestrator_inline() が成功時に Slack 通知を送信"""
         from nexuscore.webapp.orchestrator_inline import run_orchestrator_inline
 
@@ -213,7 +221,9 @@ class TestRunOrchestratorInline:
                 assert call_kwargs["status"] == "success"
                 assert call_kwargs["session_id"] == "test-run-123"
 
-    def test_run_orchestrator_inline_sends_slack_notification_on_failure(self, app, db_session, test_data):
+    def test_run_orchestrator_inline_sends_slack_notification_on_failure(
+        self, app, db_session, test_data
+    ):
         """run_orchestrator_inline() が失敗時に Slack 通知を送信"""
         from nexuscore.webapp.orchestrator_inline import run_orchestrator_inline
 
@@ -318,7 +328,9 @@ class TestRunOrchestratorInline:
                 call_kwargs = mock_sync.call_args[1]
                 assert call_kwargs["fast_lane"] is False
 
-    def test_run_orchestrator_inline_propagates_exception_after_cleanup(self, app, db_session, test_data):
+    def test_run_orchestrator_inline_propagates_exception_after_cleanup(
+        self, app, db_session, test_data
+    ):
         """run_orchestrator_inline() がクリーンアップ後にエラーを伝播"""
         from nexuscore.webapp.orchestrator_inline import run_orchestrator_inline
 

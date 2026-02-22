@@ -6,16 +6,15 @@ Run に紐づくパッチとログを元に、「何を直したか／なぜ壊�
 
 from __future__ import annotations
 
-import json
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 # Webapp モデルはオプショナルインポート
 try:
-    from nexuscore.webapp.models import Run, PatchRecord, ExecutionLog
     from nexuscore.webapp import db
+    from nexuscore.webapp.models import ExecutionLog, PatchRecord, Run
+
     HAS_WEBAPP = True
 except ImportError:
     HAS_WEBAPP = False
@@ -26,8 +25,9 @@ except ImportError:
 
 # LLM 呼び出し用
 try:
-    from nexuscore.npe.engine import guarded_llm_call
     from nexuscore.llm.llm_router import LLMRouter
+    from nexuscore.npe.engine import guarded_llm_call
+
     HAS_LLM = True
 except ImportError:
     HAS_LLM = False
@@ -39,8 +39,8 @@ def generate_pr_change_summary(
     run: object,
     guardian_review_markdown: str,
     max_tokens: int = 512,
-    llm_router: Optional[object] = None,
-) -> Optional[str]:
+    llm_router: object | None = None,
+) -> str | None:
     """
     Run に紐づくパッチとログを元に、「何を直したか／なぜ壊れていたか／リスク」を自然言語で要約する。
 
@@ -79,8 +79,9 @@ def generate_pr_change_summary(
         log_entries = []
         if hasattr(run, "id") and ExecutionLog:
             log_entries = (
-                ExecutionLog.query  # type: ignore
-                .filter(ExecutionLog.run_id == run.id)  # type: ignore
+                ExecutionLog.query.filter(  # type: ignore
+                    ExecutionLog.run_id == run.id
+                )  # type: ignore
                 .order_by(ExecutionLog.created_at.asc())  # type: ignore
                 .all()
             )
@@ -173,4 +174,3 @@ Write the summary in Japanese, 5 bullets or fewer.
     except Exception as e:
         logger.error(f"Failed to generate PR change summary: {e}", exc_info=True)
         return None
-

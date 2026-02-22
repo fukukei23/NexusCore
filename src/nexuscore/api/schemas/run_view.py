@@ -6,7 +6,8 @@ RunView projection models for API responses (RunState is not exposed directly).
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -16,7 +17,7 @@ class ExplainabilityModel(BaseModel):
     what: str = Field(..., description="What happened")
     why: str = Field(..., description="Why it happened (error code or reason)")
     next_action: str = Field(..., description="What to do next")
-    details: Optional[Dict[str, Any]] = Field(None, description="Additional details")
+    details: dict[str, Any] | None = Field(None, description="Additional details")
 
     class Config:
         json_schema_extra = {
@@ -33,11 +34,15 @@ class RunViewResponse(BaseModel):
     """RunView projection for API responses."""
 
     run_id: str = Field(..., description="Run ID")
-    status: str = Field(..., description="Run status (RUNNING, PAUSED, COMPLETED, CONFLICT, FAILED, ABORTED)")
-    phase: Optional[str] = Field(None, description="Current phase (if paused)")
-    authority_level: Optional[str] = Field(None, description="Authority level (human, partial, full)")
-    updated_at: Optional[str] = Field(None, description="Last update timestamp (ISO8601)")
-    explainability: Optional[ExplainabilityModel] = Field(
+    status: str = Field(
+        ..., description="Run status (RUNNING, PAUSED, COMPLETED, CONFLICT, FAILED, ABORTED)"
+    )
+    phase: str | None = Field(None, description="Current phase (if paused)")
+    authority_level: str | None = Field(
+        None, description="Authority level (human, partial, full)"
+    )
+    updated_at: str | None = Field(None, description="Last update timestamp (ISO8601)")
+    explainability: ExplainabilityModel | None = Field(
         None,
         description="Explainability details (required for CONFLICT, FAILED, ABORTED)",
     )
@@ -59,7 +64,9 @@ class RunCreateRequest(BaseModel):
     """Request model for creating a new run."""
 
     requirement: str = Field(..., description="User requirement")
-    authority_level: Optional[str] = Field(None, description="Authority level (human, partial, full)")
+    authority_level: str | None = Field(
+        None, description="Authority level (human, partial, full)"
+    )
     language: str = Field("ja", description="Language (ja, en)")
 
     class Config:
@@ -70,4 +77,3 @@ class RunCreateRequest(BaseModel):
                 "language": "ja",
             }
         }
-

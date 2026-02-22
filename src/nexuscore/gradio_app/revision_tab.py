@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # ==============================================================================
 # ファイル名: revision_tab.py
 # レジストリ: src/nexuscore/gradio_app/
@@ -13,12 +12,12 @@
 # ==============================================================================
 
 from __future__ import annotations
+
+import json
 import os
 import re
-import json
 import subprocess
 from pathlib import Path
-from typing import Tuple
 
 import gradio as gr
 
@@ -37,8 +36,8 @@ else:
     SANDBOX_DIR = SRC_ROOT / "sandbox_output"
 
 SAMPLE_FILE = str(SANDBOX_DIR / "sample.py")
-TEST_FILE   = str(SANDBOX_DIR / "test_sample.py")
-RESULT_LOG  = str(SANDBOX_DIR / "test_result.log")
+TEST_FILE = str(SANDBOX_DIR / "test_sample.py")
+RESULT_LOG = str(SANDBOX_DIR / "test_result.log")
 
 # 旧テキスト履歴（互換）
 HISTORY_TXT = str(SANDBOX_DIR / "patch_history.txt")
@@ -47,10 +46,13 @@ HISTORY_TXT = str(SANDBOX_DIR / "patch_history.txt")
 PATCH_HISTORY_DIR = PROJECT_ROOT / "patch_history"
 os.makedirs(PATCH_HISTORY_DIR, exist_ok=True)
 
+
 # ---------- 互換ユーティリティ ----------
 def _now_tag() -> str:
     from datetime import datetime
+
     return datetime.now().strftime("%Y%m%d_%H%M%S")
+
 
 def read_file(file_path: str) -> str:
     try:
@@ -58,9 +60,11 @@ def read_file(file_path: str) -> str:
     except Exception:
         return ""
 
+
 def save_file(file_path: str, content: str):
     Path(file_path).parent.mkdir(parents=True, exist_ok=True)
     Path(file_path).write_text(content, encoding="utf-8")
+
 
 # 旧仕様: テキスト履歴に追記（Runner 互換のため関数名は固定）
 def save_patch_history(code: str, reason: str, prompt: str):
@@ -70,6 +74,7 @@ def save_patch_history(code: str, reason: str, prompt: str):
         f.write("[📝 修正理由]:\n" + (reason or "") + "\n")
         f.write("[📤 GPTプロンプト]:\n" + (prompt or "") + "\n")
         f.write("[💻 修正コード]:\n" + (code or "") + "\n")
+
 
 # 新仕様: タイムライン JSON を保存（Runner 側も自身で保存するが、ここでも呼べる）
 def save_patch_history_json(code: str, reason: str, prompt: str) -> str:
@@ -89,8 +94,9 @@ def save_patch_history_json(code: str, reason: str, prompt: str) -> str:
     out.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return str(out)
 
+
 # ---------- pytest 実行 ----------
-def run_pytest() -> Tuple[bool, str]:
+def run_pytest() -> tuple[bool, str]:
     """
     新式: (ok, output) を返す。
     互換: Runner 側は古い実装（文字列のみ）にも耐えるラッパを持つ。
@@ -101,7 +107,7 @@ def run_pytest() -> Tuple[bool, str]:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            cwd=str(SANDBOX_DIR)
+            cwd=str(SANDBOX_DIR),
         )
         output = result.stdout + ("\n" + result.stderr if result.stderr else "")
         # 保存（Timeline JSON が拾う）
@@ -113,8 +119,11 @@ def run_pytest() -> Tuple[bool, str]:
         save_file(RESULT_LOG, output)
         return False, output
 
+
 # ---------- プロンプト生成 ----------
-def generate_prompt(sample_path: str, test_path: str, summary: str, history: str, error_log: str, user_note: str) -> str:
+def generate_prompt(
+    sample_path: str, test_path: str, summary: str, history: str, error_log: str, user_note: str
+) -> str:
     sample_code = read_file(sample_path)
     test_code = read_file(test_path)
     return f"""# Context
@@ -148,8 +157,9 @@ def generate_prompt(sample_path: str, test_path: str, summary: str, history: str
 - 差分ではなく、完全な最新コードを提示してください
 """
 
+
 # ---------- LLM応答の抽出 ----------
-def extract_code_and_reason(response: str) -> Tuple[str, str]:
+def extract_code_and_reason(response: str) -> tuple[str, str]:
     """
     - JSON形式 {"code": "...", "reason": "..."} を優先
     - それ以外は ```...``` の fenced code から抽出、残りを理由扱い
@@ -167,6 +177,7 @@ def extract_code_and_reason(response: str) -> Tuple[str, str]:
         reason = "（理由を抽出できませんでした）"
     return code, reason
 
+
 # ---------- LLM 呼び出し（安全フォールバック付き） ----------
 def call_gpt(prompt: str) -> str:
     """
@@ -177,6 +188,7 @@ def call_gpt(prompt: str) -> str:
     if api_key:
         try:
             from openai import OpenAI
+
             client = OpenAI(api_key=api_key)
             rsp = client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -184,7 +196,7 @@ def call_gpt(prompt: str) -> str:
                 temperature=0.2,
             )
             return rsp.choices[0].message.content.strip()
-        except Exception as e:
+        except Exception:
             # API失敗時はフォールバック
             pass
 
@@ -203,14 +215,21 @@ def call_gpt(prompt: str) -> str:
         i += 2
     return True
 """
-    return json.dumps({"code": fallback_code, "reason": "Handle n=2 and even numbers; standard primality check."})
+    return json.dumps(
+        {"code": fallback_code, "reason": "Handle n=2 and even numbers; standard primality check."}
+    )
+
 
 # ---------- 最小タブ UI（任意で利用可） ----------
 def tab_revision() -> gr.Blocks:
     with gr.Blocks() as tab:
         gr.Markdown("## 🔁 Auto Revision（最小デモ）")
-        code_input = gr.Code(label="📝 対象コード (sample.py)", language="python", value=read_file(SAMPLE_FILE))
-        user_instruction = gr.Textbox(label="💡 補足/指示", placeholder="例: 2 を素数として扱って", lines=2)
+        code_input = gr.Code(
+            label="📝 対象コード (sample.py)", language="python", value=read_file(SAMPLE_FILE)
+        )
+        user_instruction = gr.Textbox(
+            label="💡 補足/指示", placeholder="例: 2 を素数として扱って", lines=2
+        )
         test_failures = gr.Textbox(label="❌ 失敗ログ", value=read_file(RESULT_LOG), lines=6)
 
         generated_code = gr.Code(label="✅ 生成コード", language="python")
@@ -227,14 +246,20 @@ def tab_revision() -> gr.Blocks:
 
         def do_apply(code: str, reason: str, prompt: str):
             save_file(SAMPLE_FILE, code)
-            save_patch_history(code, reason, prompt)         # 旧テキスト
-            ok, out = run_pytest()                           # (bool, str)
+            save_patch_history(code, reason, prompt)  # 旧テキスト
+            ok, out = run_pytest()  # (bool, str)
             json_path = save_patch_history_json(code, reason, prompt)  # 新JSON
             return out, json_path
 
         revise_btn = gr.Button("🔁 修正案を生成")
         apply_btn = gr.Button("✅ 修正案を適用してテスト")
 
-        revise_btn.click(do_generate, [code_input, user_instruction, test_failures], [generated_code, explanation, user_instruction])
-        apply_btn.click(do_apply, [generated_code, explanation, user_instruction], [test_result, last_json_path])
+        revise_btn.click(
+            do_generate,
+            [code_input, user_instruction, test_failures],
+            [generated_code, explanation, user_instruction],
+        )
+        apply_btn.click(
+            do_apply, [generated_code, explanation, user_instruction], [test_result, last_json_path]
+        )
     return tab

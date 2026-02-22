@@ -14,19 +14,17 @@ test_strategy.py の包括的テスト
 """
 
 import os
-import sys
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
 
 try:
     from nexuscore.agents.test_strategy import (
-        TestStrategyManager,
+        ModuleTestStrategy,
         TestStrategyConfig,
-        ModuleTestStrategy
+        TestStrategyManager,
     )
+
     HAS_TEST_STRATEGY = True
 except ImportError:
     HAS_TEST_STRATEGY = False
@@ -44,7 +42,7 @@ class TestModuleTestStrategy:
             risk="S",
             strategy="human_design + ai_augment",
             description="Critical sandbox module",
-            min_coverage=95
+            min_coverage=95,
         )
 
         assert strategy.module_name == "sandbox_runner"
@@ -53,9 +51,15 @@ class TestModuleTestStrategy:
 
     def test_requires_human_review_property(self):
         """requires_human_reviewプロパティ"""
-        strategy_s = ModuleTestStrategy(risk="S", strategy="strategy", description="desc", min_coverage=90, module_name="mod")
-        strategy_a = ModuleTestStrategy(risk="A", strategy="strategy", description="desc", min_coverage=80, module_name="mod")
-        strategy_b = ModuleTestStrategy(risk="B", strategy="strategy", description="desc", min_coverage=60, module_name="mod")
+        strategy_s = ModuleTestStrategy(
+            risk="S", strategy="strategy", description="desc", min_coverage=90, module_name="mod"
+        )
+        strategy_a = ModuleTestStrategy(
+            risk="A", strategy="strategy", description="desc", min_coverage=80, module_name="mod"
+        )
+        strategy_b = ModuleTestStrategy(
+            risk="B", strategy="strategy", description="desc", min_coverage=60, module_name="mod"
+        )
 
         assert strategy_s.requires_human_review is True
         assert strategy_a.requires_human_review is True
@@ -63,17 +67,39 @@ class TestModuleTestStrategy:
 
     def test_is_critical_property(self):
         """is_criticalプロパティ"""
-        strategy_s = ModuleTestStrategy(risk="S", strategy="strategy", description="desc", min_coverage=95, module_name="mod")
-        strategy_a = ModuleTestStrategy(risk="A", strategy="strategy", description="desc", min_coverage=80, module_name="mod")
+        strategy_s = ModuleTestStrategy(
+            risk="S", strategy="strategy", description="desc", min_coverage=95, module_name="mod"
+        )
+        strategy_a = ModuleTestStrategy(
+            risk="A", strategy="strategy", description="desc", min_coverage=80, module_name="mod"
+        )
 
         assert strategy_s.is_critical is True
         assert strategy_a.is_critical is False
 
     def test_allows_ai_first_property(self):
         """allows_ai_firstプロパティ"""
-        strategy1 = ModuleTestStrategy(risk="S", strategy="human_design + ai_augment", description="desc", min_coverage=95, module_name="mod")
-        strategy2 = ModuleTestStrategy(risk="A", strategy="ai_first + human_review", description="desc", min_coverage=80, module_name="mod")
-        strategy3 = ModuleTestStrategy(risk="B", strategy="ai_first_only", description="desc", min_coverage=60, module_name="mod")
+        strategy1 = ModuleTestStrategy(
+            risk="S",
+            strategy="human_design + ai_augment",
+            description="desc",
+            min_coverage=95,
+            module_name="mod",
+        )
+        strategy2 = ModuleTestStrategy(
+            risk="A",
+            strategy="ai_first + human_review",
+            description="desc",
+            min_coverage=80,
+            module_name="mod",
+        )
+        strategy3 = ModuleTestStrategy(
+            risk="B",
+            strategy="ai_first_only",
+            description="desc",
+            min_coverage=60,
+            module_name="mod",
+        )
 
         assert strategy1.allows_ai_first is False
         assert strategy2.allows_ai_first is True
@@ -87,13 +113,19 @@ class TestTestStrategyConfig:
     def test_config_creation(self):
         """TestStrategyConfigの作成"""
         modules = {
-            "sandbox_runner": ModuleTestStrategy(risk="S", strategy="human_design + ai_augment", description="Critical", min_coverage=95, module_name="sandbox_runner")
+            "sandbox_runner": ModuleTestStrategy(
+                risk="S",
+                strategy="human_design + ai_augment",
+                description="Critical",
+                min_coverage=95,
+                module_name="sandbox_runner",
+            )
         }
         config = TestStrategyConfig(
             modules=modules,
             default_risk="B",
             default_strategy="ai_first_only",
-            default_min_coverage=60
+            default_min_coverage=60,
         )
 
         assert len(config.modules) == 1
@@ -102,7 +134,13 @@ class TestTestStrategyConfig:
 
     def test_get_strategy_existing_module(self):
         """既存モジュールの戦略取得"""
-        strategy = ModuleTestStrategy(risk="A", strategy="ai_first + human_review", description="Test", min_coverage=80, module_name="test_mod")
+        strategy = ModuleTestStrategy(
+            risk="A",
+            strategy="ai_first + human_review",
+            description="Test",
+            min_coverage=80,
+            module_name="test_mod",
+        )
         modules = {"test_mod": strategy}
         config = TestStrategyConfig(modules=modules)
 
@@ -114,10 +152,7 @@ class TestTestStrategyConfig:
     def test_get_strategy_default_for_unknown_module(self):
         """未知のモジュールにはデフォルト戦略を返す"""
         config = TestStrategyConfig(
-            modules={},
-            default_risk="B",
-            default_strategy="ai_first_only",
-            default_min_coverage=60
+            modules={}, default_risk="B", default_strategy="ai_first_only", default_min_coverage=60
         )
 
         result = config.get_strategy("unknown_module")
@@ -130,9 +165,27 @@ class TestTestStrategyConfig:
     def test_get_modules_by_risk(self):
         """リスクランク別モジュール取得"""
         modules = {
-            "mod_s": ModuleTestStrategy(risk="S", strategy="strategy", description="desc", min_coverage=95, module_name="mod_s"),
-            "mod_a": ModuleTestStrategy(risk="A", strategy="strategy", description="desc", min_coverage=80, module_name="mod_a"),
-            "mod_b": ModuleTestStrategy(risk="B", strategy="strategy", description="desc", min_coverage=60, module_name="mod_b")
+            "mod_s": ModuleTestStrategy(
+                risk="S",
+                strategy="strategy",
+                description="desc",
+                min_coverage=95,
+                module_name="mod_s",
+            ),
+            "mod_a": ModuleTestStrategy(
+                risk="A",
+                strategy="strategy",
+                description="desc",
+                min_coverage=80,
+                module_name="mod_a",
+            ),
+            "mod_b": ModuleTestStrategy(
+                risk="B",
+                strategy="strategy",
+                description="desc",
+                min_coverage=60,
+                module_name="mod_b",
+            ),
         }
         config = TestStrategyConfig(modules=modules)
 
@@ -145,9 +198,27 @@ class TestTestStrategyConfig:
     def test_get_critical_modules(self):
         """クリティカルモジュール取得"""
         modules = {
-            "critical1": ModuleTestStrategy(risk="S", strategy="strategy", description="desc", min_coverage=95, module_name="critical1"),
-            "critical2": ModuleTestStrategy(risk="S", strategy="strategy", description="desc", min_coverage=95, module_name="critical2"),
-            "normal": ModuleTestStrategy(risk="A", strategy="strategy", description="desc", min_coverage=80, module_name="normal")
+            "critical1": ModuleTestStrategy(
+                risk="S",
+                strategy="strategy",
+                description="desc",
+                min_coverage=95,
+                module_name="critical1",
+            ),
+            "critical2": ModuleTestStrategy(
+                risk="S",
+                strategy="strategy",
+                description="desc",
+                min_coverage=95,
+                module_name="critical2",
+            ),
+            "normal": ModuleTestStrategy(
+                risk="A",
+                strategy="strategy",
+                description="desc",
+                min_coverage=80,
+                module_name="normal",
+            ),
         }
         config = TestStrategyConfig(modules=modules)
 

@@ -3,13 +3,13 @@ FastAPI サーバー起動ヘルパー
 
 uvicorn をサブプロセスでバックグラウンド起動し、E2E テストで使用する。
 """
+
 from __future__ import annotations
 
 import subprocess
 import time
 import urllib.request
 from pathlib import Path
-from typing import Optional
 
 # プロジェクトルートを取得
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 def start_fastapi_server(
     host: str = "127.0.0.1",
     port: int = 8000,
-    python_path: Optional[str] = None,
+    python_path: str | None = None,
 ) -> subprocess.Popen:
     """
     FastAPI アプリを uvicorn でバックグラウンド起動する。
@@ -112,4 +112,3 @@ def stop_fastapi_server(process: subprocess.Popen) -> None:
     except Exception:
         # プロセスが既に終了している場合は無視
         pass
-

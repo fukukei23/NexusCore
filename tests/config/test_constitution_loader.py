@@ -2,17 +2,16 @@
 # ファイル: tests/config/test_constitution_loader.py
 # 目的  : ConstitutionLoader のテスト
 # ==============================================================================
+from unittest.mock import patch
+
 import pytest
-import os
-from pathlib import Path
-from unittest.mock import patch, mock_open
 
 from src.nexuscore.config.constitution_loader import (
     ConstitutionLoader,
     get_constitution,
     get_tier1_config,
     get_tier2_config,
-    reload_constitution
+    reload_constitution,
 )
 
 
@@ -55,7 +54,7 @@ class TestConstitutionLoader:
         ConstitutionLoader._instance = None
         ConstitutionLoader._constitution = None
 
-        with patch.object(ConstitutionLoader, '_find_constitution_file', return_value=None):
+        with patch.object(ConstitutionLoader, "_find_constitution_file", return_value=None):
             loader = ConstitutionLoader()
             constitution = loader.get_constitution()
 
@@ -65,20 +64,10 @@ class TestConstitutionLoader:
     def test_environment_specific_config(self):
         """環境別設定のマージをテスト"""
         base = {
-            "quality_gates": {
-                "tier1": {
-                    "test_coverage_min": 90
-                }
-            },
+            "quality_gates": {"tier1": {"test_coverage_min": 90}},
             "environments": {
-                "development": {
-                    "quality_gates": {
-                        "tier1": {
-                            "test_coverage_min": 80
-                        }
-                    }
-                }
-            }
+                "development": {"quality_gates": {"tier1": {"test_coverage_min": 80}}}
+            },
         }
 
         loader = ConstitutionLoader()
@@ -88,34 +77,18 @@ class TestConstitutionLoader:
 
     def test_deep_merge(self):
         """ディープマージのテスト"""
-        base = {
-            "a": {
-                "b": {
-                    "c": 1,
-                    "d": 2
-                },
-                "e": 3
-            },
-            "f": 4
-        }
+        base = {"a": {"b": {"c": 1, "d": 2}, "e": 3}, "f": 4}
 
-        override = {
-            "a": {
-                "b": {
-                    "c": 10  # 上書き
-                },
-                "g": 30  # 追加
-            }
-        }
+        override = {"a": {"b": {"c": 10}, "g": 30}}  # 上書き  # 追加
 
         loader = ConstitutionLoader()
         result = loader._deep_merge(base, override)
 
         assert result["a"]["b"]["c"] == 10  # 上書きされている
-        assert result["a"]["b"]["d"] == 2   # 保持されている
-        assert result["a"]["e"] == 3        # 保持されている
-        assert result["a"]["g"] == 30       # 追加されている
-        assert result["f"] == 4             # 保持されている
+        assert result["a"]["b"]["d"] == 2  # 保持されている
+        assert result["a"]["e"] == 3  # 保持されている
+        assert result["a"]["g"] == 30  # 追加されている
+        assert result["f"] == 4  # 保持されている
 
     def test_validation_missing_required_section(self):
         """必須セクションが不足している場合、エラーを発生"""
@@ -135,12 +108,9 @@ class TestConstitutionLoader:
 
         invalid_constitution = {
             "quality_gates": {
-                "tier1": {
-                    "test_coverage_min": 150,  # 範囲外
-                    "pylint_score_min": 8.0
-                }
+                "tier1": {"test_coverage_min": 150, "pylint_score_min": 8.0}  # 範囲外
             },
-            "security": {}
+            "security": {},
         }
 
         with pytest.raises(ValueError, match="0-100 の範囲"):

@@ -1,6 +1,7 @@
 # test_manager.py
 import os
 import sys
+
 from dotenv import load_dotenv
 
 # 環境変数読み込み
@@ -14,13 +15,14 @@ sys.path.append(os.path.join(BASE_DIR, "modules"))
 
 # モジュールインポート（例）
 try:
-    from whisper_handler import transcribe_audio
     from code_generator import generate_code_from_text
-    from tester import save_and_test_code
     from diff_viewer import generate_diff
+    from tester import save_and_test_code
+    from whisper_handler import transcribe_audio
 except ImportError as e:
     print(f"❌ モジュールの読み込みに失敗しました: {e}")
     sys.exit(1)
+
 
 # テスト関数
 def run_all_tests(audio_path=None, transcript_text=None):
@@ -53,6 +55,7 @@ def run_all_tests(audio_path=None, transcript_text=None):
     print(diff)
 
     print("\n✅ テスト完了")
+
 
 # 実行例（任意の音声 or テキストで切り替え）
 if __name__ == "__main__":

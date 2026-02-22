@@ -1,5 +1,6 @@
 # FILE: src/sitecustomize.py
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # リポジトリ直下の .env を読む（NexusCore/ の直下にある想定）

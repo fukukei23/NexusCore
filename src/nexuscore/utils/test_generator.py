@@ -19,32 +19,33 @@ test_generator: pytest テストコード生成モジュール
 from __future__ import annotations
 
 import ast
-import os
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple, List
+
 from dotenv import load_dotenv
 
 try:
     from openai import OpenAI
+
     HAS_OPENAI = True
 except ImportError:
     HAS_OPENAI = False
     OpenAI = None  # type: ignore
 
 from nexuscore.utils.test_utils import (
-    validate_test_code,
-    extract_code_from_markdown,
     create_fallback_test_file,
+    extract_code_from_markdown,
     project_path_to_module_path,
+    validate_test_code,
 )
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
 # クライアントは必要に応じて初期化（グローバルに持たない）
-_client: Optional[OpenAI] = None
+_client: OpenAI | None = None
 
 
 @dataclass
@@ -57,9 +58,10 @@ class TestGenConfig:
         max_functions: 1ファイルあたり最大何関数までテスト生成するか
         seed: ランダムシード（将来の拡張用）
     """
+
     use_llm: bool = True
     max_functions: int = 20
-    seed: Optional[int] = None
+    seed: int | None = None
 
 
 def _env_flag(name: str, default: bool) -> bool:
@@ -104,7 +106,7 @@ def generate_template_tests(
     module_path: Path,
     *,
     max_functions: int = 20,
-    project_root: Optional[Path] = None,
+    project_root: Path | None = None,
 ) -> str:
     """
     LLM を使わず、AST 解析だけで pytest 用のテストひな形を生成する。
@@ -153,13 +155,17 @@ def test_auto_generated_test_scaffold_parse_error():
 '''
 
         # 関数名を収集
-        function_names: List[str] = []
-        class_methods: List[Tuple[str, str]] = []  # (class_name, method_name)
+        function_names: list[str] = []
+        class_methods: list[tuple[str, str]] = []  # (class_name, method_name)
 
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
                 # トップレベル関数
-                if not any(isinstance(parent, ast.ClassDef) for parent in ast.walk(tree) if hasattr(parent, 'body') and node in getattr(parent, 'body', [])):
+                if not any(
+                    isinstance(parent, ast.ClassDef)
+                    for parent in ast.walk(tree)
+                    if hasattr(parent, "body") and node in getattr(parent, "body", [])
+                ):
                     # 簡易チェック: 関数がクラス内にないことを確認
                     # より正確には、親ノードを辿る必要があるが、簡易実装
                     function_names.append(node.name)
@@ -199,7 +205,7 @@ def test_auto_generated_test_scaffold_parse_error():
         # トップレベル関数のテスト
         for func_name in all_functions:
             lines.append(f"def test_{func_name}():")
-            lines.append(f'    # TODO: implement test for {module_import_path}.{func_name}')
+            lines.append(f"    # TODO: implement test for {module_import_path}.{func_name}")
             lines.append('    assert False, "not implemented"')
             lines.append("")
 
@@ -207,7 +213,9 @@ def test_auto_generated_test_scaffold_parse_error():
         for class_name, method_name in all_methods:
             test_name = f"test_{class_name}_{method_name}"
             lines.append(f"def {test_name}():")
-            lines.append(f'    # TODO: implement test for {module_import_path}.{class_name}.{method_name}')
+            lines.append(
+                f"    # TODO: implement test for {module_import_path}.{class_name}.{method_name}"
+            )
             lines.append('    assert False, "not implemented"')
             lines.append("")
 
@@ -239,9 +247,9 @@ def _try_generate_tests_with_llm(
     template_code: str,
     code: str,
     config: TestGenConfig,
-    file_path: Optional[Path] = None,
-    project_root: Optional[Path] = None,
-    module_path: Optional[str] = None,
+    file_path: Path | None = None,
+    project_root: Path | None = None,
+    module_path: str | None = None,
 ) -> str:
     """
     テンプレートコードをベースに LLM で肉付けしたテストコードを返す。
@@ -326,9 +334,9 @@ def test_function_name_error_case():
             messages=[
                 {
                     "role": "system",
-                    "content": "あなたは優秀なPythonのテストエンジニアです。安全性と品質を最優先に、pytest形式のテストコードを生成します。"
+                    "content": "あなたは優秀なPythonのテストエンジニアです。安全性と品質を最優先に、pytest形式のテストコードを生成します。",
                 },
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": prompt},
             ],
             temperature=0.3,
         )
@@ -354,10 +362,10 @@ def test_function_name_error_case():
 
 def generate_unit_tests(
     code: str,
-    file_path: Optional[Path] = None,
-    project_root: Optional[Path] = None,
-    module_path: Optional[str] = None,
-    config: Optional[TestGenConfig] = None,
+    file_path: Path | None = None,
+    project_root: Path | None = None,
+    module_path: str | None = None,
+    config: TestGenConfig | None = None,
 ) -> str:
     """
     Python コードに対して pytest 形式のユニットテストを生成する。
@@ -389,16 +397,18 @@ def generate_unit_tests(
         # 簡易実装: code を直接パース
         try:
             tree = ast.parse(code)
-            function_names: List[str] = []
+            function_names: list[str] = []
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
                     function_names.append(node.name)
-            function_names = function_names[:config.max_functions]
+            function_names = function_names[: config.max_functions]
 
-            template = "# Auto-generated by NexusCore test_generator (template mode)\n\nimport pytest\n\n"
+            template = (
+                "# Auto-generated by NexusCore test_generator (template mode)\n\nimport pytest\n\n"
+            )
             for func_name in function_names:
                 template += f"def test_{func_name}():\n"
-                template += f'    # TODO: implement test for {func_name}\n'
+                template += f"    # TODO: implement test for {func_name}\n"
                 template += '    assert False, "not implemented"\n\n'
         except Exception as e:
             logger.warning(f"Failed to parse code directly: {e}")
@@ -441,9 +451,15 @@ def test_auto_generated_test_scaffold_parse_error():
             final_code = final_code.replace("your_module.", f"{module_path}.")
         else:
             # module_path が決定できない場合は your_module を削除（コメントアウト）
-            final_code = final_code.replace("from your_module import", "# from your_module import  # module path not available")
-            final_code = final_code.replace("import your_module", "# import your_module  # module path not available")
-            final_code = final_code.replace("your_module.", "# your_module.  # module path not available")
+            final_code = final_code.replace(
+                "from your_module import", "# from your_module import  # module path not available"
+            )
+            final_code = final_code.replace(
+                "import your_module", "# import your_module  # module path not available"
+            )
+            final_code = final_code.replace(
+                "your_module.", "# your_module.  # module path not available"
+            )
 
     # 必ず何かしらのコードを返す（例外は投げない）
     return final_code
@@ -451,10 +467,10 @@ def test_auto_generated_test_scaffold_parse_error():
 
 def generate_and_validate_test_code(
     code: str,
-    file_path: Optional[Path] = None,
-    project_root: Optional[Path] = None,
-    module_path: Optional[str] = None,
-) -> Tuple[str, bool, Optional[str], list[str]]:
+    file_path: Path | None = None,
+    project_root: Path | None = None,
+    module_path: str | None = None,
+) -> tuple[str, bool, str | None, list[str]]:
     """
     テストコードを生成し、検証も行う。
 
@@ -488,9 +504,15 @@ def generate_and_validate_test_code(
             test_code = test_code.replace("your_module.", f"{module_path}.")
         else:
             # module_path が決定できない場合は your_module を削除（コメントアウト）
-            test_code = test_code.replace("from your_module import", "# from your_module import  # module path not available")
-            test_code = test_code.replace("import your_module", "# import your_module  # module path not available")
-            test_code = test_code.replace("your_module.", "# your_module.  # module path not available")
+            test_code = test_code.replace(
+                "from your_module import", "# from your_module import  # module path not available"
+            )
+            test_code = test_code.replace(
+                "import your_module", "# import your_module  # module path not available"
+            )
+            test_code = test_code.replace(
+                "your_module.", "# your_module.  # module path not available"
+            )
 
     # 検証
     is_valid, error_message, warnings = validate_test_code(test_code)
@@ -512,9 +534,9 @@ def generate_and_validate_test_code(
 
 def generate_tests_for_module(
     module_path: Path,
-    output_path: Optional[Path] = None,
-    project_root: Optional[Path] = None,
-    config: Optional[TestGenConfig] = None,
+    output_path: Path | None = None,
+    project_root: Path | None = None,
+    config: TestGenConfig | None = None,
 ) -> Path:
     """
     モジュールに対してテストコードを生成し、ファイルに保存する。
@@ -623,8 +645,12 @@ if __name__ == "__main__":
 
     # 設定の構築
     config = TestGenConfig(
-        use_llm=args.enable_llm if args.enable_llm else (not args.safe_only and DEFAULT_CONFIG.use_llm),
-        max_functions=args.max_functions if args.max_functions is not None else DEFAULT_CONFIG.max_functions,
+        use_llm=(
+            args.enable_llm if args.enable_llm else (not args.safe_only and DEFAULT_CONFIG.use_llm)
+        ),
+        max_functions=(
+            args.max_functions if args.max_functions is not None else DEFAULT_CONFIG.max_functions
+        ),
         seed=None,
     )
 

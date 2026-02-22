@@ -4,10 +4,11 @@
 import difflib
 import logging
 import os
-from typing import Dict, Any
+from typing import Any
 
 try:
     import patch  # python-patch ライブラリを使用
+
     HAS_PATCH = True
 except ImportError:
     HAS_PATCH = False
@@ -35,7 +36,7 @@ class PatchApplier:
         project_path: str,
         dry_run: bool = False,
         allow_deletions: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         パッチをプロジェクト配下に適用する。
 
@@ -55,7 +56,7 @@ class PatchApplier:
             "error": "例外メッセージ or None",
         }
         """
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "applied": False,
             "dry_run": dry_run,
             "dangerous": False,
@@ -98,7 +99,7 @@ class PatchApplier:
             # python-patch(-ng) の API: fromstring(diff) -> PatchSet
             # 文字列をバイト列に変換（python-patch-ng は bytes を期待する場合がある）
             if isinstance(patch_text, str):
-                patch_bytes = patch_text.encode('utf-8')
+                patch_bytes = patch_text.encode("utf-8")
             else:
                 patch_bytes = patch_text
             patch_set = patch.fromstring(patch_bytes)
@@ -148,7 +149,7 @@ class PatchApplier:
     # ------------------------------------------------------------------ #
     # Helper: 危険度判定
     # ------------------------------------------------------------------ #
-    def _detect_danger(self, patch_text: str) -> Dict[str, Any]:
+    def _detect_danger(self, patch_text: str) -> dict[str, Any]:
         """
         非常に単純な危険度判定:
           - 行頭が '-' で、かつ '--- ' ではない行を「削除行」とみなす。
@@ -156,10 +157,10 @@ class PatchApplier:
         delete_lines = 0
         for line in patch_text.splitlines():
             # ヘッダ行 '--- a/file' は除外
-            if line.startswith('--- '):
+            if line.startswith("--- "):
                 continue
             # 実際の削除行
-            if line.startswith('-'):
+            if line.startswith("-"):
                 delete_lines += 1
 
         return {

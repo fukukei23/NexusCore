@@ -4,9 +4,8 @@
 # 実行方法: プロジェクトルートから `python tests/test_deepseek.py` を実行
 # ==============================================================================
 
-import os
-import sys
 import logging
+import sys
 from pathlib import Path
 
 # --- プロジェクトルートをsys.pathに追加 ---
@@ -29,7 +28,8 @@ except ImportError as e:
     sys.exit(1)
 
 # --- ロギング設定 ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
 
 def run_deepseek_test():
     """
@@ -61,21 +61,31 @@ def run_deepseek_test():
             if "接続成功" in response:
                 logging.info(f"✅ テスト成功！ モデル '{model_name}' からの応答: {response}")
             else:
-                logging.warning(f"⚠️ テストは成功しましたが、予期しない応答です。モデル '{model_name}' からの応答: {response}")
+                logging.warning(
+                    f"⚠️ テストは成功しましたが、予期しない応答です。モデル '{model_name}' からの応答: {response}"
+                )
 
         except ValueError as ve:
             # APIキー未設定の場合に llm_router.py が発生させる ValueError をここで捕捉
             logging.error(f"❌ テスト失敗 ({model_name}): 設定エラーです。 -> {ve}")
-            logging.error("👉 プロジェクトルートの .env ファイルに `DEEPSEEK_API_KEY` が正しく設定されているか確認してください。")
-            break # APIキーがない場合、以降のテストは無意味なのでループを抜ける
-        
+            logging.error(
+                "👉 プロジェクトルートの .env ファイルに `DEEPSEEK_API_KEY` が正しく設定されているか確認してください。"
+            )
+            break  # APIキーがない場合、以降のテストは無意味なのでループを抜ける
+
         except Exception as e:
             # その他の予期せぬエラー（API接続エラーなど）
-            logging.error(f"❌ テスト失敗 ({model_name}): API呼び出し中にエラーが発生しました - {e}", exc_info=True)
-            logging.error("👉 考えられる原因: APIキーが間違っている、ネットワーク接続に問題がある、DeepSeek側のサーバーがダウンしている。")
+            logging.error(
+                f"❌ テスト失敗 ({model_name}): API呼び出し中にエラーが発生しました - {e}",
+                exc_info=True,
+            )
+            logging.error(
+                "👉 考えられる原因: APIキーが間違っている、ネットワーク接続に問題がある、DeepSeek側のサーバーがダウンしている。"
+            )
 
         finally:
             logging.info(f"--- モデル '{model_name}' のテストを終了 ---\n")
+
 
 if __name__ == "__main__":
     run_deepseek_test()

@@ -24,4 +24,3 @@ def test_legacy_mapping_targets_exist():
         assert (
             resolved in TASK_MODEL_CONFIGS
         ), f"Legacy task '{legacy_task}' resolves to missing '{resolved}'"
-

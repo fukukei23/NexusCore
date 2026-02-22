@@ -16,26 +16,26 @@ postmortem_agent.py の包括的テスト
 """
 
 import json
-import re
 import sys
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 # 依存モジュールをモック
-sys.modules['nexuscore.llm.llm_router'] = MagicMock()
-sys.modules['nexuscore.core.retry_utils'] = MagicMock()
-sys.modules['nexuscore.core.errors'] = MagicMock()
+sys.modules["nexuscore.llm.llm_router"] = MagicMock()
+sys.modules["nexuscore.core.retry_utils"] = MagicMock()
+sys.modules["nexuscore.core.errors"] = MagicMock()
 
 try:
-    from nexuscore.agents.postmortem_agent import (
-        PostmortemAgent,
-        _truncate,
-        _redact,
-        _validate_and_normalize,
-        ALLOWED_TARGETS,
-    )
     from nexuscore.agents.base_agent import BaseAgent
+    from nexuscore.agents.postmortem_agent import (
+        ALLOWED_TARGETS,
+        PostmortemAgent,
+        _redact,
+        _truncate,
+        _validate_and_normalize,
+    )
+
     HAS_POSTMORTEM_AGENT = True
 except ImportError:
     HAS_POSTMORTEM_AGENT = False
@@ -51,7 +51,7 @@ except ImportError:
 class TestPostmortemAgentInit:
     """PostmortemAgent 初期化のテスト"""
 
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_init_inherits_base_agent(self, mock_router_class):
         """BaseAgentを継承している"""
         mock_router_class.return_value = Mock()
@@ -59,21 +59,24 @@ class TestPostmortemAgentInit:
         agent = PostmortemAgent()
 
         assert isinstance(agent, BaseAgent)
-        assert hasattr(agent, 'llm_router')
-        assert hasattr(agent, 'logger')
+        assert hasattr(agent, "llm_router")
+        assert hasattr(agent, "logger")
 
     def test_system_prompt_defined(self):
         """SYSTEM_PROMPTが定義されている"""
-        assert hasattr(PostmortemAgent, 'SYSTEM_PROMPT')
-        assert "根本原因分析" in PostmortemAgent.SYSTEM_PROMPT or "RCA" in PostmortemAgent.SYSTEM_PROMPT
+        assert hasattr(PostmortemAgent, "SYSTEM_PROMPT")
+        assert (
+            "根本原因分析" in PostmortemAgent.SYSTEM_PROMPT
+            or "RCA" in PostmortemAgent.SYSTEM_PROMPT
+        )
 
 
 @pytest.mark.skipif(not HAS_POSTMORTEM_AGENT, reason="postmortem_agent module not available")
 class TestAnalyzeFailureAndSuggestFKBEntry:
     """PostmortemAgent.analyze_failure_and_suggest_fkb_entry() のテスト"""
 
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_analyze_failure_basic(self, mock_router_class):
         """基本的な失敗分析"""
         fkb_entry = {
@@ -83,9 +86,9 @@ class TestAnalyzeFailureAndSuggestFKBEntry:
             "target": "test_file",
             "solution_pattern": {
                 "type": "llm_diagnose_and_fix",
-                "instruction": "Fix the import statement to use the correct function name"
+                "instruction": "Fix the import statement to use the correct function name",
             },
-            "description": "インポートエラーの解決"
+            "description": "インポートエラーの解決",
         }
 
         mock_llm = Mock()
@@ -101,15 +104,15 @@ class TestAnalyzeFailureAndSuggestFKBEntry:
             source_code="def add_numbers(a, b): return a + b",
             test_code="from module import add",
             source_file_path="module.py",
-            test_file_path="test_module.py"
+            test_file_path="test_module.py",
         )
 
         assert result is not None
         assert result["id"] == "FKB-SUGGESTION-0001"
         assert result["target"] == "test_file"
 
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_analyze_failure_invalid_json(self, mock_router_class):
         """無効なJSONが返された場合"""
         mock_llm = Mock()
@@ -125,13 +128,13 @@ class TestAnalyzeFailureAndSuggestFKBEntry:
             source_code="code",
             test_code="test",
             source_file_path="src.py",
-            test_file_path="test.py"
+            test_file_path="test.py",
         )
 
         assert result is None
 
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_analyze_failure_missing_required_keys(self, mock_router_class):
         """必須キーが欠けている場合"""
         incomplete_entry = {
@@ -153,13 +156,13 @@ class TestAnalyzeFailureAndSuggestFKBEntry:
             source_code="code",
             test_code="test",
             source_file_path="src.py",
-            test_file_path="test.py"
+            test_file_path="test.py",
         )
 
         assert result is None
 
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_analyze_failure_invalid_target(self, mock_router_class):
         """無効なtarget値の場合"""
         fkb_entry = {
@@ -168,7 +171,7 @@ class TestAnalyzeFailureAndSuggestFKBEntry:
             "cause": "Cause",
             "target": "invalid_target",  # ALLOWED_TARGETSにない値
             "solution_pattern": {"type": "llm_diagnose_and_fix", "instruction": "Fix"},
-            "description": "Desc"
+            "description": "Desc",
         }
 
         mock_llm = Mock()
@@ -184,7 +187,7 @@ class TestAnalyzeFailureAndSuggestFKBEntry:
             source_code="code",
             test_code="test",
             source_file_path="src.py",
-            test_file_path="test.py"
+            test_file_path="test.py",
         )
 
         assert result is None
@@ -273,11 +276,8 @@ class TestValidateAndNormalize:
             "error_signature": "Error.*pattern",
             "cause": "Root cause",
             "target": "test_file",
-            "solution_pattern": {
-                "type": "llm_diagnose_and_fix",
-                "instruction": "Fix the issue"
-            },
-            "description": "Description"
+            "solution_pattern": {"type": "llm_diagnose_and_fix", "instruction": "Fix the issue"},
+            "description": "Description",
         }
 
         result = _validate_and_normalize(payload)
@@ -305,7 +305,7 @@ class TestValidateAndNormalize:
             "cause": "Cause",
             "target": "invalid",
             "solution_pattern": {"type": "llm_diagnose_and_fix", "instruction": "Fix"},
-            "description": "Desc"
+            "description": "Desc",
         }
 
         result = _validate_and_normalize(payload)
@@ -320,7 +320,7 @@ class TestValidateAndNormalize:
             "cause": "Cause",
             "target": "TEST_FILE",  # 大文字
             "solution_pattern": {"type": "llm_diagnose_and_fix", "instruction": "Fix"},
-            "description": "Desc"
+            "description": "Desc",
         }
 
         result = _validate_and_normalize(payload)
@@ -336,7 +336,7 @@ class TestValidateAndNormalize:
             "cause": "Cause",
             "target": "test_file",
             "solution_pattern": {"wrong_key": "value"},  # typeとinstructionがない
-            "description": "Desc"
+            "description": "Desc",
         }
 
         result = _validate_and_normalize(payload)
@@ -351,7 +351,7 @@ class TestValidateAndNormalize:
             "cause": "Cause",
             "target": "test_file",
             "solution_pattern": {"type": "llm_diagnose_and_fix", "instruction": "Fix"},
-            "description": "Desc"
+            "description": "Desc",
         }
 
         result = _validate_and_normalize(payload)
@@ -369,8 +369,8 @@ class TestValidateAndNormalize:
 class TestEdgeCases:
     """エッジケースのテスト"""
 
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_empty_error_log(self, mock_router_class):
         """空のエラーログでも動作"""
         fkb_entry = {
@@ -379,7 +379,7 @@ class TestEdgeCases:
             "cause": "Unknown",
             "target": "both",
             "solution_pattern": {"type": "llm_diagnose_and_fix", "instruction": "Investigate"},
-            "description": "Generic error"
+            "description": "Generic error",
         }
 
         mock_llm = Mock()
@@ -395,13 +395,13 @@ class TestEdgeCases:
             source_code="code",
             test_code="test",
             source_file_path="src.py",
-            test_file_path="test.py"
+            test_file_path="test.py",
         )
 
         assert result is not None
 
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_japanese_error_messages(self, mock_router_class):
         """日本語エラーメッセージ"""
         fkb_entry = {
@@ -410,7 +410,7 @@ class TestEdgeCases:
             "cause": "日本語の原因説明",
             "target": "source_file",
             "solution_pattern": {"type": "llm_diagnose_and_fix", "instruction": "修正方法"},
-            "description": "日本語の説明"
+            "description": "日本語の説明",
         }
 
         mock_llm = Mock()
@@ -426,13 +426,13 @@ class TestEdgeCases:
             source_code="# コード",
             test_code="# テスト",
             source_file_path="src.py",
-            test_file_path="test.py"
+            test_file_path="test.py",
         )
 
         assert result is not None
         assert "日本語" in result["cause"]
 
-    @patch('nexuscore.agents.base_agent.LLMRouter', None)
+    @patch("nexuscore.agents.base_agent.LLMRouter", None)
     def test_no_llm_router_available(self):
         """LLMRouterが利用できない場合"""
         agent = PostmortemAgent()
@@ -441,7 +441,7 @@ class TestEdgeCases:
             source_code="code",
             test_code="test",
             source_file_path="src.py",
-            test_file_path="test.py"
+            test_file_path="test.py",
         )
 
         assert result is None

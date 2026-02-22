@@ -1,11 +1,9 @@
 """SelfHealingService と SelfHealingConfig の統合テスト"""
-from pathlib import Path
-from unittest.mock import MagicMock
 
-import pytest
 
-from nexuscore.services.self_healing_service import SelfHealingService
+
 from nexuscore.config.self_healing_config import SelfHealingConfig
+from nexuscore.services.self_healing_service import SelfHealingService
 
 
 def test_self_healing_service_uses_config_test_command(tmp_path):
@@ -67,4 +65,3 @@ def test_self_healing_service_loads_config_from_file(tmp_path):
     assert service.config.test_command == "python -m pytest"
     assert service.config.allow_test_modification is True
     assert service.config.allow_deletions is True
-

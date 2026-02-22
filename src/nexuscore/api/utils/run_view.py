@@ -6,14 +6,15 @@ Reuses build_run_view from CLI module to convert runner results to RunView Pydan
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
+
+from nexuscore.cli.run_view import build_run_view as cli_build_run_view
 
 from ..schemas.run_view import ExplainabilityModel, RunViewResponse
-from nexuscore.cli.run_view import build_run_view as cli_build_run_view
 
 
 def build_run_view_response(
-    result: Dict[str, Any], run_state: Optional[Dict[str, Any]] = None
+    result: dict[str, Any], run_state: dict[str, Any] | None = None
 ) -> RunViewResponse:
     """
     Build RunViewResponse (Pydantic) from runner result and optional RunState.
@@ -47,4 +48,3 @@ def build_run_view_response(
         updated_at=view_dict.get("updated_at"),
         explainability=explainability,
     )
-

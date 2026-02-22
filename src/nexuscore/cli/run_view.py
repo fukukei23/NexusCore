@@ -8,10 +8,12 @@ Transforms internal RunState / Explainability into human-readable CLI output.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 
-def build_run_view(result: Dict[str, Any], run_state: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def build_run_view(
+    result: dict[str, Any], run_state: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """
     Build RunView projection from runner result and optional RunState.
 
@@ -28,7 +30,7 @@ def build_run_view(result: Dict[str, Any], run_state: Optional[Dict[str, Any]] =
         - updated_at (if available)
         - explainability (if status is CONFLICT/FAILED/ABORTED)
     """
-    view: Dict[str, Any] = {
+    view: dict[str, Any] = {
         "run_id": result.get("run_id"),
         "status": result.get("status"),
     }
@@ -68,7 +70,7 @@ def build_run_view(result: Dict[str, Any], run_state: Optional[Dict[str, Any]] =
     return view
 
 
-def format_run_view_cli(run_view: Dict[str, Any]) -> str:
+def format_run_view_cli(run_view: dict[str, Any]) -> str:
     """
     Format RunView as human-readable CLI output.
 
@@ -138,7 +140,7 @@ def format_run_view_cli(run_view: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _format_explainability(lines: list[str], explainability: Dict[str, Any]) -> None:
+def _format_explainability(lines: list[str], explainability: dict[str, Any]) -> None:
     """
     Append explainability fields to lines list.
 
@@ -155,4 +157,3 @@ def _format_explainability(lines: list[str], explainability: Dict[str, Any]) -> 
         lines.append(f"Reason: {why}")
     if next_action:
         lines.append(f"Next: {next_action}")
-

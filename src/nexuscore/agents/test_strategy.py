@@ -13,7 +13,6 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import yaml
 
@@ -50,11 +49,11 @@ class ModuleTestStrategy:
 class TestStrategyConfig:
     """テスト戦略設定全体"""
 
-    modules: Dict[str, ModuleTestStrategy]
+    modules: dict[str, ModuleTestStrategy]
     default_risk: str = "B"
     default_strategy: str = "ai_first_only"
     default_min_coverage: int = 60
-    critical_test_markers: List[str] = None
+    critical_test_markers: list[str] = None
 
     def __post_init__(self) -> None:
         if self.critical_test_markers is None:
@@ -80,15 +79,11 @@ class TestStrategyConfig:
             min_coverage=self.default_min_coverage,
         )
 
-    def get_modules_by_risk(self, risk: str) -> List[str]:
+    def get_modules_by_risk(self, risk: str) -> list[str]:
         """指定されたリスクランクのモジュール一覧を取得"""
-        return [
-            name
-            for name, strategy in self.modules.items()
-            if strategy.risk == risk
-        ]
+        return [name for name, strategy in self.modules.items() if strategy.risk == risk]
 
-    def get_critical_modules(self) -> List[str]:
+    def get_critical_modules(self) -> list[str]:
         """クリティカルなモジュール（ランクS）一覧を取得"""
         return self.get_modules_by_risk("S")
 
@@ -100,7 +95,7 @@ class TestStrategyManager:
     設定ファイルを読み込み、モジュールごとのテスト生成戦略を提供します。
     """
 
-    def __init__(self, config_path: Optional[str] = None) -> None:
+    def __init__(self, config_path: str | None = None) -> None:
         """
         :param config_path: 設定ファイルのパス（省略時は tests/test_config.yml）
         """
@@ -110,15 +105,13 @@ class TestStrategyManager:
             config_path = os.path.join(project_root, "tests", "test_config.yml")
 
         self.config_path = Path(config_path)
-        self.config: Optional[TestStrategyConfig] = None
+        self.config: TestStrategyConfig | None = None
         self._load_config()
 
     def _load_config(self) -> None:
         """設定ファイルを読み込む"""
         if not self.config_path.exists():
-            logger.warning(
-                f"Test strategy config not found: {self.config_path}. Using defaults."
-            )
+            logger.warning(f"Test strategy config not found: {self.config_path}. Using defaults.")
             self.config = TestStrategyConfig(modules={})
             return
 
@@ -142,7 +135,9 @@ class TestStrategyManager:
                 default_risk=global_config.get("default_risk", "B"),
                 default_strategy=global_config.get("default_strategy", "ai_first_only"),
                 default_min_coverage=global_config.get("default_min_coverage", 60),
-                critical_test_markers=global_config.get("critical_test_markers", ["critical", "safety", "security"]),
+                critical_test_markers=global_config.get(
+                    "critical_test_markers", ["critical", "safety", "security"]
+                ),
             )
 
             logger.info(f"Loaded test strategy config: {len(modules)} modules")
@@ -192,15 +187,14 @@ class TestStrategyManager:
         strategy = self.get_strategy(module_name)
         return strategy.min_coverage
 
-    def get_critical_modules(self) -> List[str]:
+    def get_critical_modules(self) -> list[str]:
         """クリティカルなモジュール（ランクS）一覧を取得"""
         if self.config is None:
             self._load_config()
         return self.config.get_critical_modules()
 
-    def get_modules_by_risk(self, risk: str) -> List[str]:
+    def get_modules_by_risk(self, risk: str) -> list[str]:
         """指定されたリスクランクのモジュール一覧を取得"""
         if self.config is None:
             self._load_config()
         return self.config.get_modules_by_risk(risk)
-

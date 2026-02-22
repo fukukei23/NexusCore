@@ -6,11 +6,8 @@ GitHub PR コメントを組み立てるユーティリティ。
 
 from __future__ import annotations
 
-import re
-from typing import Tuple
 
-
-def summarize_patch(patch_str: str) -> Tuple[int, int]:
+def summarize_patch(patch_str: str) -> tuple[int, int]:
     """
     unified diff から行数とファイル数を計算する。
 
@@ -119,7 +116,9 @@ def build_self_healing_pr_comment(
 
     # 過去30回の成功率
     if total_count_30 > 0:
-        lines.append(f"| Last 30 Runs | {success_rate_30:.1f}% ({success_count_30} / {total_count_30}) |")
+        lines.append(
+            f"| Last 30 Runs | {success_rate_30:.1f}% ({success_count_30} / {total_count_30}) |"
+        )
     else:
         lines.append("| Last 30 Runs | N/A (insufficient data) |")
 
@@ -169,4 +168,3 @@ def build_self_healing_pr_comment(
         lines.append("</details>")
 
     return "\n".join(lines)
-

@@ -4,9 +4,11 @@ FastAPI エラーハンドリング統一のテスト
 CR-FASTAPI-006 で実装された統一されたエラーレスポンス形式のテスト。
 すべてのエンドポイントで統一されたエラー構造を確認する。
 """
+
+from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
 from nexuscore.api.fastapi_app import app
 
@@ -36,11 +38,13 @@ def test_not_found_error_format(client: TestClient, mock_api_key, monkeypatch):
     mock_user = MagicMock()
     mock_user.id = 1
 
-    with patch("nexuscore.webapp.models.Project") as mock_project_model, \
-         patch("nexuscore.webapp.models.Run") as mock_run_model, \
-         patch("nexuscore.webapp.db") as mock_db, \
-         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.webapp.models.User") as mock_auth_user:
+    with (
+        patch("nexuscore.webapp.models.Project") as mock_project_model,
+        patch("nexuscore.webapp.models.Run") as mock_run_model,
+        patch("nexuscore.webapp.db") as mock_db,
+        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.webapp.models.User") as mock_auth_user,
+    ):
         # Project と Run のクエリをモック
         mock_query = MagicMock()
         mock_query.filter_by.return_value.first.return_value = None
@@ -53,10 +57,7 @@ def test_not_found_error_format(client: TestClient, mock_api_key, monkeypatch):
         mock_api_key_model.hash_token.return_value = "hashed_key"
         mock_api_key_model.query.filter_by.return_value.first.return_value = mock_api_key_obj
 
-        response = client.get(
-            "/api/v1/projects/999",
-            headers={"X-API-Key": mock_api_key}
-        )
+        response = client.get("/api/v1/projects/999", headers={"X-API-Key": mock_api_key})
 
         assert response.status_code == 404
         data = response.json()
@@ -83,10 +84,7 @@ def test_unauthorized_error_format(client: TestClient):
     # 認証依存で発生する 401 エラーを確認するため、別の方法でテスト
     # 実際の認証エラーは dependencies/auth.py で発生する
     # ここでは、無効なAPI Keyでリクエストして確認
-    response = client.get(
-        "/api/v1/projects",
-        headers={"X-API-Key": "invalid-key"}
-    )
+    response = client.get("/api/v1/projects", headers={"X-API-Key": "invalid-key"})
 
     # 認証エラーが発生する場合、統一された形式で返される
     if response.status_code == 401:
@@ -107,11 +105,13 @@ def test_validation_error_format(client: TestClient, mock_api_key, monkeypatch):
     mock_user = MagicMock()
     mock_user.id = 1
 
-    with patch("nexuscore.webapp.models.Project") as mock_project_model, \
-         patch("nexuscore.webapp.models.Run") as mock_run_model, \
-         patch("nexuscore.webapp.db") as mock_db, \
-         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.webapp.models.User") as mock_auth_user:
+    with (
+        patch("nexuscore.webapp.models.Project") as mock_project_model,
+        patch("nexuscore.webapp.models.Run") as mock_run_model,
+        patch("nexuscore.webapp.db") as mock_db,
+        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.webapp.models.User") as mock_auth_user,
+    ):
         # Project と Run のクエリをモック
         mock_query = MagicMock()
         mock_query.filter_by.return_value.first.return_value = None
@@ -128,7 +128,7 @@ def test_validation_error_format(client: TestClient, mock_api_key, monkeypatch):
         response = client.post(
             "/api/v1/projects",
             json={},  # name と local_path が欠如
-            headers={"X-API-Key": mock_api_key}
+            headers={"X-API-Key": mock_api_key},
         )
 
         # FastAPI のバリデーションエラー（422）が返される
@@ -153,11 +153,13 @@ def test_internal_error_format(client: TestClient, mock_api_key, monkeypatch):
     mock_user = MagicMock()
     mock_user.id = 1
 
-    with patch("nexuscore.webapp.models.Project") as mock_project_model, \
-         patch("nexuscore.webapp.models.Run") as mock_run_model, \
-         patch("nexuscore.webapp.db") as mock_db, \
-         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.webapp.models.User") as mock_auth_user:
+    with (
+        patch("nexuscore.webapp.models.Project") as mock_project_model,
+        patch("nexuscore.webapp.models.Run") as mock_run_model,
+        patch("nexuscore.webapp.db") as mock_db,
+        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.webapp.models.User") as mock_auth_user,
+    ):
         # データベースエラーをシミュレート
         mock_query = MagicMock()
         mock_query.filter_by.return_value.order_by.side_effect = Exception("Database error")
@@ -170,10 +172,7 @@ def test_internal_error_format(client: TestClient, mock_api_key, monkeypatch):
         mock_api_key_model.hash_token.return_value = "hashed_key"
         mock_api_key_model.query.filter_by.return_value.first.return_value = mock_api_key_obj
 
-        response = client.get(
-            "/api/v1/projects",
-            headers={"X-API-Key": mock_api_key}
-        )
+        response = client.get("/api/v1/projects", headers={"X-API-Key": mock_api_key})
 
         assert response.status_code == 500
         data = response.json()
@@ -244,7 +243,8 @@ def test_all_endpoints_have_error_responses(client: TestClient):
                     # 4xx または 5xx のレスポンスが定義されていることを確認
                     # OpenAPI スキーマではステータスコードが文字列として保存されているため、int に変換
                     error_statuses = [
-                        code for code in responses.keys()
+                        code
+                        for code in responses.keys()
                         if (isinstance(code, str) and code.isdigit() and int(code) >= 400)
                         or (isinstance(code, int) and code >= 400)
                     ]
@@ -254,4 +254,3 @@ def test_all_endpoints_have_error_responses(client: TestClient):
                             "ErrorResponse" in str(responses[status].get("content", {}))
                             for status in error_statuses
                         ), f"{endpoint_path} ({method}) のエラーレスポンスに ErrorResponse が含まれていません"
-

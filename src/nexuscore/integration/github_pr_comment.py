@@ -11,8 +11,7 @@ import json
 import logging
 from collections import defaultdict
 from datetime import datetime
-from pathlib import Path
-from typing import Optional, Sequence, Union, Dict, Any, List
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -20,8 +19,9 @@ logger = logging.getLogger(__name__)
 
 # Webapp モデルはオプショナルインポート（webapp が利用可能な場合のみ）
 try:
-    from nexuscore.webapp.models import Run, Project, PatchRecord, ExecutionLog
     from nexuscore.webapp import db
+    from nexuscore.webapp.models import ExecutionLog, PatchRecord, Project, Run
+
     HAS_WEBAPP = True
 except ImportError:
     HAS_WEBAPP = False
@@ -37,6 +37,7 @@ try:
 except ImportError:
     # フォールバック
     import os
+
     class AppConfig:  # type: ignore
         WEBAPP_BASE_URL = os.getenv("WEBAPP_BASE_URL", "http://localhost:5000")
 
@@ -45,18 +46,23 @@ class PRCommentContext(BaseModel):
     """
     PR コメント組み立てに必要なコンテキスト情報
     """
-    project: Optional[object] = None  # Project モデル（型チェック回避のため object）
-    run: Optional[object] = None  # Run モデル
+
+    project: object | None = None  # Project モデル（型チェック回避のため object）
+    run: object | None = None  # Run モデル
     guardian_review_markdown: str = ""  # 既存のGuardianAgentレビュー本文
-    repo_full_name: Optional[str] = None  # "owner/repo"
-    pr_number: Optional[int] = None
-    branch_name: Optional[str] = None
-    commit_sha: Optional[str] = None  # CR-E3: 対象コミットの SHA
-    change_summary: Optional[str] = None  # AI生成の修正要約（B-3）
-    diff_summary: Optional[Union[str, Dict[str, str]]] = None  # E-4/E-5: Before/After 差分サマリー（単一ファイル: str, 複数ファイル: dict）
-    markdown_report: Optional[str] = None  # E-3: Run Markdown レポート全文
-    details: Optional[Dict[str, Any]] = None  # E-5: Self-Healing 実行結果の details（メトリクス統合用）
-    semantic_diffs: Optional[Dict[str, Dict[str, Any]]] = None  # Semantic Diff 情報
+    repo_full_name: str | None = None  # "owner/repo"
+    pr_number: int | None = None
+    branch_name: str | None = None
+    commit_sha: str | None = None  # CR-E3: 対象コミットの SHA
+    change_summary: str | None = None  # AI生成の修正要約（B-3）
+    diff_summary: str | dict[str, str] | None = (
+        None  # E-4/E-5: Before/After 差分サマリー（単一ファイル: str, 複数ファイル: dict）
+    )
+    markdown_report: str | None = None  # E-3: Run Markdown レポート全文
+    details: dict[str, Any] | None = (
+        None  # E-5: Self-Healing 実行結果の details（メトリクス統合用）
+    )
+    semantic_diffs: dict[str, dict[str, Any]] | None = None  # Semantic Diff 情報
 
 
 def _format_duration(run: object) -> str:
@@ -199,7 +205,11 @@ def _collect_run_metrics(run: object) -> dict:
                 model = payload.get("model") or payload.get("model_name") or "unknown"
                 models[model] += 1
 
-                cost = payload.get("estimated_cost") or payload.get("cost_jpy") or payload.get("usage", {}).get("cost_jpy", 0.0)
+                cost = (
+                    payload.get("estimated_cost")
+                    or payload.get("cost_jpy")
+                    or payload.get("usage", {}).get("cost_jpy", 0.0)
+                )
                 try:
                     total_cost += float(cost)
                 except Exception:
@@ -244,8 +254,9 @@ def _compute_recent_success_rate(project_id: int, limit: int = 30) -> float:
 
     try:
         q = (
-            Run.query  # type: ignore
-            .filter(Run.project_id == project_id)  # type: ignore
+            Run.query.filter(  # type: ignore
+                Run.project_id == project_id
+            )  # type: ignore
             .order_by(Run.started_at.desc().nullslast())  # type: ignore
             .limit(limit)
         )
@@ -348,8 +359,8 @@ def format_markdown_report_block(md_text: str) -> str:
 # E-5: カード形式 UI レンダリング関数
 # ------------------------------------------------------------------ #
 def render_summary_card(
-    metrics: Dict[str, Any],
-    details: Optional[Dict[str, Any]] = None,
+    metrics: dict[str, Any],
+    details: dict[str, Any] | None = None,
 ) -> str:
     """
     実行メトリクスをカード形式（Markdown テーブル）でレンダリングする。
@@ -431,8 +442,8 @@ def render_summary_card(
 
 
 def format_diff_summary_block(
-    summary_text: Optional[str] = None,
-    file_summaries: Optional[Dict[str, str]] = None,
+    summary_text: str | None = None,
+    file_summaries: dict[str, str] | None = None,
 ) -> str:
     """
     Before/After 差分の AI 要約を <details> に収める。
@@ -450,13 +461,15 @@ def format_diff_summary_block(
         parts.append("## 🔍 AI Diff Summary (Multiple Files)\n")
         for file_path, summary in file_summaries.items():
             if summary and summary.strip():
-                parts.append(f"""<details>
+                parts.append(
+                    f"""<details>
 <summary>{file_path}</summary>
 
 {summary}
 
 </details>
-""")
+"""
+                )
         return "\n".join(parts) if parts else ""
 
     # E-4: 単一ファイル対応（後方互換性）
@@ -475,7 +488,7 @@ def format_diff_summary_block(
 
 
 def format_semantic_diff_block(
-    semantic_diffs: Optional[Dict[str, Dict[str, Any]]],
+    semantic_diffs: dict[str, dict[str, Any]] | None,
 ) -> str:
     """
     semantic_diffs を Markdown (<details>) でレンダリングする。
@@ -495,7 +508,7 @@ def format_semantic_diff_block(
     if not semantic_diffs:
         return ""
 
-    blocks: List[str] = []
+    blocks: list[str] = []
 
     for rel_path, data in semantic_diffs.items():
         functions = data.get("functions") or []
@@ -519,9 +532,7 @@ def format_semantic_diff_block(
             if len(sig_after) > 50:
                 sig_after = sig_after[:47] + "..."
 
-            table_lines.append(
-                f"| `{name}` | {kind} | `{sig_before}` | `{sig_after}` |"
-            )
+            table_lines.append(f"| `{name}` | {kind} | `{sig_before}` | `{sig_after}` |")
 
         behavior_lines = []
         for hint in behavior_hints:
@@ -550,17 +561,17 @@ def format_semantic_diff_block(
 
 def format_metadata_block(
     run_id: str,
-    pr_number: Optional[int],
-    commit_sha: Optional[str],
-    start_time: Optional[datetime],
-    end_time: Optional[datetime],
+    pr_number: int | None,
+    commit_sha: str | None,
+    start_time: datetime | None,
+    end_time: datetime | None,
     duration_seconds: float,
     primary_model: str,
     aux_models: list[str],
     changed_files: int,
     added_lines: int,
     removed_lines: int,
-    success_rate_last_n: Optional[float] = None,
+    success_rate_last_n: float | None = None,
     recent_runs_window: int = 30,
 ) -> str:
     """
@@ -644,7 +655,9 @@ def format_metadata_block(
     parts.append("**Reliability**")
     if success_rate_last_n is not None:
         success_rate_percent = success_rate_last_n * 100
-        parts.append(f"- Success rate (last {recent_runs_window} runs): {success_rate_percent:.1f}%")
+        parts.append(
+            f"- Success rate (last {recent_runs_window} runs): {success_rate_percent:.1f}%"
+        )
     else:
         parts.append(f"- Success rate (last {recent_runs_window} runs): N/A")
     parts.append("")
@@ -707,11 +720,7 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
             # model_call_counts からモデルを取得（フォールバック）
             if primary_model == "N/A" and model_call_counts:
                 # 呼び出し回数が多い順にソート
-                sorted_models = sorted(
-                    model_call_counts.items(),
-                    key=lambda x: x[1],
-                    reverse=True
-                )
+                sorted_models = sorted(model_call_counts.items(), key=lambda x: x[1], reverse=True)
                 if sorted_models:
                     primary_model = sorted_models[0][0]
                     # 2番目以降を aux_models に追加
@@ -861,4 +870,3 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
             logger.warning(f"Failed to build Observability Links: {e}", exc_info=True)
 
     return "\n".join(parts)
-

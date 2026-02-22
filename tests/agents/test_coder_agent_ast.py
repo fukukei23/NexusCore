@@ -1,4 +1,3 @@
-import pytest
 from nexuscore.agents.coder_agent import CoderAgent
 
 
@@ -13,4 +12,3 @@ def test_coder_agent_ast_retry(mocker):
     result = agent.implement_code("do something", "pass")
     assert result == "print('ok')"
     assert agent.execute_llm_task.call_count == 2
-

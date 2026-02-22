@@ -9,12 +9,9 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from nexuscore.agents.test_strategy import (
-    TestStrategyManager,
     ModuleTestStrategy,
-    TestStrategyConfig,
+    TestStrategyManager,
 )
 
 
@@ -257,4 +254,3 @@ class TestModuleTestStrategy:
             min_coverage=90,
         )
         assert strategy3.allows_ai_first is False
-

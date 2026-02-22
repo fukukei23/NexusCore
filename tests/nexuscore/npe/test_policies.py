@@ -4,11 +4,10 @@ CR-005-1: npe/policies.py の API 整理＋テスト追加
 機密データ検出ロジックのテスト。
 """
 
-import pytest
 from nexuscore.npe.policies import (
-    scan_text_for_secrets,
     SecretMatch,
     context_scanner,
+    scan_text_for_secrets,
     secure_context_builder,
 )
 
@@ -26,7 +25,7 @@ def test_scan_text_for_secrets_detects_aws_access_key():
     # span が元テキストの位置と整合していること
     match = aws_matches[0]
     assert match.span[0] < match.span[1]
-    assert text[match.span[0]:match.span[1]] == match.value
+    assert text[match.span[0] : match.span[1]] == match.value
     assert "AKIA" in match.value
 
 
@@ -71,7 +70,7 @@ def test_scan_text_for_secrets_detects_email():
     # span が元テキストの位置と整合していること
     match = email_matches[0]
     assert match.span[0] < match.span[1]
-    assert text[match.span[0]:match.span[1]] == match.value
+    assert text[match.span[0] : match.span[1]] == match.value
     assert "@" in match.value
     assert "example.com" in match.value
 
@@ -172,13 +171,8 @@ def test_secure_context_builder_masks_email():
 
 def test_secret_match_dataclass():
     """SecretMatch データクラスが正しく動作すること。"""
-    match = SecretMatch(
-        type="aws_access_key",
-        value="AKIAIOSFODNN7EXAMPLE",
-        span=(0, 20)
-    )
+    match = SecretMatch(type="aws_access_key", value="AKIAIOSFODNN7EXAMPLE", span=(0, 20))
 
     assert match.type == "aws_access_key"
     assert match.value == "AKIAIOSFODNN7EXAMPLE"
     assert match.span == (0, 20)
-

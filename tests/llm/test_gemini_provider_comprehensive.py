@@ -9,10 +9,10 @@ Tests cover:
 - Environment variable handling
 - Gemini-specific features
 """
+
 import os
 import sys
-from unittest.mock import Mock, MagicMock, patch
-import pytest
+from unittest.mock import MagicMock, Mock, patch
 
 # Mock google.generativeai module if not installed
 if "google.generativeai" not in sys.modules:
@@ -94,7 +94,7 @@ class TestGeminiProviderExecute:
                 assert result == "Gemini response"
                 mock_model.generate_content.assert_called_once_with(
                     "test prompt",
-                    generation_config={"temperature": 0.3, "response_mime_type": "text/plain"}
+                    generation_config={"temperature": 0.3, "response_mime_type": "text/plain"},
                 )
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
@@ -123,7 +123,11 @@ class TestGeminiProviderExecute:
                 call_args = mock_model.generate_content.call_args
                 assert call_args[1]["generation_config"]["temperature"] == 0.7
 
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key", "NEXUS_DEFAULT_MAX_OUT_TOKENS": "2000"}, clear=True)
+    @patch.dict(
+        os.environ,
+        {"GEMINI_API_KEY": "test-key", "NEXUS_DEFAULT_MAX_OUT_TOKENS": "2000"},
+        clear=True,
+    )
     @patch("nexuscore.llm.providers.gemini_provider._real_call_enabled", return_value=True)
     def test_execute_with_max_tokens(self, mock_real_enabled):
         """Should support max_output_tokens parameter"""

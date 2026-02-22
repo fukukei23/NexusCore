@@ -9,20 +9,18 @@ tester_agent が LLM にテスト生成を依頼する際の
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
-
 
 def build_test_generation_prompt(
     target_file_path: str,
     target_code: str,
-    existing_tests: Optional[str] = None,
+    existing_tests: str | None = None,
     test_level: str = "unit",  # "unit" | "component" | "e2e"
     risk_level: str = "B",  # "S" | "A" | "B"
     strategy: str = "ai_first_only",
-    requirements: Optional[List[str]] = None,
+    requirements: list[str] | None = None,
     min_coverage: int = 60,
-    module_name: Optional[str] = None,
-    additional_requirements: Optional[str] = None,
+    module_name: str | None = None,
+    additional_requirements: str | None = None,
 ) -> str:
     """
     テスト生成用のプロンプトを組み立てる。
@@ -45,7 +43,7 @@ def build_test_generation_prompt(
     lines = [
         "# テスト生成タスク",
         "",
-        f"## 対象ファイル",
+        "## 対象ファイル",
         f"`{target_file_path}`",
         "",
         "## 対象コード",
@@ -57,13 +55,15 @@ def build_test_generation_prompt(
 
     # 既存テストがあれば追加
     if existing_tests:
-        lines.extend([
-            "## 既存テスト",
-            "```python",
-            existing_tests,
-            "```",
-            "",
-        ])
+        lines.extend(
+            [
+                "## 既存テスト",
+                "```python",
+                existing_tests,
+                "```",
+                "",
+            ]
+        )
 
     # テストレベルに応じた指示
     test_level_instructions = {
@@ -170,47 +170,51 @@ def build_test_generation_prompt(
         lines.append("")
 
     # カバレッジ目標
-    lines.extend([
-        f"## 目標カバレッジ",
-        f"{min_coverage}% 以上を目指してください。",
-        "",
-    ])
+    lines.extend(
+        [
+            "## 目標カバレッジ",
+            f"{min_coverage}% 以上を目指してください。",
+            "",
+        ]
+    )
 
     # 出力形式
-    lines.extend([
-        "## 出力形式",
-        "",
-        "以下の形式で pytest テストコードを生成してください：",
-        "",
-        "```python",
-        f"# tests/test_{target_file_path.replace('/', '_').replace('.py', '')}.py",
-        "",
-        "import pytest",
-        "from unittest.mock import Mock, patch, MagicMock",
-        "",
-        "# テストコードをここに記述",
-        "```",
-        "",
-        "## 注意事項",
-        "",
-        "- `time.sleep` は使わない",
-        "- 外部API依存は必ずモック化",
-        "- ランダム値は固定する",
-        "- 実ファイル削除は行わない（tmp_path を使用）",
-        "- 実行時間は短く（〜500ms）",
-        "- 1テスト = 1責務",
-        "- 公開APIに対するテスト",
-        "- 内部実装に依存しない",
-        "",
-    ])
+    lines.extend(
+        [
+            "## 出力形式",
+            "",
+            "以下の形式で pytest テストコードを生成してください：",
+            "",
+            "```python",
+            f"# tests/test_{target_file_path.replace('/', '_').replace('.py', '')}.py",
+            "",
+            "import pytest",
+            "from unittest.mock import Mock, patch, MagicMock",
+            "",
+            "# テストコードをここに記述",
+            "```",
+            "",
+            "## 注意事項",
+            "",
+            "- `time.sleep` は使わない",
+            "- 外部API依存は必ずモック化",
+            "- ランダム値は固定する",
+            "- 実ファイル削除は行わない（tmp_path を使用）",
+            "- 実行時間は短く（〜500ms）",
+            "- 1テスト = 1責務",
+            "- 公開APIに対するテスト",
+            "- 内部実装に依存しない",
+            "",
+        ]
+    )
 
     return "\n".join(lines)
 
 
 def build_specification_based_test_prompt(
     module_name: str,
-    specifications: List[str],
-    existing_code: Optional[str] = None,
+    specifications: list[str],
+    existing_code: str | None = None,
 ) -> str:
     """
     仕様ベースのテスト生成用プロンプトを組み立てる。
@@ -229,54 +233,59 @@ def build_specification_based_test_prompt(
     lines = [
         "# 仕様ベーステスト生成タスク",
         "",
-        f"## 対象モジュール",
+        "## 対象モジュール",
         f"`{module_name}`",
         "",
     ]
 
     if existing_code:
-        lines.extend([
-            "## 既存コード",
-            "```python",
-            existing_code,
-            "```",
-            "",
-        ])
+        lines.extend(
+            [
+                "## 既存コード",
+                "```python",
+                existing_code,
+                "```",
+                "",
+            ]
+        )
 
-    lines.extend([
-        "## 仕様・懸念・エッジケース",
-        "",
-        "以下の仕様・懸念・エッジケースが **破られていないこと** を確認する",
-        "pytest テストを生成してください：",
-        "",
-    ])
+    lines.extend(
+        [
+            "## 仕様・懸念・エッジケース",
+            "",
+            "以下の仕様・懸念・エッジケースが **破られていないこと** を確認する",
+            "pytest テストを生成してください：",
+            "",
+        ]
+    )
 
     for i, spec in enumerate(specifications, 1):
         lines.append(f"{i}. {spec}")
 
-    lines.extend([
-        "",
-        "## 出力形式",
-        "",
-        "各仕様項目について、以下の形式でテストを生成してください：",
-        "",
-        "```python",
-        "def test_<仕様の要約>():",
-        "    \"\"\"",
-        "    仕様: <元の仕様文>",
-        "    \"\"\"",
-        "    # テストコード",
-        "    assert ...",
-        "```",
-        "",
-        "## 注意事項",
-        "",
-        "- 仕様の意図を正確に反映したテストを書く",
-        "- 仕様が破られた場合にテストが失敗することを確認する",
-        "- エッジケースも適切にカバーする",
-        "- テストは明確で読みやすいものにする",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## 出力形式",
+            "",
+            "各仕様項目について、以下の形式でテストを生成してください：",
+            "",
+            "```python",
+            "def test_<仕様の要約>():",
+            '    """',
+            "    仕様: <元の仕様文>",
+            '    """',
+            "    # テストコード",
+            "    assert ...",
+            "```",
+            "",
+            "## 注意事項",
+            "",
+            "- 仕様の意図を正確に反映したテストを書く",
+            "- 仕様が破られた場合にテストが失敗することを確認する",
+            "- エッジケースも適切にカバーする",
+            "- テストは明確で読みやすいものにする",
+            "",
+        ]
+    )
 
     return "\n".join(lines)
-

@@ -7,7 +7,7 @@ Tests for RunState integrity verification using HMAC-SHA256 (CR-NEXUS-026).
 from __future__ import annotations
 
 import json
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -20,7 +20,7 @@ def test_integrity_sign_and_verify_ok(monkeypatch: Any, tmp_path: Any) -> None:
     monkeypatch.setenv("NEXUSCORE_RUN_STATE_DIR", str(tmp_path / "run_state"))
     monkeypatch.setenv("NEXUSCORE_RUNSTATE_HMAC_SECRET", "test-secret-key")
 
-    state: Dict[str, Any] = {
+    state: dict[str, Any] = {
         "schema_version": "1.0",
         "run_id": "test-integrity-ok",
         "status": "PAUSED",
@@ -59,7 +59,7 @@ def test_integrity_detects_tampering(monkeypatch: Any, tmp_path: Any) -> None:
     monkeypatch.setenv("NEXUSCORE_RUN_STATE_DIR", str(tmp_path / "run_state"))
     monkeypatch.setenv("NEXUSCORE_RUNSTATE_HMAC_SECRET", "test-secret-key")
 
-    state: Dict[str, Any] = {
+    state: dict[str, Any] = {
         "schema_version": "1.0",
         "run_id": "test-integrity-tamper",
         "status": "PAUSED",
@@ -86,7 +86,7 @@ def test_integrity_missing_or_wrong_secret(monkeypatch: Any, tmp_path: Any) -> N
     """Test that missing secret raises RuntimeError, and wrong secret causes verification failure."""
     monkeypatch.setenv("NEXUSCORE_RUN_STATE_DIR", str(tmp_path / "run_state"))
 
-    state: Dict[str, Any] = {
+    state: dict[str, Any] = {
         "schema_version": "1.0",
         "run_id": "test-integrity-secret",
         "status": "PAUSED",
@@ -135,7 +135,7 @@ def test_resume_fails_on_integrity_violation(monkeypatch: Any, tmp_path: Any) ->
     run_id = "test-resume-integrity-violation"
 
     # Create a valid paused state
-    state: Dict[str, Any] = {
+    state: dict[str, Any] = {
         "schema_version": "1.0",
         "run_id": run_id,
         "status": "PAUSED",
@@ -146,8 +146,6 @@ def test_resume_fails_on_integrity_violation(monkeypatch: Any, tmp_path: Any) ->
     save_state(state)
 
     # Tamper with the saved state file (modify status after signing)
-    import json
-    from pathlib import Path
 
     state_file = tmp_path / "run_state" / f"{run_id}.json"
     tampered_data = json.loads(state_file.read_text())

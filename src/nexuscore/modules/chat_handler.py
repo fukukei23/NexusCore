@@ -1,7 +1,8 @@
 # src/modules/chat_handler.py
 
-from typing import List, Dict, Any, Optional
 import os
+from typing import Any, Optional
+
 from dotenv import load_dotenv
 
 try:
@@ -30,8 +31,9 @@ def get_client() -> "OpenAI":
     _client = OpenAI(api_key=api_key)
     return _client
 
+
 # チャット履歴を元にGPT応答を取得（LLM Router 未統合版）
-def handle_chat(message: str, history: List[Dict[str, Any]]) -> tuple[str, List[Dict[str, Any]]]:
+def handle_chat(message: str, history: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
     """
     Keep lazy client creation so import時にAPIキーが無くてもテストを落とさない。
     """

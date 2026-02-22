@@ -3,20 +3,23 @@ Tests for retry utilities with exponential backoff
 
 指数バックオフリトライロジックの信頼性を保証するテスト群
 """
-import pytest
+
 import time
 from unittest.mock import Mock, patch
-from nexuscore.core.retry_utils import (
-    retry,
-    retry_with_context,
-    RetryContext,
-)
+
+import pytest
+
 from nexuscore.core.errors import (
+    InvalidModelOutputError,
+    ModelConnectionError,
     ModelRateLimitError,
     ModelTimeoutError,
-    ModelConnectionError,
-    InvalidModelOutputError,
     SandboxExecutionError,
+)
+from nexuscore.core.retry_utils import (
+    RetryContext,
+    retry,
+    retry_with_context,
 )
 
 
@@ -254,6 +257,7 @@ class TestRetryDecorator:
 
     def test_return_value_preservation(self):
         """戻り値が正しく保持されることを確認"""
+
         @retry(max_retries=2, base_delay=0.1)
         def return_dict():
             return {"status": "ok", "value": 42}
@@ -288,7 +292,9 @@ class TestRetryWithContext:
         def successful_func():
             return "success"
 
-        wrapped = retry_with_context(successful_func, max_retries=2, base_delay=0.1, context=context)
+        wrapped = retry_with_context(
+            successful_func, max_retries=2, base_delay=0.1, context=context
+        )
         result = wrapped()
 
         assert result == "success"
@@ -394,10 +400,7 @@ class TestRetryWithContext:
             return "success"
 
         wrapped = retry_with_context(
-            flaky_with_log,
-            max_retries=2,
-            base_delay=0.1,
-            logger_instance=mock_logger
+            flaky_with_log, max_retries=2, base_delay=0.1, logger_instance=mock_logger
         )
         result = wrapped()
 
@@ -464,6 +467,7 @@ class TestEdgeCases:
 
     def test_exception_chain_preserved(self):
         """例外チェーンが保持されることを確認"""
+
         @retry(max_retries=1, base_delay=0.1)
         def chained_exception():
             try:
@@ -654,6 +658,7 @@ class TestSpec33RetryControlPolicy:
 # Batch 0 Mini: Characterization Tests with Mock Sleep (Deterministic)
 # ==============================================================================
 
+
 class TestRetryCharacterizationDeterministic:
     """
     Characterization tests using mock_sleep fixture for deterministic testing.
@@ -688,10 +693,7 @@ class TestRetryCharacterizationDeterministic:
             return "success"
 
         wrapped = retry_with_context(
-            successful_func,
-            max_retries=2,
-            base_delay=1.0,
-            context=context
+            successful_func, max_retries=2, base_delay=1.0, context=context
         )
         result = wrapped()
 
@@ -729,12 +731,7 @@ class TestRetryCharacterizationDeterministic:
                 raise ModelTimeoutError("Timeout on first attempt")
             return "success"
 
-        wrapped = retry_with_context(
-            flaky_func,
-            max_retries=2,
-            base_delay=1.0,
-            context=context
-        )
+        wrapped = retry_with_context(flaky_func, max_retries=2, base_delay=1.0, context=context)
         result = wrapped()
 
         # 検証: 2回目で成功
@@ -773,12 +770,7 @@ class TestRetryCharacterizationDeterministic:
             call_count += 1
             raise ModelRateLimitError(f"Rate limit on attempt {call_count}")
 
-        wrapped = retry_with_context(
-            always_failing,
-            max_retries=2,
-            base_delay=1.0,
-            context=context
-        )
+        wrapped = retry_with_context(always_failing, max_retries=2, base_delay=1.0, context=context)
 
         # 検証: 例外が re-raise される
         with pytest.raises(ModelRateLimitError) as exc_info:
@@ -807,6 +799,7 @@ class TestRetryCharacterizationDeterministic:
 # Batch 0 Mini: Must Not Tests (Contract Enforcement)
 # ==============================================================================
 
+
 class TestRetryMustNotContracts:
     """
     Must Not tests enforcing critical invariants.
@@ -830,7 +823,6 @@ class TestRetryMustNotContracts:
 
         根拠: retry_utils.py:139-148（classifier例外の捕捉と should_retry=False 設定）
         """
-        from unittest.mock import patch, Mock
 
         call_count = 0
         classify_error_call_count = 0
@@ -847,11 +839,9 @@ class TestRetryMustNotContracts:
             raise RuntimeError("Classifier is broken")
 
         # classify_error をモックして例外を投げる
-        with patch('nexuscore.core.retry_utils.classify_error', side_effect=broken_classifier):
+        with patch("nexuscore.core.retry_utils.classify_error", side_effect=broken_classifier):
             wrapped = retry_with_context(
-                flaky_func,
-                max_retries=3,  # 最大3回リトライ可能だが...
-                base_delay=1.0
+                flaky_func, max_retries=3, base_delay=1.0  # 最大3回リトライ可能だが...
             )
 
             # 検証: 元の例外が re-raise される
@@ -890,9 +880,7 @@ class TestRetryMustNotContracts:
             raise ModelTimeoutError(f"Attempt {call_count}")
 
         wrapped = retry_with_context(
-            always_failing,
-            max_retries=5,  # 最大5回リトライ → 計6回試行
-            base_delay=1.0
+            always_failing, max_retries=5, base_delay=1.0  # 最大5回リトライ → 計6回試行
         )
 
         with pytest.raises(ModelTimeoutError):
@@ -926,11 +914,7 @@ class TestRetryMustNotContracts:
             call_count += 1
             raise SandboxExecutionError("Sandbox failed")
 
-        wrapped = retry_with_context(
-            sandbox_fail,
-            max_retries=3,
-            base_delay=1.0
-        )
+        wrapped = retry_with_context(sandbox_fail, max_retries=3, base_delay=1.0)
 
         with pytest.raises(SandboxExecutionError):
             wrapped()
@@ -954,7 +938,7 @@ class TestRetryMustNotContracts:
             value_error_fail,
             max_retries=3,
             base_delay=1.0,
-            retry_on=(ModelTimeoutError,)  # ValueError は含まれない
+            retry_on=(ModelTimeoutError,),  # ValueError は含まれない
         )
 
         with pytest.raises(ValueError):

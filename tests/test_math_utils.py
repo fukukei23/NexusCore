@@ -12,7 +12,9 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 # ▼▼▼▼▼【インポートパス修正点】▼▼▼▼▼
 from tools.utils.math_utils import add
+
 # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
 
 def test_add():
     """add関数が正しく 2 + 3 = 5 を計算できることをテストする。"""

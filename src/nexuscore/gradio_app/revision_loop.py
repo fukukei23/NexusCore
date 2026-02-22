@@ -1,12 +1,13 @@
 # OpenCodeInterpreter 拡張：反復AI修正ループ・バージョン管理付きGradioアプリ
 
-import gradio as gr
-import os
 import json
+import os
 import re
 import subprocess
 from datetime import datetime
 from typing import Optional
+
+import gradio as gr
 from dotenv import load_dotenv
 
 try:
@@ -17,6 +18,7 @@ except Exception:  # pragma: no cover - when openai is missing
 # === 設定と初期化 ===
 load_dotenv()
 _client: Optional["OpenAI"] = None
+
 
 def get_client() -> "OpenAI":
     """Lazy-load OpenAI client to avoid import時のAPIキー不足で落ちるのを防ぐ。"""
@@ -31,6 +33,7 @@ def get_client() -> "OpenAI":
     _client = OpenAI(api_key=api_key)
     return _client
 
+
 # === パス設定 ===
 SANDBOX_DIR = "../sandbox_output"
 SAMPLE_FILE = os.path.join(SANDBOX_DIR, "sample.py")
@@ -39,23 +42,23 @@ RESULT_LOG = os.path.join(SANDBOX_DIR, "test_result.log")
 HISTORY_DIR = "patch_history"
 os.makedirs(HISTORY_DIR, exist_ok=True)
 
+
 # === ファイル保存 ===
 def save_file(path, content):
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
 
+
 def read_file(path):
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return f.read()
+
 
 # === テスト実行 ===
 def run_pytest():
     try:
         result = subprocess.run(
-            ["pytest", TEST_FILE],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+            ["pytest", TEST_FILE], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
         output = result.stdout + "\n" + result.stderr
         save_file(RESULT_LOG, output)
@@ -63,8 +66,11 @@ def run_pytest():
     except Exception as e:
         return f"⚠️ pytest execution failed: {e}"
 
+
 # === GPTプロンプト生成 ===
-def generate_prompt(main_file, related_files, version_summary, history_summary, failed_tests, user_instruction):
+def generate_prompt(
+    main_file, related_files, version_summary, history_summary, failed_tests, user_instruction
+):
     return f"""
 【前提】
 - 対象ファイル: {main_file}
@@ -94,6 +100,7 @@ def generate_prompt(main_file, related_files, version_summary, history_summary, 
 ---
 """
 
+
 # === GPT呼び出しとコード抽出 ===
 def extract_code_and_reason(full_response):
     code_match = re.search(r"```(?:python)?\n(.*?)```", full_response, re.DOTALL)
@@ -102,12 +109,14 @@ def extract_code_and_reason(full_response):
     reason = reason_match[1].strip() if len(reason_match) > 1 else ""
     return code, reason
 
+
 def call_gpt(prompt):
     client = get_client()
     response = client.chat.completions.create(
         model="gpt-4", messages=[{"role": "user", "content": prompt}], temperature=0
     )
     return response.choices[0].message.content.strip()
+
 
 # === 履歴保存 ===
 def save_patch_history(code, reason, prompt):
@@ -117,9 +126,13 @@ def save_patch_history(code, reason, prompt):
         "code": code,
         "reason": reason,
         "prompt": prompt,
-        "test_log": read_file(RESULT_LOG) if os.path.exists(RESULT_LOG) else ""
+        "test_log": read_file(RESULT_LOG) if os.path.exists(RESULT_LOG) else "",
     }
-    save_file(os.path.join(HISTORY_DIR, f"patch_{now}.json"), json.dumps(data, indent=2, ensure_ascii=False))
+    save_file(
+        os.path.join(HISTORY_DIR, f"patch_{now}.json"),
+        json.dumps(data, indent=2, ensure_ascii=False),
+    )
+
 
 # === Gradio UI ===
 with gr.Blocks() as demo:
@@ -139,7 +152,9 @@ with gr.Blocks() as demo:
     def generate_revision(user_code, user_note, fail_log):
         version_summary = "現行バージョンはユーザー入力の内容"
         history = "履歴は直近の1回のみ"
-        prompt = generate_prompt("sample.py", "test_sample.py", version_summary, history, fail_log, user_note)
+        prompt = generate_prompt(
+            "sample.py", "test_sample.py", version_summary, history, fail_log, user_note
+        )
         gpt_response = call_gpt(prompt)
         code, reason = extract_code_and_reason(gpt_response)
         return code, reason, prompt
@@ -150,11 +165,21 @@ with gr.Blocks() as demo:
         result = run_pytest()
         return result
 
-    revise_btn.click(fn=generate_revision, inputs=[code_input, user_instruction, test_failures], outputs=[generated_code, explanation, user_instruction])
-    approve_btn.click(fn=apply_patch, inputs=[generated_code, explanation, user_instruction], outputs=[test_result])
+    revise_btn.click(
+        fn=generate_revision,
+        inputs=[code_input, user_instruction, test_failures],
+        outputs=[generated_code, explanation, user_instruction],
+    )
+    approve_btn.click(
+        fn=apply_patch,
+        inputs=[generated_code, explanation, user_instruction],
+        outputs=[test_result],
+    )
 
 if __name__ == "__main__":
     demo.launch()
+
+
 def launch_revision_ui():
     with gr.Row():
         # ここに反復AI修正ループの UI を構成

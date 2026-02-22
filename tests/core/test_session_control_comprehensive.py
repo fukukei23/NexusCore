@@ -6,11 +6,9 @@ checkpoints, and state persistence.
 """
 
 import json
-import time
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, Mock
-import pytest
+from unittest.mock import patch
 
 from nexuscore.core.session_control import SessionController, SessionState
 
@@ -25,7 +23,7 @@ class TestSessionState:
             status="running",
             last_phase="planning",
             last_updated=1234567890.0,
-            metadata={"key": "value"}
+            metadata={"key": "value"},
         )
 
         assert state.session_id == "test-123"
@@ -151,11 +149,8 @@ class TestSessionControllerInternalMethods:
         with tempfile.TemporaryDirectory() as tmpdir:
             controller = SessionController("test-session", root_dir=tmpdir)
 
-            with patch('time.time', return_value=1234567890.0):
-                controller.checkpoint(
-                    phase="planning",
-                    metadata={"plan": "test plan"}
-                )
+            with patch("time.time", return_value=1234567890.0):
+                controller.checkpoint(phase="planning", metadata={"plan": "test plan"})
 
             assert controller.state_file.exists()
             with controller.state_file.open("r") as f:
@@ -184,10 +179,10 @@ class TestSessionControllerInternalMethods:
         with tempfile.TemporaryDirectory() as tmpdir:
             controller = SessionController("test", root_dir=tmpdir)
 
-            with patch('time.time', return_value=1000.0):
+            with patch("time.time", return_value=1000.0):
                 controller.checkpoint(phase="phase1")
 
-            with patch('time.time', return_value=2000.0):
+            with patch("time.time", return_value=2000.0):
                 controller.checkpoint(phase="phase2")
 
             with controller.state_file.open("r") as f:
@@ -269,7 +264,7 @@ class TestSessionControllerFileIO:
                 "status": "running",
                 "last_phase": "coding",
                 "last_updated": 12345.0,
-                "metadata": {"key": "value"}
+                "metadata": {"key": "value"},
             }
             controller._write_state(state_data)
 
@@ -412,12 +407,9 @@ class TestSessionControllerIntegration:
             complex_metadata = {
                 "plan": {
                     "steps": ["step1", "step2", "step3"],
-                    "details": {
-                        "complexity": "high",
-                        "estimated_time": 120
-                    }
+                    "details": {"complexity": "high", "estimated_time": 120},
                 },
-                "results": [1, 2, 3]
+                "results": [1, 2, 3],
             }
 
             controller.checkpoint(phase="complex", metadata=complex_metadata)

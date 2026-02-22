@@ -1,9 +1,6 @@
 """self_healing_config.py のテスト"""
-import json
-import tempfile
-from pathlib import Path
 
-import pytest
+import json
 
 from nexuscore.config.self_healing_config import SelfHealingConfig
 
@@ -101,4 +98,3 @@ def test_self_healing_config_empty_allowed_branches(tmp_path):
     config = SelfHealingConfig.load(str(tmp_path))
 
     assert config.allowed_target_branches == []
-

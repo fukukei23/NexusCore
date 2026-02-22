@@ -9,14 +9,10 @@ from __future__ import annotations
 import json
 import os
 import time
-from pathlib import Path
 from typing import Any
-
-import pytest
 
 from nexuscore.orchestrator.run_lock import (
     _lock_file_path,
-    _safe_run_id,
     refresh_run_lock,
     release_run_lock,
     try_acquire_run_lock,
@@ -39,7 +35,7 @@ def test_refresh_extends_expires_at(monkeypatch: Any, tmp_path: Any) -> None:
     assert reason is None
 
     # Read initial expires_at
-    with open(lock_path, "r") as f:
+    with open(lock_path) as f:
         initial_data = json.load(f)
     initial_expires_at = initial_data["expires_at"]
     initial_acquired_at = initial_data["acquired_at"]
@@ -56,7 +52,7 @@ def test_refresh_extends_expires_at(monkeypatch: Any, tmp_path: Any) -> None:
     assert details is None
 
     # Verify expires_at was extended
-    with open(lock_path, "r") as f:
+    with open(lock_path) as f:
         refreshed_data = json.load(f)
     refreshed_expires_at = refreshed_data["expires_at"]
     refreshed_acquired_at = refreshed_data["acquired_at"]
@@ -64,10 +60,16 @@ def test_refresh_extends_expires_at(monkeypatch: Any, tmp_path: Any) -> None:
     # expires_at should be refreshed (now + TTL), which should be later than initial
     # (Note: initial was acquired_at + TTL, so refreshed should be later)
     current_time = time.time()
-    assert refreshed_expires_at > current_time, f"refreshed expires_at should be in the future (got {refreshed_expires_at}, now={current_time})"
-    assert refreshed_expires_at > initial_expires_at, f"expires_at should be extended after refresh (initial={initial_expires_at}, refreshed={refreshed_expires_at})"
+    assert (
+        refreshed_expires_at > current_time
+    ), f"refreshed expires_at should be in the future (got {refreshed_expires_at}, now={current_time})"
+    assert (
+        refreshed_expires_at > initial_expires_at
+    ), f"expires_at should be extended after refresh (initial={initial_expires_at}, refreshed={refreshed_expires_at})"
     assert "last_heartbeat_at" in refreshed_data, "last_heartbeat_at should be set after refresh"
-    assert refreshed_data["last_heartbeat_at"] > initial_acquired_at, "last_heartbeat_at should be updated"
+    assert (
+        refreshed_data["last_heartbeat_at"] > initial_acquired_at
+    ), "last_heartbeat_at should be updated"
 
     # Cleanup
     release_run_lock(run_id)
@@ -208,16 +210,19 @@ def test_refresh_failure_triggers_safe_stop(monkeypatch: Any, tmp_path: Any) -> 
 
         # Verify that state was updated to ABORTED
         stored = load_state(run_id)
-        assert stored["status"] == "ABORTED", f"Status should be ABORTED on refresh failure (got {stored['status']})"
+        assert (
+            stored["status"] == "ABORTED"
+        ), f"Status should be ABORTED on refresh failure (got {stored['status']})"
         assert stored.get("last_error", {}).get("code") == "LOCK_REFRESH_FAILED"
 
         # Verify result includes explainability
         assert result["status"] == "ABORTED"
         assert "explainability" in result
-        assert result["explainability"]["why"] == "LOCK_REFRESH_FAILED", f"Expected why='LOCK_REFRESH_FAILED', got {result['explainability']}"
+        assert (
+            result["explainability"]["why"] == "LOCK_REFRESH_FAILED"
+        ), f"Expected why='LOCK_REFRESH_FAILED', got {result['explainability']}"
         assert "inspect_lock_dir_permissions" in result["explainability"]["next_action"]
     finally:
         # Restore original function
         authority_runner_module.refresh_run_lock = original_refresh_func
         release_run_lock(run_id)
-

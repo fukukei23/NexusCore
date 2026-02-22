@@ -12,10 +12,11 @@ import pytest
 
 try:
     from nexuscore.diff.semantic_diff import (
-        compute_semantic_diff,
-        SemanticDiffResult,
         FunctionChange,
+        SemanticDiffResult,
+        compute_semantic_diff,
     )
+
     HAS_SEMANTIC_DIFF = True
 except ImportError:
     HAS_SEMANTIC_DIFF = False
@@ -68,7 +69,9 @@ def test_semantic_diff_detects_modified_function(tmp_path: Path) -> None:
     assert ("foo", "modified") in names_kinds
 
     # シグネチャの変更を確認
-    foo_change = next((f for f in result.functions if f.name == "foo" and f.kind == "modified"), None)
+    foo_change = next(
+        (f for f in result.functions if f.name == "foo" and f.kind == "modified"), None
+    )
     assert foo_change is not None
     assert foo_change.signature_before is not None
     assert foo_change.signature_after is not None
@@ -120,4 +123,3 @@ def test_semantic_diff_to_dict(tmp_path: Path) -> None:
     assert "behavior_hints" in result_dict
     assert isinstance(result_dict["functions"], list)
     assert isinstance(result_dict["behavior_hints"], list)
-

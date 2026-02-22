@@ -20,11 +20,10 @@ GRADIO_TABS = [
 
 # Gradio 主要ボタンラベル（実際の unified_gradio_ui.py のボタンラベルに合わせる）
 GRADIO_BUTTON_LABELS = [
-    "🔁 コード生成",           # Code / Prompt タブ
-    "💾 コードを保存",         # Code / Prompt タブ
-    "🔧 パッチ生成",           # AI Revision タブ
-    "✅ パッチ適用",           # AI Revision タブ
-    "▶️ テスト実行",           # Test Runner タブ
+    "🔁 コード生成",  # Code / Prompt タブ
+    "💾 コードを保存",  # Code / Prompt タブ
+    "🔧 パッチ生成",  # AI Revision タブ
+    "✅ パッチ適用",  # AI Revision タブ
+    "▶️ テスト実行",  # Test Runner タブ
     "🚀 Self-Healing を実行",  # History & Diff タブ（Self-Healing Run 発火ボタン）
 ]
-

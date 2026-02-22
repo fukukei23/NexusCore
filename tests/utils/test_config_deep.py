@@ -1,5 +1,4 @@
 import importlib
-from typing import List
 
 import pytest
 
@@ -38,7 +37,7 @@ def test_scope_include_respects_env(monkeypatch):
     importlib.reload(config_module)
     config = get_config_instance()
 
-    include_globs: List[str] = config.BASELINE_AUTOMATION_POLICY["scope"]["include_globs"]
+    include_globs: list[str] = config.BASELINE_AUTOMATION_POLICY["scope"]["include_globs"]
     assert include_globs == ["alpha/**", "beta/**", "gamma/**"]
 
 
@@ -55,7 +54,9 @@ def test_role_autonomy_env_override(monkeypatch):
 
 def test_secret_detection_patterns_contains_openai():
     """シークレット検出パターンが sk- トークンを含むことを保証."""
-    patterns: List[str] = config_module.config.BASELINE_AUTOMATION_POLICY["secret_detection_patterns"]
+    patterns: list[str] = config_module.config.BASELINE_AUTOMATION_POLICY[
+        "secret_detection_patterns"
+    ]
     assert any("sk-" in pattern for pattern in patterns)
 
 

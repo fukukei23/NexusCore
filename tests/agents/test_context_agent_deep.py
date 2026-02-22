@@ -8,7 +8,11 @@ def test_create_new_context_fallback(monkeypatch, tmp_path):
     monkeypatch.setattr(ContextAgent, "_find_project_root", lambda self: str(tmp_path))
     # avoid file I/O prompts
     monkeypatch.setattr(ContextAgent, "save_context", lambda self, ctx: None)
-    monkeypatch.setattr(ContextAgent, "_create_enhanced_context", lambda self: (_ for _ in ()).throw(RuntimeError("fail")))
+    monkeypatch.setattr(
+        ContextAgent,
+        "_create_enhanced_context",
+        lambda self: (_ for _ in ()).throw(RuntimeError("fail")),
+    )
     monkeypatch.setattr(ContextAgent, "request_human_dev_policy", lambda self: {"method": "mock"})
 
     agent = ContextAgent()

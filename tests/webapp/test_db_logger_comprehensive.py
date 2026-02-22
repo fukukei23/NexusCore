@@ -5,6 +5,7 @@ db_logger.py の包括的なテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask legacy db_logger tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -195,8 +196,9 @@ class TestEnhanceLogTransaction:
 
     def test_enhance_log_transaction_with_usage_data(self, app, test_run):
         """usageデータがpayloadに含まれる"""
-        from nexuscore.webapp.db_logger import enhance_log_transaction
         import json
+
+        from nexuscore.webapp.db_logger import enhance_log_transaction
 
         log_data = {
             "event": "llm_call",
@@ -292,8 +294,9 @@ class TestEnhanceLogTransaction:
 
     def test_enhance_log_transaction_with_empty_payload(self, app, test_run):
         """payloadが空の場合はlog_data全体を使用"""
-        from nexuscore.webapp.db_logger import enhance_log_transaction
         import json
+
+        from nexuscore.webapp.db_logger import enhance_log_transaction
 
         log_data = {
             "event": "custom",

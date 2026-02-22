@@ -6,18 +6,18 @@ CR-NEXUS-032: Moved from /api/v1/runs to /api/v1/run-records to avoid collision 
 Run管理用の FastAPI エンドポイント（DBベース）。
 既存の Flask 実装 (`src/nexuscore/webapp/api_external.py`) と互換性を保つ。
 """
+
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import desc
 
-from ..schemas.run import RunListResponse, RunResponse, RunSummary
+from ..dependencies.auth import AuthenticatedUser, get_current_user
 from ..schemas.error import ErrorResponse
-from ..dependencies.auth import get_current_user, AuthenticatedUser
+from ..schemas.run import RunListResponse, RunResponse, RunSummary
 from ..utils.errors import (
-    make_not_found_error,
     make_internal_error,
+    make_not_found_error,
 )
 
 router = APIRouter(tags=["run-records"], prefix="/run-records")
@@ -60,7 +60,7 @@ def _get_user_id_from_auth(current_user: AuthenticatedUser) -> int:
     },
 )
 async def list_runs(
-    project_id: Optional[int] = Query(None, description="プロジェクトIDでフィルタ"),
+    project_id: int | None = Query(None, description="プロジェクトIDでフィルタ"),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> RunListResponse:
     """
@@ -99,17 +99,13 @@ async def list_runs(
         HTTPException: 内部エラー時（500）
     """
     try:
-        from nexuscore.webapp.models import Run, Project
         from nexuscore.webapp import db
+        from nexuscore.webapp.models import Project, Run
 
         user_id = _get_user_id_from_auth(current_user)
 
         # ユーザーが所有するプロジェクトのRunのみ取得
-        query = (
-            Run.query
-            .join(Project)
-            .filter(Project.owner_id == user_id)
-        )
+        query = Run.query.join(Project).filter(Project.owner_id == user_id)
 
         if project_id:
             query = query.filter(Run.project_id == project_id)
@@ -187,19 +183,14 @@ async def get_run(
         HTTPException: Runが見つからない場合（404）または内部エラー時（500）
     """
     try:
-        from nexuscore.webapp.models import Run, Project
-        from nexuscore.webapp import db
+        from nexuscore.webapp.models import Project, Run
 
         user_id = _get_user_id_from_auth(current_user)
 
         # Runを取得し、所有権を確認
         run = (
-            Run.query
-            .join(Project)
-            .filter(
-                Run.run_id == run_id,
-                Project.owner_id == user_id
-            )
+            Run.query.join(Project)
+            .filter(Run.run_id == run_id, Project.owner_id == user_id)
             .first()
         )
 
@@ -226,4 +217,3 @@ async def get_run(
             raise
         logger.error(f"Failed to get run: {e}", exc_info=True)
         raise make_internal_error(f"Failed to get run: {str(e)}")
-

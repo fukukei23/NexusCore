@@ -1,5 +1,7 @@
 """Tests for nexuscore.agents.policy_interface"""
-from unittest.mock import patch, MagicMock
+
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from nexuscore.agents import policy_interface
@@ -204,6 +206,7 @@ def test_policy_interface_queue_timeout():
 
     # タイムアウトを短く設定してキューから取得を試みる
     import queue
+
     try:
         result = pi.result_queue.get(timeout=0.01)
         assert False, "Should have raised queue.Empty"
@@ -243,7 +246,7 @@ def test_launch_and_wait_for_input_keyboard_interrupt(mock_gr):
 
     with patch.object(pi, "create_gradio_interface", return_value=mock_interface):
         # KeyboardInterruptをシミュレート
-        import queue
+
         original_get = pi.result_queue.get
 
         def mock_get(timeout=None):
@@ -307,7 +310,7 @@ def test_policy_interface_default_policy_completeness():
         "quality_requirements",
         "security_policy",
         "configured_at",
-        "method"
+        "method",
     ]
 
     for field in required_fields:
@@ -324,7 +327,7 @@ def test_launch_and_wait_for_input_exception_handling(mock_gr):
 
     with patch.object(pi, "create_gradio_interface", return_value=mock_interface):
         # 一般的な例外をシミュレート
-        import queue
+
         original_get = pi.result_queue.get
 
         def mock_get(timeout=None):
@@ -374,4 +377,3 @@ def test_policy_interface_result_queue_thread_safety():
 
     # すべての結果が取得されたことを確認
     assert len(results) > 0
-

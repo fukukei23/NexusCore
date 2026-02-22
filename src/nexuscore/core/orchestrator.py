@@ -27,14 +27,14 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # ------------------------------------------------------------------------------
 # パス設定 (自己完結性を高めるため: src/ を sys.path に追加)
 # ------------------------------------------------------------------------------
 try:
-    current_dir = Path(__file__).resolve().parent          # .../src/nexuscore/core
-    src_dir = current_dir.parents[2]                       # .../src
+    current_dir = Path(__file__).resolve().parent  # .../src/nexuscore/core
+    src_dir = current_dir.parents[2]  # .../src
     if str(src_dir) not in sys.path:
         sys.path.insert(0, str(src_dir))
 except Exception:
@@ -45,26 +45,26 @@ except Exception:
 # ------------------------------------------------------------------------------
 
 # エージェント群
-from nexuscore.agents.requirement_agent import RequirementAgent
 from nexuscore.agents.architect_agent import ArchitectAgent
-from nexuscore.agents.planner_agent import PlannerAgent
 from nexuscore.agents.coder_agent import CoderAgent
-from nexuscore.agents.tester_agent import TesterAgent
 from nexuscore.agents.debugger_agent import DebuggerAgent
 from nexuscore.agents.guardian_agent import GuardianAgent
-from nexuscore.agents.policy_agent import PolicyAgent
-from nexuscore.agents.postmortem_agent import PostmortemAgent
 from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
 from nexuscore.agents.patch_applier import PatchApplier
+from nexuscore.agents.planner_agent import PlannerAgent
+from nexuscore.agents.policy_agent import PolicyAgent
+from nexuscore.agents.postmortem_agent import PostmortemAgent
+from nexuscore.agents.requirement_agent import RequirementAgent
+from nexuscore.agents.tester_agent import TesterAgent
 
-# NPE: クラスではなく「関数ベース・プロトコル」として利用
-from nexuscore.npe.engine import guarded_llm_call
+# セッション制御
+from nexuscore.core.session_control import SessionController
 
 # LLM ルーター
 from nexuscore.llm.llm_router import LLMRouter
 
-# セッション制御
-from nexuscore.core.session_control import SessionController
+# NPE: クラスではなく「関数ベース・プロトコル」として利用
+from nexuscore.npe.engine import guarded_llm_call
 
 # ユーティリティ (必要に応じて使用)
 try:
@@ -87,6 +87,7 @@ class OrchestratorPhase(Enum):
     Requirement → Plan → Architecture → Implementation → Testing → Review
     の順序で実行される。
     """
+
     REQUIREMENTS = auto()
     PLAN = auto()
     ARCHITECTURE = auto()
@@ -102,22 +103,23 @@ class OrchestratorContext:
 
     各フェーズ間で状態を引き継ぐために使用される。
     """
+
     task_id: str
     user_requirement: str
     language: str = "ja"
     fast_lane: bool = False
-    run_db_id: Optional[int] = None
+    run_db_id: int | None = None
 
     # フェーズごとの出力
-    specs: Dict[str, Any] = field(default_factory=dict)
-    plan: Dict[str, Any] = field(default_factory=dict)
-    architecture: Dict[str, Any] = field(default_factory=dict)
-    implementation: Dict[str, Any] = field(default_factory=dict)
-    testing: Dict[str, Any] = field(default_factory=dict)
-    review: Dict[str, Any] = field(default_factory=dict)
+    specs: dict[str, Any] = field(default_factory=dict)
+    plan: dict[str, Any] = field(default_factory=dict)
+    architecture: dict[str, Any] = field(default_factory=dict)
+    implementation: dict[str, Any] = field(default_factory=dict)
+    testing: dict[str, Any] = field(default_factory=dict)
+    review: dict[str, Any] = field(default_factory=dict)
 
     # フェーズ実行ログ（テスト用）
-    phase_log: List[str] = field(default_factory=list)
+    phase_log: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -130,7 +132,7 @@ class Orchestrator:
     """
 
     project_path: str
-    constitution: Dict[str, Any]
+    constitution: dict[str, Any]
 
     # --- エージェント群 ---
     requirement_agent: RequirementAgent
@@ -150,7 +152,7 @@ class Orchestrator:
     max_retries: int = 5
 
     # 新規: セッション制御オブジェクト（省略可能）
-    session_controller: Optional[SessionController] = None
+    session_controller: SessionController | None = None
 
     # --- 内部状態 ---
     logger: logging.Logger = field(init=False)
@@ -189,7 +191,7 @@ class Orchestrator:
             self.logger.addHandler(fh)
             self.logger.addHandler(ch)
 
-    def _maybe_stop(self, phase: str, extra: Optional[Dict[str, Any]] = None) -> None:
+    def _maybe_stop(self, phase: str, extra: dict[str, Any] | None = None) -> None:
         """
         フェーズの境目で呼び出される中断判定ヘルパー。
 
@@ -224,7 +226,7 @@ class Orchestrator:
     # ------------------------------------------------------------------
     # NPE 経由で LLM を叩くヘルパー
     # ------------------------------------------------------------------
-    def _execute_task_via_npe(self, prompt: str, metadata: Dict[str, Any]) -> str:
+    def _execute_task_via_npe(self, prompt: str, metadata: dict[str, Any]) -> str:
         """
         最新 NPE 仕様に基づき、guarded_llm_call() 経由で LLMRouter を呼び出す。
         - 予算ガード / ログ / ポリシーは NPE 側の engine/budget/logger/policies に委譲。
@@ -280,7 +282,7 @@ class Orchestrator:
         self._maybe_stop("before_requirement", {"task_id": context.task_id})
         context.phase_log.append("REQUIREMENTS")
 
-        specs: Dict[str, Any] = {}
+        specs: dict[str, Any] = {}
 
         try:
             use_ui = bool(getattr(self.requirement_agent, "use_ui", False))
@@ -296,7 +298,9 @@ class Orchestrator:
             raise
 
         if not specs:
-            self.logger.error(f"[{context.task_id}] Requirement definition returned empty specs. Aborting.")
+            self.logger.error(
+                f"[{context.task_id}] Requirement definition returned empty specs. Aborting."
+            )
             raise ValueError("Requirement definition returned empty specs")
 
         context.specs = specs
@@ -365,6 +369,7 @@ class Orchestrator:
             if context.fast_lane:
                 # FastLane: Planning / Coding / Testing を並列実行
                 from concurrent.futures import ThreadPoolExecutor
+
                 with ThreadPoolExecutor(max_workers=3) as ex:
                     future_plan = ex.submit(_run_plan)
                     future_code = ex.submit(_run_code)
@@ -394,7 +399,9 @@ class Orchestrator:
                 plan = {"raw_plan": plan_text}
 
             context.plan = plan
-            self._maybe_stop("after_planning", {"plan_preview": str(plan_text)[:500] if plan_text else ""})
+            self._maybe_stop(
+                "after_planning", {"plan_preview": str(plan_text)[:500] if plan_text else ""}
+            )
 
             # Orchestrator ログフック（Planning完了）
             try:
@@ -569,7 +576,7 @@ python hello.py
         user_requirement: str,
         language: str = "ja",
         fast_lane: bool = False,
-        run_db_id: Optional[int] = None,
+        run_db_id: int | None = None,
     ) -> None:
         """
         高レベルな「フルプロジェクト」実行フロー。
@@ -597,7 +604,9 @@ python hello.py
                 extra={
                     "task_id": task_id,
                     "requirement": user_requirement[:200],
-                    "autonomy_level": self.constitution.get("automation_policy", {}).get("autonomy_level"),
+                    "autonomy_level": self.constitution.get("automation_policy", {}).get(
+                        "autonomy_level"
+                    ),
                 },
             )
         except Exception:
@@ -644,7 +653,11 @@ python hello.py
                 }
 
             # Phase 3 以降の開発サイクル（将来拡張用）
-            tasks = context.plan.get("functions_to_implement", []) if isinstance(context.plan, dict) else []
+            tasks = (
+                context.plan.get("functions_to_implement", [])
+                if isinstance(context.plan, dict)
+                else []
+            )
             self.logger.info(f"[{task_id}] Phase 3: Development Cycle (tasks={len(tasks)})")
 
             self.logger.info(f"=== Full Project Run Finished === requirement='{user_requirement}'")
@@ -665,8 +678,8 @@ python hello.py
         except RuntimeError as e:
             if str(e) == "SessionStopped":
                 self.logger.info(
-                    f"Project run stopped by user request. "
-                    f"All generated files remain on disk for session resume."
+                    "Project run stopped by user request. "
+                    "All generated files remain on disk for session resume."
                 )
                 # Orchestrator ログフック（中断）
                 try:
@@ -723,7 +736,9 @@ python hello.py
                 return func(*args, **kwargs) or ""
             except Exception as err:
                 self.logger.warning(
-                    "[FastLane] tester fallback %s failed: %s", func_name, err,
+                    "[FastLane] tester fallback %s failed: %s",
+                    func_name,
+                    err,
                     exc_info=True,
                 )
                 return ""
@@ -738,9 +753,7 @@ python hello.py
             except Exception:
                 plan_json = None
             if plan_json:
-                module_hint = os.getenv(
-                    "FAST_LANE_TEST_MODULE", "fast_lane.regression_suite"
-                )
+                module_hint = os.getenv("FAST_LANE_TEST_MODULE", "fast_lane.regression_suite")
                 result = _call_with_logging(
                     "generate_tests_from_plan",
                     plan_json,
@@ -770,7 +783,8 @@ python hello.py
 # Agent チームの組成
 # ==============================================================================
 
-def assemble_agent_team(project_path: str) -> Dict[str, Any]:
+
+def assemble_agent_team(project_path: str) -> dict[str, Any]:
     """
     ハイブリッド・アーキテクチャに基づき、Orchestrator に渡すエージェント群と LLMRouter を生成する。
     API サーバ等の外部エントリポイントからも再利用され得るデフォルトのチーム編成。
@@ -815,7 +829,7 @@ def assemble_agent_team(project_path: str) -> Dict[str, Any]:
     )
     patch_applier_agent = PatchApplier()
 
-    agents: Dict[str, Any] = {
+    agents: dict[str, Any] = {
         "requirement_agent": requirement_agent,
         "architect_agent": architect_agent,
         "planner_agent": planner_agent,
@@ -837,6 +851,7 @@ def assemble_agent_team(project_path: str) -> Dict[str, Any]:
 # ==============================================================================
 # CLI エントリポイント (main_cli.py からも直接 import されることを想定)
 # ==============================================================================
+
 
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -899,8 +914,7 @@ def main() -> None:
 
     # SessionController を初期化
     session_controller = SessionController(
-        session_id=session_id,
-        root_dir=os.path.join(args.project, ".nexus", "sessions")
+        session_id=session_id, root_dir=os.path.join(args.project, ".nexus", "sessions")
     )
 
     try:

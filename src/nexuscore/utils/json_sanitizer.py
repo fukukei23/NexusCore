@@ -3,14 +3,16 @@
 # 目的: LLM出力の ```json フェンスや余計な前後文を除去し、最長JSONを抽出して dict/list に変換
 # ==============================================================================
 from __future__ import annotations
-import re
+
 import json
-from typing import Any, Union
+import re
+from typing import Any
 
 # コードフェンスを検出するためのコンパイル済み正規表現
 _FENCE_RE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.DOTALL)
 
-def sanitize_json_like(payload: Any) -> Union[dict, list, Any]:
+
+def sanitize_json_like(payload: Any) -> dict | list | Any:
     """
     LLMからの出力を安全にJSONオブジェクトに変換する。
 
@@ -40,7 +42,7 @@ def sanitize_json_like(payload: Any) -> Union[dict, list, Any]:
     if end <= start:
         return payload  # 有効な閉じ記号が見つからない
 
-    candidate = s[start:end+1]
+    candidate = s[start : end + 1]
 
     # 3. JSONとしてパースを試みる
     try:

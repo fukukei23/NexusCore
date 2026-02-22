@@ -59,4 +59,3 @@ def test_cr_spec_fingerprint_matches():
         f"  python tools/update_cr_spec_fingerprint.py\n\n"
         f"注意: このツールを実行する前に、上記の影響範囲を確認してください。"
     )
-

@@ -5,6 +5,7 @@ api_badges.py の包括的なテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask API (api_badges.py) は削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask API (api_badges.py) has been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -76,7 +77,9 @@ def test_project(app, test_user):
     return project
 
 
-def create_run(project_id: int, status: str, triggered_by: int, started_at: datetime | None = None) -> Run:
+def create_run(
+    project_id: int, status: str, triggered_by: int, started_at: datetime | None = None
+) -> Run:
     """テスト用Runを作成するヘルパー"""
     run = Run(
         project_id=project_id,
@@ -135,7 +138,9 @@ class TestProjectSuccessRateBadge:
         assert "90.0% success" in data["message"]
         assert data["color"] == "brightgreen"
 
-    def test_success_rate_badge_with_70_to_89_percent_success(self, client, test_project, test_user):
+    def test_success_rate_badge_with_70_to_89_percent_success(
+        self, client, test_project, test_user
+    ):
         """70-89%の成功率はgreen"""
         for _ in range(8):
             create_run(test_project.id, "SUCCESS", test_user.id)
@@ -149,7 +154,9 @@ class TestProjectSuccessRateBadge:
         assert "80.0% success" in data["message"]
         assert data["color"] == "green"
 
-    def test_success_rate_badge_with_50_to_69_percent_success(self, client, test_project, test_user):
+    def test_success_rate_badge_with_50_to_69_percent_success(
+        self, client, test_project, test_user
+    ):
         """50-69%の成功率はyellow"""
         for _ in range(6):
             create_run(test_project.id, "SUCCESS", test_user.id)
@@ -163,7 +170,9 @@ class TestProjectSuccessRateBadge:
         assert "60.0% success" in data["message"]
         assert data["color"] == "yellow"
 
-    def test_success_rate_badge_with_below_50_percent_success(self, client, test_project, test_user):
+    def test_success_rate_badge_with_below_50_percent_success(
+        self, client, test_project, test_user
+    ):
         """50%未満の成功率はred"""
         for _ in range(3):
             create_run(test_project.id, "SUCCESS", test_user.id)
@@ -181,11 +190,21 @@ class TestProjectSuccessRateBadge:
         """30回を超えるRunがある場合は最新30回のみを使用"""
         # 古いRun: すべて失敗（無視される）
         for i in range(20):
-            run = create_run(test_project.id, "FAILED", test_user.id, started_at=datetime.utcnow() - timedelta(days=100 - i))
+            run = create_run(
+                test_project.id,
+                "FAILED",
+                test_user.id,
+                started_at=datetime.utcnow() - timedelta(days=100 - i),
+            )
 
         # 最新30回: すべて成功
         for i in range(30):
-            create_run(test_project.id, "SUCCESS", test_user.id, started_at=datetime.utcnow() - timedelta(days=30 - i))
+            create_run(
+                test_project.id,
+                "SUCCESS",
+                test_user.id,
+                started_at=datetime.utcnow() - timedelta(days=30 - i),
+            )
 
         response = client.get(f"/api/projects/{test_project.id}/badge/success_rate")
 
@@ -240,8 +259,18 @@ class TestProjectLastRunBadge:
 
     def test_last_run_badge_with_success_status(self, client, test_project, test_user):
         """最新RunがSUCCESSの場合はbrightgreen"""
-        create_run(test_project.id, "FAILED", test_user.id, started_at=datetime.utcnow() - timedelta(hours=2))
-        create_run(test_project.id, "SUCCESS", test_user.id, started_at=datetime.utcnow() - timedelta(hours=1))
+        create_run(
+            test_project.id,
+            "FAILED",
+            test_user.id,
+            started_at=datetime.utcnow() - timedelta(hours=2),
+        )
+        create_run(
+            test_project.id,
+            "SUCCESS",
+            test_user.id,
+            started_at=datetime.utcnow() - timedelta(hours=1),
+        )
 
         response = client.get(f"/api/projects/{test_project.id}/badge/last_run")
 
@@ -252,8 +281,18 @@ class TestProjectLastRunBadge:
 
     def test_last_run_badge_with_failed_status(self, client, test_project, test_user):
         """最新RunがFAILEDの場合はred"""
-        create_run(test_project.id, "SUCCESS", test_user.id, started_at=datetime.utcnow() - timedelta(hours=2))
-        create_run(test_project.id, "FAILED", test_user.id, started_at=datetime.utcnow() - timedelta(hours=1))
+        create_run(
+            test_project.id,
+            "SUCCESS",
+            test_user.id,
+            started_at=datetime.utcnow() - timedelta(hours=2),
+        )
+        create_run(
+            test_project.id,
+            "FAILED",
+            test_user.id,
+            started_at=datetime.utcnow() - timedelta(hours=1),
+        )
 
         response = client.get(f"/api/projects/{test_project.id}/badge/last_run")
 
@@ -264,8 +303,18 @@ class TestProjectLastRunBadge:
 
     def test_last_run_badge_with_running_status(self, client, test_project, test_user):
         """最新RunがRUNNINGの場合はblue"""
-        create_run(test_project.id, "SUCCESS", test_user.id, started_at=datetime.utcnow() - timedelta(hours=2))
-        create_run(test_project.id, "RUNNING", test_user.id, started_at=datetime.utcnow() - timedelta(hours=1))
+        create_run(
+            test_project.id,
+            "SUCCESS",
+            test_user.id,
+            started_at=datetime.utcnow() - timedelta(hours=2),
+        )
+        create_run(
+            test_project.id,
+            "RUNNING",
+            test_user.id,
+            started_at=datetime.utcnow() - timedelta(hours=1),
+        )
 
         response = client.get(f"/api/projects/{test_project.id}/badge/last_run")
 
@@ -276,8 +325,18 @@ class TestProjectLastRunBadge:
 
     def test_last_run_badge_with_pending_status(self, client, test_project, test_user):
         """最新RunがPENDINGの場合はlightgrey"""
-        create_run(test_project.id, "SUCCESS", test_user.id, started_at=datetime.utcnow() - timedelta(hours=2))
-        create_run(test_project.id, "PENDING", test_user.id, started_at=datetime.utcnow() - timedelta(hours=1))
+        create_run(
+            test_project.id,
+            "SUCCESS",
+            test_user.id,
+            started_at=datetime.utcnow() - timedelta(hours=2),
+        )
+        create_run(
+            test_project.id,
+            "PENDING",
+            test_user.id,
+            started_at=datetime.utcnow() - timedelta(hours=1),
+        )
 
         response = client.get(f"/api/projects/{test_project.id}/badge/last_run")
 
@@ -353,11 +412,26 @@ class TestProjectLastRunBadge:
     def test_last_run_badge_orders_by_started_at(self, client, test_project, test_user):
         """started_atが最新のRunを使用する"""
         # 古いRun
-        create_run(test_project.id, "SUCCESS", test_user.id, started_at=datetime.utcnow() - timedelta(hours=10))
-        create_run(test_project.id, "PENDING", test_user.id, started_at=datetime.utcnow() - timedelta(hours=8))
+        create_run(
+            test_project.id,
+            "SUCCESS",
+            test_user.id,
+            started_at=datetime.utcnow() - timedelta(hours=10),
+        )
+        create_run(
+            test_project.id,
+            "PENDING",
+            test_user.id,
+            started_at=datetime.utcnow() - timedelta(hours=8),
+        )
 
         # 最新Run
-        create_run(test_project.id, "FAILED", test_user.id, started_at=datetime.utcnow() - timedelta(hours=1))
+        create_run(
+            test_project.id,
+            "FAILED",
+            test_user.id,
+            started_at=datetime.utcnow() - timedelta(hours=1),
+        )
 
         response = client.get(f"/api/projects/{test_project.id}/badge/last_run")
 

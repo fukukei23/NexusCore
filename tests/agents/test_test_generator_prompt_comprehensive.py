@@ -8,12 +8,11 @@ Comprehensive Tests for test_generator_prompt module
 - エッジケースを含める
 ============================================================================
 """
-import pytest
-from nexuscore.agents.test_generator_prompt import (
-    build_test_generation_prompt,
-    build_specification_based_test_prompt,
-)
 
+from nexuscore.agents.test_generator_prompt import (
+    build_specification_based_test_prompt,
+    build_test_generation_prompt,
+)
 
 # ============================================================================
 # Tests: build_test_generation_prompt

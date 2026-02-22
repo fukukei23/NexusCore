@@ -10,13 +10,13 @@
 
 from __future__ import annotations
 
-import os
-import json
 import argparse
-import logging
 import asyncio
-from typing import List, Dict, Any
+import json
+import logging
+import os
 from dataclasses import dataclass, field
+from typing import Any
 
 # 既存基盤
 from ..agents.base_agent import BaseAgent
@@ -26,11 +26,15 @@ from ..llm.llm_router import LLMRouter  # 直接クライアントを生成す�
 try:
     from tools.prompt_batcher import build_batch_prompt  # type: ignore
 except Exception:
+
     def build_batch_prompt(task_title, code_snippets, **_):
         blocks = []
         for i, it in enumerate(code_snippets or [], 1):
-            blocks.append(f"[{i}] {it.get('path','')}\n{it.get('content','')}\n{it.get('error','')}")
+            blocks.append(
+                f"[{i}] {it.get('path','')}\n{it.get('content','')}\n{it.get('error','')}"
+            )
         return f"# {task_title}\n" + "\n---\n".join(blocks)
+
 
 # ---------------------------- 設定 ---------------------------- #
 DEFAULT_CONFIDENCE_THRESHOLD = float(os.getenv("NEXUS_CONFIDENCE_SKIP_THRESHOLD", "0.90"))
@@ -39,6 +43,7 @@ DEFAULT_MAX_OUTPUT_TOKENS = int(os.getenv("NEXUS_DEFAULT_MAX_OUT_TOKENS", "512")
 DEFAULT_TEMP = float(os.getenv("NEXUS_ROUTER_TEMPERATURE", "0.2"))
 COST_CAP = float(os.getenv("NEXUS_REVIEW_COST_CAP_USD", "0.02"))  # ここは使わず、明示モデル優先
 
+
 # ---------------------------- データ構造 ---------------------------- #
 @dataclass
 class ReviewItem:
@@ -46,32 +51,36 @@ class ReviewItem:
     content: str
     error: str = ""
 
+
 @dataclass
 class ModelReview:
     model: str
-    summary: Dict[str, Any]  # {"issues":[...],"severity":"low|medium|high","confidence":0.0-1.0}
+    summary: dict[str, Any]  # {"issues":[...],"severity":"low|medium|high","confidence":0.0-1.0}
     raw: str = ""
     ok: bool = True
     error: str = ""
 
+
 @dataclass
 class ConsensusResult:
-    issues: List[str] = field(default_factory=list)
-    file_fixes: Dict[str, str] = field(default_factory=dict)
+    issues: list[str] = field(default_factory=list)
+    file_fixes: dict[str, str] = field(default_factory=dict)
     confidence: float = 0.0
-    contributing_models: List[str] = field(default_factory=list)
+    contributing_models: list[str] = field(default_factory=list)
+
 
 # ---------------------------- プロンプト ---------------------------- #
 SUMMARY_SYSTEM = (
     "You are a concise, rigorous code reviewer.\n"
     "Return ONLY JSON with schema:\n"
     "{"
-    "\"issues\":[{\"title\":string,\"evidence\":string}],"
-    "\"severity\":\"low|medium|high\","
-    "\"confidence\": 0.0-1.0"
+    '"issues":[{"title":string,"evidence":string}],'
+    '"severity":"low|medium|high",'
+    '"confidence": 0.0-1.0'
     "}\n"
     "No preface. No code fences. Keep output minimal."
 )
+
 
 def make_summary_prompt(task: str, batch_text: str) -> str:
     return (
@@ -82,9 +91,11 @@ def make_summary_prompt(task: str, batch_text: str) -> str:
         "- JSONスキーマ厳守\n"
     )
 
+
 # ---------------------------- ロジック ---------------------------- #
 class ReviewAgent(BaseAgent):
     SYSTEM_PROMPT = SUMMARY_SYSTEM
+
 
 def _make_client_forced(model_name: str):
     """
@@ -94,6 +105,7 @@ def _make_client_forced(model_name: str):
     r = LLMRouter()
     # 明示モデルが不明でもルーターが最終的に LocalLLM にフォールバック
     return r._make_client(model_name)  # 公開APIが無いので内部を利用
+
 
 async def _run_one_model(
     model_name: str,
@@ -131,9 +143,10 @@ async def _run_one_model(
             error=str(e),
         )
 
-def _merge_consensus(reviews: List[ModelReview]) -> ConsensusResult:
+
+def _merge_consensus(reviews: list[ModelReview]) -> ConsensusResult:
     seen = set()
-    merged: List[str] = []
+    merged: list[str] = []
     for r in reviews:
         for it in r.summary.get("issues", []):
             title = (it.get("title") or "").strip()
@@ -149,10 +162,11 @@ def _merge_consensus(reviews: List[ModelReview]) -> ConsensusResult:
         contributing_models=[f"{r.model}{'' if r.ok else ' (fail)'}" for r in reviews],
     )
 
+
 async def run_consensus_review(
     task: str,
-    items: List[ReviewItem],
-    models: List[str],
+    items: list[ReviewItem],
+    models: list[str],
     confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
     max_extra_validations: int = DEFAULT_MAX_EXTRA_VALIDATIONS,
     max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
@@ -169,8 +183,10 @@ async def run_consensus_review(
     first_wave = models[:2] if len(models) >= 2 else models
     second_wave = models[2:] if len(models) > 2 else []
 
-    results: List[ModelReview] = []
-    first_tasks = [asyncio.create_task(_run_one_model(m, prompt, max_output_tokens)) for m in first_wave]
+    results: list[ModelReview] = []
+    first_tasks = [
+        asyncio.create_task(_run_one_model(m, prompt, max_output_tokens)) for m in first_wave
+    ]
     first_done = await asyncio.gather(*first_tasks)
     results.extend(first_done)
 
@@ -192,9 +208,11 @@ async def run_consensus_review(
 
     return consensus
 
+
 # ---------------------------- CLI ---------------------------- #
-def _parse_models(s: str) -> List[str]:
+def _parse_models(s: str) -> list[str]:
     return [x.strip() for x in s.split(",") if x.strip()]
+
 
 def main():
     logging.basicConfig(level=logging.INFO)
@@ -212,7 +230,7 @@ def main():
         ReviewItem(path="tests/test_app.py", content="assert add(2,2)==5", error="AssertionError"),
     ]
     if args.inputs_json and os.path.exists(args.inputs_json):
-        with open(args.inputs_json, "r", encoding="utf-8") as f:
+        with open(args.inputs_json, encoding="utf-8") as f:
             raw = json.load(f)
         items = [ReviewItem(**x) for x in raw]
 
@@ -229,11 +247,18 @@ def main():
             max_output_tokens=args.tokens,
         )
     )
-    print(json.dumps({
-        "issues": result.issues,
-        "confidence": round(result.confidence, 3),
-        "models": result.contributing_models,
-    }, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {
+                "issues": result.issues,
+                "confidence": round(result.confidence, 3),
+                "models": result.contributing_models,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
 
 if __name__ == "__main__":
     main()

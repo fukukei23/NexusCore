@@ -18,13 +18,14 @@
 
 import json
 import logging
-import time
 import os
 import re
+import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
-from flask import Flask, render_template_string, redirect, url_for, flash
+from flask import Flask, flash, redirect, render_template_string, url_for
+
 from .base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,9 @@ logger.setLevel(logging.INFO)
 
 
 class ConstitutionalCouncilAgent(BaseAgent):
-    def __init__(self, policy_path: str = "config/policy_rules.json", amendments_dir: str = "amendments"):
+    def __init__(
+        self, policy_path: str = "config/policy_rules.json", amendments_dir: str = "amendments"
+    ):
         """
         憲法評議会エージェント（Constitutional Council Agent）
         インシデント（Postmortem）や新知見（Knowledge）に基づき、
@@ -82,7 +85,7 @@ class ConstitutionalCouncilAgent(BaseAgent):
     # -------------------------------
     # Validation
     # -------------------------------
-    def _validate_amendment(self, proposal: Dict[str, Any]) -> bool:
+    def _validate_amendment(self, proposal: dict[str, Any]) -> bool:
         """LLMによって提案された改正案の形式を検証する"""
         if not isinstance(proposal, dict):
             logger.warning("[Council] Invalid proposal format: not a dict.")
@@ -102,7 +105,9 @@ class ConstitutionalCouncilAgent(BaseAgent):
             return False
 
         if "policy_id" in proposal and "delete_policy_id" in proposal:
-            logger.warning("[Council] Proposal cannot contain both 'policy_id' and 'delete_policy_id'.")
+            logger.warning(
+                "[Council] Proposal cannot contain both 'policy_id' and 'delete_policy_id'."
+            )
             return False
 
         return True
@@ -110,7 +115,9 @@ class ConstitutionalCouncilAgent(BaseAgent):
     # -------------------------------
     # LLM Invocation
     # -------------------------------
-    def _invoke_llm_with_retry(self, prompt: str, retries: int = 2, delay: float = 1.0) -> Optional[str]:
+    def _invoke_llm_with_retry(
+        self, prompt: str, retries: int = 2, delay: float = 1.0
+    ) -> str | None:
         """
         BaseAgent.execute_llm_task を用い、指数バックオフで再試行。
         """
@@ -123,9 +130,11 @@ class ConstitutionalCouncilAgent(BaseAgent):
                 return resp if isinstance(resp, str) else str(resp)
             except Exception as e:
                 last_err = e
-                logger.warning(f"[Council] LLM execute failed (attempt {attempt+1}/{retries+1}): {e}")
+                logger.warning(
+                    f"[Council] LLM execute failed (attempt {attempt+1}/{retries+1}): {e}"
+                )
                 if attempt < retries:
-                    time.sleep(delay * (2 ** attempt))
+                    time.sleep(delay * (2**attempt))
         logger.error(f"[Council] LLM execute failed after {retries+1} attempts: {last_err}")
         return None
 
@@ -148,11 +157,15 @@ class ConstitutionalCouncilAgent(BaseAgent):
                 break
             except RuntimeError as e:
                 last_load_err = e
-                wait = 2 ** attempt
-                logger.warning(f"[Council] Failed to load policies (attempt {attempt+1}/{retry_attempts}): {e}. Retrying in {wait}s...")
+                wait = 2**attempt
+                logger.warning(
+                    f"[Council] Failed to load policies (attempt {attempt+1}/{retry_attempts}): {e}. Retrying in {wait}s..."
+                )
                 time.sleep(wait)
         if current_policies is None:
-            logger.error(f"[Council] Aborting session: Could not load policies after {retry_attempts} attempts. Last error: {last_load_err}")
+            logger.error(
+                f"[Council] Aborting session: Could not load policies after {retry_attempts} attempts. Last error: {last_load_err}"
+            )
             return
 
         prompt = f"""
@@ -191,19 +204,27 @@ Analyze the case files in light of the current constitution and propose exactly 
                 txt = txt.replace("json", "", 1).strip()
             proposal = json.loads(txt)
         except json.JSONDecodeError as e:
-            logger.error(f"[Council] Invalid JSON amendment from LLM: {e}. Raw response: {raw_response}")
+            logger.error(
+                f"[Council] Invalid JSON amendment from LLM: {e}. Raw response: {raw_response}"
+            )
             return
 
         if not isinstance(proposal, dict):
-            logger.error(f"[Council] Invalid proposal format (not a dict). Aborting. Proposal: {proposal}")
+            logger.error(
+                f"[Council] Invalid proposal format (not a dict). Aborting. Proposal: {proposal}"
+            )
             return
 
         if not proposal:
-            logger.info("[Council] Constitution deemed sufficient. No changes proposed. Session adjourned.")
+            logger.info(
+                "[Council] Constitution deemed sufficient. No changes proposed. Session adjourned."
+            )
             return
 
         if not self._validate_amendment(proposal):
-            logger.error(f"[Council] Amendment proposal failed validation. Session aborted. Proposal: {proposal}")
+            logger.error(
+                f"[Council] Amendment proposal failed validation. Session aborted. Proposal: {proposal}"
+            )
             return
 
         # 検証を通過 → 保留ファイル保存
@@ -240,11 +261,15 @@ Analyze the case files in light of the current constitution and propose exactly 
                 return True
             except Exception as e:
                 last_err = e
-                wait = 2 ** attempt
-                logger.error(f"[Council] Error archiving file (attempt {attempt+1}/{retry_attempts}): {e}. Retrying in {wait}s...")
+                wait = 2**attempt
+                logger.error(
+                    f"[Council] Error archiving file (attempt {attempt+1}/{retry_attempts}): {e}. Retrying in {wait}s..."
+                )
                 time.sleep(wait)
 
-        logger.error(f"[Council] Failed to archive amendment {pending_file.name} after {retry_attempts} attempts. Last error: {last_err}")
+        logger.error(
+            f"[Council] Failed to archive amendment {pending_file.name} after {retry_attempts} attempts. Last error: {last_err}"
+        )
         return False
 
     # -------------------------------
@@ -291,7 +316,9 @@ Analyze the case files in light of the current constitution and propose exactly 
                 new_policies.append(proposal)
                 logger.info(f"[Council] New policy '{pid}' enacted.")
         else:
-            logger.error(f"[Council] Invalid proposal structure (no 'delete_policy_id' or 'policy_id'): {proposal}")
+            logger.error(
+                f"[Council] Invalid proposal structure (no 'delete_policy_id' or 'policy_id'): {proposal}"
+            )
             return False
 
         try:
@@ -302,7 +329,9 @@ Analyze the case files in light of the current constitution and propose exactly 
 
         # アーカイブ（enacted_）へ
         if not self._archive_amendment(pending_file, "enacted"):
-            logger.error(f"[Council] CRITICAL: Policies saved, but failed to archive {pending_file.name}. Manual cleanup required.")
+            logger.error(
+                f"[Council] CRITICAL: Policies saved, but failed to archive {pending_file.name}. Manual cleanup required."
+            )
             return False
 
         return True
@@ -320,7 +349,7 @@ Analyze the case files in light of the current constitution and propose exactly 
             try:
                 pending_files = sorted(
                     list(self.amendments_dir.glob("pending_*.json")),
-                    key=lambda f: f.stat().st_mtime
+                    key=lambda f: f.stat().st_mtime,
                 )
             except Exception as e:
                 print(f"Error reading amendments directory: {e}")
@@ -333,20 +362,24 @@ Analyze the case files in light of the current constitution and propose exactly 
             print("\n=== 保留中の改正案一覧 (Pending Amendments) ===")
             for idx, f in enumerate(pending_files):
                 try:
-                    with f.open('r', encoding='utf-8') as fp:
+                    with f.open("r", encoding="utf-8") as fp:
                         proposal = json.load(fp)
-                        summary = proposal.get('description', proposal.get('delete_policy_id', 'N/A'))
+                        summary = proposal.get(
+                            "description", proposal.get("delete_policy_id", "N/A")
+                        )
                         print(f"[{idx}] {f.name} (Summary: {str(summary)[:50]}...)")
                 except Exception as e:
                     print(f"[{idx}] {f.name} (Error reading content: {e})")
 
             print("------------------------------------------")
-            choice = input("番号を選択 (a:承認, r:却下, q:終了) [例: a 0] -> ").strip().lower().split()
+            choice = (
+                input("番号を選択 (a:承認, r:却下, q:終了) [例: a 0] -> ").strip().lower().split()
+            )
             if not choice:
                 continue
 
             action = choice[0]
-            if action == 'q':
+            if action == "q":
                 print("CLIを終了します。")
                 break
 
@@ -360,12 +393,20 @@ Analyze the case files in light of the current constitution and propose exactly 
                 continue
 
             target_file = pending_files[idx]
-            if action == 'a':
+            if action == "a":
                 print(f"承認中: {target_file.name}...")
-                print("承認成功。" if self.approve_amendment(target_file) else "承認失敗。ログを確認してください。")
-            elif action == 'r':
+                print(
+                    "承認成功。"
+                    if self.approve_amendment(target_file)
+                    else "承認失敗。ログを確認してください。"
+                )
+            elif action == "r":
                 print(f"却下中: {target_file.name}...")
-                print("却下成功。" if self.reject_amendment(target_file) else "却下失敗。ログを確認してください。")
+                print(
+                    "却下成功。"
+                    if self.reject_amendment(target_file)
+                    else "却下失敗。ログを確認してください。"
+                )
             else:
                 print("無効なアクションです。(a, r, q のみ)")
 
@@ -374,7 +415,9 @@ Analyze the case files in light of the current constitution and propose exactly 
     # -------------------------------
     def run_web_ui(self, host: str = "127.0.0.1", port: int = 5000):
         app = Flask(__name__)
-        app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev_only_secret_key_for_council_ui_fallback')
+        app.secret_key = os.getenv(
+            "FLASK_SECRET_KEY", "dev_only_secret_key_for_council_ui_fallback"
+        )
         agent = self
 
         TEMPLATE = """<!doctype html>
@@ -440,7 +483,7 @@ Analyze the case files in light of the current constitution and propose exactly 
                 pending_files = sorted(
                     agent.amendments_dir.glob("pending_*.json"),
                     key=lambda f: f.stat().st_mtime,
-                    reverse=True
+                    reverse=True,
                 )
             except Exception as e:
                 logger.error(f"[WEB-UI] Error reading amendments directory: {e}")
@@ -465,7 +508,7 @@ Analyze the case files in light of the current constitution and propose exactly 
             if not (filename.startswith("pending_") and filename.endswith(".json")):
                 logger.warning(f"[WEB-UI] Filename format mismatch: {filename}")
                 return False
-            core = filename[len("pending_"):-len(".json")]
+            core = filename[len("pending_") : -len(".json")]
             if not core:
                 logger.warning(f"[WEB-UI] Filename has empty core: {filename}")
                 return False
@@ -479,13 +522,13 @@ Analyze the case files in light of the current constitution and propose exactly 
             if not _is_safe_filename(filename):
                 logger.warning(f"[WEB-UI] Invalid path/filename detected in approve: {filename}")
                 flash(f"無効なファイル名です: {filename}", "danger")
-                return redirect(url_for('index'))
+                return redirect(url_for("index"))
             try:
                 file_path = agent.amendments_dir.joinpath(filename).resolve()
                 if file_path.parent != agent.amendments_dir.resolve():
                     logger.error(f"[WEB-UI] Resolved path mismatch: {file_path}")
                     flash("セキュリティ違反が検出されました。", "danger")
-                    return redirect(url_for('index'))
+                    return redirect(url_for("index"))
 
                 ok = agent.approve_amendment(file_path)
                 if ok:
@@ -493,35 +536,44 @@ Analyze the case files in light of the current constitution and propose exactly 
                 else:
                     # False の場合、アーカイブ失敗 or 途中エラー。存在チェックで分岐。
                     if (agent.amendments_dir / filename).exists():
-                        flash(f"改正案 '{filename}' のアーカイブに失敗しました。ポリシーは更新済みの可能性があります。手動確認を。", "danger")
+                        flash(
+                            f"改正案 '{filename}' のアーカイブに失敗しました。ポリシーは更新済みの可能性があります。手動確認を。",
+                            "danger",
+                        )
                     else:
-                        flash(f"改正案 '{filename}' の承認に失敗しました。ログを確認してください。", "danger")
+                        flash(
+                            f"改正案 '{filename}' の承認に失敗しました。ログを確認してください。",
+                            "danger",
+                        )
             except Exception as e:
                 logger.error(f"[WEB-UI] Error during approval of {filename}: {e}")
                 flash(f"承認処理中に予期せぬエラー: {e}", "danger")
-            return redirect(url_for('index'))
+            return redirect(url_for("index"))
 
         @app.route("/reject/<filename>")
         def reject(filename: str):
             if not _is_safe_filename(filename):
                 logger.warning(f"[WEB-UI] Invalid path/filename detected in reject: {filename}")
                 flash(f"無効なファイル名です: {filename}", "danger")
-                return redirect(url_for('index'))
+                return redirect(url_for("index"))
             try:
                 file_path = agent.amendments_dir.joinpath(filename).resolve()
                 if file_path.parent != agent.amendments_dir.resolve():
                     logger.error(f"[WEB-UI] Resolved path mismatch: {file_path}")
                     flash("セキュリティ違反が検出されました。", "danger")
-                    return redirect(url_for('index'))
+                    return redirect(url_for("index"))
 
                 if agent.reject_amendment(file_path):
                     flash(f"改正案 '{filename}' は正常に却下されました。", "info")
                 else:
-                    flash(f"改正案 '{filename}' の却下（アーカイブ）に失敗しました。ログを確認してください。", "danger")
+                    flash(
+                        f"改正案 '{filename}' の却下（アーカイブ）に失敗しました。ログを確認してください。",
+                        "danger",
+                    )
             except Exception as e:
                 logger.error(f"[WEB-UI] Error during rejection of {filename}: {e}")
                 flash(f"却下処理中に予期せぬエラー: {e}", "danger")
-            return redirect(url_for('index'))
+            return redirect(url_for("index"))
 
         logger.info(f"[Council] Starting Web UI at http://{host}:{port}")
         app.run(host=host, port=port)
@@ -532,14 +584,16 @@ Analyze the case files in light of the current constitution and propose exactly 
 # --------------------------------
 if __name__ == "__main__":
     import sys
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
 
     council_agent = ConstitutionalCouncilAgent()
 
     if len(sys.argv) > 1 and sys.argv[1] == "web":
         print("Starting Web UI mode...")
-        if os.getenv('FLASK_SECRET_KEY') is None:
+        if os.getenv("FLASK_SECRET_KEY") is None:
             print("WARNING: 'FLASK_SECRET_KEY' not set. Using insecure fallback key.")
         council_agent.run_web_ui()
     else:

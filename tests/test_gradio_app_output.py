@@ -19,7 +19,6 @@ if "gradio" not in sys.modules:
 # プロジェクトルートの gradio_app（pytest.ini の pythonpath=. により import 可能）
 import gradio_app
 
-
 # テスト用の簡単な Python 関数コード
 SAMPLE_FUNC_CODE = """
 def is_prime(n):
