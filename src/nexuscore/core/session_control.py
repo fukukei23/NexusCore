@@ -47,6 +47,9 @@ class SessionController:
 
         self.control_file = self.root / f"{session_id}.control.json"
         self.state_file = self.root / f"{session_id}.state.json"
+        # Optional: runner-injected phase gating (external control).
+        # Default empty keeps existing behavior unchanged.
+        self.stop_before_phases: list[str] = []
 
     # ---------------------------------------------------------------------
     # 外部（Chat UI / CLI / Web API）から呼び出すことを想定したメソッド
@@ -73,6 +76,22 @@ class SessionController:
         """
         cmd = self._read_control()
         return cmd.get("command") in ("stop", "pause")
+
+    def set_stop_before_phases(self, phases: list[str]) -> None:
+        """
+        Set phase-gating stop policy (runner-side external control).
+
+        This does NOT interpret phases; it merely stores them so callers can
+        enforce a consistent stop policy at phase boundaries.
+        """
+        self.stop_before_phases = list(phases)
+        # Keep it observable for external tools without changing the command semantics.
+        try:
+            cmd = self._read_control()
+            cmd["stop_before_phases"] = list(phases)
+            self._write_control(cmd)
+        except Exception:
+            pass
 
     def checkpoint(self, phase: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         """
@@ -109,6 +128,15 @@ class SessionController:
                 return json.load(f)
         except Exception:
             # 破損していても全システムを止めない
+            return {}
+
+    def _read_state(self) -> Dict[str, Any]:
+        if not self.state_file.exists():
+            return {}
+        try:
+            with self.state_file.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
             return {}
 
     def _write_state(self, data: Dict[str, Any]) -> None:
