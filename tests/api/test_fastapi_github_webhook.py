@@ -4,13 +4,14 @@ FastAPI GitHub Webhook エンドポイントのテスト
 CR-FASTAPI-003 で作成された /api/v1/github/webhook エンドポイントのテスト。
 既存の Flask テスト (`tests/api/test_github_self_healing_webhook.py`) の期待値に準拠。
 """
+
 import hashlib
 import hmac
 import json
-import os
+from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
 from nexuscore.api.fastapi_app import app
 
@@ -83,7 +84,7 @@ def test_webhook_endpoint_accepts_valid_pull_request_event(client: TestClient, m
                 "X-GitHub-Delivery": "test-delivery-123",
                 "X-Hub-Signature-256": signature,
                 "Content-Type": "application/json",
-            }
+            },
         )
 
         assert response.status_code == 200
@@ -120,7 +121,7 @@ def test_webhook_endpoint_rejects_invalid_signature(client: TestClient, mock_web
             "X-GitHub-Delivery": "test-delivery-123",
             "X-Hub-Signature-256": invalid_signature,
             "Content-Type": "application/json",
-        }
+        },
     )
 
     assert response.status_code == 401
@@ -152,7 +153,7 @@ def test_webhook_endpoint_ignores_non_pull_request_event(client: TestClient):
             "X-GitHub-Event": "push",  # pull_request 以外
             "X-GitHub-Delivery": "test-delivery-123",
             "Content-Type": "application/json",
-        }
+        },
     )
 
     assert response.status_code == 200
@@ -188,7 +189,7 @@ def test_webhook_endpoint_handles_missing_signature_header(client: TestClient, m
             "X-GitHub-Event": "pull_request",
             "X-GitHub-Delivery": "test-delivery-123",
             "Content-Type": "application/json",
-        }
+        },
     )
 
     # シークレットが設定されている場合、署名ヘッダーがないと401を返す
@@ -228,7 +229,7 @@ def test_webhook_endpoint_handles_skipped_pr(client: TestClient, mock_webhook_se
                 "X-GitHub-Delivery": "test-delivery-123",
                 "X-Hub-Signature-256": signature,
                 "Content-Type": "application/json",
-            }
+            },
         )
 
         assert response.status_code == 200
@@ -272,7 +273,7 @@ def test_webhook_endpoint_handles_invalid_json(client: TestClient):
             "X-GitHub-Event": "pull_request",
             "X-GitHub-Delivery": "test-delivery-123",
             "Content-Type": "application/json",
-        }
+        },
     )
 
     assert response.status_code == 200
@@ -316,10 +317,9 @@ def test_webhook_endpoint_without_secret_allows_requests(client: TestClient, mon
                 "X-GitHub-Event": "pull_request",
                 "X-GitHub-Delivery": "test-delivery-123",
                 "Content-Type": "application/json",
-            }
+            },
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["accepted"] is True
-

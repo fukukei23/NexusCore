@@ -4,15 +4,14 @@ NexusCore SaaS基盤 - データベースモデル
 SQLAlchemy ORM モデル定義。
 既存の Orchestrator / NPE とは独立して動作する。
 """
+
 from __future__ import annotations
 
 import hashlib
 import secrets
 from datetime import datetime
-from typing import Optional
 
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, JSON
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 # db は __init__.py からインポート
@@ -23,6 +22,7 @@ class User(db.Model):
     """
     ユーザーモデル（GitHub OAuth で認証）
     """
+
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
@@ -37,7 +37,9 @@ class User(db.Model):
     # リレーション
     projects = relationship("Project", back_populates="owner", lazy="dynamic")
     runs = relationship("Run", back_populates="triggered_by_user", lazy="dynamic")
-    api_keys = relationship("ApiKey", back_populates="user", lazy="dynamic", cascade="all, delete-orphan")
+    api_keys = relationship(
+        "ApiKey", back_populates="user", lazy="dynamic", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, github_login='{self.github_login}')>"
@@ -47,6 +49,7 @@ class Project(db.Model):
     """
     プロジェクトモデル（対象リポジトリ）
     """
+
     __tablename__ = "projects"
 
     id = Column(Integer, primary_key=True)
@@ -60,7 +63,9 @@ class Project(db.Model):
 
     # リレーション
     owner = relationship("User", back_populates="projects")
-    runs = relationship("Run", back_populates="project", lazy="dynamic", cascade="all, delete-orphan")
+    runs = relationship(
+        "Run", back_populates="project", lazy="dynamic", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Project(id={self.id}, name='{self.name}', owner_id={self.owner_id})>"
@@ -70,13 +75,16 @@ class Run(db.Model):
     """
     実行記録（1回のオーケストレーション実行を表現）
     """
+
     __tablename__ = "runs"
 
     id = Column(Integer, primary_key=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
     run_id = Column(String(64), unique=True, nullable=False, index=True)  # uuid.uuid4().hex
     triggered_by = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
-    status = Column(String(32), nullable=False, default="PENDING", index=True)  # PENDING, RUNNING, SUCCESS, FAILED
+    status = Column(
+        String(32), nullable=False, default="PENDING", index=True
+    )  # PENDING, RUNNING, SUCCESS, FAILED
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
     autonomy_level = Column(Integer, nullable=True)  # 実行時の設定
@@ -87,8 +95,12 @@ class Run(db.Model):
     # リレーション
     project = relationship("Project", back_populates="runs")
     triggered_by_user = relationship("User", back_populates="runs")
-    patch_records = relationship("PatchRecord", back_populates="run", lazy="dynamic", cascade="all, delete-orphan")
-    execution_logs = relationship("ExecutionLog", back_populates="run", lazy="dynamic", cascade="all, delete-orphan")
+    patch_records = relationship(
+        "PatchRecord", back_populates="run", lazy="dynamic", cascade="all, delete-orphan"
+    )
+    execution_logs = relationship(
+        "ExecutionLog", back_populates="run", lazy="dynamic", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Run(id={self.id}, run_id='{self.run_id}', status='{self.status}')>"
@@ -98,6 +110,7 @@ class PatchRecord(db.Model):
     """
     パッチ適用記録
     """
+
     __tablename__ = "patch_records"
 
     id = Column(Integer, primary_key=True)
@@ -118,10 +131,13 @@ class ExecutionLog(db.Model):
     """
     実行ログ（NPE / Orchestrator / Agent からの構造化ログ）
     """
+
     __tablename__ = "execution_logs"
 
     id = Column(Integer, primary_key=True)
-    run_id = Column(Integer, ForeignKey("runs.id"), nullable=True, index=True)  # 紐付かない場合もある
+    run_id = Column(
+        Integer, ForeignKey("runs.id"), nullable=True, index=True
+    )  # 紐付かない場合もある
     source = Column(String(64), nullable=False, index=True)  # NPE, ORCHESTRATOR, AGENT, SANDBOX 等
     level = Column(String(16), nullable=False, index=True)  # INFO, WARNING, ERROR
     message = Column(String(512), nullable=False)
@@ -139,6 +155,7 @@ class ApiKey(db.Model):
     """
     APIキー（読み取り専用、ユーザーが自身のラン履歴やログを読むため）
     """
+
     __tablename__ = "api_keys"
 
     id = Column(Integer, primary_key=True)
@@ -172,4 +189,3 @@ class ApiKey(db.Model):
 
     def __repr__(self) -> str:
         return f"<ApiKey(id={self.id}, user_id={self.user_id}, name='{self.name}')>"
-

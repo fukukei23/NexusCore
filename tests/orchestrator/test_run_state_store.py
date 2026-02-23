@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
-
-import pytest
+from typing import Any
 
 from nexuscore.orchestrator import run_state_store
 
@@ -11,7 +9,7 @@ def test_run_state_roundtrip_save_load_update(monkeypatch: Any, tmp_path: Any) -
     monkeypatch.setenv("NEXUSCORE_RUN_STATE_DIR", str(tmp_path / "run_state"))
     monkeypatch.setenv("NEXUSCORE_RUNSTATE_HMAC_SECRET", "test-secret-key")
 
-    state: Dict[str, Any] = {
+    state: dict[str, Any] = {
         "run_id": "run-1",
         "status": "paused",
         "authority_level": "partial",
@@ -32,5 +30,3 @@ def test_run_state_roundtrip_save_load_update(monkeypatch: Any, tmp_path: Any) -
     assert updated["next_phase"] is None
     assert updated["run_id"] == "run-1"
     assert "updated_at" in updated
-
-

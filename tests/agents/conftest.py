@@ -3,8 +3,8 @@ Pytest configuration for agents tests.
 
 This conftest.py prevents collection of test files with missing dependencies.
 """
+
 import os
-import pytest
 
 
 def pytest_collection_modifyitems(session, config, items):

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import enum
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import List, Sequence, Optional
 
 
 class ReviewDecision(str, enum.Enum):
@@ -17,11 +17,12 @@ class ReviewIssue:
     """
     個別の指摘事項。
     """
+
     level: str  # "error" | "warning" | "info"
-    code: str   # 例: "SEC-001", "TEST-003", etc.
+    code: str  # 例: "SEC-001", "TEST-003", etc.
     message: str
-    file_path: Optional[str] = None
-    line_no: Optional[int] = None
+    file_path: str | None = None
+    line_no: int | None = None
 
 
 @dataclass
@@ -29,8 +30,9 @@ class ReviewResult:
     """
     GuardianAgent が使うレビュー結果の構造。
     """
+
     decision: ReviewDecision
-    issues: List[ReviewIssue] = field(default_factory=list)
+    issues: list[ReviewIssue] = field(default_factory=list)
 
     @property
     def has_errors(self) -> bool:
@@ -67,8 +69,9 @@ class FileChange:
     """
     diff解析済みの1ファイル分の変更情報（最低限）。
     """
+
     path: str
-    hunks: List["Hunk"]
+    hunks: list[Hunk]
 
 
 @dataclass
@@ -76,11 +79,12 @@ class Hunk:
     """
     unified diff の hunk 情報。
     """
+
     old_start: int
     old_lines: int
     new_start: int
     new_lines: int
-    lines: List[str]  # "+...", "-...", " ..." の行
+    lines: list[str]  # "+...", "-...", " ..." の行
 
 
 class GuardianAutoReviewer:
@@ -146,7 +150,7 @@ class GuardianAutoReviewer:
         自動レビュー結果を返す。
         """
         files = self._parse_unified_diff(diff_text)
-        issues: List[ReviewIssue] = []
+        issues: list[ReviewIssue] = []
 
         # 各チェックを実行
         issues.extend(self._check_sandbox_violations(files))
@@ -172,15 +176,15 @@ class GuardianAutoReviewer:
     # diff パーサ（簡易版）
     # =============================
 
-    def _parse_unified_diff(self, diff_text: str) -> List[FileChange]:
+    def _parse_unified_diff(self, diff_text: str) -> list[FileChange]:
         """
         ざっくりした unified diff パーサ。
         精密さよりも「パターン検出用に最低限」が目的。
         """
         lines = diff_text.splitlines()
-        files: List[FileChange] = []
-        current_file: Optional[FileChange] = None
-        current_hunk: Optional[Hunk] = None
+        files: list[FileChange] = []
+        current_file: FileChange | None = None
+        current_hunk: Hunk | None = None
 
         file_header_re = re.compile(r"^\+\+\+\s+b/(.+)$")
         hunk_header_re = re.compile(r"^@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@")
@@ -233,8 +237,8 @@ class GuardianAutoReviewer:
     # 共通チェック
     # =============================
 
-    def _check_sandbox_violations(self, files: Sequence[FileChange]) -> List[ReviewIssue]:
-        issues: List[ReviewIssue] = []
+    def _check_sandbox_violations(self, files: Sequence[FileChange]) -> list[ReviewIssue]:
+        issues: list[ReviewIssue] = []
 
         for fc in files:
             # 危険なパス
@@ -274,8 +278,8 @@ class GuardianAutoReviewer:
 
         return issues
 
-    def _check_testing_rules(self, files: Sequence[FileChange]) -> List[ReviewIssue]:
-        issues: List[ReviewIssue] = []
+    def _check_testing_rules(self, files: Sequence[FileChange]) -> list[ReviewIssue]:
+        issues: list[ReviewIssue] = []
         for fc in files:
             is_test_file = fc.path.startswith("tests/") or fc.path.endswith("_test.py")
             for h in fc.hunks:
@@ -304,8 +308,8 @@ class GuardianAutoReviewer:
                     line_no += 1
         return issues
 
-    def _check_code_safety_rules(self, files: Sequence[FileChange]) -> List[ReviewIssue]:
-        issues: List[ReviewIssue] = []
+    def _check_code_safety_rules(self, files: Sequence[FileChange]) -> list[ReviewIssue]:
+        issues: list[ReviewIssue] = []
 
         try_except_pass_re = re.compile(r"try\s*:\s*$")
         except_pass_re = re.compile(r"except(?:\s+\w+)?\s*:\s*pass\b")
@@ -316,7 +320,7 @@ class GuardianAutoReviewer:
             is_src = fc.path.startswith("src/")
             for h in fc.hunks:
                 line_no = h.new_start
-                recent_try_line: Optional[int] = None
+                recent_try_line: int | None = None
                 for line in h.lines:
                     if not line.startswith("+"):
                         if line.startswith("-"):
@@ -340,7 +344,9 @@ class GuardianAutoReviewer:
                         )
 
                     # 素の except / except Exception も src では警告
-                    if is_src and (except_bare_re.search(content) or except_exception_re.search(content)):
+                    if is_src and (
+                        except_bare_re.search(content) or except_exception_re.search(content)
+                    ):
                         issues.append(
                             ReviewIssue(
                                 level="warning",
@@ -371,8 +377,8 @@ class GuardianAutoReviewer:
     # NexusCore 専用チェック
     # =============================
 
-    def _check_nexuscore_specific(self, files: Sequence[FileChange]) -> List[ReviewIssue]:
-        issues: List[ReviewIssue] = []
+    def _check_nexuscore_specific(self, files: Sequence[FileChange]) -> list[ReviewIssue]:
+        issues: list[ReviewIssue] = []
 
         for fc in files:
             # Orchestrator のステージ順序破壊チェック（簡易）
@@ -422,8 +428,8 @@ class GuardianAutoReviewer:
     # atelier-kyo-manager 専用チェック
     # =============================
 
-    def _check_atelier_specific(self, files: Sequence[FileChange]) -> List[ReviewIssue]:
-        issues: List[ReviewIssue] = []
+    def _check_atelier_specific(self, files: Sequence[FileChange]) -> list[ReviewIssue]:
+        issues: list[ReviewIssue] = []
 
         for fc in files:
             for h in fc.hunks:

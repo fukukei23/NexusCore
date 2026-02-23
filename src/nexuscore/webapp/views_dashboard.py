@@ -9,21 +9,21 @@ WebApp HTML UI view.
 既存の Orchestrator / NPE とは独立して動作する。
 Gradio UI との統合もここで行う。
 """
+
 from __future__ import annotations
 
 import json
-from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from flask import Blueprint, request, jsonify, render_template
+from flask import Blueprint, jsonify, request
 
 from nexuscore.webapp import db
-from nexuscore.webapp.models import Project, Run, ExecutionLog, PatchRecord
-from nexuscore.webapp.auth import require_auth, get_current_user
+from nexuscore.webapp.auth import get_current_user, require_auth
+from nexuscore.webapp.models import ExecutionLog, PatchRecord, Project, Run
 from nexuscore.webapp.views_projects import (
-    _render_run_status_badge,
-    _format_duration,
     _compute_run_duration,
+    _format_duration,
+    _render_run_status_badge,
 )
 
 bp = Blueprint("views_dashboard", __name__, url_prefix="/dashboard")
@@ -50,24 +50,25 @@ def dashboard():
 
     # 集計データ
     total_runs = Run.query.join(Project).filter(Project.owner_id == user.id).count()
-    success_runs = Run.query.join(Project).filter(
-        Project.owner_id == user.id, Run.status == "SUCCESS"
-    ).count()
-    failed_runs = Run.query.join(Project).filter(
-        Project.owner_id == user.id, Run.status == "FAILED"
-    ).count()
+    success_runs = (
+        Run.query.join(Project).filter(Project.owner_id == user.id, Run.status == "SUCCESS").count()
+    )
+    failed_runs = (
+        Run.query.join(Project).filter(Project.owner_id == user.id, Run.status == "FAILED").count()
+    )
 
     # LLMごとの call_count, cost_sum（簡易版）
     # SQLiteではJSON操作がサポートされていないため、try-exceptで囲む
     from sqlalchemy import func
+
     try:
         llm_stats = (
             db.session.query(
                 ExecutionLog.payload_json["model"].astext.label("model"),
                 func.count(ExecutionLog.id).label("call_count"),
-                func.sum(
-                    func.cast(ExecutionLog.payload_json["cost_est_usd"], db.Float)
-                ).label("cost_sum"),
+                func.sum(func.cast(ExecutionLog.payload_json["cost_est_usd"], db.Float)).label(
+                    "cost_sum"
+                ),
             )
             .filter(ExecutionLog.source == "NPE")
             .group_by(ExecutionLog.payload_json["model"].astext)
@@ -78,19 +79,25 @@ def dashboard():
         llm_stats = []
 
     if request.headers.get("Accept", "").startswith("application/json"):
-        return jsonify({
-            "projects": [{"id": p.id, "name": p.name} for p in projects],
-            "stats": {
-                "total_runs": total_runs,
-                "success_runs": success_runs,
-                "failed_runs": failed_runs,
-                "success_rate": (success_runs / total_runs * 100) if total_runs > 0 else 0,
-            },
-            "llm_stats": [
-                {"model": s.model, "call_count": s.call_count, "cost_sum": float(s.cost_sum or 0)}
-                for s in llm_stats
-            ],
-        })
+        return jsonify(
+            {
+                "projects": [{"id": p.id, "name": p.name} for p in projects],
+                "stats": {
+                    "total_runs": total_runs,
+                    "success_runs": success_runs,
+                    "failed_runs": failed_runs,
+                    "success_rate": (success_runs / total_runs * 100) if total_runs > 0 else 0,
+                },
+                "llm_stats": [
+                    {
+                        "model": s.model,
+                        "call_count": s.call_count,
+                        "cost_sum": float(s.cost_sum or 0),
+                    }
+                    for s in llm_stats
+                ],
+            }
+        )
 
     html = f"""
     <!DOCTYPE html>
@@ -141,7 +148,7 @@ def project_dashboard(project_id: int):
     Data access: Direct DB access (no API call)
     FastAPI equivalent: N/A (internal UI only)
     """
-    from sqlalchemy import desc, func
+    from sqlalchemy import desc
 
     user = get_current_user()
     project = Project.query.filter_by(id=project_id, owner_id=user.id).first_or_404()
@@ -153,7 +160,9 @@ def project_dashboard(project_id: int):
     failed_runs = sum(1 for r in all_runs if r.status == "FAILED")
 
     # 過去30回の成功率
-    recent_runs = Run.query.filter_by(project_id=project.id).order_by(desc(Run.started_at)).limit(30).all()
+    recent_runs = (
+        Run.query.filter_by(project_id=project.id).order_by(desc(Run.started_at)).limit(30).all()
+    )
     recent_success = sum(1 for r in recent_runs if r.status == "SUCCESS")
     success_rate = (recent_success / len(recent_runs) * 100) if recent_runs else 0.0
 
@@ -168,7 +177,7 @@ def project_dashboard(project_id: int):
     latest_run = Run.query.filter_by(project_id=project.id).order_by(desc(Run.created_at)).first()
 
     # 最新Runのメトリクス
-    latest_run_metrics: Optional[Dict[str, Any]] = None
+    latest_run_metrics: dict[str, Any] | None = None
     if latest_run:
         # パッチ情報
         patches = PatchRecord.query.filter_by(run_id=latest_run.id).all()
@@ -187,7 +196,11 @@ def project_dashboard(project_id: int):
                 except Exception:
                     payload = {}
 
-            cost = payload.get("estimated_cost") or payload.get("cost_jpy") or payload.get("usage", {}).get("cost_jpy", 0.0)
+            cost = (
+                payload.get("estimated_cost")
+                or payload.get("cost_jpy")
+                or payload.get("usage", {}).get("cost_jpy", 0.0)
+            )
             try:
                 total_cost += float(cost)
             except Exception:
@@ -204,7 +217,7 @@ def project_dashboard(project_id: int):
         }
 
     # LLMコスト内訳
-    llm_breakdown: Dict[str, Dict[str, Any]] = {}
+    llm_breakdown: dict[str, dict[str, Any]] = {}
     if latest_run:
         logs = ExecutionLog.query.filter_by(run_id=latest_run.id, source="NPE").all()
         for lg in logs:
@@ -230,16 +243,24 @@ def project_dashboard(project_id: int):
             llm_breakdown[model]["call_count"] += 1
             llm_breakdown[model]["token_prompt"] += usage.get("prompt_tokens", 0)
             llm_breakdown[model]["token_completion"] += usage.get("completion_tokens", 0)
-            llm_breakdown[model]["token_total"] += usage.get("prompt_tokens", 0) + usage.get("completion_tokens", 0)
+            llm_breakdown[model]["token_total"] += usage.get("prompt_tokens", 0) + usage.get(
+                "completion_tokens", 0
+            )
 
-            cost = payload.get("estimated_cost") or payload.get("cost_jpy") or usage.get("cost_jpy", 0.0)
+            cost = (
+                payload.get("estimated_cost")
+                or payload.get("cost_jpy")
+                or usage.get("cost_jpy", 0.0)
+            )
             try:
                 llm_breakdown[model]["cost_total"] += float(cost)
             except Exception:
                 pass
 
     # 直近のRun一覧（最大10件）
-    recent_runs_list = Run.query.filter_by(project_id=project.id).order_by(desc(Run.created_at)).limit(10).all()
+    recent_runs_list = (
+        Run.query.filter_by(project_id=project.id).order_by(desc(Run.created_at)).limit(10).all()
+    )
 
     # HTMLを生成
     html = render_project_dashboard_html(
@@ -254,7 +275,7 @@ def project_dashboard(project_id: int):
     return html
 
 
-def _render_llm_cost_table(llm_breakdown: Dict[str, Dict[str, Any]]) -> str:
+def _render_llm_cost_table(llm_breakdown: dict[str, dict[str, Any]]) -> str:
     """
     LLMコスト内訳テーブルをHTMLとして返す
     """
@@ -292,7 +313,7 @@ def _render_llm_cost_table(llm_breakdown: Dict[str, Dict[str, Any]]) -> str:
 """
 
 
-def _render_recent_runs_list(project: Project, runs: List[Run]) -> str:
+def _render_recent_runs_list(project: Project, runs: list[Run]) -> str:
     """
     直近のRun一覧をHTMLとして返す
     """
@@ -323,11 +344,11 @@ def _render_recent_runs_list(project: Project, runs: List[Run]) -> str:
 def render_project_dashboard_html(
     *,
     project: Project,
-    stats: Dict[str, Any],
-    recent_runs: List[Run],
-    latest_run: Optional[Run],
-    latest_run_metrics: Optional[Dict[str, Any]],
-    llm_breakdown: Dict[str, Dict[str, Any]],
+    stats: dict[str, Any],
+    recent_runs: list[Run],
+    latest_run: Run | None,
+    latest_run_metrics: dict[str, Any] | None,
+    llm_breakdown: dict[str, dict[str, Any]],
 ) -> str:
     """
     プロジェクトダッシュボードのHTMLを生成（カードレイアウト）
@@ -576,4 +597,3 @@ def gradio_dashboard(project_id: int):
     </html>
     """
     return html
-

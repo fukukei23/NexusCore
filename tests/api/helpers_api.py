@@ -6,7 +6,7 @@ JSON レスポンスの検証を共通化。
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def assert_json_keys(obj: dict, keys: Iterable[str]) -> None:
@@ -22,4 +22,3 @@ def assert_json_keys(obj: dict, keys: Iterable[str]) -> None:
     """
     for k in keys:
         assert k in obj, f"Missing key in JSON response: {k}"
-

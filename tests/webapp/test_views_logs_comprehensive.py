@@ -5,6 +5,7 @@ views_logs.py の包括的なテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask legacy views_logs comprehensive tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -147,14 +148,18 @@ class TestProjectLogs:
         db.session.add(other_user)
         db.session.commit()
 
-        other_project = Project(owner_id=other_user.id, name="other_project", local_path="/tmp/other")
+        other_project = Project(
+            owner_id=other_user.id, name="other_project", local_path="/tmp/other"
+        )
         db.session.add(other_project)
         db.session.commit()
 
         response = authenticated_client.get(f"/logs/projects/{other_project.id}")
         assert response.status_code == 404
 
-    def test_project_logs_displays_logs(self, authenticated_client, test_project, test_run, test_execution_log):
+    def test_project_logs_displays_logs(
+        self, authenticated_client, test_project, test_run, test_execution_log
+    ):
         """ログエントリが表示される"""
         response = authenticated_client.get(f"/logs/projects/{test_project.id}")
 
@@ -166,7 +171,9 @@ class TestProjectLogs:
         """sourceでフィルタリングできる"""
         # 異なるsourceのログを作成
         log1 = ExecutionLog(run_id=test_run.id, source="NPE", level="INFO", message="NPE log")
-        log2 = ExecutionLog(run_id=test_run.id, source="ORCHESTRATOR", level="INFO", message="Orchestrator log")
+        log2 = ExecutionLog(
+            run_id=test_run.id, source="ORCHESTRATOR", level="INFO", message="Orchestrator log"
+        )
         db.session.add_all([log1, log2])
         db.session.commit()
 
@@ -208,7 +215,9 @@ class TestProjectLogs:
         response = authenticated_client.get(f"/logs/projects/{test_project.id}?page=2")
         assert response.status_code == 200
 
-    def test_project_logs_with_per_page_parameter(self, authenticated_client, test_project, test_run):
+    def test_project_logs_with_per_page_parameter(
+        self, authenticated_client, test_project, test_run
+    ):
         """per_pageパラメータでページサイズを変更できる"""
         for i in range(20):
             log = ExecutionLog(
@@ -223,11 +232,12 @@ class TestProjectLogs:
         response = authenticated_client.get(f"/logs/projects/{test_project.id}?per_page=5")
         assert response.status_code == 200
 
-    def test_project_logs_json_response(self, authenticated_client, test_project, test_run, test_execution_log):
+    def test_project_logs_json_response(
+        self, authenticated_client, test_project, test_run, test_execution_log
+    ):
         """Accept: application/jsonヘッダーでJSON形式を返す"""
         response = authenticated_client.get(
-            f"/logs/projects/{test_project.id}",
-            headers={"Accept": "application/json"}
+            f"/logs/projects/{test_project.id}", headers={"Accept": "application/json"}
         )
 
         assert response.status_code == 200
@@ -270,7 +280,9 @@ class TestRunLogs:
         db.session.add(other_user)
         db.session.commit()
 
-        other_project = Project(owner_id=other_user.id, name="other_project", local_path="/tmp/other")
+        other_project = Project(
+            owner_id=other_user.id, name="other_project", local_path="/tmp/other"
+        )
         db.session.add(other_project)
         db.session.commit()
 
@@ -294,7 +306,9 @@ class TestRunLogs:
         assert b"Self-Healing Metrics" in response.data or b"Metrics" in response.data
         assert b"Model:" in response.data or b"Exec Time:" in response.data
 
-    def test_run_logs_displays_execution_logs(self, authenticated_client, test_run, test_execution_log):
+    def test_run_logs_displays_execution_logs(
+        self, authenticated_client, test_run, test_execution_log
+    ):
         """実行ログが表示される"""
         response = authenticated_client.get(f"/logs/runs/{test_run.run_id}")
 
@@ -305,7 +319,9 @@ class TestRunLogs:
     def test_run_logs_with_source_filter(self, authenticated_client, test_run):
         """sourceでフィルタリングできる"""
         log1 = ExecutionLog(run_id=test_run.id, source="NPE", level="INFO", message="NPE log")
-        log2 = ExecutionLog(run_id=test_run.id, source="ORCHESTRATOR", level="INFO", message="Orchestrator log")
+        log2 = ExecutionLog(
+            run_id=test_run.id, source="ORCHESTRATOR", level="INFO", message="Orchestrator log"
+        )
         db.session.add_all([log1, log2])
         db.session.commit()
 
@@ -380,8 +396,7 @@ class TestRunLogs:
     def test_run_logs_json_response(self, authenticated_client, test_run, test_execution_log):
         """Accept: application/jsonヘッダーでJSON形式を返す"""
         response = authenticated_client.get(
-            f"/logs/runs/{test_run.run_id}",
-            headers={"Accept": "application/json"}
+            f"/logs/runs/{test_run.run_id}", headers={"Accept": "application/json"}
         )
 
         assert response.status_code == 200

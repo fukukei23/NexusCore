@@ -9,13 +9,12 @@
 # ==============================================================================
 from __future__ import annotations
 
-import os
-from typing import Optional
 from nexuscore.logging_standard import get_logger
 
 # .env を環境にロード（既存環境変数は上書きしない = 環境変数が最優先）
 try:
     from dotenv import load_dotenv
+
     load_dotenv(override=False)
 except Exception:
     pass
@@ -28,14 +27,15 @@ except Exception:
 
 # 4.4: Retry と例外分類
 try:
-    from nexuscore.core.retry_utils import retry_with_context, RetryContext
     from nexuscore.core.errors import (
+        InvalidModelOutputError,
+        ModelConnectionError,
         ModelRateLimitError,
         ModelTimeoutError,
-        ModelConnectionError,
-        InvalidModelOutputError,
         convert_http_error_to_nexus_error,
     )
+    from nexuscore.core.retry_utils import RetryContext, retry_with_context
+
     HAS_RETRY = True
 except ImportError:
     HAS_RETRY = False
@@ -54,32 +54,35 @@ class BaseAgent:
     - execute_llm_task(prompt, as_json=False) を通じて LLM を実行
     - as_json=True の場合は「JSONのみ」system 指示を自動付与
     """
+
     # 各派生クラスで上書き可能
     SYSTEM_PROMPT: str = "You are a helpful assistant."
 
     def __init__(self) -> None:
         self.logger = get_logger(__name__)
         # ルーター初期化（失敗しても動作は継続する）
-        self.llm_router: Optional[object] = None
+        self.llm_router: object | None = None
         try:
             if LLMRouter is not None:
                 self.llm_router = LLMRouter()
             else:
-                self.logger.warning("LLMRouter が見つかりません。ローカルフォールバックに切り替えます。")
+                self.logger.warning(
+                    "LLMRouter が見つかりません。ローカルフォールバックに切り替えます。"
+                )
         except Exception as e:
             self.logger.error(f"LLMRouter 初期化に失敗: {e}", exc_info=True)
             self.llm_router = None
         # 4.4: RetryContext を保持（self_healing_service から設定可能）
-        self.retry_context: Optional[RetryContext] = None
+        self.retry_context: RetryContext | None = None
 
     # ---------------------------- Public API ---------------------------- #
     def execute_llm_task(
         self,
         prompt: str,
         as_json: bool = False,
-        task_type: Optional[str] = None,
-        retry_context: Optional[RetryContext] = None,
-        **kwargs
+        task_type: str | None = None,
+        retry_context: RetryContext | None = None,
+        **kwargs,
     ) -> str:
         """
         ルーター経由で最適な LLM を取得し実行。
@@ -125,14 +128,12 @@ class BaseAgent:
             if llm and hasattr(llm, "execute"):
                 try:
                     result = llm.execute(
-                        prompt=prompt,
-                        system_prompt=system_prompt,
-                        as_json=as_json,
-                        **kwargs
+                        prompt=prompt, system_prompt=system_prompt, as_json=as_json, **kwargs
                     )
                     # as_json=True の場合、JSON パースを試行して検証
                     if as_json and result:
                         import json
+
                         try:
                             json.loads(result)
                         except json.JSONDecodeError as e:
@@ -153,10 +154,11 @@ class BaseAgent:
         active_retry_context = retry_context or self.retry_context
         if HAS_RETRY and retry_with_context:
             from nexuscore.core.errors import (
+                ModelConnectionError,
                 ModelRateLimitError,
                 ModelTimeoutError,
-                ModelConnectionError,
             )
+
             wrapped_func = retry_with_context(
                 _execute_llm_internal,
                 max_retries=2,

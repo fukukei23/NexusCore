@@ -16,17 +16,13 @@ file_utils.py の包括的テスト
 
 import json
 import os
-import tempfile
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-import pytest
+from unittest.mock import Mock
 
 from nexuscore.utils.file_utils import (
+    create_project_structure,
+    download_history,
     extract_file_content,
     file_list_display,
-    download_history,
-    create_project_structure,
 )
 
 
@@ -195,7 +191,7 @@ class TestDownloadHistory:
         """単純な履歴をダウンロード"""
         history = [
             {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": "Hi there"}
+            {"role": "assistant", "content": "Hi there"},
         ]
 
         filename = download_history(history)
@@ -207,7 +203,7 @@ class TestDownloadHistory:
             assert filename.endswith(".json")
 
             # 内容を確認
-            with open(filename, "r", encoding="utf-8") as f:
+            with open(filename, encoding="utf-8") as f:
                 loaded = json.load(f)
 
             assert loaded == history
@@ -225,7 +221,7 @@ class TestDownloadHistory:
         try:
             assert os.path.exists(filename)
 
-            with open(filename, "r", encoding="utf-8") as f:
+            with open(filename, encoding="utf-8") as f:
                 loaded = json.load(f)
 
             assert loaded == []
@@ -237,13 +233,13 @@ class TestDownloadHistory:
         """Unicode文字を含む履歴"""
         history = [
             {"role": "user", "content": "こんにちは"},
-            {"role": "assistant", "content": "안녕하세요"}
+            {"role": "assistant", "content": "안녕하세요"},
         ]
 
         filename = download_history(history)
 
         try:
-            with open(filename, "r", encoding="utf-8") as f:
+            with open(filename, encoding="utf-8") as f:
                 loaded = json.load(f)
 
             assert loaded[0]["content"] == "こんにちは"
@@ -280,7 +276,7 @@ class TestDownloadHistory:
 
         try:
             # ファイル内容を直接読み込む（JSONパースせず）
-            with open(filename, "r", encoding="utf-8") as f:
+            with open(filename, encoding="utf-8") as f:
                 content = f.read()
 
             # エスケープされずに日本語が直接保存されている
@@ -308,9 +304,7 @@ class TestCreateProjectStructure:
         """単一ファイルを作成"""
         root = tmp_path / "single_file_project"
 
-        files = [
-            {"name": "README.md", "type": "file", "content": "# Test Project"}
-        ]
+        files = [{"name": "README.md", "type": "file", "content": "# Test Project"}]
 
         create_project_structure(str(root), files)
 
@@ -322,9 +316,7 @@ class TestCreateProjectStructure:
         """単一フォルダを作成"""
         root = tmp_path / "single_folder_project"
 
-        files = [
-            {"name": "src", "type": "folder"}
-        ]
+        files = [{"name": "src", "type": "folder"}]
 
         create_project_structure(str(root), files)
 
@@ -373,7 +365,11 @@ class TestCreateProjectStructure:
         root = tmp_path / "backslash_project"
 
         files = [
-            {"name": "src\\\\components\\\\Button.tsx", "type": "file", "content": "export const Button"}
+            {
+                "name": "src\\\\components\\\\Button.tsx",
+                "type": "file",
+                "content": "export const Button",
+            }
         ]
 
         create_project_structure(str(root), files)
@@ -386,9 +382,7 @@ class TestCreateProjectStructure:
         """先頭のスラッシュを含むパス"""
         root = tmp_path / "leading_slash"
 
-        files = [
-            {"name": "/src/main.py", "type": "file", "content": "# Main"}
-        ]
+        files = [{"name": "/src/main.py", "type": "file", "content": "# Main"}]
 
         create_project_structure(str(root), files)
 
@@ -522,9 +516,7 @@ class TestEdgeCases:
         path_parts = ["level" + str(i) for i in range(10)]
         deep_path = "/".join(path_parts) + "/file.txt"
 
-        files = [
-            {"name": deep_path, "type": "file", "content": "Deep file"}
-        ]
+        files = [{"name": deep_path, "type": "file", "content": "Deep file"}]
 
         create_project_structure(str(root), files)
 

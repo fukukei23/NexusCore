@@ -18,32 +18,32 @@ Self-Healing Code Review MVP の本体サービス。
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import shutil
 import subprocess
 import time
-import uuid
+from datetime import UTC
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from nexuscore.core.session_control import SessionController
-from nexuscore.core.run_history import RunHistoryLogger
-from nexuscore.core.diff_preview import wrap_diff_as_markdown, summarize_diff_files
-from nexuscore.core.stacktrace_mapper import extract_candidate_files
 from nexuscore.agents.patch_applier import PatchApplier
 from nexuscore.config.self_healing_config import SelfHealingConfig
+from nexuscore.core.diff_preview import summarize_diff_files, wrap_diff_as_markdown
+from nexuscore.core.run_history import RunHistoryLogger
+from nexuscore.core.session_control import SessionController
+from nexuscore.core.stacktrace_mapper import extract_candidate_files
 from nexuscore.diff.semantic_diff import compute_semantic_diff
 
 # 4.4: Retry と例外分類
 try:
-    from nexuscore.core.retry_utils import RetryContext
     from nexuscore.core.errors import (
         SandboxExecutionError,
         convert_http_error_to_nexus_error,
     )
-    from nexuscore.core.sandbox_executor import run_in_sandbox, SandboxResult
+    from nexuscore.core.retry_utils import RetryContext
+    from nexuscore.core.sandbox_executor import SandboxResult, run_in_sandbox
+
     HAS_RETRY = True
 except ImportError:
     HAS_RETRY = False
@@ -65,11 +65,11 @@ class SelfHealingService:
     def __init__(
         self,
         project_root: str,
-        session_controller: Optional[SessionController] = None,
+        session_controller: SessionController | None = None,
         debugger_agent: Any = None,
-        patch_applier: Optional[PatchApplier] = None,
-        history_logger: Optional[RunHistoryLogger] = None,
-        config: Optional[SelfHealingConfig] = None,
+        patch_applier: PatchApplier | None = None,
+        history_logger: RunHistoryLogger | None = None,
+        config: SelfHealingConfig | None = None,
     ) -> None:
         """
         :param project_root: NexusCore プロジェクトのルート
@@ -99,7 +99,7 @@ class SelfHealingService:
         repo_full_name: str,
         pr_number: int,
         head_sha: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         指定された PR に対して Self-Healing コードレビューを 1 回実行する。
 
@@ -116,13 +116,13 @@ class SelfHealingService:
         """
         # 実行時間の記録開始
         import time
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         run_id = f"sh-{int(time.time())}-{pr_number}-{head_sha[:7]}"
         session_id = self.session_controller.session_id
 
         started_ts = time.monotonic()
-        started_at_iso = datetime.now(timezone.utc).isoformat()
+        started_at_iso = datetime.now(UTC).isoformat()
         started_at = time.time()
 
         # 4.4: Retry コンテキストを初期化（全ステップで共有）
@@ -132,7 +132,11 @@ class SelfHealingService:
         if retry_context:
             if self.debugger_agent and hasattr(self.debugger_agent, "retry_context"):
                 self.debugger_agent.retry_context = retry_context
-            if hasattr(self, "_guardian_agent") and self._guardian_agent and hasattr(self._guardian_agent, "retry_context"):
+            if (
+                hasattr(self, "_guardian_agent")
+                and self._guardian_agent
+                and hasattr(self._guardian_agent, "retry_context")
+            ):
                 self._guardian_agent.retry_context = retry_context
 
         repo_slug = repo_full_name.replace("/", "_")
@@ -418,7 +422,7 @@ class SelfHealingService:
 
             # 7. 実際に Patch を適用
             # E-5: パッチ適用前に、変更されるすべてのファイルの before を取得
-            before_code_by_file: Dict[str, str] = {}
+            before_code_by_file: dict[str, str] = {}
             patch_changed_files = summarize_diff_files(patch_text)
             for file_path in patch_changed_files:  # E-5: すべてのファイルを取得
                 full_path = project_path / file_path
@@ -438,10 +442,14 @@ class SelfHealingService:
 
             # E-5: パッチ適用後に、変更されたすべてのファイルの after を取得し、差分サマリーを生成
             diff_summary = None
-            if before_code_by_file and hasattr(self, "_guardian_agent") and self._guardian_agent is not None:
+            if (
+                before_code_by_file
+                and hasattr(self, "_guardian_agent")
+                and self._guardian_agent is not None
+            ):
                 try:
                     # すべてのファイルの before/after を dict に格納
-                    file_diffs: Dict[str, Dict[str, str]] = {}
+                    file_diffs: dict[str, dict[str, str]] = {}
                     for file_path, before_code in before_code_by_file.items():
                         full_path = project_path / file_path
                         if full_path.exists():
@@ -452,7 +460,7 @@ class SelfHealingService:
                             }
 
                     # Semantic Diff を生成して details に積む
-                    semantic_diffs: Dict[str, Dict[str, object]] = {}
+                    semantic_diffs: dict[str, dict[str, object]] = {}
                     for rel_path, contents in file_diffs.items():
                         before = contents.get("before") or ""
                         after = contents.get("after") or ""
@@ -477,7 +485,9 @@ class SelfHealingService:
                             semantic_diffs=semantic_diffs if semantic_diffs else None,
                             model="gpt-4.1",
                         )
-                        self.logger.info(f"Generated diff summary for {len(file_diffs)} files via GuardianAgent")
+                        self.logger.info(
+                            f"Generated diff summary for {len(file_diffs)} files via GuardianAgent"
+                        )
                 except Exception as e:
                     self.logger.warning(f"Failed to generate diff summary: {e}", exc_info=True)
 
@@ -589,7 +599,7 @@ class SelfHealingService:
     # ------------------------------------------------------------------
     # 内部ユーティリティ
     # ------------------------------------------------------------------
-    def _maybe_stop(self, phase: str, meta: Optional[Dict[str, Any]] = None) -> None:
+    def _maybe_stop(self, phase: str, meta: dict[str, Any] | None = None) -> None:
         if not self.session_controller:
             return
         try:
@@ -629,9 +639,7 @@ class SelfHealingService:
             # 既存のローカル clone を利用するパターン
             from_repo = Path(base_dir) / repo_full_name
             if from_repo.exists():
-                self.logger.info(
-                    f"Copying existing repo from {from_repo} to sandbox {target_dir}"
-                )
+                self.logger.info(f"Copying existing repo from {from_repo} to sandbox {target_dir}")
                 shutil.copytree(from_repo, target_dir)
             else:
                 self.logger.warning(
@@ -679,7 +687,9 @@ class SelfHealingService:
             self.logger.error(f"git checkout {head_sha} failed: {e.stdout}", exc_info=True)
             raise
 
-    def _run_tests(self, project_path: Path, retry_context: Optional[RetryContext] = None) -> Tuple[bool, str]:
+    def _run_tests(
+        self, project_path: Path, retry_context: RetryContext | None = None
+    ) -> tuple[bool, str]:
         """
         プロジェクト配下でテストコマンドを実行する。
         デフォルトは pytest。環境変数 NEXUS_SELF_HEALING_TEST_CMD で上書き可能。
@@ -715,7 +725,8 @@ class SelfHealingService:
 
                 # RetryContext に記録
                 if retry_context and result.exception_type:
-                    from nexuscore.core.errors import SandboxExecutionError, classify_error
+                    from nexuscore.core.errors import SandboxExecutionError
+
                     error = SandboxExecutionError(f"Sandbox execution failed: {result.stderr}")
                     retry_context.record_attempt(
                         attempt=0,  # sandbox_executor 内部で retry 済み
@@ -755,9 +766,9 @@ class SelfHealingService:
     def _get_changed_files(
         self,
         project_path: Path,
-        base_ref: Optional[str],
-        head_ref: Optional[str],
-    ) -> List[str]:
+        base_ref: str | None,
+        head_ref: str | None,
+    ) -> list[str]:
         """
         PR で変更されたファイル一覧を git diff から取得する。
 
@@ -784,12 +795,10 @@ class SelfHealingService:
             )
 
             if proc.returncode != 0:
-                self.logger.warning(
-                    f"git diff failed (code={proc.returncode}): {proc.stderr}"
-                )
+                self.logger.warning(f"git diff failed (code={proc.returncode}): {proc.stderr}")
                 return []
 
-            files: List[str] = []
+            files: list[str] = []
             for line in proc.stdout.splitlines():
                 path = line.strip()
                 if path:
@@ -805,9 +814,9 @@ class SelfHealingService:
         *,
         project_path: Path,
         error_log: str,
-        changed_files: List[str],
-        stacktrace_files: List[str],
-    ) -> Dict[str, str]:
+        changed_files: list[str],
+        stacktrace_files: list[str],
+    ) -> dict[str, str]:
         """
         DebuggerAgent に渡す対象ファイルの内容を集める。
 
@@ -815,7 +824,7 @@ class SelfHealingService:
           1. stacktrace_files
           2. changed_files
         """
-        candidates: List[str] = []
+        candidates: list[str] = []
         for path in stacktrace_files:
             if path not in candidates:
                 candidates.append(path)
@@ -824,7 +833,7 @@ class SelfHealingService:
                 candidates.append(path)
 
         # パスが絶対 / 相対の両方あり得るので、少しだけ頑張る
-        files_dict: Dict[str, str] = {}
+        files_dict: dict[str, str] = {}
 
         for p in candidates:
             abs_path = Path(p)
@@ -862,9 +871,9 @@ class SelfHealingService:
     def _generate_patch_via_debugger(
         self,
         error_log: str,
-        files: Dict[str, str],
+        files: dict[str, str],
         project_path: Path,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         DebuggerAgent にエラーとファイル情報を渡して patch を生成させる。
 
@@ -891,9 +900,7 @@ class SelfHealingService:
                     files=files,
                 )
 
-            self.logger.warning(
-                "DebuggerAgent has neither 'debug_and_patch' nor 'generate_patch'."
-            )
+            self.logger.warning("DebuggerAgent has neither 'debug_and_patch' nor 'generate_patch'.")
             return {}
         except Exception as e:
             self.logger.error(
@@ -912,18 +919,18 @@ class SelfHealingService:
         head_sha: str,
         status: str,
         summary: str,
-        details: Dict[str, Any],
+        details: dict[str, Any],
         started_at: float,
-        started_at_iso: Optional[str] = None,
-        started_ts: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        started_at_iso: str | None = None,
+        started_ts: float | None = None,
+    ) -> dict[str, Any]:
         """
         RunHistoryLogger への記録と戻り値 dict の生成をまとめる。
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         finished_at = time.time()
-        finished_at_iso = datetime.now(timezone.utc).isoformat()
+        finished_at_iso = datetime.now(UTC).isoformat()
 
         # 所要時間の計算
         if started_ts is not None:
@@ -934,7 +941,7 @@ class SelfHealingService:
 
         # ISO8601形式の開始時刻が未指定の場合は生成
         if started_at_iso is None:
-            started_at_iso = datetime.fromtimestamp(started_at, tz=timezone.utc).isoformat()
+            started_at_iso = datetime.fromtimestamp(started_at, tz=UTC).isoformat()
 
         try:
             record = self.history_logger.new_self_healing_record(
@@ -972,8 +979,8 @@ class SelfHealingService:
         # E-5: Run レポートの自動生成（webapp が利用可能な場合）
         try:
             from nexuscore.integration.run_report_generator import write_run_report_file
-            from nexuscore.webapp.models import Run
             from nexuscore.webapp import db
+            from nexuscore.webapp.models import Run
 
             # run_id で Run を検索
             run = Run.query.filter_by(run_id=run_id).first()  # type: ignore
@@ -999,5 +1006,3 @@ class SelfHealingService:
             "finished_at_iso": finished_at_iso,
             "duration_seconds": duration_seconds,
         }
-
-

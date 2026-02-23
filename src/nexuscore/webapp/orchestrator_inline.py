@@ -3,14 +3,14 @@ NexusCore Webapp - Orchestrator インライン実行ヘルパー
 
 同期実行用のヘルパー関数（デバッグ用）。
 """
+
 from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Optional
 
-from nexuscore.webapp.models import Run, Project
 from nexuscore.webapp import db
+from nexuscore.webapp.models import Project, Run
 from nexuscore.webapp.orchestrator_helper import run_orchestrator_sync
 
 logger = logging.getLogger(__name__)
@@ -86,4 +86,3 @@ def run_orchestrator_inline(
                 )
         except Exception as e:
             logger.warning(f"Failed to send Slack notification: {e}", exc_info=True)
-

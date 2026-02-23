@@ -6,17 +6,17 @@ NexusCore SaaS基盤 - サンドボックス実行の安定化
 
 既存の Orchestrator / NPE / Agents とは独立して動作する。
 """
+
 from __future__ import annotations
 
 import enum
 import logging
 import os
 import subprocess
-import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any
 
 try:
     import resource
@@ -101,12 +101,10 @@ def _check_forbidden_modules(code: str) -> None:
     if detected_modules:
         module_list = ", ".join(sorted(set(detected_modules)))
         logger.warning(f"Forbidden module usage detected: {module_list}")
-        raise SandboxSecurityError(
-            f"Forbidden module(s) detected in code: {module_list}"
-        )
+        raise SandboxSecurityError(f"Forbidden module(s) detected in code: {module_list}")
 
 
-def load_sandbox_policy(policy_path: str | None = None) -> Dict[str, Any]:
+def load_sandbox_policy(policy_path: str | None = None) -> dict[str, Any]:
     """
     sandbox_policy.yml を読み込んで辞書として返す。
 
@@ -180,6 +178,7 @@ class SandboxExceptionType(enum.Enum):
     """
     サンドボックス実行時の例外種別
     """
+
     RATE_LIMIT = "rate_limit"  # レート制限エラー
     TIMEOUT = "timeout"  # タイムアウト
     INVALID_OUTPUT = "invalid_output"  # 無効な出力
@@ -192,11 +191,12 @@ class SandboxResult:
     """
     サンドボックス実行結果
     """
+
     stdout: str
     stderr: str
     returncode: int
     timed_out: bool = False
-    exception_type: Optional[SandboxExceptionType] = None
+    exception_type: SandboxExceptionType | None = None
     execution_time_sec: float = 0.0
 
 
@@ -212,7 +212,7 @@ class SandboxExecutor:
         default_timeout_sec: int = 300,
         max_retries: int = 3,
         retry_delay_sec: float = 1.0,
-        policy: Dict[str, Any] | None = None,
+        policy: dict[str, Any] | None = None,
     ):
         """
         Args:
@@ -236,10 +236,10 @@ class SandboxExecutor:
 
     def run_in_sandbox(
         self,
-        cmd: List[str],
-        timeout_sec: Optional[int] = None,
-        cwd: Optional[str | Path] = None,
-        env: Optional[dict] = None,
+        cmd: list[str],
+        timeout_sec: int | None = None,
+        cwd: str | Path | None = None,
+        env: dict | None = None,
         retry_on_errors: bool = True,
     ) -> SandboxResult:
         """
@@ -262,7 +262,7 @@ class SandboxExecutor:
             現時点では、リソース制限（メモリ・CPU時間）のみが適用される。
         """
         timeout = timeout_sec or self.default_timeout_sec
-        last_exception: Optional[Exception] = None
+        last_exception: Exception | None = None
 
         for attempt in range(self.max_retries + 1):
             try:
@@ -273,7 +273,9 @@ class SandboxExecutor:
                 last_exception = e
                 exception_type = SandboxExceptionType.TIMEOUT
                 # サンドボックスログ（タイムアウト）
-                self._log_sandbox_error(None, exception_type, "Sandbox timed out", {"cmd": cmd, "timeout": timeout})
+                self._log_sandbox_error(
+                    None, exception_type, "Sandbox timed out", {"cmd": cmd, "timeout": timeout}
+                )
                 if not retry_on_errors or attempt >= self.max_retries:
                     return SandboxResult(
                         stdout="",
@@ -314,7 +316,9 @@ class SandboxExecutor:
                     )
 
                 # サンドボックスログ（エラー）
-                self._log_sandbox_error(None, exception_type, f"Sandbox execution error: {str(e)[:200]}", {"cmd": cmd})
+                self._log_sandbox_error(
+                    None, exception_type, f"Sandbox execution error: {str(e)[:200]}", {"cmd": cmd}
+                )
 
                 # ロジック系の失敗はリトライしない
                 if exception_type == SandboxExceptionType.EXECUTION_ERROR:
@@ -327,7 +331,7 @@ class SandboxExecutor:
 
                 # リトライ可能なエラー
                 if retry_on_errors and attempt < self.max_retries:
-                    delay = self.retry_delay_sec * (2 ** attempt)  # 指数バックオフ
+                    delay = self.retry_delay_sec * (2**attempt)  # 指数バックオフ
                     logger.warning(
                         f"Sandbox execution failed (attempt {attempt + 1}/{self.max_retries + 1}): {e}. "
                         f"Retrying in {delay:.1f}s..."
@@ -353,10 +357,10 @@ class SandboxExecutor:
 
     def _execute_once(
         self,
-        cmd: List[str],
+        cmd: list[str],
         timeout_sec: int,
-        cwd: Optional[str | Path],
-        env: Optional[dict],
+        cwd: str | Path | None,
+        env: dict | None,
     ) -> SandboxResult:
         """
         1回の実行を実行（リトライなし）
@@ -389,20 +393,20 @@ class SandboxExecutor:
                 execution_time_sec=execution_time,
             )
 
-        except subprocess.TimeoutExpired as e:
+        except subprocess.TimeoutExpired:
             execution_time = time.time() - start_time
             raise
 
-        except Exception as e:
+        except Exception:
             execution_time = time.time() - start_time
             raise
 
     def _log_sandbox_error(
         self,
-        run_db_id: Optional[int],
+        run_db_id: int | None,
         error_type: SandboxExceptionType,
         message: str,
-        payload: Optional[Dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
     ) -> None:
         """
         サンドボックスエラーを ExecutionLog に記録する（Flaskアプリコンテキストが存在する場合のみ）
@@ -422,7 +426,7 @@ class SandboxExecutor:
             # インポートエラーは既存の処理を止めない
             return
 
-        base_payload: Dict[str, Any] = {"error_type": error_type.value}
+        base_payload: dict[str, Any] = {"error_type": error_type.value}
         if payload:
             base_payload.update(payload)
 
@@ -441,7 +445,10 @@ class SandboxExecutor:
         error_msg = str(exception).lower()
 
         # レート制限
-        if any(keyword in error_msg for keyword in ["rate limit", "rate_limit", "429", "too many requests"]):
+        if any(
+            keyword in error_msg
+            for keyword in ["rate limit", "rate_limit", "429", "too many requests"]
+        ):
             return SandboxExceptionType.RATE_LIMIT
 
         # ネットワークエラー
@@ -461,10 +468,10 @@ _default_executor = SandboxExecutor()
 
 
 def run_in_sandbox(
-    cmd: List[str],
+    cmd: list[str],
     timeout_sec: int = 300,
-    cwd: Optional[str | Path] = None,
-    env: Optional[dict] = None,
+    cwd: str | Path | None = None,
+    env: dict | None = None,
     retry_on_errors: bool = True,
 ) -> SandboxResult:
     """
@@ -487,4 +494,3 @@ def run_in_sandbox(
         env=env,
         retry_on_errors=retry_on_errors,
     )
-

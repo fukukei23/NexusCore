@@ -5,6 +5,7 @@ webapp/orchestrator_helper.py の高品質なテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask legacy orchestrator_helper tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -86,7 +87,9 @@ class TestCreateOrchestratorInstance:
 
         with patch("nexuscore.webapp.orchestrator_helper.assemble_agent_team") as mock_team:
             with patch("nexuscore.webapp.orchestrator_helper.Orchestrator") as MockOrchestrator:
-                with patch("nexuscore.webapp.orchestrator_helper.SessionController") as MockSessionController:
+                with patch(
+                    "nexuscore.webapp.orchestrator_helper.SessionController"
+                ) as MockSessionController:
                     mock_team.return_value = {}
                     mock_orchestrator = Mock()
                     MockOrchestrator.return_value = mock_orchestrator
@@ -113,7 +116,9 @@ class TestCreateOrchestratorInstance:
 
         with patch("nexuscore.webapp.orchestrator_helper.assemble_agent_team") as mock_team:
             with patch("nexuscore.webapp.orchestrator_helper.Orchestrator") as MockOrchestrator:
-                with patch("nexuscore.webapp.orchestrator_helper.SessionController") as MockSessionController:
+                with patch(
+                    "nexuscore.webapp.orchestrator_helper.SessionController"
+                ) as MockSessionController:
                     mock_team.return_value = {}
                     mock_orchestrator = Mock()
                     MockOrchestrator.return_value = mock_orchestrator
@@ -137,7 +142,9 @@ class TestCreateOrchestratorInstance:
 
         with patch("nexuscore.webapp.orchestrator_helper.assemble_agent_team") as mock_team:
             with patch("nexuscore.webapp.orchestrator_helper.Orchestrator") as MockOrchestrator:
-                with patch("nexuscore.webapp.orchestrator_helper.SessionController") as MockSessionController:
+                with patch(
+                    "nexuscore.webapp.orchestrator_helper.SessionController"
+                ) as MockSessionController:
                     mock_team.return_value = {}
                     mock_orchestrator = Mock()
                     MockOrchestrator.return_value = mock_orchestrator
@@ -192,7 +199,9 @@ class TestCreateOrchestratorInstance:
                     MockOrchestrator.return_value = mock_orchestrator
 
                     # AppConfig がエラーを投げる
-                    MockAppConfig.BASELINE_AUTOMATION_POLICY.get.side_effect = Exception("Config error")
+                    MockAppConfig.BASELINE_AUTOMATION_POLICY.get.side_effect = Exception(
+                        "Config error"
+                    )
 
                     # エラーを無視してデフォルト値で進む
                     result = create_orchestrator_instance(project_path=project_path)
@@ -227,7 +236,9 @@ class TestRunOrchestratorSync:
 
         project_path = str(tmp_path)
 
-        with patch("nexuscore.webapp.orchestrator_helper.create_orchestrator_instance") as mock_create:
+        with patch(
+            "nexuscore.webapp.orchestrator_helper.create_orchestrator_instance"
+        ) as mock_create:
             mock_orchestrator = Mock()
             mock_orchestrator.run_full_project = Mock()
             mock_create.return_value = mock_orchestrator
@@ -249,7 +260,9 @@ class TestRunOrchestratorSync:
 
         project_path = str(tmp_path)
 
-        with patch("nexuscore.webapp.orchestrator_helper.create_orchestrator_instance") as mock_create:
+        with patch(
+            "nexuscore.webapp.orchestrator_helper.create_orchestrator_instance"
+        ) as mock_create:
             mock_orchestrator = Mock()
             mock_orchestrator.run_full_project = Mock()
             mock_create.return_value = mock_orchestrator
@@ -272,7 +285,9 @@ class TestRunOrchestratorSync:
 
         project_path = str(tmp_path)
 
-        with patch("nexuscore.webapp.orchestrator_helper.create_orchestrator_instance") as mock_create:
+        with patch(
+            "nexuscore.webapp.orchestrator_helper.create_orchestrator_instance"
+        ) as mock_create:
             mock_orchestrator = Mock()
             mock_orchestrator.run_full_project = Mock()
             mock_create.return_value = mock_orchestrator
@@ -291,7 +306,9 @@ class TestRunOrchestratorSync:
 
         project_path = str(tmp_path)
 
-        with patch("nexuscore.webapp.orchestrator_helper.create_orchestrator_instance") as mock_create:
+        with patch(
+            "nexuscore.webapp.orchestrator_helper.create_orchestrator_instance"
+        ) as mock_create:
             mock_orchestrator = Mock()
             mock_orchestrator.run_full_project = Mock()
             mock_create.return_value = mock_orchestrator
@@ -319,7 +336,9 @@ class TestRunOrchestratorSync:
 
         project_path = str(tmp_path)
 
-        with patch("nexuscore.webapp.orchestrator_helper.create_orchestrator_instance") as mock_create:
+        with patch(
+            "nexuscore.webapp.orchestrator_helper.create_orchestrator_instance"
+        ) as mock_create:
             mock_orchestrator = Mock()
             mock_orchestrator.run_full_project = Mock()
             mock_create.return_value = mock_orchestrator
@@ -341,7 +360,9 @@ class TestRunOrchestratorSync:
 
         project_path = str(tmp_path)
 
-        with patch("nexuscore.webapp.orchestrator_helper.create_orchestrator_instance") as mock_create:
+        with patch(
+            "nexuscore.webapp.orchestrator_helper.create_orchestrator_instance"
+        ) as mock_create:
             mock_orchestrator = Mock()
             mock_orchestrator.run_full_project.side_effect = Exception("Orchestrator error")
             mock_create.return_value = mock_orchestrator

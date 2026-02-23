@@ -10,6 +10,7 @@
 
 詳細なエラーコード仕様は `docs/api/ERROR_CODE_CATALOG.md` を参照してください。
 """
+
 from pydantic import BaseModel, Field
 
 
@@ -23,7 +24,10 @@ class ErrorDetail(BaseModel):
             - 詳細なエラーコード仕様は `docs/api/ERROR_CODE_CATALOG.md` を参照してください
         message: 人間が読めるエラーメッセージ
     """
-    code: str = Field(..., description="エラーコード（ERROR_CODE_CATALOG.md に定義されたコードのみ使用）")
+
+    code: str = Field(
+        ..., description="エラーコード（ERROR_CODE_CATALOG.md に定義されたコードのみ使用）"
+    )
     message: str = Field(..., description="人間が読めるエラーメッセージ")
 
 
@@ -43,15 +47,12 @@ class ErrorResponse(BaseModel):
 
     詳細なエラーコード仕様は `docs/api/ERROR_CODE_CATALOG.md` を参照してください。
     """
+
     error: ErrorDetail = Field(..., description="エラー詳細情報")
 
     class Config:
         json_schema_extra = {
             "example": {
-                "error": {
-                    "code": "PROJECT_NOT_FOUND",
-                    "message": "Project with id 123 not found"
-                }
+                "error": {"code": "PROJECT_NOT_FOUND", "message": "Project with id 123 not found"}
             }
         }
-

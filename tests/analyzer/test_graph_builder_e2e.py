@@ -11,7 +11,8 @@ import pytest
 
 try:
     from nexuscore.analyzer.graph_builder import DependencyGraphBuilder
-    from nexuscore.analyzer.unified_analyzer import TreeSitterEngine, AnalysisResult
+    from nexuscore.analyzer.unified_analyzer import AnalysisResult, TreeSitterEngine
+
     HAS_ANALYZER = True
 except ImportError:
     HAS_ANALYZER = False
@@ -60,4 +61,3 @@ def test_graph_builder_builds_dependency_graph(sample_project_dir):
     node_strs = [str(n) for n in nodes]
     assert any("module_a" in n for n in node_strs), f"module_a not found in nodes: {node_strs}"
     assert any("module_b" in n for n in node_strs), f"module_b not found in nodes: {node_strs}"
-

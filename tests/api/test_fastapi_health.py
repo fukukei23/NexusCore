@@ -3,6 +3,7 @@ FastAPI Health エンドポイントのテスト
 
 CR-FASTAPI-001 で作成された /api/v1/health エンドポイントのテスト。
 """
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -12,6 +13,7 @@ def client():
     """FastAPI TestClient のフィクスチャ"""
     # インポートを遅延させて、テスト実行時のパフォーマンスを向上
     from nexuscore.api.fastapi_app import app
+
     return TestClient(app)
 
 
@@ -56,4 +58,3 @@ def test_health_check_openapi_definition(client: TestClient):
     get_operation = health_path["get"]
     assert "responses" in get_operation
     assert "200" in get_operation["responses"]
-

@@ -22,7 +22,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 
 def _get_lock_dir() -> Path:
@@ -78,7 +78,7 @@ def _lock_file_path(run_id: str) -> Path:
 def _is_lock_stale(lock_path: Path) -> bool:
     """Check if a lock file is stale (expires_at < now)."""
     try:
-        with open(lock_path, "r") as f:
+        with open(lock_path) as f:
             data = json.load(f)
         expires_at = data.get("expires_at")
         if not expires_at:
@@ -99,7 +99,7 @@ def _move_to_stale(lock_path: Path) -> None:
         pass
 
 
-def try_acquire_run_lock(run_id: str) -> Tuple[bool, Optional[str]]:
+def try_acquire_run_lock(run_id: str) -> tuple[bool, str | None]:
     """
     Attempt to acquire a filesystem lock for a given run_id.
 
@@ -172,7 +172,7 @@ def try_acquire_run_lock(run_id: str) -> Tuple[bool, Optional[str]]:
         return False, f"LOCK_ERROR: {str(e)}"
 
 
-def refresh_run_lock(run_id: str) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
+def refresh_run_lock(run_id: str) -> tuple[bool, str | None, dict[str, Any] | None]:
     """
     Refresh the lock expiration time for a given run_id (owner verification required).
 
@@ -200,7 +200,7 @@ def refresh_run_lock(run_id: str) -> Tuple[bool, Optional[str], Optional[Dict[st
         if not lock_path.exists():
             return False, "LOCK_NOT_FOUND", None
 
-        with open(lock_path, "r") as f:
+        with open(lock_path) as f:
             lock_data = json.load(f)
     except (json.JSONDecodeError, OSError, FileNotFoundError) as e:
         return False, "LOCK_REFRESH_FAILED", {"error": str(e), "error_type": type(e).__name__}
@@ -225,7 +225,7 @@ def refresh_run_lock(run_id: str) -> Tuple[bool, Optional[str], Optional[Dict[st
         # Atomic rename
         temp_path.replace(lock_path)
         return True, None, None
-    except (OSError, IOError, json.JSONEncodeError) as e:
+    except (OSError, json.JSONEncodeError) as e:
         # Clean up temp file if it exists
         try:
             if temp_path.exists():

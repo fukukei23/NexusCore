@@ -8,11 +8,12 @@ Comprehensive Tests for PatchApplier
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
-import pytest
+
 import tempfile
-import os
 import types
 from pathlib import Path
+
+import pytest
 
 from nexuscore.agents import patch_applier as pa_module
 from nexuscore.agents.patch_applier import PatchApplier
@@ -46,10 +47,12 @@ def temp_project():
     with tempfile.TemporaryDirectory(prefix="test_patch_") as tmpdir:
         # テスト用のファイルを作成
         test_file = Path(tmpdir) / "example.py"
-        test_file.write_text("""def hello():
+        test_file.write_text(
+            """def hello():
     print("Hello")
     return "world"
-""")
+"""
+        )
         yield {
             "path": tmpdir,
             "file": str(test_file),
@@ -177,7 +180,9 @@ class TestApplyPatch:
         assert result["applied"] is False
         assert "failed" in result["reason"].lower()
 
-    def test_apply_patch_blocks_dangerous_patch(self, monkeypatch, patch_applier, temp_project, dangerous_patch):
+    def test_apply_patch_blocks_dangerous_patch(
+        self, monkeypatch, patch_applier, temp_project, dangerous_patch
+    ):
         """allow_deletions=Falseの場合、削除行を含むパッチをブロック"""
         result = patch_applier.apply_patch(
             patch_text=dangerous_patch,
@@ -190,7 +195,9 @@ class TestApplyPatch:
         assert result["delete_lines"] > 0
         assert "allow_deletions" in result["reason"]
 
-    def test_apply_patch_allows_dangerous_patch_when_enabled(self, monkeypatch, patch_applier, temp_project, dangerous_patch):
+    def test_apply_patch_allows_dangerous_patch_when_enabled(
+        self, monkeypatch, patch_applier, temp_project, dangerous_patch
+    ):
         """allow_deletions=Trueの場合、削除行を含むパッチを許可"""
         dummy_set = DummyPatchSet(should_apply=True)
 
@@ -229,7 +236,9 @@ class TestApplyPatch:
         assert "parse" in result["reason"].lower()
         assert result["error"] is not None
 
-    def test_apply_patch_with_application_failure(self, monkeypatch, patch_applier, temp_project, safe_patch):
+    def test_apply_patch_with_application_failure(
+        self, monkeypatch, patch_applier, temp_project, safe_patch
+    ):
         """パッチ適用の失敗"""
         dummy_set = DummyPatchSet(should_apply=False)
 
@@ -247,7 +256,9 @@ class TestApplyPatch:
         assert result["applied"] is False
         assert "failed" in result["reason"].lower()
 
-    def test_apply_patch_with_exception_during_apply(self, monkeypatch, patch_applier, temp_project, safe_patch):
+    def test_apply_patch_with_exception_during_apply(
+        self, monkeypatch, patch_applier, temp_project, safe_patch
+    ):
         """適用中の例外"""
 
         class ErrorPatchSet:
@@ -269,7 +280,9 @@ class TestApplyPatch:
         assert "exception" in result["reason"].lower()
         assert result["error"] is not None
 
-    def test_apply_patch_handles_strip_parameter(self, monkeypatch, patch_applier, temp_project, safe_patch):
+    def test_apply_patch_handles_strip_parameter(
+        self, monkeypatch, patch_applier, temp_project, safe_patch
+    ):
         """strip引数をサポートするケース"""
         dummy_set = DummyPatchSet(should_apply=True)
 
@@ -287,7 +300,9 @@ class TestApplyPatch:
         # stripパラメータが設定されている
         assert dummy_set.root == temp_project["path"]
 
-    def test_apply_patch_handles_strip_type_error(self, monkeypatch, patch_applier, temp_project, safe_patch):
+    def test_apply_patch_handles_strip_type_error(
+        self, monkeypatch, patch_applier, temp_project, safe_patch
+    ):
         """strip引数がサポートされていない場合のフォールバック"""
 
         class StripErrorPatchSet:
@@ -381,7 +396,9 @@ class TestDetectDanger:
 
 
 class TestApplyPatchBool:
-    def test_apply_patch_bool_returns_true_on_success(self, monkeypatch, patch_applier, temp_project, safe_patch):
+    def test_apply_patch_bool_returns_true_on_success(
+        self, monkeypatch, patch_applier, temp_project, safe_patch
+    ):
         """成功時にTrueを返す"""
         dummy_set = DummyPatchSet(should_apply=True)
 
@@ -398,7 +415,9 @@ class TestApplyPatchBool:
 
         assert result is True
 
-    def test_apply_patch_bool_returns_false_on_failure(self, monkeypatch, patch_applier, temp_project, safe_patch):
+    def test_apply_patch_bool_returns_false_on_failure(
+        self, monkeypatch, patch_applier, temp_project, safe_patch
+    ):
         """失敗時にFalseを返す"""
         dummy_set = DummyPatchSet(should_apply=False)
 
@@ -440,7 +459,9 @@ class TestApplyPatchBool:
 
 
 class TestApply:
-    def test_apply_is_alias_for_apply_patch_bool(self, monkeypatch, patch_applier, temp_project, safe_patch):
+    def test_apply_is_alias_for_apply_patch_bool(
+        self, monkeypatch, patch_applier, temp_project, safe_patch
+    ):
         """applyメソッドはapply_patch_boolのエイリアス"""
         dummy_set = DummyPatchSet(should_apply=True)
 

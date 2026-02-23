@@ -193,4 +193,3 @@ def contains_evidence(text: str) -> bool:
     has_result = any(re.search(pattern, text_lower) for pattern in result_patterns)
 
     return has_command or has_result
-

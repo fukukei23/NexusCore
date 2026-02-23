@@ -71,7 +71,9 @@ def test_generate_final_code_uses_extract_and_save(monkeypatch):
 
 
 def test_list_and_open(monkeypatch):
-    monkeypatch.setattr(os, "walk", lambda root: [("/a", [], ["a.py", "b.txt"]), ("/b", [], ["c.py"])])
+    monkeypatch.setattr(
+        os, "walk", lambda root: [("/a", [], ["a.py", "b.txt"]), ("/b", [], ["c.py"])]
+    )
     files = ig.list_saved_files()
     assert "a.py" in files[0] or "c.py" in files[-1]
 

@@ -1,13 +1,9 @@
-import json
-import os
 import zipfile
 
-import pytest
-
+from nexuscore.utils import zip_output
 from nexuscore.utils.clean_output import clean_output
 from nexuscore.utils.json_sanitizer import sanitize_json_like
 from nexuscore.utils.math_ops import add
-from nexuscore.utils import zip_output
 
 
 def test_clean_output_strips_code_block():
@@ -17,7 +13,7 @@ def test_clean_output_strips_code_block():
 
 
 def test_sanitize_json_like_removes_fence():
-    payload = "```json\n{\"a\": 1, \"b\": [1, 2]}\n```"
+    payload = '```json\n{"a": 1, "b": [1, 2]}\n```'
     result = sanitize_json_like(payload)
     assert isinstance(result, dict)
     assert result["b"] == [1, 2]

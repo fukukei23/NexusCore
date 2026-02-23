@@ -9,7 +9,6 @@ LLM プロバイダ向け HTTP クライアント補助モジュール。
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 try:  # pragma: no cover - exercised indirectly via providers
     import requests
@@ -37,7 +36,7 @@ class HttpClientFactory:
                 "operate in stub mode."
             )
 
-    def create_session(self) -> Optional["requests.Session"]:
+    def create_session(self) -> requests.Session | None:
         if not self.available or not requests:
             return None
 

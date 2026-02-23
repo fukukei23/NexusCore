@@ -7,17 +7,18 @@ Flask SaaS UI のスモークテストで使用する共通フィクスチャを
 
 from __future__ import annotations
 
-import pytest
-from datetime import datetime, timedelta
 import json
-import os
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
+
+import pytest
 
 # webapp 関連のインポートは条件付き（Gradio/analyzer テストでは不要）
 try:
     from nexuscore.webapp import create_app, db
-    from nexuscore.webapp.models import Project, Run, User, ExecutionLog, PatchRecord, ApiKey
+    from nexuscore.webapp.models import ApiKey, ExecutionLog, PatchRecord, Project, Run, User
+
     HAS_WEBAPP = True
 except ImportError:
     HAS_WEBAPP = False
@@ -36,11 +37,13 @@ def app():
     """テスト用 Flask アプリ"""
     if not HAS_WEBAPP:
         pytest.skip("webapp modules not available")
-    app = create_app(config_overrides={
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "TESTING": True,
-        "SECRET_KEY": "test-secret-key",
-    })
+    app = create_app(
+        config_overrides={
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+            "TESTING": True,
+            "SECRET_KEY": "test-secret-key",
+        }
+    )
     return app
 
 
@@ -129,7 +132,9 @@ def test_project_id(app, test_user_id):
         pytest.skip("webapp modules not available")
     with app.app_context():
         # 既存の Project が存在するかチェック（test_project fixture が先に実行される可能性がある）
-        existing_project = Project.query.filter_by(name="Test Project", owner_id=test_user_id).first()
+        existing_project = Project.query.filter_by(
+            name="Test Project", owner_id=test_user_id
+        ).first()
         if existing_project:
             return int(existing_project.id)
 
@@ -170,11 +175,13 @@ def test_run_with_metrics(app, test_project_id, test_user_id):
             source="NPE",
             level="INFO",
             message="Test log",
-            payload_json=json.dumps({
-                "model": "gpt-4.1",
-                "retry_count": 2,
-                "last_error_class": "rate_limit",
-            }),
+            payload_json=json.dumps(
+                {
+                    "model": "gpt-4.1",
+                    "retry_count": 2,
+                    "last_error_class": "rate_limit",
+                }
+            ),
         )
         db.session.add(log1)
 
@@ -183,10 +190,12 @@ def test_run_with_metrics(app, test_project_id, test_user_id):
             source="ORCHESTRATOR",
             level="INFO",
             message="Test log 2",
-            payload_json=json.dumps({
-                "execution_ms": 1234,
-                "files_changed": 3,
-            }),
+            payload_json=json.dumps(
+                {
+                    "execution_ms": 1234,
+                    "files_changed": 3,
+                }
+            ),
         )
         db.session.add(log2)
 
@@ -220,12 +229,14 @@ def test_run_with_self_healing_metrics(app, test_project_id, test_user_id):
             source="NPE",
             level="INFO",
             message="LLM call",
-            payload_json=json.dumps({
-                "model": "gpt-4.1",
-                "retry_count": 2,
-                "last_error_class": "rate_limit",
-                "estimated_cost": 10.0,
-            }),
+            payload_json=json.dumps(
+                {
+                    "model": "gpt-4.1",
+                    "retry_count": 2,
+                    "last_error_class": "rate_limit",
+                    "estimated_cost": 10.0,
+                }
+            ),
         )
         db.session.add(log1)
 
@@ -234,12 +245,14 @@ def test_run_with_self_healing_metrics(app, test_project_id, test_user_id):
             source="ORCHESTRATOR",
             level="INFO",
             message="Guardian review",
-            payload_json=json.dumps({
-                "guardian_review": {
-                    "decision": "approved",
-                    "reason": "Patch looks safe",
-                },
-            }),
+            payload_json=json.dumps(
+                {
+                    "guardian_review": {
+                        "decision": "approved",
+                        "reason": "Patch looks safe",
+                    },
+                }
+            ),
         )
         db.session.add(log2)
 
@@ -288,7 +301,7 @@ def test_api_key(app, test_user_id):
 # ==============================================================================
 
 # テスト結果を保存するためのグローバル変数
-_test_results: List[Dict[str, Any]] = []
+_test_results: list[dict[str, Any]] = []
 _result_file_path: Path | None = None
 _error_log_file_path: Path | None = None
 
@@ -325,7 +338,9 @@ def pytest_runtest_logreport(report):
             "nodeid": report.nodeid,
             "outcome": report.outcome,  # "passed", "failed", "skipped"
             "duration": getattr(report, "duration", 0.0),
-            "longrepr": str(report.longrepr) if hasattr(report, "longrepr") and report.longrepr else None,
+            "longrepr": (
+                str(report.longrepr) if hasattr(report, "longrepr") and report.longrepr else None
+            ),
         }
         _test_results.append(test_result)
 
@@ -342,7 +357,9 @@ def pytest_collectreport(report):
             "nodeid": report.nodeid or "collection",
             "outcome": "error",
             "duration": 0.0,
-            "longrepr": str(report.longrepr) if hasattr(report, "longrepr") and report.longrepr else None,
+            "longrepr": (
+                str(report.longrepr) if hasattr(report, "longrepr") and report.longrepr else None
+            ),
         }
         _test_results.append(test_result)
 
@@ -358,7 +375,7 @@ def pytest_sessionfinish(session, exitstatus):
 
     try:
         # テスト結果をテキスト形式で整形
-        lines: List[str] = []
+        lines: list[str] = []
         lines.append("=" * 80)
         lines.append("NexusCore Test Results")
         lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -383,7 +400,7 @@ def pytest_sessionfinish(session, exitstatus):
         lines.append("")
 
         # エラーログ用のリスト
-        error_lines: List[str] = []
+        error_lines: list[str] = []
         error_lines.append("=" * 80)
         error_lines.append("NexusCore Test Error Logs")
         error_lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -435,6 +452,7 @@ def pytest_sessionfinish(session, exitstatus):
 
         # ターミナルにメッセージを表示（1回のみ）
         import sys
+
         message = f"\n✅ テスト結果を保存しました: {_result_file_path}\n"
         if _error_log_file_path and len(error_lines) > 5:
             message += f"✅ エラーログを保存しました: {_error_log_file_path}\n"
@@ -444,7 +462,7 @@ def pytest_sessionfinish(session, exitstatus):
 
     except Exception as e:
         import sys
+
         error_message = f"⚠️ テスト結果の保存に失敗しました: {e}\n"
         sys.stderr.write(error_message)
         sys.stderr.flush()
-

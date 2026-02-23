@@ -7,12 +7,8 @@ LLMコール予算管理機能を網羅的にテストします。
 from __future__ import annotations
 
 import json
-import os
 import threading
 import time
-from datetime import datetime, timezone
-from pathlib import Path
-from unittest.mock import Mock, patch
 
 import pytest
 
@@ -30,7 +26,6 @@ from nexuscore.npe.budget import (
     record_estimate,
     record_usage,
 )
-
 
 # =============================================================================
 # Fixtures
@@ -184,7 +179,7 @@ class TestUtilityFunctions:
         """_now_utc_iso() が ISO 8601 形式を返す"""
         iso = _now_utc_iso()
         assert "T" in iso
-        assert ("Z" in iso or "+" in iso or iso.endswith("+00:00"))
+        assert "Z" in iso or "+" in iso or iso.endswith("+00:00")
 
     def test_day_key_current_day(self):
         """_day_key() が現在の日付を YYYY-MM-DD 形式で返す"""
@@ -349,6 +344,7 @@ class TestRecordUsage:
 
     def test_record_usage_thread_safe(self, temp_ledger):
         """複数スレッドから呼び出しても安全"""
+
         def record_worker(n):
             for i in range(10):
                 record_usage(f"model-{n}", f"task-{n}-{i}", 0.1 * i, 10 * i, 5 * i)
@@ -680,6 +676,7 @@ class TestEdgeCases:
 
     def test_concurrent_read_and_write(self, clean_env, temp_ledger):
         """読み込みと書き込みの並行実行"""
+
         def writer():
             for i in range(50):
                 record_usage("gpt-5", f"task-{i}", 0.1, 10, 10)
@@ -759,6 +756,11 @@ class TestEdgeCases:
         )
 
         assert isinstance(decision.caps, dict)
-        required_keys = ["per_call_cap_jpy", "daily_soft_cap_jpy", "daily_hard_cap_jpy", "today_total_jpy"]
+        required_keys = [
+            "per_call_cap_jpy",
+            "daily_soft_cap_jpy",
+            "daily_hard_cap_jpy",
+            "today_total_jpy",
+        ]
         for key in required_keys:
             assert key in decision.caps

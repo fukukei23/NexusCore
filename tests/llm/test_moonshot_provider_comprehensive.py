@@ -9,9 +9,10 @@ Tests cover:
 - Environment variable handling
 - Kimi-specific features
 """
+
 import os
-from unittest.mock import Mock, MagicMock, patch
-import pytest
+from unittest.mock import Mock, patch
+
 from nexuscore.llm.providers.moonshot_provider import MoonshotLLM
 
 
@@ -38,7 +39,11 @@ class TestMoonshotProviderInit:
         assert provider.real_calls is True
         assert provider.api_key == "test-key"
 
-    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key", "KIMI_BASE_URL": "https://custom.moonshot.com"}, clear=True)
+    @patch.dict(
+        os.environ,
+        {"KIMI_API_KEY": "test-key", "KIMI_BASE_URL": "https://custom.moonshot.com"},
+        clear=True,
+    )
     @patch("nexuscore.llm.providers.moonshot_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.moonshot_provider.HTTP_CLIENT_FACTORY")
     def test_init_with_custom_base_url(self, mock_factory, mock_real_enabled):
@@ -84,7 +89,7 @@ class TestMoonshotProviderExecute:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "choices": [{"message": {"content": "Kimi response"}}],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 20}
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20},
         }
         mock_session.post.return_value = mock_response
         mock_factory.available = True
@@ -112,7 +117,7 @@ class TestMoonshotProviderExecute:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "choices": [{"message": {"content": "response"}}],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 20}
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20},
         }
         mock_session.post.return_value = mock_response
         mock_factory.available = True
@@ -124,7 +129,9 @@ class TestMoonshotProviderExecute:
         call_args = mock_session.post.call_args
         assert call_args[1]["json"]["temperature"] == 0.7
 
-    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key", "NEXUS_DEFAULT_MAX_OUT_TOKENS": "2000"}, clear=True)
+    @patch.dict(
+        os.environ, {"KIMI_API_KEY": "test-key", "NEXUS_DEFAULT_MAX_OUT_TOKENS": "2000"}, clear=True
+    )
     @patch("nexuscore.llm.providers.moonshot_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.moonshot_provider.HTTP_CLIENT_FACTORY")
     def test_execute_with_max_tokens(self, mock_factory, mock_real_enabled):
@@ -134,7 +141,7 @@ class TestMoonshotProviderExecute:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "choices": [{"message": {"content": "response"}}],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 20}
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20},
         }
         mock_session.post.return_value = mock_response
         mock_factory.available = True
@@ -156,7 +163,7 @@ class TestMoonshotProviderExecute:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "choices": [{"message": {"content": '{"key": "value"}'}}],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 20}
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20},
         }
         mock_session.post.return_value = mock_response
         mock_factory.available = True

@@ -6,6 +6,7 @@
 #   - 簡易ローテーション
 # ==============================================================================
 from __future__ import annotations
+
 import datetime
 import json
 import os
@@ -17,7 +18,8 @@ AUDIT_DIR = Path(os.getenv("NPE_AUDIT_DIR", "logs/npe"))
 AUDIT_DIR.mkdir(parents=True, exist_ok=True)
 DEFAULT_LOG = AUDIT_DIR / "npe_audit_log.jsonl"
 ROTATE_BYTES = int(os.getenv("NPE_AUDIT_ROTATE_BYTES", "5242880"))  # 5MB
-ROTATE_KEEP  = int(os.getenv("NPE_AUDIT_ROTATE_KEEP", "3"))
+ROTATE_KEEP = int(os.getenv("NPE_AUDIT_ROTATE_KEEP", "3"))
+
 
 def _rotate_if_needed(path: Path) -> None:
     try:
@@ -37,6 +39,7 @@ def _rotate_if_needed(path: Path) -> None:
     except Exception as e:
         print(f"[NPE-Logger] WARN: rotation failed: {e}")
 
+
 def log_transaction(log_data: dict, log_file: str | Path = DEFAULT_LOG):
     """
     監査証跡をJSONLで追記。排他＋簡易ローテーション＋フォールバック出力。
@@ -47,7 +50,7 @@ def log_transaction(log_data: dict, log_file: str | Path = DEFAULT_LOG):
         log_file = Path(log_file)
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
-    log_data["event_timestamp_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    log_data["event_timestamp_utc"] = datetime.datetime.now(datetime.UTC).isoformat()
     entry_compact = json.dumps(log_data, ensure_ascii=False)
 
     # コンソール（開発者の可視性）
@@ -73,9 +76,10 @@ def log_transaction(log_data: dict, log_file: str | Path = DEFAULT_LOG):
     # Webapp層への直接依存を削除し、インターフェース経由でアクセス
     try:
         from nexuscore.core.logging_interface import get_logging_provider
+
         provider = get_logging_provider()
         provider.enhance_transaction(log_data, log_file)
-    except Exception as e:
+    except Exception:
         # DB書き込み失敗は既存の処理を止めない
         # （プロバイダーが NoOp の場合も含む）
         pass

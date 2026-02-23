@@ -7,12 +7,14 @@
 # ==============================================================================
 from .base_agent import BaseAgent
 
+
 class ArchitectAgent(BaseAgent):
     SYSTEM_PROMPT = """
 あなたは、ベストプラクティスに精通したシニアソフトウェアアーキテクトです。
 ユーザーの高レベルな要求を解釈し、堅牢でスケーラブルなプロジェクトの完全なファイル構造と、
 各ファイルのスケルトンコード（骨格）、そして依存関係を定義するJSONを出力してください。
 """
+
     # ★★★★★ ここからが最重要修正点 (1/2) ★★★★★
     def __init__(self):
         """
@@ -20,6 +22,7 @@ class ArchitectAgent(BaseAgent):
         新しいBaseAgentの__init__を呼び出すことで、LLMRouterが自動的にセットアップされる。
         """
         super().__init__()
+
     # ★★★★★ ここまで ★★★★★
 
     def design_project_structure(self, user_requirement: str) -> str:

@@ -1,7 +1,8 @@
 # modules/code_generator.py
 
-from typing import Optional
 import os
+from typing import Optional
+
 from dotenv import load_dotenv
 
 try:
@@ -28,6 +29,7 @@ def get_client() -> "OpenAI":
         raise RuntimeError("OPENAI_API_KEY is not set. Provide it via env or .env file.")
     _client = OpenAI(api_key=api_key)
     return _client
+
 
 def generate_code_from_text(natural_text: str) -> str:
     """

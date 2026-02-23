@@ -1,23 +1,23 @@
 """
 JobStateMachine の統合テスト
 """
+
 from __future__ import annotations
 
 import tempfile
-import time
 from pathlib import Path
 
 import pytest
 
 from nexuscore.core.job_state_machine import (
+    CompletedState,
+    FailedState,
     JobStateMachine,
     PendingState,
     RunningState,
-    CompletedState,
-    FailedState,
 )
-from nexuscore.core.session_control import SessionController
 from nexuscore.core.run_history import RunHistoryLogger
+from nexuscore.core.session_control import SessionController
 
 
 class TestJobStateMachine:
@@ -233,6 +233,7 @@ class TestJobStateMachineWithSessionController:
             assert state_file.exists()
 
             import json
+
             with state_file.open() as f:
                 state_data = json.load(f)
                 assert state_data["last_phase"] == "state_completed"
@@ -261,6 +262,7 @@ class TestJobStateMachineWithHistoryLogger:
             assert history_file.exists()
 
             import json
+
             with history_file.open() as f:
                 lines = [line.strip() for line in f if line.strip()]
                 assert len(lines) == 1
@@ -288,6 +290,7 @@ class TestJobStateMachineWithHistoryLogger:
             assert history_file.exists()
 
             import json
+
             with history_file.open() as f:
                 lines = [line.strip() for line in f if line.strip()]
                 assert len(lines) == 1
@@ -332,10 +335,10 @@ class TestJobStateMachineIntegration:
             assert history_file.exists()
 
             import json
+
             with history_file.open() as f:
                 lines = [line.strip() for line in f if line.strip()]
                 assert len(lines) == 1
                 record = json.loads(lines[0])
                 assert record["status"] == "success"
                 assert record["details"]["result"] == "success"
-

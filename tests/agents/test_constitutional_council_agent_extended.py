@@ -1,10 +1,7 @@
 """constitutional_council_agent.py の拡張テスト（カバレッジ向上用）"""
-import json
-import time
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
-import pytest
+import json
+from unittest.mock import patch
 
 from nexuscore.agents.constitutional_council_agent import ConstitutionalCouncilAgent
 
@@ -107,7 +104,7 @@ def test_approve_amendment_deleting_policy(tmp_path):
     # 既存ポリシー
     existing_policies = [
         {"policy_id": "P-1", "description": "Keep"},
-        {"policy_id": "P-2", "description": "Delete"}
+        {"policy_id": "P-2", "description": "Delete"},
     ]
     agent._save_policies(existing_policies)
 

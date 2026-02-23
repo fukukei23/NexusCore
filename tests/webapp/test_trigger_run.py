@@ -5,6 +5,7 @@ NexusCore Webapp - trigger_run エンドポイントのテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,18 +13,20 @@ import pytest
 pytest.skip(
     "Flask legacy trigger_run tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
 @pytest.fixture
 def app():
     """テスト用 Flask アプリ"""
-    app = create_app(config_overrides={
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "TESTING": True,
-        "SECRET_KEY": "test-secret-key",
-    })
+    app = create_app(
+        config_overrides={
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+            "TESTING": True,
+            "SECRET_KEY": "test-secret-key",
+        }
+    )
     return app
 
 
@@ -178,4 +181,3 @@ def test_trigger_run_wrong_owner(client, app, test_user, test_project):
 
         # 404 エラーを確認
         assert response.status_code == 404
-

@@ -7,31 +7,23 @@ Tier 2品質ゲート（ミューテーションテスト）エージェント�
 テストカバレッジ目標: 80%以上
 """
 
+from unittest.mock import Mock, patch
+
 import pytest
-import subprocess
-from unittest.mock import Mock, patch, MagicMock
-from dataclasses import asdict
 
 from nexuscore.agents.mutation_tester_agent import (
-    MutationTesterAgent,
-    MutationReport,
     Mutant,
+    MutationReport,
+    MutationTesterAgent,
     MutationTestError,
-    MutationTestTimeoutError
+    MutationTestTimeoutError,
 )
 
 
 @pytest.fixture
 def mock_constitution():
     """テスト用憲法データ"""
-    return {
-        "quality_gates": {
-            "tier2": {
-                "mutation_score_min": 80,
-                "mutation_timeout_sec": 10
-            }
-        }
-    }
+    return {"quality_gates": {"tier2": {"mutation_score_min": 80, "mutation_timeout_sec": 10}}}
 
 
 @pytest.fixture
@@ -108,10 +100,7 @@ class TestRunMutationTesting:
     """run_mutation_testing メソッドのテスト"""
 
     def test_run_mutation_testing_success_pass(
-        self,
-        mutation_agent,
-        mock_constitution,
-        mock_mutmut_success_output
+        self, mutation_agent, mock_constitution, mock_mutmut_success_output
     ):
         """ミューテーションテスト成功（合格）"""
         # _run_mutmut は Dict[str, int] を返す
@@ -120,16 +109,16 @@ class TestRunMutationTesting:
             "killed": 17,
             "survived": 3,
             "timeout": 0,
-            "suspicious": 0
+            "suspicious": 0,
         }
 
-        with patch.object(mutation_agent, '_run_mutmut', return_value=mock_mutmut_result):
-            with patch.object(mutation_agent, '_get_survived_mutants', return_value=[]):
+        with patch.object(mutation_agent, "_run_mutmut", return_value=mock_mutmut_result):
+            with patch.object(mutation_agent, "_get_survived_mutants", return_value=[]):
                 result = mutation_agent.run_mutation_testing(
                     source_path="src/example.py",
                     test_path="tests/test_example.py",
                     constitution=mock_constitution,
-                    timeout_per_test=10
+                    timeout_per_test=10,
                 )
 
                 # 検証
@@ -145,10 +134,7 @@ class TestRunMutationTesting:
                 assert "✅" in result.feedback or "クリア" in result.feedback
 
     def test_run_mutation_testing_success_fail(
-        self,
-        mutation_agent,
-        mock_constitution,
-        mock_mutmut_fail_output
+        self, mutation_agent, mock_constitution, mock_mutmut_fail_output
     ):
         """ミューテーションテスト成功（不合格）"""
         survived_mutant = Mutant(
@@ -157,7 +143,7 @@ class TestRunMutationTesting:
             mutator="BinaryOperator",
             original_code="a + b",
             mutated_code="a - b",
-            status="survived"
+            status="survived",
         )
 
         mock_mutmut_result = {
@@ -165,16 +151,18 @@ class TestRunMutationTesting:
             "killed": 13,
             "survived": 7,
             "timeout": 2,
-            "suspicious": 1
+            "suspicious": 1,
         }
 
-        with patch.object(mutation_agent, '_run_mutmut', return_value=mock_mutmut_result):
-            with patch.object(mutation_agent, '_get_survived_mutants', return_value=[survived_mutant]):
+        with patch.object(mutation_agent, "_run_mutmut", return_value=mock_mutmut_result):
+            with patch.object(
+                mutation_agent, "_get_survived_mutants", return_value=[survived_mutant]
+            ):
                 result = mutation_agent.run_mutation_testing(
                     source_path="src/example.py",
                     test_path="tests/test_example.py",
                     constitution=mock_constitution,
-                    timeout_per_test=10
+                    timeout_per_test=10,
                 )
 
                 assert result.passed is False  # 56.5% < 80%
@@ -184,51 +172,37 @@ class TestRunMutationTesting:
                 assert len(result.survived_mutants) == 1
                 assert "❌" in result.feedback or "不合格" in result.feedback
 
-    def test_run_mutation_testing_no_mutants(
-        self,
-        mutation_agent,
-        mock_constitution
-    ):
+    def test_run_mutation_testing_no_mutants(self, mutation_agent, mock_constitution):
         """mutantが0個の場合"""
-        mock_mutmut_result = {
-            "total": 0,
-            "killed": 0,
-            "survived": 0,
-            "timeout": 0,
-            "suspicious": 0
-        }
+        mock_mutmut_result = {"total": 0, "killed": 0, "survived": 0, "timeout": 0, "suspicious": 0}
 
-        with patch.object(mutation_agent, '_run_mutmut', return_value=mock_mutmut_result):
+        with patch.object(mutation_agent, "_run_mutmut", return_value=mock_mutmut_result):
             result = mutation_agent.run_mutation_testing(
                 source_path="src/empty.py",
                 test_path="tests/test_empty.py",
-                constitution=mock_constitution
+                constitution=mock_constitution,
             )
 
             assert result.passed is False  # 0% < 80%
             assert result.mutation_score == 0.0
             assert result.total_mutants == 0
 
-    def test_run_mutation_testing_edge_case_100_percent(
-        self,
-        mutation_agent,
-        mock_constitution
-    ):
+    def test_run_mutation_testing_edge_case_100_percent(self, mutation_agent, mock_constitution):
         """全てのmutantをkillした場合（100%）"""
         mock_mutmut_result = {
             "total": 15,
             "killed": 15,
             "survived": 0,
             "timeout": 0,
-            "suspicious": 0
+            "suspicious": 0,
         }
 
-        with patch.object(mutation_agent, '_run_mutmut', return_value=mock_mutmut_result):
-            with patch.object(mutation_agent, '_get_survived_mutants', return_value=[]):
+        with patch.object(mutation_agent, "_run_mutmut", return_value=mock_mutmut_result):
+            with patch.object(mutation_agent, "_get_survived_mutants", return_value=[]):
                 result = mutation_agent.run_mutation_testing(
                     source_path="src/perfect.py",
                     test_path="tests/test_perfect.py",
-                    constitution=mock_constitution
+                    constitution=mock_constitution,
                 )
 
                 assert result.passed is True
@@ -236,17 +210,15 @@ class TestRunMutationTesting:
                 assert result.survived == 0
                 assert "✅" in result.feedback
 
-    def test_run_mutation_testing_timeout_error(
-        self,
-        mutation_agent,
-        mock_constitution
-    ):
+    def test_run_mutation_testing_timeout_error(self, mutation_agent, mock_constitution):
         """mutmutタイムアウト時は適切なMutationReportを返す"""
-        with patch.object(mutation_agent, '_run_mutmut', side_effect=MutationTestTimeoutError("timeout")):
+        with patch.object(
+            mutation_agent, "_run_mutmut", side_effect=MutationTestTimeoutError("timeout")
+        ):
             result = mutation_agent.run_mutation_testing(
                 source_path="src/example.py",
                 test_path="tests/test_example.py",
-                constitution=mock_constitution
+                constitution=mock_constitution,
             )
 
             # タイムアウトエラーは適切に処理される
@@ -257,17 +229,15 @@ class TestRunMutationTesting:
             assert "タイムアウト" in result.feedback
             assert "600秒" in result.feedback
 
-    def test_run_mutation_testing_execution_error(
-        self,
-        mutation_agent,
-        mock_constitution
-    ):
+    def test_run_mutation_testing_execution_error(self, mutation_agent, mock_constitution):
         """mutmut実行エラー時は適切なMutationReportを返す"""
-        with patch.object(mutation_agent, '_run_mutmut', side_effect=MutationTestError("execution failed")):
+        with patch.object(
+            mutation_agent, "_run_mutmut", side_effect=MutationTestError("execution failed")
+        ):
             result = mutation_agent.run_mutation_testing(
                 source_path="src/example.py",
                 test_path="tests/test_example.py",
-                constitution=mock_constitution
+                constitution=mock_constitution,
             )
 
             # 実行エラーは適切に処理される
@@ -342,17 +312,13 @@ class TestParseMutmutOutput:
 class TestGetSurvivedMutants:
     """_get_survived_mutants メソッドのテスト"""
 
-    def test_get_survived_mutants_success(
-        self,
-        mutation_agent,
-        mock_survived_mutants_output
-    ):
+    def test_get_survived_mutants_success(self, mutation_agent, mock_survived_mutants_output):
         """生き残ったmutantの正常取得"""
         mock_result = Mock()
         mock_result.stdout = mock_survived_mutants_output
         mock_result.stderr = ""
 
-        with patch('subprocess.run', return_value=mock_result):
+        with patch("subprocess.run", return_value=mock_result):
             mutants = mutation_agent._get_survived_mutants()
 
             assert len(mutants) == 2
@@ -371,14 +337,14 @@ class TestGetSurvivedMutants:
         mock_result.stdout = "No mutants survived"
         mock_result.stderr = ""
 
-        with patch('subprocess.run', return_value=mock_result):
+        with patch("subprocess.run", return_value=mock_result):
             mutants = mutation_agent._get_survived_mutants()
 
             assert len(mutants) == 0
 
     def test_get_survived_mutants_error(self, mutation_agent):
         """mutmut results エラー"""
-        with patch('subprocess.run', side_effect=Exception("Error")):
+        with patch("subprocess.run", side_effect=Exception("Error")):
             mutants = mutation_agent._get_survived_mutants()
 
             assert len(mutants) == 0
@@ -387,11 +353,7 @@ class TestGetSurvivedMutants:
 class TestParseSurvivedMutants:
     """_parse_survived_mutants メソッドのテスト"""
 
-    def test_parse_survived_mutants_multiple(
-        self,
-        mutation_agent,
-        mock_survived_mutants_output
-    ):
+    def test_parse_survived_mutants_multiple(self, mutation_agent, mock_survived_mutants_output):
         """複数のmutantをパース"""
         mutants = mutation_agent._parse_survived_mutants(mock_survived_mutants_output)
 
@@ -416,7 +378,7 @@ class TestSuggestTestForMutant:
             mutator="BinaryOperator",
             original_code="a + b",
             mutated_code="a - b",
-            status="survived"
+            status="survived",
         )
 
         suggestion = mutation_agent._suggest_test_for_mutant(mutant)
@@ -431,7 +393,7 @@ class TestSuggestTestForMutant:
             mutator="BinaryOperator",
             original_code="a - b",
             mutated_code="a + b",
-            status="survived"
+            status="survived",
         )
 
         suggestion = mutation_agent._suggest_test_for_mutant(mutant)
@@ -446,7 +408,7 @@ class TestSuggestTestForMutant:
             mutator="BinaryOperator",
             original_code="a * b",
             mutated_code="a / b",
-            status="survived"
+            status="survived",
         )
 
         suggestion = mutation_agent._suggest_test_for_mutant(mutant)
@@ -461,7 +423,7 @@ class TestSuggestTestForMutant:
             mutator="ComparisonOperator",
             original_code="x > 0",
             mutated_code="x >= 0",
-            status="survived"
+            status="survived",
         )
 
         suggestion = mutation_agent._suggest_test_for_mutant(mutant)
@@ -476,7 +438,7 @@ class TestSuggestTestForMutant:
             mutator="ComparisonOperator",
             original_code="x < 100",
             mutated_code="x <= 100",
-            status="survived"
+            status="survived",
         )
 
         suggestion = mutation_agent._suggest_test_for_mutant(mutant)
@@ -491,7 +453,7 @@ class TestSuggestTestForMutant:
             mutator="LogicalOperator",
             original_code="if a and b:",
             mutated_code="if a or b:",
-            status="survived"
+            status="survived",
         )
 
         suggestion = mutation_agent._suggest_test_for_mutant(mutant)
@@ -506,7 +468,7 @@ class TestSuggestTestForMutant:
             mutator="LogicalOperator",
             original_code="if a or b:",
             mutated_code="if a and b:",
-            status="survived"
+            status="survived",
         )
 
         suggestion = mutation_agent._suggest_test_for_mutant(mutant)
@@ -521,7 +483,7 @@ class TestSuggestTestForMutant:
             mutator="UnknownMutator",
             original_code="foo()",
             mutated_code="bar()",
-            status="survived"
+            status="survived",
         )
 
         suggestion = mutation_agent._suggest_test_for_mutant(mutant)
@@ -535,9 +497,7 @@ class TestGenerateFeedback:
     def test_generate_feedback_passed(self, mutation_agent):
         """合格時のフィードバック"""
         feedback = mutation_agent._generate_feedback(
-            survived_mutants=[],
-            mutation_score=85.0,
-            min_score=80.0
+            survived_mutants=[], mutation_score=85.0, min_score=80.0
         )
 
         assert "✅" in feedback
@@ -553,7 +513,7 @@ class TestGenerateFeedback:
                 mutator="BinaryOperator",
                 original_code="a + b",
                 mutated_code="a - b",
-                status="survived"
+                status="survived",
             ),
             Mutant(
                 file_path="test.py",
@@ -561,14 +521,12 @@ class TestGenerateFeedback:
                 mutator="ComparisonOperator",
                 original_code="x > 0",
                 mutated_code="x >= 0",
-                status="survived"
-            )
+                status="survived",
+            ),
         ]
 
         feedback = mutation_agent._generate_feedback(
-            survived_mutants=mutants,
-            mutation_score=60.0,
-            min_score=80.0
+            survived_mutants=mutants, mutation_score=60.0, min_score=80.0
         )
 
         assert "❌" in feedback
@@ -588,15 +546,13 @@ class TestGenerateFeedback:
                 mutator="BinaryOperator",
                 original_code="x",
                 mutated_code="y",
-                status="survived"
+                status="survived",
             )
             for i in range(15)
         ]
 
         feedback = mutation_agent._generate_feedback(
-            survived_mutants=mutants,
-            mutation_score=50.0,
-            min_score=80.0
+            survived_mutants=mutants, mutation_score=50.0, min_score=80.0
         )
 
         assert "15個のミュータント" in feedback
@@ -619,7 +575,7 @@ class TestMutationReportDataclass:
             timeout=0,
             suspicious=0,
             survived_mutants=[],
-            feedback="Good"
+            feedback="Good",
         )
 
         assert report.passed is True
@@ -634,7 +590,7 @@ class TestMutationReportDataclass:
             mutator="Test",
             original_code="a",
             mutated_code="b",
-            status="survived"
+            status="survived",
         )
 
         report = MutationReport(
@@ -646,7 +602,7 @@ class TestMutationReportDataclass:
             timeout=0,
             suspicious=0,
             survived_mutants=[mutant],
-            feedback="Needs improvement"
+            feedback="Needs improvement",
         )
 
         report_dict = report.to_dict()
@@ -667,15 +623,13 @@ class TestMutantDataclass:
             mutator="BinaryOperator",
             original_code="x + y",
             mutated_code="x - y",
-            status="survived"
+            status="survived",
         )
 
         assert mutant.file_path == "example.py"
         assert mutant.line_number == 42
         assert mutant.mutator == "BinaryOperator"
         assert mutant.status == "survived"
-
-
 
 
 @pytest.mark.slow

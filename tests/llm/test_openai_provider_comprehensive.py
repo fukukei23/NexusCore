@@ -10,9 +10,12 @@ Tests cover:
 - JSON mode
 - Environment variable handling
 """
+
 import os
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
+
 import pytest
+
 from nexuscore.llm.providers.openai_provider import OpenAILLM
 
 
@@ -39,7 +42,11 @@ class TestOpenAIProviderInit:
         assert provider.real_calls is True
         assert provider.api_key == "test-key"
 
-    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "OPENAI_BASE_URL": "https://custom.api.com"}, clear=True)
+    @patch.dict(
+        os.environ,
+        {"OPENAI_API_KEY": "test-key", "OPENAI_BASE_URL": "https://custom.api.com"},
+        clear=True,
+    )
     @patch("nexuscore.llm.providers.openai_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_provider.HTTP_CLIENT_FACTORY")
     def test_init_with_custom_base_url(self, mock_factory, mock_real_enabled):
@@ -51,7 +58,15 @@ class TestOpenAIProviderInit:
         provider = OpenAILLM("gpt-5.1")
         assert provider.base_url == "https://custom.api.com"
 
-    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "OPENAI_AZURE": "1", "OPENAI_AZURE_DEPLOYMENT": "gpt-5-deploy"}, clear=True)
+    @patch.dict(
+        os.environ,
+        {
+            "OPENAI_API_KEY": "test-key",
+            "OPENAI_AZURE": "1",
+            "OPENAI_AZURE_DEPLOYMENT": "gpt-5-deploy",
+        },
+        clear=True,
+    )
     @patch("nexuscore.llm.providers.openai_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_provider.HTTP_CLIENT_FACTORY")
     def test_init_azure_mode(self, mock_factory, mock_real_enabled):
@@ -99,7 +114,7 @@ class TestOpenAIProviderExecute:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "choices": [{"message": {"content": "AI response"}}],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 20}
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20},
         }
         mock_session.post.return_value = mock_response
         mock_factory.available = True
@@ -121,7 +136,7 @@ class TestOpenAIProviderExecute:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "choices": [{"message": {"content": '{"result": "success"}'}}],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 20}
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20},
         }
         mock_session.post.return_value = mock_response
         mock_factory.available = True
@@ -146,7 +161,7 @@ class TestOpenAIProviderExecute:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "choices": [{"message": {"content": "AI response"}}],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 20}
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20},
         }
         mock_session.post.return_value = mock_response
         mock_factory.available = True
@@ -224,12 +239,16 @@ class TestOpenAIProviderErrorHandling:
 class TestOpenAIProviderAzure:
     """Test Azure OpenAI specific features"""
 
-    @patch.dict(os.environ, {
-        "OPENAI_API_KEY": "azure-key",
-        "OPENAI_AZURE": "1",
-        "OPENAI_AZURE_DEPLOYMENT": "gpt-5-deploy",
-        "OPENAI_BASE_URL": "https://my-resource.openai.azure.com"
-    }, clear=True)
+    @patch.dict(
+        os.environ,
+        {
+            "OPENAI_API_KEY": "azure-key",
+            "OPENAI_AZURE": "1",
+            "OPENAI_AZURE_DEPLOYMENT": "gpt-5-deploy",
+            "OPENAI_BASE_URL": "https://my-resource.openai.azure.com",
+        },
+        clear=True,
+    )
     @patch("nexuscore.llm.providers.openai_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_provider.HTTP_CLIENT_FACTORY")
     def test_azure_url_format(self, mock_factory, mock_real_enabled):
@@ -239,7 +258,7 @@ class TestOpenAIProviderAzure:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "choices": [{"message": {"content": "Azure response"}}],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 20}
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20},
         }
         mock_session.post.return_value = mock_response
         mock_factory.available = True
@@ -253,12 +272,16 @@ class TestOpenAIProviderAzure:
         assert "openai/deployments/gpt-5-deploy/chat/completions" in url
         assert "api-version" in url
 
-    @patch.dict(os.environ, {
-        "OPENAI_API_KEY": "azure-key",
-        "OPENAI_AZURE": "1",
-        "OPENAI_AZURE_DEPLOYMENT": "gpt-5-deploy",
-        "OPENAI_AZURE_API_VERSION": "2024-10-01-preview"
-    }, clear=True)
+    @patch.dict(
+        os.environ,
+        {
+            "OPENAI_API_KEY": "azure-key",
+            "OPENAI_AZURE": "1",
+            "OPENAI_AZURE_DEPLOYMENT": "gpt-5-deploy",
+            "OPENAI_AZURE_API_VERSION": "2024-10-01-preview",
+        },
+        clear=True,
+    )
     @patch("nexuscore.llm.providers.openai_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_provider.HTTP_CLIENT_FACTORY")
     def test_azure_custom_api_version(self, mock_factory, mock_real_enabled):
@@ -268,7 +291,7 @@ class TestOpenAIProviderAzure:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "choices": [{"message": {"content": "Azure response"}}],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 20}
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20},
         }
         mock_session.post.return_value = mock_response
         mock_factory.available = True
@@ -291,7 +314,7 @@ class TestOpenAIProviderModelVariants:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "choices": [{"message": {"content": "response"}}],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 20}
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20},
         }
         mock_session.post.return_value = mock_response
         mock_factory.available = True
@@ -315,7 +338,7 @@ class TestOpenAIProviderModelVariants:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "choices": [{"message": {"content": "response"}}],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 20}
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20},
         }
         mock_session.post.return_value = mock_response
         mock_factory.available = True

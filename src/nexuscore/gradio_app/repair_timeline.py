@@ -21,11 +21,12 @@
 # ==============================================================================
 
 from __future__ import annotations
+
 import json
 import os
-from pathlib import Path
-from typing import List, Dict, Any, Tuple
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
 
 import gradio as gr
 
@@ -47,7 +48,7 @@ JST = timezone(timedelta(hours=9))
 
 
 # ---------- 入出力 ----------
-def _read_json(path: Path) -> Dict[str, Any]:
+def _read_json(path: Path) -> dict[str, Any]:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception as e:
@@ -55,8 +56,8 @@ def _read_json(path: Path) -> Dict[str, Any]:
         return {}
 
 
-def _collect_items(limit: int | None, date_filter: str) -> List[Dict[str, Any]]:
-    files: List[Path] = []
+def _collect_items(limit: int | None, date_filter: str) -> list[dict[str, Any]]:
+    files: list[Path] = []
     for d in PATCH_HISTORY_DIRS:
         if d.exists():
             files.extend(d.glob("patch_*.json"))
@@ -72,7 +73,7 @@ def _collect_items(limit: int | None, date_filter: str) -> List[Dict[str, Any]]:
     else:
         start = datetime(1970, 1, 1, tzinfo=JST)
 
-    items: List[Dict[str, Any]] = []
+    items: list[dict[str, Any]] = []
     for f in files:
         data = _read_json(f)
         ts = data.get("timestamp") or f.stem.replace("patch_", "")
@@ -106,7 +107,7 @@ def _categorize_reason(text: str) -> str:
     return "不明"
 
 
-def _compute_metrics(items: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _compute_metrics(items: list[dict[str, Any]]) -> dict[str, Any]:
     total = len(items)
     success = sum(1 for x in items if (x.get("status") or "").startswith("success"))
     attempts = sum(1 for x in items if (x.get("status") or "").startswith("attempt"))
@@ -118,7 +119,7 @@ def _compute_metrics(items: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     streak_win = streak_lose = 0
     for x in items:
-        st = (x.get("status") or "")
+        st = x.get("status") or ""
         if st.startswith("success"):
             if streak_lose == 0:
                 streak_win += 1
@@ -133,7 +134,7 @@ def _compute_metrics(items: List[Dict[str, Any]]) -> Dict[str, Any]:
             if streak_win > 0 or streak_lose > 0:
                 break
 
-    cats: Dict[str, int] = {}
+    cats: dict[str, int] = {}
     for x in items:
         cats[_categorize_reason(x.get("reason") or x.get("summary") or "")] = (
             cats.get(_categorize_reason(x.get("reason") or x.get("summary") or ""), 0) + 1
@@ -153,7 +154,7 @@ def _compute_metrics(items: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 # ---------- タイムライン行（policy バッジ対応） ----------
-def _make_policy_badge(x: Dict[str, Any]) -> str:
+def _make_policy_badge(x: dict[str, Any]) -> str:
     prof = (x.get("policy_profile") or "").strip()
     ver = (x.get("policy_version") or "").strip()
     icon = (x.get("policy_icon") or "").strip()
@@ -169,13 +170,13 @@ def _make_policy_badge(x: Dict[str, Any]) -> str:
 
 
 def build_timeline_rows(
-    items: List[Dict[str, Any]],
+    items: list[dict[str, Any]],
     pair_mode: bool,
     show_attempt: bool,
     show_success: bool,
     show_initial: bool,
-) -> List[Tuple[str, str]]:
-    rows: List[Tuple[str, str]] = []
+) -> list[tuple[str, str]]:
+    rows: list[tuple[str, str]] = []
     for x in items:
         status = x.get("status", "unknown")
         if status.startswith("attempt") and not show_attempt:
@@ -186,7 +187,11 @@ def build_timeline_rows(
             continue
 
         ts = x.get("timestamp", "N/A")
-        ok = "✅" if status.startswith("success") else ("❌" if status.startswith("attempt") else "🟡")
+        ok = (
+            "✅"
+            if status.startswith("success")
+            else ("❌" if status.startswith("attempt") else "🟡")
+        )
         badge = _make_policy_badge(x)
         label = f"{ts} {ok} {status}" + (f" {badge}" if badge else "")
         rows.append((label, ts))
@@ -196,7 +201,9 @@ def build_timeline_rows(
         def key_for_pair(lbl_ts: str) -> str:
             return (lbl_ts or "")[:13]
 
-        rows.sort(key=lambda r: (key_for_pair(r[1]), "1" if " attempt" in r[0] else "2"), reverse=True)
+        rows.sort(
+            key=lambda r: (key_for_pair(r[1]), "1" if " attempt" in r[0] else "2"), reverse=True
+        )
 
     return rows
 
@@ -207,7 +214,7 @@ def _render_diff_md(diff_str: str | None) -> str:
     return f"```diff\n{diff_str}\n```"
 
 
-def pick_detail(ts_key: str, all_items: List[Dict[str, Any]]):
+def pick_detail(ts_key: str, all_items: list[dict[str, Any]]):
     x = next((i for i in all_items if i.get("timestamp") == ts_key), None)
     if not x:
         return "", "", "", {}, "", "> 差分はありません"
@@ -277,9 +284,13 @@ def build_ui():
                     with gr.TabItem("💻 修正コード"):
                         code_view = gr.Code(label="修正コード", language="python", lines=22)
                     with gr.TabItem("📝 修正理由"):
-                        reason_view = gr.Textbox(label="修正理由・要約", lines=12, interactive=False, container=False)
+                        reason_view = gr.Textbox(
+                            label="修正理由・要約", lines=12, interactive=False, container=False
+                        )
                     with gr.TabItem("🧪 テストログ"):
-                        testlog_view = gr.Textbox(label="pytest log", lines=22, interactive=False, container=False)
+                        testlog_view = gr.Textbox(
+                            label="pytest log", lines=22, interactive=False, container=False
+                        )
                     with gr.TabItem("ℹ️ メタ情報"):
                         meta_view = gr.JSON(label="メタ情報")
                     with gr.TabItem("📚 FKBマッチ"):
@@ -310,7 +321,9 @@ def build_ui():
                 f"**平均試行/成功**: {(m['attempts']/max(1,m['success'])):.2f}\n"
                 f"- **連勝**: {m['streak_win']} | **連敗**: {m['streak_lose']}"
             )
-            cat_rows = [[k, v] for k, v in sorted(m["categories"].items(), key=lambda x: (-x[1], x[0]))]
+            cat_rows = [
+                [k, v] for k, v in sorted(m["categories"].items(), key=lambda x: (-x[1], x[0]))
+            ]
 
             rows = build_timeline_rows(items, pair, a, s, i)
             choices = [lab for lab, _ in rows]
@@ -345,7 +358,19 @@ def build_ui():
         demo.load(
             _initial,
             inputs=None,
-            outputs=[tl, kpi_md, cat_df, sources_box, store, code_view, reason_view, testlog_view, meta_view, fkb_view, diff_view],
+            outputs=[
+                tl,
+                kpi_md,
+                cat_df,
+                sources_box,
+                store,
+                code_view,
+                reason_view,
+                testlog_view,
+                meta_view,
+                fkb_view,
+                diff_view,
+            ],
         )
 
         reload_btn.click(
@@ -354,7 +379,11 @@ def build_ui():
             outputs=[tl, kpi_md, cat_df, sources_box, store],
         )
 
-        tl.change(_pick, inputs=[tl, store], outputs=[code_view, reason_view, testlog_view, meta_view, fkb_view, diff_view])
+        tl.change(
+            _pick,
+            inputs=[tl, store],
+            outputs=[code_view, reason_view, testlog_view, meta_view, fkb_view, diff_view],
+        )
 
         for c in [range_sel, ck_attempt, ck_success, ck_initial, pair_mode]:
             c.change(

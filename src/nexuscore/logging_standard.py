@@ -9,26 +9,23 @@ Usage:
     logger = get_logger(__name__)
     logger.info("Application started")
 """
+
 from __future__ import annotations
+
 import logging
 import sys
-from pathlib import Path
-from typing import Optional
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 
 class NexusCoreLogger:
     """標準ロガーファクトリー"""
 
     _configured = False
-    _log_dir: Optional[Path] = None
+    _log_dir: Path | None = None
 
     @classmethod
-    def get_logger(
-        cls,
-        name: str,
-        audit: bool = False
-    ) -> logging.Logger:
+    def get_logger(cls, name: str, audit: bool = False) -> logging.Logger:
         """
         標準ロガーを取得
 
@@ -76,9 +73,7 @@ class NexusCoreLogger:
 
         # ファイルハンドラー（ローテーション付き）
         file_handler = RotatingFileHandler(
-            cls._log_dir / "nexuscore.log",
-            maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5
+            cls._log_dir / "nexuscore.log", maxBytes=10 * 1024 * 1024, backupCount=5  # 10MB
         )
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(cls._get_formatter(verbose=True))
@@ -90,12 +85,11 @@ class NexusCoreLogger:
         if verbose:
             return logging.Formatter(
                 "%(asctime)s [%(levelname)8s] %(name)s (%(filename)s:%(lineno)d) - %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S"
+                datefmt="%Y-%m-%d %H:%M:%S",
             )
         else:
             return logging.Formatter(
-                "%(asctime)s [%(levelname)s] %(name)s - %(message)s",
-                datefmt="%H:%M:%S"
+                "%(asctime)s [%(levelname)s] %(name)s - %(message)s", datefmt="%H:%M:%S"
             )
 
     @staticmethod
@@ -103,6 +97,7 @@ class NexusCoreLogger:
         """ログディレクトリのパスを取得"""
         # 環境変数で上書き可能
         import os
+
         log_dir_env = os.getenv("NEXUS_LOG_DIR")
         if log_dir_env:
             return Path(log_dir_env)
@@ -124,18 +119,18 @@ class NexusCoreLogger:
         """監査ログ用の追加ハンドラーを設定"""
         audit_file = cls._log_dir / "audit.jsonl"
         audit_handler = RotatingFileHandler(
-            audit_file,
-            maxBytes=50 * 1024 * 1024,  # 50MB
-            backupCount=10
+            audit_file, maxBytes=50 * 1024 * 1024, backupCount=10  # 50MB
         )
         audit_handler.setLevel(logging.INFO)
 
         # JSON形式のフォーマッター（簡易版）
-        audit_handler.setFormatter(logging.Formatter(
-            '{"timestamp": "%(asctime)s", "level": "%(levelname)s", '
-            '"module": "%(name)s", "message": "%(message)s"}',
-            datefmt="%Y-%m-%dT%H:%M:%S"
-        ))
+        audit_handler.setFormatter(
+            logging.Formatter(
+                '{"timestamp": "%(asctime)s", "level": "%(levelname)s", '
+                '"module": "%(name)s", "message": "%(message)s"}',
+                datefmt="%Y-%m-%dT%H:%M:%S",
+            )
+        )
         logger.addHandler(audit_handler)
 
 

@@ -6,16 +6,14 @@ Tests for RunView projection (CR-NEXUS-027).
 
 from __future__ import annotations
 
-from typing import Any, Dict
-
-import pytest
+from typing import Any
 
 from nexuscore.cli.run_view import build_run_view, format_run_view_cli
 
 
 def test_run_view_running(monkeypatch: Any, tmp_path: Any) -> None:
     """Test that RUNNING status shows run_id and status."""
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "status": "RUNNING",
         "run_id": "test-run-123",
     }
@@ -30,13 +28,13 @@ def test_run_view_running(monkeypatch: Any, tmp_path: Any) -> None:
 
 def test_run_view_paused_with_phase(monkeypatch: Any, tmp_path: Any) -> None:
     """Test that PAUSED status shows phase and resume instruction."""
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "status": "paused",
         "run_id": "test-run-paused",
         "next_phase": "implementation",
     }
 
-    run_state: Dict[str, Any] = {
+    run_state: dict[str, Any] = {
         "run_id": "test-run-paused",
         "status": "PAUSED",
         "next_phase": "implementation",
@@ -56,7 +54,7 @@ def test_run_view_paused_with_phase(monkeypatch: Any, tmp_path: Any) -> None:
 
 def test_run_view_conflict_shows_explainability(monkeypatch: Any, tmp_path: Any) -> None:
     """Test that CONFLICT status shows explainability."""
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "status": "CONFLICT",
         "run_id": "test-run-conflict",
         "explainability": {
@@ -78,7 +76,7 @@ def test_run_view_conflict_shows_explainability(monkeypatch: Any, tmp_path: Any)
 
 def test_run_view_failed_shows_explainability(monkeypatch: Any, tmp_path: Any) -> None:
     """Test that FAILED status shows explainability."""
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "status": "FAILED",
         "run_id": "test-run-failed",
         "explainability": {
@@ -100,7 +98,7 @@ def test_run_view_failed_shows_explainability(monkeypatch: Any, tmp_path: Any) -
 
 def test_run_view_aborted_shows_explainability(monkeypatch: Any, tmp_path: Any) -> None:
     """Test that ABORTED status shows explainability."""
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "status": "ABORTED",
         "run_id": "test-run-aborted",
         "explainability": {
@@ -123,7 +121,7 @@ def test_run_view_aborted_shows_explainability(monkeypatch: Any, tmp_path: Any) 
 def test_run_view_handles_why_code_variation(monkeypatch: Any, tmp_path: Any) -> None:
     """Test that RunView handles why_code / why key variations."""
     # Test with why_code
-    result1: Dict[str, Any] = {
+    result1: dict[str, Any] = {
         "status": "FAILED",
         "run_id": "test-why-code",
         "explainability": {
@@ -139,7 +137,7 @@ def test_run_view_handles_why_code_variation(monkeypatch: Any, tmp_path: Any) ->
     assert "TEST_ERROR" in output1 or "Reason:" in output1
 
     # Test with why (no why_code)
-    result2: Dict[str, Any] = {
+    result2: dict[str, Any] = {
         "status": "FAILED",
         "run_id": "test-why",
         "explainability": {
@@ -157,13 +155,13 @@ def test_run_view_handles_why_code_variation(monkeypatch: Any, tmp_path: Any) ->
 
 def test_run_view_extracts_authority_level_from_run_state(monkeypatch: Any, tmp_path: Any) -> None:
     """Test that authority_level is extracted from run_state when available."""
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "status": "paused",
         "run_id": "test-auth-level",
         "next_phase": "planning",
     }
 
-    run_state: Dict[str, Any] = {
+    run_state: dict[str, Any] = {
         "run_id": "test-auth-level",
         "status": "PAUSED",
         "authority_level": "full",
@@ -178,7 +176,7 @@ def test_run_view_extracts_authority_level_from_run_state(monkeypatch: Any, tmp_
 
 def test_run_view_completed_status(monkeypatch: Any, tmp_path: Any) -> None:
     """Test that completed status is formatted correctly."""
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "status": "completed",
         "run_id": "test-completed",
         "next_phase": None,
@@ -189,4 +187,3 @@ def test_run_view_completed_status(monkeypatch: Any, tmp_path: Any) -> None:
 
     assert "RUN COMPLETED" in output
     assert "run_id: test-completed" in output
-

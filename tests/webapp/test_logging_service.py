@@ -5,6 +5,7 @@ NexusCore Webapp - logging_service のテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask legacy logging_service tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -20,10 +21,12 @@ def test_log_execution_event_with_app_context():
     """
     app context ありで log_execution_event() → ExecutionLog 1件
     """
-    app = create_app(config_overrides={
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "TESTING": True,
-    })
+    app = create_app(
+        config_overrides={
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+            "TESTING": True,
+        }
+    )
 
     with app.app_context():
         db.create_all()
@@ -68,16 +71,19 @@ def test_log_execution_event_with_run_id():
     """
     run_id を指定した場合のテスト
     """
-    app = create_app(config_overrides={
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "TESTING": True,
-    })
+    app = create_app(
+        config_overrides={
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+            "TESTING": True,
+        }
+    )
 
     with app.app_context():
         db.create_all()
 
         # Run を作成（簡易版）
-        from nexuscore.webapp.models import Run, Project, User
+        from nexuscore.webapp.models import Project, Run, User
+
         user = User(
             github_id="123",
             github_login="test_user",
@@ -116,4 +122,3 @@ def test_log_execution_event_with_run_id():
         assert len(logs) == 1
         assert logs[0].run_id == run.id
         assert logs[0].source == "ORCHESTRATOR"
-

@@ -9,15 +9,16 @@ Flaskアプリコンテキストが存在する場合のみDBに書き込む。
 このモジュールは既存の log_transaction からの呼び出しを想定しているが、
 新しいコードでは logging_service.log_execution_event を直接使用することを推奨。
 """
+
 from __future__ import annotations
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def enhance_log_transaction(log_data: Dict[str, Any], log_file: str | None = None) -> None:
+def enhance_log_transaction(log_data: dict[str, Any], log_file: str | None = None) -> None:
     """
     既存の log_transaction を拡張して、DBにも書き込む。
 
@@ -62,7 +63,7 @@ def enhance_log_transaction(log_data: Dict[str, Any], log_file: str | None = Non
     run_id = log_data.get("run_id")
 
     # payload を作成（元の log_data から必要な情報を抽出）
-    payload: Dict[str, Any] = {}
+    payload: dict[str, Any] = {}
     if task_type:
         payload["task_type"] = task_type
     if model:
@@ -84,4 +85,3 @@ def enhance_log_transaction(log_data: Dict[str, Any], log_file: str | None = Non
         message=message,
         payload=payload,
     )
-

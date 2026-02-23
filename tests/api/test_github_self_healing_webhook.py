@@ -1,7 +1,6 @@
 """github_self_healing_webhook.py のテスト"""
-from unittest.mock import MagicMock
 
-import pytest
+
 
 from nexuscore.api.github_self_healing_webhook import (
     format_pr_comment,

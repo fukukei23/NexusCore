@@ -4,9 +4,11 @@ FastAPI Runs エンドポイントのテスト
 CR-FASTAPI-005 で作成された /api/v1/runs エンドポイントのテスト。
 既存の Flask テストの期待値に準拠。
 """
+
+from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
 from nexuscore.api.fastapi_app import app
 
@@ -29,12 +31,14 @@ def mock_api_key(monkeypatch):
 @pytest.fixture
 def mock_db_models():
     """データベースモデルをモック"""
-    with patch("nexuscore.webapp.models.Run") as mock_run, \
-         patch("nexuscore.webapp.models.Project") as mock_project, \
-         patch("nexuscore.webapp.models.User") as mock_user, \
-         patch("nexuscore.webapp.db") as mock_db, \
-         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.webapp.models.User") as mock_auth_user:
+    with (
+        patch("nexuscore.webapp.models.Run") as mock_run,
+        patch("nexuscore.webapp.models.Project") as mock_project,
+        patch("nexuscore.webapp.models.User") as mock_user,
+        patch("nexuscore.webapp.db") as mock_db,
+        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.webapp.models.User") as mock_auth_user,
+    ):
         yield {
             "Run": mock_run,
             "Project": mock_project,
@@ -83,7 +87,10 @@ def test_list_runs_success(client: TestClient, mock_api_key, mock_db_models):
 
     with patch("nexuscore.api.routes.runs.desc", side_effect=mock_desc):
         mock_query = MagicMock()
-        mock_query.join.return_value.filter.return_value.order_by.return_value.all.return_value = [mock_run1, mock_run2]
+        mock_query.join.return_value.filter.return_value.order_by.return_value.all.return_value = [
+            mock_run1,
+            mock_run2,
+        ]
         mock_db_models["Run"].query = mock_query
 
         # API Key認証のモック
@@ -92,10 +99,7 @@ def test_list_runs_success(client: TestClient, mock_api_key, mock_db_models):
         mock_db_models["ApiKey"].hash_token.return_value = "hashed_key"
         mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
 
-        response = client.get(
-            "/api/v1/run-records",
-            headers={"X-API-Key": mock_api_key}
-        )
+        response = client.get("/api/v1/run-records", headers={"X-API-Key": mock_api_key})
 
         assert response.status_code == 200
     data = response.json()
@@ -157,8 +161,7 @@ def test_list_runs_with_project_filter(client: TestClient, mock_api_key, mock_db
         mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
 
         response = client.get(
-            "/api/v1/run-records?project_id=1",
-            headers={"X-API-Key": mock_api_key}
+            "/api/v1/run-records?project_id=1", headers={"X-API-Key": mock_api_key}
         )
 
         assert response.status_code == 200
@@ -208,10 +211,7 @@ def test_get_run_success(client: TestClient, mock_api_key, mock_db_models):
     mock_db_models["ApiKey"].hash_token.return_value = "hashed_key"
     mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
 
-    response = client.get(
-        "/api/v1/run-records/run-123",
-        headers={"X-API-Key": mock_api_key}
-    )
+    response = client.get("/api/v1/run-records/run-123", headers={"X-API-Key": mock_api_key})
 
     assert response.status_code == 200
     data = response.json()
@@ -245,8 +245,7 @@ def test_get_run_not_found(client: TestClient, mock_api_key, mock_db_models):
     mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
 
     response = client.get(
-        "/api/v1/run-records/nonexistent-run-id",
-        headers={"X-API-Key": mock_api_key}
+        "/api/v1/run-records/nonexistent-run-id", headers={"X-API-Key": mock_api_key}
     )
 
     assert response.status_code == 404
@@ -314,10 +313,7 @@ def test_runs_response_structure(client: TestClient, mock_api_key, mock_db_model
     mock_db_models["ApiKey"].hash_token.return_value = "hashed_key"
     mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
 
-    response = client.get(
-        "/api/v1/run-records/run-123",
-        headers={"X-API-Key": mock_api_key}
-    )
+    response = client.get("/api/v1/run-records/run-123", headers={"X-API-Key": mock_api_key})
 
     assert response.status_code == 200
     data = response.json()
@@ -332,4 +328,3 @@ def test_runs_response_structure(client: TestClient, mock_api_key, mock_db_model
     assert isinstance(data["run_id"], str)
     assert isinstance(data["project_id"], int)
     assert data["status"] in ["PENDING", "RUNNING", "SUCCESS", "FAILED"]
-

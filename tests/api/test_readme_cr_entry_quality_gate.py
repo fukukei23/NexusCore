@@ -6,8 +6,6 @@ docs/api/README.md の CR エントリに対して、必須項目が存在し、
 
 from pathlib import Path
 
-import pytest
-
 from tests.api._readme_cr_helpers import (
     extract_cr_blocks,
     extract_cr_field,
@@ -63,15 +61,11 @@ def test_readme_cr_blocks_have_required_fields():
                     }
                 )
 
-    assert not failures, (
-        f"CR blocks missing required fields or fields are empty:\n"
-        + "\n".join(
-            f"  - CR-ID: {f['cr_id']}\n"
-            f"    Field: {f['field']}\n"
-            f"    Reason: {f['reason']}"
-            + (f"\n    Value: {f['value']}" if "value" in f else "")
-            for f in failures
-        )
+    assert not failures, "CR blocks missing required fields or fields are empty:\n" + "\n".join(
+        f"  - CR-ID: {f['cr_id']}\n"
+        f"    Field: {f['field']}\n"
+        f"    Reason: {f['reason']}" + (f"\n    Value: {f['value']}" if "value" in f else "")
+        for f in failures
     )
 
 
@@ -106,18 +100,16 @@ def test_completed_cr_blocks_have_completion_report_field():
                     {
                         "cr_id": cr_id,
                         "reason": "ステータスが ✅ 完了 だが '完了レポート' フィールドが実質的に空（プレースホルダまたは空文字）",
-                        "value": completion_report_value[:50]
-                        if len(completion_report_value) > 50
-                        else completion_report_value,
+                        "value": (
+                            completion_report_value[:50]
+                            if len(completion_report_value) > 50
+                            else completion_report_value
+                        ),
                     }
                 )
 
-    assert not failures, (
-        f"Completed CR blocks missing completion report field:\n"
-        + "\n".join(
-            f"  - CR-ID: {f['cr_id']}\n    Reason: {f['reason']}"
-            + (f"\n    Value: {f['value']}" if "value" in f else "")
-            for f in failures
-        )
+    assert not failures, "Completed CR blocks missing completion report field:\n" + "\n".join(
+        f"  - CR-ID: {f['cr_id']}\n    Reason: {f['reason']}"
+        + (f"\n    Value: {f['value']}" if "value" in f else "")
+        for f in failures
     )
-

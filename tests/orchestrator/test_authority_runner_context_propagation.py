@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pytest
 
@@ -9,7 +9,7 @@ from nexuscore.orchestrator import authority_runner
 
 class DummyOrchestrator:
     def __init__(self) -> None:
-        self.constitution: Dict[str, Any] = {}
+        self.constitution: dict[str, Any] = {}
 
     def run_full_project(self, *args: Any, **kwargs: Any) -> None:
         # Should not be reached in this test (we patch _invoke_orchestrator).
@@ -22,11 +22,11 @@ class DummyOrchestrator:
 )
 def test_run_with_authority_propagates_authority_level_in_execution_context(
     monkeypatch: Any,
-    authority_level: Optional[str],
+    authority_level: str | None,
 ) -> None:
     orch = DummyOrchestrator()
 
-    captured: Dict[str, Any] = {}
+    captured: dict[str, Any] = {}
 
     def fake_invoke_orchestrator(**kwargs: Any) -> None:
         captured.update(kwargs)
@@ -44,5 +44,3 @@ def test_run_with_authority_propagates_authority_level_in_execution_context(
     ctx = captured["execution_context"]
     assert "authority_level" in ctx
     assert ctx["authority_level"] == authority_level
-
-

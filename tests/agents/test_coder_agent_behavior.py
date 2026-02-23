@@ -7,9 +7,7 @@ from nexuscore.agents.coder_agent import CoderAgent
 
 @pytest.fixture(autouse=True)
 def patch_base_init(monkeypatch):
-    monkeypatch.setattr(
-        "nexuscore.agents.coder_agent.BaseAgent.__init__", lambda self: None
-    )
+    monkeypatch.setattr("nexuscore.agents.coder_agent.BaseAgent.__init__", lambda self: None)
 
 
 def test_implement_code_success(monkeypatch):

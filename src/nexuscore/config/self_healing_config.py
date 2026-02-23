@@ -23,7 +23,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -32,7 +32,7 @@ class SelfHealingConfig:
     label: str = "self-healing"
 
     # 対象とする PR の base ブランチ (None or [] の場合 → 全ブランチ許可)
-    allowed_target_branches: Optional[List[str]] = None
+    allowed_target_branches: list[str] | None = None
 
     # テスト実行コマンド (例: "pytest -q", "npm test" など)
     test_command: str = "pytest -q"
@@ -45,7 +45,7 @@ class SelfHealingConfig:
     allow_deletions: bool = False
 
     @classmethod
-    def load(cls, project_root: str) -> "SelfHealingConfig":
+    def load(cls, project_root: str) -> SelfHealingConfig:
         """
         project_root/.nexus/self_healing.config.json を読み込み、
         見つからなければデフォルト設定を返す。
@@ -57,7 +57,7 @@ class SelfHealingConfig:
             return cls()
 
         try:
-            data: Dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+            data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             # 壊れている場合は安全側デフォルト
             return cls()
@@ -83,9 +83,7 @@ class SelfHealingConfig:
 
         test_command = data.get("test_command", cls.test_command)
 
-        allow_test_modification = _get_bool(
-            "allow_test_modification", cls.allow_test_modification
-        )
+        allow_test_modification = _get_bool("allow_test_modification", cls.allow_test_modification)
         allow_deletions = _get_bool("allow_deletions", cls.allow_deletions)
 
         return cls(
@@ -95,4 +93,3 @@ class SelfHealingConfig:
             allow_test_modification=allow_test_modification,
             allow_deletions=allow_deletions,
         )
-

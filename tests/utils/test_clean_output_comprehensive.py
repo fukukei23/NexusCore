@@ -3,9 +3,7 @@ Comprehensive tests for clean_output module.
 Tests the clean_output function for removing code fences from LLM outputs.
 """
 
-import pytest
 from nexuscore.utils.clean_output import clean_output
-
 
 # ==============================================================================
 # clean_output Tests

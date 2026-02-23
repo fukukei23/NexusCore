@@ -5,14 +5,15 @@ README バッジ向けのメトリクス API。
 shields.io などで使用できる JSON エンドポイントを提供する。
 既存の Flask 実装 (`src/nexuscore/webapp/api_badges.py`) と互換性を保つ。
 """
+
 import logging
-from sqlalchemy import desc
 
 from fastapi import APIRouter, status
+from sqlalchemy import desc
 
 from ..schemas.badge import BadgeResponse
 from ..schemas.error import ErrorResponse
-from ..utils.errors import make_not_found_error, make_internal_error
+from ..utils.errors import make_internal_error, make_not_found_error
 
 router = APIRouter(tags=["badges"])
 
@@ -67,7 +68,12 @@ async def project_success_rate_badge(project_id: int) -> BadgeResponse:
             raise make_not_found_error("Project", str(project_id))
 
         # 過去30回のRunを取得
-        runs = Run.query.filter_by(project_id=project.id).order_by(desc(Run.started_at)).limit(30).all()
+        runs = (
+            Run.query.filter_by(project_id=project.id)
+            .order_by(desc(Run.started_at))
+            .limit(30)
+            .all()
+        )
 
         if not runs:
             success_rate = 0.0
@@ -148,7 +154,9 @@ async def project_last_run_badge(project_id: int) -> BadgeResponse:
             raise make_not_found_error("Project", str(project_id))
 
         # 最新のRunを取得
-        latest_run = Run.query.filter_by(project_id=project.id).order_by(desc(Run.started_at)).first()
+        latest_run = (
+            Run.query.filter_by(project_id=project.id).order_by(desc(Run.started_at)).first()
+        )
 
         if not latest_run:
             return BadgeResponse(
@@ -187,4 +195,3 @@ async def project_last_run_badge(project_id: int) -> BadgeResponse:
             raise
         logger.error(f"Failed to get last run badge: {e}", exc_info=True)
         raise make_internal_error(f"Failed to get last run badge: {str(e)}")
-

@@ -8,20 +8,20 @@ Comprehensive Tests for guardian_agent.py
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
+
 import sys
 from unittest.mock import MagicMock
 
 # git モジュールをモック化（import 前に実行）
-sys.modules['git'] = MagicMock()
+sys.modules["git"] = MagicMock()
 
-import pytest
 import json
 import os
-from unittest.mock import Mock, patch, call
-from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pytest
 
 from nexuscore.agents.guardian_agent import GuardianAgent
-
 
 # ============================================================================
 # Fixtures
@@ -31,7 +31,7 @@ from nexuscore.agents.guardian_agent import GuardianAgent
 @pytest.fixture
 def guardian():
     """GuardianAgent インスタンス"""
-    with patch('nexuscore.agents.guardian_agent.GitController'):
+    with patch("nexuscore.agents.guardian_agent.GitController"):
         agent = GuardianAgent(api_key="test-key", model="test-model")
         return agent
 
@@ -56,6 +56,7 @@ def constitution():
 def quality_report():
     """品質レポートのモック"""
     from nexuscore.utils.code_analyzer import QualityReport
+
     return QualityReport(
         passed=True,
         coverage_percentage=85.0,
@@ -75,6 +76,7 @@ def quality_report():
 def mutation_report():
     """ミューテーションレポートのモック"""
     from nexuscore.agents.mutation_tester_agent import MutationReport
+
     return MutationReport(
         passed=True,
         mutation_score=85.0,
@@ -95,7 +97,7 @@ def mutation_report():
 class TestGuardianAgentInit:
     def test_init_with_api_key_and_model(self):
         """API keyとmodelを指定して初期化"""
-        with patch('nexuscore.agents.guardian_agent.GitController'):
+        with patch("nexuscore.agents.guardian_agent.GitController"):
             agent = GuardianAgent(api_key="custom-key", model="custom-model")
 
             assert agent.api_key == "custom-key"
@@ -103,17 +105,20 @@ class TestGuardianAgentInit:
 
     def test_init_without_parameters(self):
         """パラメータなしで初期化"""
-        with patch('nexuscore.agents.guardian_agent.GitController'), \
-             patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'env-key'}):
+        with (
+            patch("nexuscore.agents.guardian_agent.GitController"),
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "env-key"}),
+        ):
             agent = GuardianAgent()
 
             assert agent.api_key == "env-key"
             assert agent.model == ""
 
-    @patch('nexuscore.agents.guardian_agent.GitController')
+    @patch("nexuscore.agents.guardian_agent.GitController")
     def test_init_with_git_error(self, mock_git):
         """Git初期化エラー時の処理"""
         import git
+
         mock_git.side_effect = git.InvalidGitRepositoryError("Not a git repo")
 
         agent = GuardianAgent()
@@ -122,7 +127,7 @@ class TestGuardianAgentInit:
 
     def test_init_budget_callback(self):
         """バジェットコールバックの設定"""
-        with patch('nexuscore.agents.guardian_agent.GitController'):
+        with patch("nexuscore.agents.guardian_agent.GitController"):
             agent = GuardianAgent()
 
             callback = Mock()
@@ -138,12 +143,18 @@ class TestGuardianAgentInit:
 
 
 class TestRunQualityGates:
-    @patch('nexuscore.agents.guardian_agent.MutationTesterAgent')
-    @patch('nexuscore.agents.guardian_agent.analyze_code_quality')
-    @patch('nexuscore.agents.guardian_agent.get_constitution')
+    @patch("nexuscore.agents.guardian_agent.MutationTesterAgent")
+    @patch("nexuscore.agents.guardian_agent.analyze_code_quality")
+    @patch("nexuscore.agents.guardian_agent.get_constitution")
     def test_run_quality_gates_success(
-        self, mock_get_const, mock_analyze, mock_mutation_class,
-        guardian, constitution, quality_report, mutation_report
+        self,
+        mock_get_const,
+        mock_analyze,
+        mock_mutation_class,
+        guardian,
+        constitution,
+        quality_report,
+        mutation_report,
     ):
         """品質ゲート実行成功"""
         mock_get_const.return_value = constitution
@@ -163,11 +174,16 @@ class TestRunQualityGates:
         assert result["tier2"] == mutation_report
         assert len(result["violations"]) == 0
 
-    @patch('nexuscore.agents.guardian_agent.MutationTesterAgent')
-    @patch('nexuscore.agents.guardian_agent.analyze_code_quality')
+    @patch("nexuscore.agents.guardian_agent.MutationTesterAgent")
+    @patch("nexuscore.agents.guardian_agent.analyze_code_quality")
     def test_run_quality_gates_tier1_failure(
-        self, mock_analyze, mock_mutation_class,
-        guardian, constitution, quality_report, mutation_report
+        self,
+        mock_analyze,
+        mock_mutation_class,
+        guardian,
+        constitution,
+        quality_report,
+        mutation_report,
     ):
         """Tier 1失敗時の処理"""
         # Tier 1失敗
@@ -188,11 +204,16 @@ class TestRunQualityGates:
         assert result["overall_passed"] is False
         assert "テストカバレッジ不足" in result["violations"]
 
-    @patch('nexuscore.agents.guardian_agent.MutationTesterAgent')
-    @patch('nexuscore.agents.guardian_agent.analyze_code_quality')
+    @patch("nexuscore.agents.guardian_agent.MutationTesterAgent")
+    @patch("nexuscore.agents.guardian_agent.analyze_code_quality")
     def test_run_quality_gates_tier2_failure(
-        self, mock_analyze, mock_mutation_class,
-        guardian, constitution, quality_report, mutation_report
+        self,
+        mock_analyze,
+        mock_mutation_class,
+        guardian,
+        constitution,
+        quality_report,
+        mutation_report,
     ):
         """Tier 2失敗時の処理"""
         mock_analyze.return_value = quality_report
@@ -214,11 +235,10 @@ class TestRunQualityGates:
         assert result["overall_passed"] is False
         assert any("ミューテーションスコア" in v for v in result["violations"])
 
-    @patch('nexuscore.agents.guardian_agent.MutationTesterAgent')
-    @patch('nexuscore.agents.guardian_agent.analyze_code_quality')
+    @patch("nexuscore.agents.guardian_agent.MutationTesterAgent")
+    @patch("nexuscore.agents.guardian_agent.analyze_code_quality")
     def test_run_quality_gates_tier1_exception(
-        self, mock_analyze, mock_mutation_class,
-        guardian, constitution, mutation_report
+        self, mock_analyze, mock_mutation_class, guardian, constitution, mutation_report
     ):
         """Tier 1実行中の例外処理"""
         mock_analyze.side_effect = Exception("Analysis error")
@@ -237,11 +257,10 @@ class TestRunQualityGates:
         assert isinstance(result["overall_passed"], bool)
         assert "tier1" in result or "tier2" in result
 
-    @patch('nexuscore.agents.guardian_agent.MutationTesterAgent')
-    @patch('nexuscore.agents.guardian_agent.analyze_code_quality')
+    @patch("nexuscore.agents.guardian_agent.MutationTesterAgent")
+    @patch("nexuscore.agents.guardian_agent.analyze_code_quality")
     def test_run_quality_gates_tier2_exception(
-        self, mock_analyze, mock_mutation_class,
-        guardian, constitution, quality_report
+        self, mock_analyze, mock_mutation_class, guardian, constitution, quality_report
     ):
         """Tier 2実行中の例外処理"""
         mock_analyze.return_value = quality_report
@@ -267,7 +286,7 @@ class TestRunQualityGates:
 
 
 class TestReview:
-    @patch.object(GuardianAgent, 'execute_llm_task')
+    @patch.object(GuardianAgent, "execute_llm_task")
     def test_review_approve(self, mock_llm, guardian):
         """レビュー承認"""
         review_response = {
@@ -289,7 +308,7 @@ class TestReview:
         assert result["reason"] == "コードは品質基準を満たしています"
         assert "feedback_for_coder" not in result
 
-    @patch.object(GuardianAgent, 'execute_llm_task')
+    @patch.object(GuardianAgent, "execute_llm_task")
     def test_review_reject(self, mock_llm, guardian):
         """レビュー拒否"""
         review_response = {
@@ -312,7 +331,7 @@ class TestReview:
         assert result["reason"] == "テストが不十分です"
         assert result["feedback_for_coder"] == "エッジケースのテストを追加してください"
 
-    @patch.object(GuardianAgent, 'execute_llm_task')
+    @patch.object(GuardianAgent, "execute_llm_task")
     def test_review_invalid_json(self, mock_llm, guardian):
         """無効なJSON応答の処理"""
         mock_llm.return_value = "This is not JSON"
@@ -329,7 +348,7 @@ class TestReview:
         assert result["decision"] == "REJECT"
         assert "Invalid JSON" in result["reason"]
 
-    @patch.object(GuardianAgent, 'execute_llm_task')
+    @patch.object(GuardianAgent, "execute_llm_task")
     def test_review_missing_decision(self, mock_llm, guardian):
         """decisionフィールドが欠けている場合"""
         review_response = {"reason": "Some reason"}
@@ -354,12 +373,18 @@ class TestReview:
 
 
 class TestReviewWithQualityGates:
-    @patch.object(GuardianAgent, 'execute_llm_task')
-    @patch.object(GuardianAgent, '_run_quality_gates')
-    @patch.object(GuardianAgent, '_format_quality_gates_summary')
+    @patch.object(GuardianAgent, "execute_llm_task")
+    @patch.object(GuardianAgent, "_run_quality_gates")
+    @patch.object(GuardianAgent, "_format_quality_gates_summary")
     def test_review_with_quality_gates_pass(
-        self, mock_format, mock_gates, mock_llm,
-        guardian, constitution, quality_report, mutation_report
+        self,
+        mock_format,
+        mock_gates,
+        mock_llm,
+        guardian,
+        constitution,
+        quality_report,
+        mutation_report,
     ):
         """品質ゲート合格→LLMレビュー承認"""
         # 品質ゲート合格
@@ -392,7 +417,7 @@ class TestReviewWithQualityGates:
         assert result["decision"] == "APPROVE"
         assert result["quality_gates"]["overall_passed"] is True
 
-    @patch.object(GuardianAgent, '_run_quality_gates')
+    @patch.object(GuardianAgent, "_run_quality_gates")
     def test_review_with_quality_gates_fail(
         self, mock_gates, guardian, constitution, quality_report, mutation_report
     ):
@@ -432,9 +457,7 @@ class TestReviewWithQualityGates:
 
 
 class TestFormatQualityGatesSummary:
-    def test_format_summary_with_tier1_and_tier2(
-        self, guardian, quality_report, mutation_report
-    ):
+    def test_format_summary_with_tier1_and_tier2(self, guardian, quality_report, mutation_report):
         """Tier 1とTier 2の結果をフォーマット"""
         quality_gates_result = {
             "tier1": quality_report,
@@ -449,9 +472,7 @@ class TestFormatQualityGatesSummary:
         assert "Tier 2" in summary and "テスト品質" in summary
         assert "85.0%" in summary  # mutation score
 
-    def test_format_summary_with_failures(
-        self, guardian, quality_report, mutation_report
-    ):
+    def test_format_summary_with_failures(self, guardian, quality_report, mutation_report):
         """失敗した品質ゲート結果をフォーマット"""
         quality_report.passed = False
         mutation_report.passed = False
@@ -500,9 +521,7 @@ class TestGenerateCommitMessage:
             "mutation_score": 88,
         }
 
-        message = guardian._generate_commit_message(
-            review_data, changed_files, debug_info
-        )
+        message = guardian._generate_commit_message(review_data, changed_files, debug_info)
 
         assert "Guardian" in message
         assert "合格" in message
@@ -514,9 +533,9 @@ class TestGenerateCommitMessage:
 
 
 class TestReviewUnifiedDiff:
-    @patch.object(GuardianAgent, '_review_with_llm')
-    @patch.object(GuardianAgent, '_summarize_diff_for_llm')
-    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
+    @patch.object(GuardianAgent, "_review_with_llm")
+    @patch.object(GuardianAgent, "_summarize_diff_for_llm")
+    @patch("nexuscore.agents.guardian_agent.GuardianAutoReviewer")
     def test_review_unified_diff_approve(
         self, mock_auto_reviewer_class, mock_summarize, mock_review_llm, guardian
     ):
@@ -553,14 +572,15 @@ class TestReviewUnifiedDiff:
         mock_summarize.assert_called_once()
         mock_review_llm.assert_called_once()
 
-    @patch('nexuscore.agents.guardian_agent.ReviewDecision')
-    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
+    @patch("nexuscore.agents.guardian_agent.ReviewDecision")
+    @patch("nexuscore.agents.guardian_agent.GuardianAutoReviewer")
     def test_review_unified_diff_auto_reject(
         self, mock_auto_reviewer_class, mock_review_decision, guardian
     ):
         """自動レビューでREJECTされる場合"""
         # ReviewDecisionをモック
         from enum import Enum
+
         class MockReviewDecision(Enum):
             APPROVE = "APPROVE"
             REJECT = "REJECT"
@@ -589,8 +609,8 @@ class TestReviewUnifiedDiff:
         assert result["decision"] == "REJECT"
         assert "自動レビューで拒否" in result["reason"]
 
-    @patch.object(GuardianAgent, '_review_with_llm')
-    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
+    @patch.object(GuardianAgent, "_review_with_llm")
+    @patch("nexuscore.agents.guardian_agent.GuardianAutoReviewer")
     def test_review_unified_diff_manual_review(
         self, mock_auto_reviewer_class, mock_review_llm, guardian
     ):
@@ -600,6 +620,7 @@ class TestReviewUnifiedDiff:
         mock_auto_result = Mock()
 
         from enum import Enum
+
         class MockReviewDecision(Enum):
             APPROVE = "APPROVE"
             REJECT = "REJECT"
@@ -651,13 +672,10 @@ class TestReviewUnifiedDiff:
         assert "変更ファイル数: 1" in summary
         assert "残り 12 行" in summary  # 62行 - 50行 = 12行
 
-    @patch.object(GuardianAgent, 'execute_llm_task')
+    @patch.object(GuardianAgent, "execute_llm_task")
     def test_review_with_llm_success(self, mock_llm, guardian):
         """LLMレビュー成功"""
-        mock_llm.return_value = json.dumps({
-            "decision": "APPROVE",
-            "reason": "コード品質良好"
-        })
+        mock_llm.return_value = json.dumps({"decision": "APPROVE", "reason": "コード品質良好"})
 
         diff_summary = "変更ファイル数: 1"
         result = guardian._review_with_llm(diff_summary)
@@ -666,7 +684,7 @@ class TestReviewUnifiedDiff:
         assert result["reason"] == "コード品質良好"
         mock_llm.assert_called_once()
 
-    @patch.object(GuardianAgent, 'execute_llm_task')
+    @patch.object(GuardianAgent, "execute_llm_task")
     def test_review_with_llm_error(self, mock_llm, guardian):
         """LLMレビュー失敗時のエラーハンドリング"""
         mock_llm.side_effect = Exception("LLM API error")
@@ -692,7 +710,7 @@ class TestReviewUnifiedDiff:
 
 
 class TestGenerateDiffSummary:
-    @patch.object(GuardianAgent, 'execute_llm_task')
+    @patch.object(GuardianAgent, "execute_llm_task")
     def test_generate_diff_summary_single_file(self, mock_llm, guardian):
         """単一ファイル差分のサマリー生成"""
         mock_llm.return_value = "- コードが簡潔化されました\n- 可読性が向上しました"
@@ -701,24 +719,17 @@ class TestGenerateDiffSummary:
         after_code = "def new_func():\n    return 1"
 
         result = guardian.generate_diff_summary(
-            before_code=before_code,
-            after_code=after_code,
-            model="gpt-4.1"
+            before_code=before_code, after_code=after_code, model="gpt-4.1"
         )
 
         assert isinstance(result, str)
         assert "簡潔化" in result
         mock_llm.assert_called_once()
 
-    @patch.object(GuardianAgent, '_generate_multi_file_diff_summary')
-    def test_generate_diff_summary_multi_file(
-        self, mock_multi, guardian
-    ):
+    @patch.object(GuardianAgent, "_generate_multi_file_diff_summary")
+    def test_generate_diff_summary_multi_file(self, mock_multi, guardian):
         """複数ファイル差分のサマリー生成"""
-        mock_multi.return_value = {
-            "file1.py": "- 改善点1",
-            "file2.py": "- 改善点2"
-        }
+        mock_multi.return_value = {"file1.py": "- 改善点1", "file2.py": "- 改善点2"}
 
         file_diffs = {
             "file1.py": {"before": "old code 1", "after": "new code 1"},
@@ -739,12 +750,11 @@ class TestGenerateDiffSummary:
 
 
 class TestIntegrationScenarios:
-    @patch.object(GuardianAgent, 'execute_llm_task')
-    @patch.object(GuardianAgent, '_run_quality_gates')
-    @patch('nexuscore.agents.guardian_agent.GitController')
+    @patch.object(GuardianAgent, "execute_llm_task")
+    @patch.object(GuardianAgent, "_run_quality_gates")
+    @patch("nexuscore.agents.guardian_agent.GitController")
     def test_full_review_workflow(
-        self, mock_git_class, mock_gates, mock_llm,
-        constitution, quality_report, mutation_report
+        self, mock_git_class, mock_gates, mock_llm, constitution, quality_report, mutation_report
     ):
         """完全なレビューワークフロー"""
         # GitController のモック
@@ -801,8 +811,8 @@ class TestGuardianAdvancedEdgeCases:
     """より深いエッジケースと統合シナリオ"""
 
     @patch.object(GuardianAgent, "execute_llm_task")
-    @patch('nexuscore.agents.guardian_agent.ReviewDecision')
-    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
+    @patch("nexuscore.agents.guardian_agent.ReviewDecision")
+    @patch("nexuscore.agents.guardian_agent.GuardianAutoReviewer")
     def test_review_unified_diff_with_malformed_diff(
         self, mock_auto_reviewer_class, mock_review_decision, mock_execute, guardian
     ):
@@ -823,10 +833,9 @@ class TestGuardianAdvancedEdgeCases:
         mock_auto_reviewer.review_diff.return_value = mock_auto_result
 
         # LLMのモック設定
-        mock_execute.return_value = json.dumps({
-            "decision": "MANUAL_REVIEW",
-            "reason": "Malformed diff format"
-        })
+        mock_execute.return_value = json.dumps(
+            {"decision": "MANUAL_REVIEW", "reason": "Malformed diff format"}
+        )
 
         # 不正な形式のdiff（diffヘッダーが欠けている）
         malformed_diff = """
@@ -843,8 +852,8 @@ this is not a proper diff
         assert "reason" in result
 
     @patch.object(GuardianAgent, "execute_llm_task")
-    @patch('nexuscore.agents.guardian_agent.ReviewDecision')
-    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
+    @patch("nexuscore.agents.guardian_agent.ReviewDecision")
+    @patch("nexuscore.agents.guardian_agent.GuardianAutoReviewer")
     def test_review_unified_diff_with_very_large_diff(
         self, mock_auto_reviewer_class, mock_review_decision, mock_execute, guardian
     ):
@@ -865,10 +874,9 @@ this is not a proper diff
         mock_auto_reviewer.review_diff.return_value = mock_auto_result
 
         # LLMのモック設定
-        mock_execute.return_value = json.dumps({
-            "decision": "APPROVE",
-            "reason": "Changes look good despite size"
-        })
+        mock_execute.return_value = json.dumps(
+            {"decision": "APPROVE", "reason": "Changes look good despite size"}
+        )
 
         # 100行以上の大きなdiffを作成
         large_diff = "diff --git a/test.py b/test.py\n"
@@ -885,8 +893,8 @@ this is not a proper diff
         assert mock_execute.called
 
     @patch.object(GuardianAgent, "execute_llm_task")
-    @patch('nexuscore.agents.guardian_agent.ReviewDecision')
-    @patch('nexuscore.agents.guardian_agent.GuardianAutoReviewer')
+    @patch("nexuscore.agents.guardian_agent.ReviewDecision")
+    @patch("nexuscore.agents.guardian_agent.GuardianAutoReviewer")
     def test_review_unified_diff_with_multiple_file_types(
         self, mock_auto_reviewer_class, mock_review_decision, mock_execute, guardian
     ):
@@ -907,10 +915,9 @@ this is not a proper diff
         mock_auto_reviewer.review_diff.return_value = mock_auto_result
 
         # LLMのモック設定
-        mock_execute.return_value = json.dumps({
-            "decision": "APPROVE",
-            "reason": "All file types processed successfully"
-        })
+        mock_execute.return_value = json.dumps(
+            {"decision": "APPROVE", "reason": "All file types processed successfully"}
+        )
 
         # Python, JavaScript, JSONファイルを含むdiff
         multi_type_diff = """diff --git a/app.py b/app.py
@@ -943,7 +950,7 @@ diff --git a/script.js b/script.js
             after_code="def new_func():\n    pass",
             file_diffs={},
             semantic_diffs={},
-            model="test-model"
+            model="test-model",
         )
 
         # 空のbeforeでも処理できる

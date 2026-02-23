@@ -1,8 +1,8 @@
 """Unit tests for main_ui.py"""
-import os
+
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+
 import pytest
 
 # プロジェクトルートをパスに追加
@@ -14,6 +14,7 @@ def test_main_ui_import():
     """main_ui.pyのインポートテスト"""
     try:
         import main_ui
+
         assert main_ui is not None
     except ImportError as e:
         pytest.skip(f"main_ui.pyのインポートに失敗: {e}")
@@ -23,6 +24,7 @@ def test_launch_all_tabs_function_exists():
     """launch_all_tabs関数の存在確認"""
     try:
         import main_ui
+
         assert hasattr(main_ui, "launch_all_tabs")
         assert callable(main_ui.launch_all_tabs)
     except ImportError:
@@ -53,9 +55,9 @@ def test_main_ui_imports():
     """main_ui.pyのインポートが正常に動作することを確認"""
     try:
         import main_ui
+
         # 主要な関数や変数が存在することを確認
         assert hasattr(main_ui, "launch_all_tabs")
         assert hasattr(main_ui, "has_generator")
     except ImportError as e:
         pytest.skip(f"main_ui.pyのインポートに失敗: {e}")
-

@@ -22,10 +22,9 @@
 #      フォールバックとして正規表現での抽出を試みる、より安全な方式に変更しました。
 # ==============================================================================
 import json
-import re
-import logging
 import os
-from typing import Any, Dict, Optional
+import re
+from typing import Any
 
 from .base_agent import BaseAgent
 
@@ -33,7 +32,10 @@ from .base_agent import BaseAgent
 # --- 入力/出力データを安全に処理するためのヘルパー関数 ---
 
 ALLOWED_TARGETS = {"source_file", "test_file", "both"}
-MAX_CTX = int(os.getenv("FKB_CONTEXT_LIMIT", "20000"))  # プロンプトに含める各コンテキストの最大文字数
+MAX_CTX = int(
+    os.getenv("FKB_CONTEXT_LIMIT", "20000")
+)  # プロンプトに含める各コンテキストの最大文字数
+
 
 def _truncate(s: str, limit: int = MAX_CTX) -> str:
     """文字列が長すぎる場合に、中央を省略して切り詰める"""
@@ -43,21 +45,25 @@ def _truncate(s: str, limit: int = MAX_CTX) -> str:
     tail = s[-limit // 2 :]
     return f"{head}\n...\n{tail}"
 
+
 def _redact(s: str) -> str:
     """文字列から既知の秘匿情報パターンをマスクする"""
     if not s:
         return s
     # AWSキーや一般的なAPIキーのパターンをマスク
     s = re.sub(r"AKIA[0-9A-Z]{16}", "****AWS_KEY_REDACTED****", s)
-    s = re.sub(r"(?i)api[_-]?key[:=]\s*['\"][A-Za-z0-9_\-]{16,}['\"]", "api_key:'****REDACTED****'", s)
+    s = re.sub(
+        r"(?i)api[_-]?key[:=]\s*['\"][A-Za-z0-9_\-]{16,}['\"]", "api_key:'****REDACTED****'", s
+    )
     return s
 
-def _validate_and_normalize(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+
+def _validate_and_normalize(payload: dict[str, Any]) -> dict[str, Any] | None:
     """LLMが生成したJSONのスキーマと内容を検証・正規化する"""
     required = {"id", "error_signature", "cause", "target", "solution_pattern", "description"}
     if not isinstance(payload, dict) or not required.issubset(payload.keys()):
         return None
-    
+
     # targetを正規化
     tgt = str(payload.get("target", "")).strip().lower()
     if tgt not in ALLOWED_TARGETS:
@@ -66,7 +72,11 @@ def _validate_and_normalize(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]
 
     # solution_patternを検証
     sp = payload.get("solution_pattern")
-    if not isinstance(sp, dict) or sp.get("type") != "llm_diagnose_and_fix" or not sp.get("instruction"):
+    if (
+        not isinstance(sp, dict)
+        or sp.get("type") != "llm_diagnose_and_fix"
+        or not sp.get("instruction")
+    ):
         return None
 
     # error_signatureが有効な正規表現か検証
@@ -74,8 +84,10 @@ def _validate_and_normalize(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]
         re.compile(str(payload["error_signature"]))
     except re.error:
         return None
-        
+
     return payload
+
+
 # ★★★★★ ここまで ★★★★★
 
 
@@ -92,18 +104,20 @@ class PostmortemAgent(BaseAgent):
         source_code: str,
         test_code: str,
         source_file_path: str,
-        test_file_path: str
-    ) -> Optional[dict]:
+        test_file_path: str,
+    ) -> dict | None:
         """
         未知のエラーを分析し、KnowledgeBaseに追加すべき新しいエントリを提案する。
         """
-        self.logger.info(f"Analyzing failed test to generate new FKB entry (source={source_file_path}, test={test_file_path})")
+        self.logger.info(
+            f"Analyzing failed test to generate new FKB entry (source={source_file_path}, test={test_file_path})"
+        )
 
         # ★★★★★ ここからが最終ブラッシュアップの核心 (2/3) ★★★★★
         # LLMに渡す前に、コンテキストを安全な形にサニタイズする
         error_log_s = _redact(_truncate(error_log))
         source_code_s = _redact(_truncate(source_code))
-        test_code_s   = _redact(_truncate(test_code))
+        test_code_s = _redact(_truncate(test_code))
         # ★★★★★ ここまで ★★★★★
 
         prompt = f"""
@@ -170,7 +184,7 @@ class PostmortemAgent(BaseAgent):
 """
         try:
             response_str = self.execute_llm_task(prompt, temperature=0.3, as_json=True)
-            
+
             if not response_str:
                 self.logger.error("LLM response was empty.")
                 return None
@@ -183,26 +197,34 @@ class PostmortemAgent(BaseAgent):
                 candidate = json.loads(response_str)
             except json.JSONDecodeError:
                 # 失敗した場合のみ、フォールバックとして波括弧で囲まれた部分を抽出
-                match = re.search(r'\{.*\}', response_str, re.DOTALL)
+                match = re.search(r"\{.*\}", response_str, re.DOTALL)
                 if not match:
-                    self.logger.error(f"LLM response does not contain a JSON object. Raw response:\n{response_str}")
+                    self.logger.error(
+                        f"LLM response does not contain a JSON object. Raw response:\n{response_str}"
+                    )
                     return None
                 try:
                     candidate = json.loads(match.group(0))
                 except json.JSONDecodeError as e:
-                    self.logger.error(f"Failed to parse extracted JSON: {e}. Raw extract:\n{match.group(0)}")
+                    self.logger.error(
+                        f"Failed to parse extracted JSON: {e}. Raw extract:\n{match.group(0)}"
+                    )
                     return None
-            
+
             # スキーマと内容の検証
             normalized = _validate_and_normalize(candidate)
             if not normalized:
-                self.logger.error(f"Generated JSON failed schema/regex validation. Raw candidate:\n{candidate}")
+                self.logger.error(
+                    f"Generated JSON failed schema/regex validation. Raw candidate:\n{candidate}"
+                )
                 return None
-            
+
             self.logger.info("Successfully generated and validated a new FKB suggestion.")
             return normalized
             # ★★★★★ ここまで ★★★★★
 
         except Exception as e:
-            self.logger.error(f"An unexpected error occurred in PostmortemAgent: {e}", exc_info=True)
+            self.logger.error(
+                f"An unexpected error occurred in PostmortemAgent: {e}", exc_info=True
+            )
             return None

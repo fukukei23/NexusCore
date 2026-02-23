@@ -4,22 +4,31 @@ Projects エンドポイント
 プロジェクト管理用の FastAPI エンドポイント。
 既存の Flask 実装 (`src/nexuscore/webapp/api_external.py`) と互換性を保つ。
 """
+
 import logging
 import os
-from typing import List
 
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import desc
 
-from ..schemas.project import ProjectCreateRequest, ProjectListResponse, ProjectResponse, ProjectSummary
-from ..schemas.project_run import ProjectRunRequest, ProjectRunResponse, LatestRunResponse, LatestRunDetail
+from ..dependencies.auth import AuthenticatedUser, get_current_user
 from ..schemas.error import ErrorResponse
-from ..dependencies.auth import get_current_user, AuthenticatedUser
+from ..schemas.project import (
+    ProjectCreateRequest,
+    ProjectListResponse,
+    ProjectResponse,
+    ProjectSummary,
+)
+from ..schemas.project_run import (
+    LatestRunDetail,
+    LatestRunResponse,
+    ProjectRunRequest,
+    ProjectRunResponse,
+)
 from ..utils.errors import (
-    make_not_found_error,
-    make_internal_error,
-    make_validation_error,
     make_bad_request_error,
+    make_internal_error,
+    make_not_found_error,
 )
 
 router = APIRouter(tags=["projects"])
@@ -95,16 +104,13 @@ async def list_projects(
         HTTPException: 内部エラー時（500）
     """
     try:
-        from nexuscore.webapp.models import Project
         from nexuscore.webapp import db
+        from nexuscore.webapp.models import Project
 
         user_id = _get_user_id_from_auth(current_user)
 
         projects = (
-            Project.query
-            .filter_by(owner_id=user_id)
-            .order_by(desc(Project.created_at))
-            .all()
+            Project.query.filter_by(owner_id=user_id).order_by(desc(Project.created_at)).all()
         )
 
         data = [
@@ -182,8 +188,8 @@ async def create_project(
         HTTPException: バリデーションエラー時（400）または内部エラー時（500）
     """
     try:
-        from nexuscore.webapp.models import Project
         from nexuscore.webapp import db
+        from nexuscore.webapp.models import Project
 
         user_id = _get_user_id_from_auth(current_user)
 
@@ -263,16 +269,11 @@ async def get_project(
     """
     try:
         from nexuscore.webapp.models import Project
-        from nexuscore.webapp import db
 
         user_id = _get_user_id_from_auth(current_user)
 
         # プロジェクトの所有権を確認
-        project = (
-            Project.query
-            .filter_by(id=project_id, owner_id=user_id)
-            .first()
-        )
+        project = Project.query.filter_by(id=project_id, owner_id=user_id).first()
 
         if not project:
             raise make_not_found_error("Project", str(project_id))
@@ -296,9 +297,9 @@ async def get_project(
 
 
 @router.post(
-        "/projects/{project_id}/run",
-        response_model=ProjectRunResponse,
-        summary="Trigger project run",
+    "/projects/{project_id}/run",
+    response_model=ProjectRunResponse,
+    summary="Trigger project run",
     responses={
         200: {"model": ProjectRunResponse, "description": "Synchronous execution completed"},
         202: {"model": ProjectRunResponse, "description": "Asynchronous execution started"},
@@ -354,22 +355,17 @@ async def trigger_project_run(
         HTTPException: プロジェクトが見つからない場合（404）、requirement が未指定の場合（400）、または内部エラー時（500）
     """
     import uuid
-    from datetime import datetime
 
     try:
-        from nexuscore.webapp.models import Project, Run
         from nexuscore.webapp import db
-        from nexuscore.webapp.orchestrator_inline import run_orchestrator_inline
         from nexuscore.webapp.celery_app import run_orchestrator_task
+        from nexuscore.webapp.models import Project, Run
+        from nexuscore.webapp.orchestrator_inline import run_orchestrator_inline
 
         user_id = _get_user_id_from_auth(current_user)
 
         # プロジェクトの所有権を確認
-        project = (
-            Project.query
-            .filter_by(id=project_id, owner_id=user_id)
-            .first()
-        )
+        project = Project.query.filter_by(id=project_id, owner_id=user_id).first()
 
         if not project:
             raise make_not_found_error("Project", str(project_id))
@@ -492,27 +488,17 @@ async def get_latest_run(
     """
     try:
         from nexuscore.webapp.models import Project, Run
-        from nexuscore.webapp import db
 
         user_id = _get_user_id_from_auth(current_user)
 
         # プロジェクトの所有権を確認
-        project = (
-            Project.query
-            .filter_by(id=project_id, owner_id=user_id)
-            .first()
-        )
+        project = Project.query.filter_by(id=project_id, owner_id=user_id).first()
 
         if not project:
             raise make_not_found_error("Project", str(project_id))
 
         # 最新の Run を取得
-        run = (
-            Run.query
-            .filter_by(project_id=project.id)
-            .order_by(desc(Run.started_at))
-            .first()
-        )
+        run = Run.query.filter_by(project_id=project.id).order_by(desc(Run.started_at)).first()
 
         if not run:
             return LatestRunResponse(run=None)
@@ -533,4 +519,3 @@ async def get_latest_run(
             raise
         logger.error(f"Failed to get latest run: {e}", exc_info=True)
         raise make_internal_error(f"Failed to get latest run: {str(e)}")
-

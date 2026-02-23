@@ -6,11 +6,9 @@ test_test_generator_prompt.py
 
 from __future__ import annotations
 
-import pytest
-
 from nexuscore.agents.test_generator_prompt import (
-    build_test_generation_prompt,
     build_specification_based_test_prompt,
+    build_test_generation_prompt,
 )
 
 
@@ -125,4 +123,3 @@ class TestBuildSpecificationBasedTestPrompt:
         assert "file_utils" in prompt
         assert "normalize_path" in prompt
         assert "ファイルパスは正規化されること" in prompt
-

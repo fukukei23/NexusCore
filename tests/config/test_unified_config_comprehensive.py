@@ -8,23 +8,23 @@ Comprehensive Tests for unified_config.py
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
-import pytest
-import os
+
 import json
+import os
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+
+import pytest
 
 from nexuscore.config.unified_config import (
-    DatabaseConfig,
-    CeleryConfig,
     AutonomyConfig,
+    CeleryConfig,
+    DatabaseConfig,
     LLMConfig,
     NexusConfig,
     get_config,
     set_config,
 )
-
 
 # ============================================================================
 # Fixtures
@@ -35,6 +35,7 @@ from nexuscore.config.unified_config import (
 def reset_global_config():
     """各テスト前後でグローバル設定をリセット"""
     import nexuscore.config.unified_config as uc
+
     original_config = uc._config
 
     # テスト前にリセット
@@ -51,9 +52,14 @@ def clean_env(monkeypatch):
     """クリーンな環境変数"""
     # 全ての NEXUS 関連環境変数をクリア
     for key in list(os.environ.keys()):
-        if key.startswith('NEXUS_') or key.startswith('DATABASE_') or \
-           key.startswith('CELERY_') or key.startswith('REDIS_') or \
-           key.startswith('FLASK_') or key.startswith('SQLALCHEMY_'):
+        if (
+            key.startswith("NEXUS_")
+            or key.startswith("DATABASE_")
+            or key.startswith("CELERY_")
+            or key.startswith("REDIS_")
+            or key.startswith("FLASK_")
+            or key.startswith("SQLALCHEMY_")
+        ):
             monkeypatch.delenv(key, raising=False)
     return monkeypatch
 
@@ -119,10 +125,7 @@ class TestDatabaseConfig:
 
     def test_direct_creation(self):
         """直接インスタンス化"""
-        config = DatabaseConfig(
-            uri="mysql://user:pass@localhost/db",
-            track_modifications=True
-        )
+        config = DatabaseConfig(uri="mysql://user:pass@localhost/db", track_modifications=True)
 
         assert config.uri == "mysql://user:pass@localhost/db"
         assert config.track_modifications is True
@@ -176,8 +179,7 @@ class TestCeleryConfig:
     def test_validate_success(self):
         """正常なバリデーション"""
         config = CeleryConfig(
-            broker_url="redis://localhost:6379/0",
-            result_backend="redis://localhost:6379/1"
+            broker_url="redis://localhost:6379/0", result_backend="redis://localhost:6379/1"
         )
         config.validate()  # 例外が発生しない
 
@@ -351,11 +353,7 @@ class TestNexusConfig:
     def test_from_env_with_config_file(self, clean_env, temp_config_dir):
         """設定ファイルからself-healing設定をロード"""
         config_file = temp_config_dir / "self_healing.config.json"
-        sh_config = {
-            "enabled": True,
-            "max_attempts": 3,
-            "timeout": 300
-        }
+        sh_config = {"enabled": True, "max_attempts": 3, "timeout": 300}
         config_file.write_text(json.dumps(sh_config))
 
         config = NexusConfig.from_env(config_file=config_file)
@@ -427,12 +425,11 @@ class TestNexusConfig:
             flask_secret_key="test-key",
             database=DatabaseConfig(uri="sqlite:///test.db"),
             celery=CeleryConfig(
-                broker_url="redis://localhost:6379/0",
-                result_backend="redis://localhost:6379/1"
+                broker_url="redis://localhost:6379/0", result_backend="redis://localhost:6379/1"
             ),
             autonomy=AutonomyConfig(user=1, admin=2, system=3),
             llm=LLMConfig(),
-            self_healing={"enabled": True}
+            self_healing={"enabled": True},
         )
 
         assert config.flask_secret_key == "test-key"
@@ -473,11 +470,10 @@ class TestGetConfig:
             flask_secret_key="custom-key",
             database=DatabaseConfig(uri="sqlite:///custom.db"),
             celery=CeleryConfig(
-                broker_url="redis://custom:6379/0",
-                result_backend="redis://custom:6379/1"
+                broker_url="redis://custom:6379/0", result_backend="redis://custom:6379/1"
             ),
             autonomy=AutonomyConfig(),
-            llm=LLMConfig()
+            llm=LLMConfig(),
         )
 
         set_config(custom_config)
@@ -553,11 +549,10 @@ class TestIntegrationScenarios:
             flask_secret_key="custom",
             database=DatabaseConfig(uri="sqlite:///custom.db"),
             celery=CeleryConfig(
-                broker_url="redis://localhost:6379/0",
-                result_backend="redis://localhost:6379/1"
+                broker_url="redis://localhost:6379/0", result_backend="redis://localhost:6379/1"
             ),
             autonomy=AutonomyConfig(),
-            llm=LLMConfig()
+            llm=LLMConfig(),
         )
         set_config(custom_config)
 
@@ -619,7 +614,7 @@ class TestEdgeCases:
         """Unicode文字を含む設定ファイル"""
         config_file = temp_config_dir / "self_healing.config.json"
         sh_config = {"message": "こんにちは世界", "emoji": "🚀"}
-        config_file.write_text(json.dumps(sh_config, ensure_ascii=False), encoding='utf-8')
+        config_file.write_text(json.dumps(sh_config, ensure_ascii=False), encoding="utf-8")
 
         config = NexusConfig.from_env(config_file=config_file)
         assert config.self_healing["message"] == "こんにちは世界"

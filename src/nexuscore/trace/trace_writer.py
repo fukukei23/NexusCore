@@ -14,10 +14,8 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 from nexuscore.guard.policy_engine import GuardDecision, GuardInput, GuardResult
 
@@ -31,10 +29,11 @@ DEFAULT_TRACE_DIR = Path("var/trace")
 DEFAULT_TRACE_FILE = DEFAULT_TRACE_DIR / "guard_decisions.jsonl"
 
 
-def _get_git_commit() -> Optional[str]:
+def _get_git_commit() -> str | None:
     """Git commit hash を取得（取得不能なら None）"""
     try:
         import subprocess
+
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             capture_output=True,
@@ -49,10 +48,11 @@ def _get_git_commit() -> Optional[str]:
     return None
 
 
-def _get_repo_dirty() -> Optional[bool]:
+def _get_repo_dirty() -> bool | None:
     """Git repository が dirty かどうかを取得（取得不能なら None）"""
     try:
         import subprocess
+
         result = subprocess.run(
             ["git", "diff", "--quiet"],
             capture_output=True,
@@ -91,7 +91,7 @@ def _build_trace_event(
     event = {
         "event_type": "guard_decision",
         "schema_version": SCHEMA_VERSION,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "environment": environment,
         "policy_id": policy_id,
         "decision": decision.value,
@@ -142,7 +142,7 @@ def _build_trace_event(
 def write_guard_decision_event(
     guard_result: GuardResult,
     guard_input: GuardInput,
-    trace_file: Optional[Path] = None,
+    trace_file: Path | None = None,
     policy_id: str = "nexusguard-v0.1.1",
 ) -> None:
     """
@@ -193,7 +193,7 @@ class TraceWriter:
     将来的な拡張用（現時点では write_guard_decision_event をラップするだけ）。
     """
 
-    def __init__(self, trace_file: Optional[Path] = None):
+    def __init__(self, trace_file: Path | None = None):
         """
         Args:
             trace_file: 保存先ファイルパス（None の場合はデフォルト）

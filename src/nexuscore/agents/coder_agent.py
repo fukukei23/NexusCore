@@ -5,10 +5,12 @@
 #      - __init__を明示的に呼び出すように変更。
 #      - LLM呼び出しをexecute_llm_taskメソッドに統一。
 # ==============================================================================
-from .base_agent import BaseAgent
 import ast
 import logging
 import re
+
+from .base_agent import BaseAgent
+
 
 class CoderAgent(BaseAgent):
     SYSTEM_PROMPT = "あなたは、クリーンで効率的なコードを書くことを得意とする、世界クラスのPython開発者です。あなたの唯一の仕事は、与えられた指示に基づき、完全に動作するPythonコードを生成することです。"
@@ -21,6 +23,7 @@ class CoderAgent(BaseAgent):
         新しいBaseAgentの__init__を呼び出すことで、LLMRouterが自動的にセットアップされる。
         """
         super().__init__()
+
     # ★★★★★ ここまで ★★★★★
 
     # ------------------------------------------------------------------
@@ -35,7 +38,9 @@ class CoderAgent(BaseAgent):
         except Exception as e:
             return False, f"ParseError: {e}"
 
-    def implement_code(self, task_description: str, existing_code: str, code_language: str = "python") -> str:
+    def implement_code(
+        self, task_description: str, existing_code: str, code_language: str = "python"
+    ) -> str:
         """
         生成→AST検査→失敗時リトライを最短1秒以内で回す。
         """
@@ -71,7 +76,9 @@ class CoderAgent(BaseAgent):
             last_error = err
             logging.getLogger(self.__class__.__name__).warning(
                 "AST validation failed (attempt %s/%s): %s",
-                attempt + 1, self.RETRY_LIMIT, err,
+                attempt + 1,
+                self.RETRY_LIMIT,
+                err,
             )
             # フィードバックをプロンプトに追記して再試行
             prompt += f"\n# AST検査フィードバック: {err}\n# 構文エラーを必ず修正してください。"
@@ -85,45 +92,46 @@ class CoderAgent(BaseAgent):
         """
         # マークダウンコードブロックを抽出
         # パターン: ```python\n...\n``` または ```python\n...\n``` または ```\n...\n```
-        code_block_pattern = re.compile(
-            r'```(?:\w+)?\s*\n(.*?)```',
-            re.DOTALL | re.MULTILINE
-        )
+        code_block_pattern = re.compile(r"```(?:\w+)?\s*\n(.*?)```", re.DOTALL | re.MULTILINE)
         matches = code_block_pattern.findall(response)
 
         if matches:
             # 最初のコードブロックを使用
             extracted = matches[0].strip()
             # 先頭の説明文やコメント行を除去（「以下はコードです」などの前置きを削除）
-            lines = extracted.split('\n')
+            lines = extracted.split("\n")
             # Pythonコードとして妥当な行から開始（import, def, class, # から始まる行など）
             start_idx = 0
             for i, line in enumerate(lines):
                 stripped = line.strip()
                 if stripped and (
-                    stripped.startswith(('import ', 'from ', 'def ', 'class ', '#', '"', "'"))
-                    or stripped.startswith(('print', 'if ', 'for ', 'while ', 'return ', '='))
+                    stripped.startswith(("import ", "from ", "def ", "class ", "#", '"', "'"))
+                    or stripped.startswith(("print", "if ", "for ", "while ", "return ", "="))
                 ):
                     start_idx = i
                     break
-            return '\n'.join(lines[start_idx:]).strip()
+            return "\n".join(lines[start_idx:]).strip()
 
         # コードブロックが見つからない場合は、レスポンス全体から不要な前置きを削除
-        lines = response.split('\n')
+        lines = response.split("\n")
         cleaned_lines = []
         code_started = False
         for line in lines:
             stripped = line.strip()
             # コードらしい行が見つかったら開始
-            if not code_started and stripped and (
-                stripped.startswith(('import ', 'from ', 'def ', 'class ', 'print', '#'))
-                or stripped.startswith(('if ', 'for ', 'while ', 'return '))
+            if (
+                not code_started
+                and stripped
+                and (
+                    stripped.startswith(("import ", "from ", "def ", "class ", "print", "#"))
+                    or stripped.startswith(("if ", "for ", "while ", "return "))
+                )
             ):
                 code_started = True
-            if code_started or stripped.startswith('#') or stripped.startswith('"""'):
+            if code_started or stripped.startswith("#") or stripped.startswith('"""'):
                 cleaned_lines.append(line)
 
-        return '\n'.join(cleaned_lines).strip()
+        return "\n".join(cleaned_lines).strip()
 
     def _validate_code(self, language: str, code: str) -> tuple[bool, str]:
         lang = (language or "python").lower()
@@ -132,6 +140,7 @@ class CoderAgent(BaseAgent):
         # Tree-sitter オプション検査（対応言語のみ）
         try:
             from nexuscore.utils.tree_sitter_checker import SemanticAnalyzer
+
             analyzer = SemanticAnalyzer()
             available, msg = analyzer.check_availability()
             if not available:
@@ -139,7 +148,9 @@ class CoderAgent(BaseAgent):
             if not analyzer.setup_parsers([lang]):
                 return True, ""  # 言語未対応ならスキップ
             result = analyzer.analyze_source_code(code, language=lang)
-            if getattr(result, "success", False) and not result.data.get("errors", {}).get("has_syntax_errors"):
+            if getattr(result, "success", False) and not result.data.get("errors", {}).get(
+                "has_syntax_errors"
+            ):
                 return True, ""
             return False, f"Tree-sitter validation failed for {lang}"
         except Exception:

@@ -3,19 +3,21 @@ Comprehensive tests for analyzer/graph_builder.py
 
 依存関係グラフ構築の包括的テスト
 """
+
 import sys
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
 # networkxのモック化（必要に応じて）
 try:
     import networkx as nx
+
     HAS_NETWORKX = True
 except ImportError:
     HAS_NETWORKX = False
     # networkxをモック化してimportエラーを回避
-    sys.modules['networkx'] = MagicMock()
+    sys.modules["networkx"] = MagicMock()
     import networkx as nx
 
 # networkxモジュールをモック化してからimport
@@ -80,12 +82,7 @@ class TestBuildBasic:
         result.to_dict.return_value = {
             "success": True,
             "file_path": "test.py",
-            "semantic_info": {
-                "definitions": [
-                    {"name": "func_a", "type": "function"}
-                ],
-                "calls": []
-            }
+            "semantic_info": {"definitions": [{"name": "func_a", "type": "function"}], "calls": []},
         }
 
         graph = builder.build([result])
@@ -105,10 +102,10 @@ class TestBuildBasic:
                 "definitions": [
                     {"name": "ClassA", "type": "class"},
                     {"name": "func_b", "type": "function"},
-                    {"name": "var_c", "type": "variable"}
+                    {"name": "var_c", "type": "variable"},
                 ],
-                "calls": []
-            }
+                "calls": [],
+            },
         }
 
         graph = builder.build([result])
@@ -126,20 +123,14 @@ class TestBuildBasic:
         result1.to_dict.return_value = {
             "success": True,
             "file_path": "file1.py",
-            "semantic_info": {
-                "definitions": [{"name": "func_a", "type": "function"}],
-                "calls": []
-            }
+            "semantic_info": {"definitions": [{"name": "func_a", "type": "function"}], "calls": []},
         }
 
         result2 = Mock(spec=AnalysisResult)
         result2.to_dict.return_value = {
             "success": True,
             "file_path": "file2.py",
-            "semantic_info": {
-                "definitions": [{"name": "func_b", "type": "function"}],
-                "calls": []
-            }
+            "semantic_info": {"definitions": [{"name": "func_b", "type": "function"}], "calls": []},
         }
 
         graph = builder.build([result1, result2])
@@ -159,12 +150,10 @@ class TestBuildBasic:
             "semantic_info": {
                 "definitions": [
                     {"name": "main", "type": "function"},
-                    {"name": "helper", "type": "function"}
+                    {"name": "helper", "type": "function"},
                 ],
-                "calls": [
-                    {"scope": "main", "name": "helper"}
-                ]
-            }
+                "calls": [{"scope": "main", "name": "helper"}],
+            },
         }
 
         graph = builder.build([result])
@@ -184,10 +173,7 @@ class TestBuildEdgeCases:
         builder = DependencyGraphBuilder()
 
         result = Mock(spec=AnalysisResult)
-        result.to_dict.return_value = {
-            "success": False,  # 解析失敗
-            "file_path": "error.py"
-        }
+        result.to_dict.return_value = {"success": False, "file_path": "error.py"}  # 解析失敗
 
         graph = builder.build([result])
 
@@ -200,7 +186,7 @@ class TestBuildEdgeCases:
         result = Mock(spec=AnalysisResult)
         result.to_dict.return_value = {
             "success": True,
-            "file_path": "incomplete.py"
+            "file_path": "incomplete.py",
             # semantic_info がない
         }
 
@@ -216,7 +202,7 @@ class TestBuildEdgeCases:
         result.to_dict.return_value = {
             "success": True,
             "file_path": "empty.py",
-            "semantic_info": {}
+            "semantic_info": {},
         }
 
         graph = builder.build([result])
@@ -231,7 +217,7 @@ class TestBuildEdgeCases:
         result.to_dict.return_value = {
             "success": True,
             "file_path": "none.py",
-            "semantic_info": None
+            "semantic_info": None,
         }
 
         graph = builder.build([result])
@@ -247,13 +233,9 @@ class TestBuildEdgeCases:
             "success": True,
             "file_path": "caller.py",
             "semantic_info": {
-                "definitions": [
-                    {"name": "main", "type": "function"}
-                ],
-                "calls": [
-                    {"scope": "main", "name": "undefined_func"}  # 未定義
-                ]
-            }
+                "definitions": [{"name": "main", "type": "function"}],
+                "calls": [{"scope": "main", "name": "undefined_func"}],  # 未定義
+            },
         }
 
         graph = builder.build([result])
@@ -272,10 +254,10 @@ class TestBuildEdgeCases:
             "semantic_info": {
                 "definitions": [
                     {"name": "func", "type": "function"},
-                    {"name": "func", "type": "function"}  # 同名
+                    {"name": "func", "type": "function"},  # 同名
                 ],
-                "calls": []
-            }
+                "calls": [],
+            },
         }
 
         graph = builder.build([result])
@@ -301,12 +283,7 @@ class TestNodeAttributes:
         result.to_dict.return_value = {
             "success": True,
             "file_path": "test.py",
-            "semantic_info": {
-                "definitions": [
-                    {"name": "MyClass", "type": "class"}
-                ],
-                "calls": []
-            }
+            "semantic_info": {"definitions": [{"name": "MyClass", "type": "class"}], "calls": []},
         }
 
         graph = builder.build([result])
@@ -323,12 +300,7 @@ class TestNodeAttributes:
         result.to_dict.return_value = {
             "success": True,
             "file_path": "module.py",
-            "semantic_info": {
-                "definitions": [
-                    {"name": "func", "type": "function"}
-                ],
-                "calls": []
-            }
+            "semantic_info": {"definitions": [{"name": "func", "type": "function"}], "calls": []},
         }
 
         graph = builder.build([result])
@@ -349,10 +321,10 @@ class TestNodeAttributes:
                 "definitions": [
                     {"name": "ClassA", "type": "class"},
                     {"name": "func_b", "type": "function"},
-                    {"name": "var_c", "type": "variable"}
+                    {"name": "var_c", "type": "variable"},
                 ],
-                "calls": []
-            }
+                "calls": [],
+            },
         }
 
         graph = builder.build([result])
@@ -377,14 +349,12 @@ class TestGraphBuilderIntegration:
             "success": True,
             "file_path": "main.py",
             "semantic_info": {
-                "definitions": [
-                    {"name": "main", "type": "function"}
-                ],
+                "definitions": [{"name": "main", "type": "function"}],
                 "calls": [
                     {"scope": "main", "name": "process"},
-                    {"scope": "main", "name": "validate"}
-                ]
-            }
+                    {"scope": "main", "name": "validate"},
+                ],
+            },
         }
 
         # File 2: utils.py
@@ -395,12 +365,10 @@ class TestGraphBuilderIntegration:
             "semantic_info": {
                 "definitions": [
                     {"name": "process", "type": "function"},
-                    {"name": "validate", "type": "function"}
+                    {"name": "validate", "type": "function"},
                 ],
-                "calls": [
-                    {"scope": "process", "name": "helper"}
-                ]
-            }
+                "calls": [{"scope": "process", "name": "helper"}],
+            },
         }
 
         # File 3: helper.py
@@ -408,12 +376,7 @@ class TestGraphBuilderIntegration:
         result3.to_dict.return_value = {
             "success": True,
             "file_path": "helper.py",
-            "semantic_info": {
-                "definitions": [
-                    {"name": "helper", "type": "function"}
-                ],
-                "calls": []
-            }
+            "semantic_info": {"definitions": [{"name": "helper", "type": "function"}], "calls": []},
         }
 
         graph = builder.build([result1, result2, result3])
@@ -437,10 +400,7 @@ class TestGraphBuilderIntegration:
         result.to_dict.return_value = {
             "success": True,
             "file_path": "test.py",
-            "semantic_info": {
-                "definitions": [{"name": "func", "type": "function"}],
-                "calls": []
-            }
+            "semantic_info": {"definitions": [{"name": "func", "type": "function"}], "calls": []},
         }
 
         graph = builder.build([result])
@@ -458,10 +418,10 @@ class TestGraphBuilderIntegration:
             "semantic_info": {
                 "definitions": [
                     {"name": "func_a", "type": "function"},
-                    {"name": "func_b", "type": "function"}
+                    {"name": "func_b", "type": "function"},
                 ],
-                "calls": []
-            }
+                "calls": [],
+            },
         }
 
         builder.build([result])

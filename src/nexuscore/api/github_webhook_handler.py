@@ -10,7 +10,7 @@ github_self_healing_webhook.github_webhook() を呼び出す。
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from flask import request
 
@@ -19,7 +19,7 @@ from nexuscore.api.github_self_healing_webhook import github_webhook
 logger = logging.getLogger(__name__)
 
 
-def handle_github_webhook() -> Dict[str, Any]:
+def handle_github_webhook() -> dict[str, Any]:
     """
     Flask の /api/github/webhook エンドポイントから呼び出される。
 
@@ -70,7 +70,7 @@ def handle_github_webhook() -> Dict[str, Any]:
         }, 500
 
 
-def _post_pr_comment_if_configured(result: Dict[str, Any], payload: Dict[str, Any]) -> None:
+def _post_pr_comment_if_configured(result: dict[str, Any], payload: dict[str, Any]) -> None:
     """
     GITHUB_SELF_HEALING_TOKEN が設定されていれば、PR にコメントを投稿する。
     """
@@ -123,7 +123,7 @@ def _post_pr_comment_if_configured(result: Dict[str, Any], payload: Dict[str, An
         logger.error(f"Failed to post PR comment: {e}", exc_info=True)
 
 
-def _send_slack_notification_if_configured(result: Dict[str, Any], payload: Dict[str, Any]) -> None:
+def _send_slack_notification_if_configured(result: dict[str, Any], payload: dict[str, Any]) -> None:
     """
     NEXUS_SLACK_WEBHOOK_URL が設定されていれば、Slack に通知を送信する。
     """
@@ -136,11 +136,18 @@ def _send_slack_notification_if_configured(result: Dict[str, Any], payload: Dict
 
     try:
         from nexuscore.core.notifier import SlackNotifier
+
         try:
-            from nexuscore.integration.github_pr_comment import _collect_run_metrics, _compute_recent_success_rate
+            from nexuscore.integration.github_pr_comment import (
+                _collect_run_metrics,
+                _compute_recent_success_rate,
+            )
         except ImportError:
             # フォールバック: run_report_generator からインポート
-            from nexuscore.integration.run_report_generator import _collect_run_metrics, _compute_recent_success_rate
+            from nexuscore.integration.run_report_generator import (
+                _collect_run_metrics,
+                _compute_recent_success_rate,
+            )
 
         repo_full_name = payload.get("repository", {}).get("full_name")
         pr_number = payload.get("pull_request", {}).get("number")
@@ -155,8 +162,7 @@ def _send_slack_notification_if_configured(result: Dict[str, Any], payload: Dict
         metrics = None
 
         try:
-            from nexuscore.webapp.models import Run, Project
-            from nexuscore.webapp import db
+            from nexuscore.webapp.models import Run
 
             # result から run_id を取得（run_id が含まれている場合）
             run_id = result.get("run_id") or result.get("details", {}).get("run_id")
@@ -172,12 +178,17 @@ def _send_slack_notification_if_configured(result: Dict[str, Any], payload: Dict
             logger.warning(f"Failed to collect metrics for Slack notification: {e}", exc_info=True)
 
         # PR URL と Run ログ URL を構築
-        pr_url = f"https://github.com/{repo_full_name}/pull/{pr_number}" if repo_full_name and pr_number else None
+        pr_url = (
+            f"https://github.com/{repo_full_name}/pull/{pr_number}"
+            if repo_full_name and pr_number
+            else None
+        )
 
         run_logs_url = None
         if run and run.run_id:
             try:
                 from nexuscore.config.config import AppConfig
+
                 base_url = AppConfig.WEBAPP_BASE_URL.rstrip("/")
                 run_logs_url = f"{base_url}/logs/runs/{run.run_id}"
             except Exception as e:
@@ -208,9 +219,10 @@ def _send_slack_notification_if_configured(result: Dict[str, Any], payload: Dict
         if success:
             logger.info(f"Sent Slack notification for {repo_full_name} PR #{pr_number}")
         else:
-            logger.warning(f"Failed to send Slack notification for {repo_full_name} PR #{pr_number}")
+            logger.warning(
+                f"Failed to send Slack notification for {repo_full_name} PR #{pr_number}"
+            )
 
     except Exception as e:
         # Slack 通知失敗は致命的ではないのでログだけ
         logger.error(f"Failed to send Slack notification: {e}", exc_info=True)
-

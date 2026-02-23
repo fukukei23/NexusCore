@@ -5,6 +5,7 @@ views_dashboard.py の包括的なテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask legacy views_dashboard comprehensive tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -128,7 +129,9 @@ class TestDashboard:
         assert response.status_code == 200
         assert b"Total Runs: 0" in response.data
 
-    def test_dashboard_displays_statistics(self, authenticated_client, test_user, test_project, test_run):
+    def test_dashboard_displays_statistics(
+        self, authenticated_client, test_user, test_project, test_run
+    ):
         """統計情報が表示される"""
         response = authenticated_client.get("/dashboard/")
 
@@ -157,7 +160,9 @@ class TestDashboard:
         db.session.add(other_user)
         db.session.commit()
 
-        other_project = Project(owner_id=other_user.id, name="other_project", local_path="/tmp/other")
+        other_project = Project(
+            owner_id=other_user.id, name="other_project", local_path="/tmp/other"
+        )
         db.session.add(other_project)
         db.session.commit()
 
@@ -166,7 +171,9 @@ class TestDashboard:
         assert response.status_code == 200
         assert b"other_project" not in response.data
 
-    def test_dashboard_displays_llm_stats(self, authenticated_client, test_user, test_project, test_run):
+    def test_dashboard_displays_llm_stats(
+        self, authenticated_client, test_user, test_project, test_run
+    ):
         """LLM使用統計が表示される"""
         # ExecutionLogを作成
         log = ExecutionLog(
@@ -257,14 +264,18 @@ class TestProjectDashboard:
         db.session.add(other_user)
         db.session.commit()
 
-        other_project = Project(owner_id=other_user.id, name="other_project", local_path="/tmp/other")
+        other_project = Project(
+            owner_id=other_user.id, name="other_project", local_path="/tmp/other"
+        )
         db.session.add(other_project)
         db.session.commit()
 
         response = authenticated_client.get(f"/dashboard/projects/{other_project.id}")
         assert response.status_code == 404
 
-    def test_project_dashboard_displays_statistics(self, authenticated_client, test_project, test_run):
+    def test_project_dashboard_displays_statistics(
+        self, authenticated_client, test_project, test_run
+    ):
         """統計カードが表示される"""
         response = authenticated_client.get(f"/dashboard/projects/{test_project.id}")
 
@@ -272,7 +283,9 @@ class TestProjectDashboard:
         assert b"Success Rate" in response.data
         assert b"Total Runs" in response.data
 
-    def test_project_dashboard_displays_latest_run(self, authenticated_client, test_project, test_run):
+    def test_project_dashboard_displays_latest_run(
+        self, authenticated_client, test_project, test_run
+    ):
         """最新Run情報が表示される"""
         response = authenticated_client.get(f"/dashboard/projects/{test_project.id}")
 
@@ -280,18 +293,22 @@ class TestProjectDashboard:
         assert b"Latest Run" in response.data
         assert test_run.run_id[:8].encode() in response.data
 
-    def test_project_dashboard_displays_llm_breakdown(self, authenticated_client, test_project, test_run):
+    def test_project_dashboard_displays_llm_breakdown(
+        self, authenticated_client, test_project, test_run
+    ):
         """LLMコスト内訳が表示される"""
         log = ExecutionLog(
             run_id=test_run.id,
             source="NPE",
             level="INFO",
             message="LLM call",
-            payload_json=json.dumps({
-                "model": "gpt-4",
-                "usage": {"prompt_tokens": 100, "completion_tokens": 50},
-                "estimated_cost": 0.05,
-            }),
+            payload_json=json.dumps(
+                {
+                    "model": "gpt-4",
+                    "usage": {"prompt_tokens": 100, "completion_tokens": 50},
+                    "estimated_cost": 0.05,
+                }
+            ),
         )
         db.session.add(log)
         db.session.commit()
@@ -302,7 +319,9 @@ class TestProjectDashboard:
         assert b"LLM Cost Breakdown" in response.data
         assert b"gpt-4" in response.data
 
-    def test_project_dashboard_displays_recent_runs(self, authenticated_client, test_project, test_user):
+    def test_project_dashboard_displays_recent_runs(
+        self, authenticated_client, test_project, test_user
+    ):
         """直近のRun一覧が表示される"""
         # 5件のRunを作成
         for i in range(5):
@@ -377,7 +396,9 @@ class TestGradioDashboard:
         db.session.add(other_user)
         db.session.commit()
 
-        other_project = Project(owner_id=other_user.id, name="other_project", local_path="/tmp/other")
+        other_project = Project(
+            owner_id=other_user.id, name="other_project", local_path="/tmp/other"
+        )
         db.session.add(other_project)
         db.session.commit()
 
@@ -466,7 +487,13 @@ class TestHelperFunctions:
             stats=stats,
             recent_runs=[test_run],
             latest_run=test_run,
-            latest_run_metrics={"patch_count": 1, "affected_files": 1, "llm_call_count_total": 5, "estimated_cost_total": 10.0, "duration_sec": 60.0},
+            latest_run_metrics={
+                "patch_count": 1,
+                "affected_files": 1,
+                "llm_call_count_total": 5,
+                "estimated_cost_total": 10.0,
+                "duration_sec": 60.0,
+            },
             llm_breakdown={},
         )
 

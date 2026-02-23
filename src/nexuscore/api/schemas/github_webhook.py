@@ -4,7 +4,9 @@ GitHub Webhook API リクエスト・レスポンススキーマ
 FastAPI の GitHub Webhook エンドポイント用の Pydantic モデル定義。
 既存の Flask API (`src/nexuscore/api/github_webhook_handler.py`) の仕様に準拠。
 """
-from typing import Any, Dict, List, Literal, Optional
+
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -15,6 +17,7 @@ class GitHubRepository(BaseModel):
     Attributes:
         full_name: リポジトリのフルネーム（例: "owner/repo"）
     """
+
     full_name: str = Field(..., description="リポジトリのフルネーム")
 
 
@@ -25,6 +28,7 @@ class GitHubPullRequestLabel(BaseModel):
     Attributes:
         name: ラベル名
     """
+
     name: str = Field(..., description="ラベル名")
 
 
@@ -35,6 +39,7 @@ class GitHubPullRequestHead(BaseModel):
     Attributes:
         sha: コミットSHA
     """
+
     sha: str = Field(..., description="コミットSHA")
 
 
@@ -45,6 +50,7 @@ class GitHubPullRequestBase(BaseModel):
     Attributes:
         ref: ブランチ名
     """
+
     ref: str = Field(..., description="ブランチ名")
 
 
@@ -61,9 +67,10 @@ class GitHubPullRequest(BaseModel):
         head: head ブランチ情報
         base: base ブランチ情報
     """
+
     number: int = Field(..., description="PR番号")
     draft: bool = Field(default=False, description="ドラフトPRかどうか")
-    labels: List[GitHubPullRequestLabel] = Field(default_factory=list, description="ラベル一覧")
+    labels: list[GitHubPullRequestLabel] = Field(default_factory=list, description="ラベル一覧")
     head: GitHubPullRequestHead = Field(..., description="head ブランチ情報")
     base: GitHubPullRequestBase = Field(..., description="base ブランチ情報")
 
@@ -79,6 +86,7 @@ class GitHubWebhookPayload(BaseModel):
         repository: リポジトリ情報
         pull_request: Pull Request情報
     """
+
     action: str = Field(..., description="イベントアクション")
     repository: GitHubRepository = Field(..., description="リポジトリ情報")
     pull_request: GitHubPullRequest = Field(..., description="Pull Request情報")
@@ -101,14 +109,15 @@ class GitHubWebhookResponse(BaseModel):
         status: ステータス（"skipped", "fixed", "not_fixed", "no_issues", "error" など）
         summary: サマリー
     """
+
     accepted: bool = Field(..., description="Webhookが受け入れられたかどうか")
-    result: Optional[Dict[str, Any]] = Field(None, description="実行結果")
-    reason: Optional[str] = Field(None, description="拒否理由")
-    error: Optional[str] = Field(None, description="エラーメッセージ")
-    status: Optional[Literal["skipped", "fixed", "not_fixed", "no_issues", "error"]] = Field(
+    result: dict[str, Any] | None = Field(None, description="実行結果")
+    reason: str | None = Field(None, description="拒否理由")
+    error: str | None = Field(None, description="エラーメッセージ")
+    status: Literal["skipped", "fixed", "not_fixed", "no_issues", "error"] | None = Field(
         None, description="ステータス"
     )
-    summary: Optional[str] = Field(None, description="サマリー")
+    summary: str | None = Field(None, description="サマリー")
 
     class Config:
         json_schema_extra = {
@@ -121,4 +130,3 @@ class GitHubWebhookResponse(BaseModel):
                 },
             }
         }
-

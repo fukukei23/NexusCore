@@ -5,6 +5,7 @@ webapp/api_external.py の高品質なテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask API (api_external.py) は削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask API (api_external.py) has been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -48,6 +49,7 @@ def client(app):
 def db_session(app):
     """Database session for tests"""
     from nexuscore.webapp import db
+
     with app.app_context():
         yield db.session
 
@@ -112,10 +114,7 @@ class TestListProjects:
 
     def test_list_projects_with_invalid_api_key(self, client):
         """無効な API キーでプロジェクト一覧を取得すると 401 が返る"""
-        response = client.get(
-            "/api/v1/projects",
-            headers={"X-Api-Key": "invalid_key"}
-        )
+        response = client.get("/api/v1/projects", headers={"X-Api-Key": "invalid_key"})
 
         assert response.status_code == 401
         data = response.get_json()
@@ -123,10 +122,7 @@ class TestListProjects:
 
     def test_list_projects_with_valid_api_key(self, client, test_user, test_api_key, test_project):
         """有効な API キーでプロジェクト一覧を取得できる"""
-        response = client.get(
-            "/api/v1/projects",
-            headers={"X-Api-Key": test_api_key}
-        )
+        response = client.get("/api/v1/projects", headers={"X-Api-Key": test_api_key})
 
         assert response.status_code == 200
         data = response.get_json()
@@ -140,17 +136,19 @@ class TestListProjects:
         assert project["local_path"] == "/tmp/test-project"
         assert "created_at" in project
 
-    def test_list_projects_with_api_key_query_param(self, client, test_user, test_api_key, test_project):
+    def test_list_projects_with_api_key_query_param(
+        self, client, test_user, test_api_key, test_project
+    ):
         """API キーをクエリパラメータで指定してもアクセスできる"""
-        response = client.get(
-            f"/api/v1/projects?api_key={test_api_key}"
-        )
+        response = client.get(f"/api/v1/projects?api_key={test_api_key}")
 
         assert response.status_code == 200
         data = response.get_json()
         assert len(data["projects"]) == 1
 
-    def test_list_projects_returns_only_user_projects(self, db_session, client, test_user, test_api_key, test_project):
+    def test_list_projects_returns_only_user_projects(
+        self, db_session, client, test_user, test_api_key, test_project
+    ):
         """list_projects() がユーザー自身のプロジェクトのみを返す"""
         # 別のユーザーとそのプロジェクトを作成
         other_user = User(github_id="99999", github_login="otheruser")
@@ -165,10 +163,7 @@ class TestListProjects:
         db_session.add(other_project)
         db_session.commit()
 
-        response = client.get(
-            "/api/v1/projects",
-            headers={"X-Api-Key": test_api_key}
-        )
+        response = client.get("/api/v1/projects", headers={"X-Api-Key": test_api_key})
 
         assert response.status_code == 200
         data = response.get_json()
@@ -176,7 +171,9 @@ class TestListProjects:
         assert len(data["projects"]) == 1
         assert data["projects"][0]["id"] == test_project.id
 
-    def test_list_projects_ordered_by_created_at_desc(self, db_session, client, test_user, test_api_key):
+    def test_list_projects_ordered_by_created_at_desc(
+        self, db_session, client, test_user, test_api_key
+    ):
         """list_projects() がプロジェクトを作成日時の降順で返す"""
         # 複数のプロジェクトを作成
         project1 = Project(owner_id=test_user.id, name="Project 1", local_path="/tmp/p1")
@@ -185,10 +182,7 @@ class TestListProjects:
         db_session.add_all([project1, project2, project3])
         db_session.commit()
 
-        response = client.get(
-            "/api/v1/projects",
-            headers={"X-Api-Key": test_api_key}
-        )
+        response = client.get("/api/v1/projects", headers={"X-Api-Key": test_api_key})
 
         assert response.status_code == 200
         data = response.get_json()
@@ -201,10 +195,7 @@ class TestListProjects:
 
     def test_list_projects_empty_result(self, client, test_user, test_api_key):
         """list_projects() がプロジェクトがない場合空配列を返す"""
-        response = client.get(
-            "/api/v1/projects",
-            headers={"X-Api-Key": test_api_key}
-        )
+        response = client.get("/api/v1/projects", headers={"X-Api-Key": test_api_key})
 
         assert response.status_code == 200
         data = response.get_json()
@@ -217,8 +208,7 @@ class TestExternalTriggerRun:
     def test_trigger_run_without_api_key(self, client, test_project):
         """API キーなしで Run を発火すると 401 が返る"""
         response = client.post(
-            f"/api/v1/projects/{test_project.id}/run",
-            json={"requirement": "Test requirement"}
+            f"/api/v1/projects/{test_project.id}/run", json={"requirement": "Test requirement"}
         )
 
         assert response.status_code == 401
@@ -226,9 +216,7 @@ class TestExternalTriggerRun:
     def test_trigger_run_without_requirement(self, client, test_api_key, test_project):
         """requirement 未指定で Run を発火すると 400 が返る"""
         response = client.post(
-            f"/api/v1/projects/{test_project.id}/run",
-            headers={"X-Api-Key": test_api_key},
-            json={}
+            f"/api/v1/projects/{test_project.id}/run", headers={"X-Api-Key": test_api_key}, json={}
         )
 
         assert response.status_code == 400
@@ -241,7 +229,7 @@ class TestExternalTriggerRun:
         response = client.post(
             f"/api/v1/projects/{test_project.id}/run",
             headers={"X-Api-Key": test_api_key},
-            json={"requirement": ""}
+            json={"requirement": ""},
         )
 
         assert response.status_code == 400
@@ -251,7 +239,7 @@ class TestExternalTriggerRun:
         response = client.post(
             "/api/v1/projects/99999/run",
             headers={"X-Api-Key": test_api_key},
-            json={"requirement": "Test requirement"}
+            json={"requirement": "Test requirement"},
         )
 
         assert response.status_code == 404
@@ -259,7 +247,9 @@ class TestExternalTriggerRun:
         assert "error" in data
         assert "not found" in data["error"].lower()
 
-    def test_trigger_run_with_other_users_project(self, db_session, client, test_api_key, test_user):
+    def test_trigger_run_with_other_users_project(
+        self, db_session, client, test_api_key, test_user
+    ):
         """他のユーザーのプロジェクトで Run を発火すると 404 が返る"""
         # 別のユーザーとそのプロジェクトを作成
         other_user = User(github_id="99999", github_login="otheruser")
@@ -277,7 +267,7 @@ class TestExternalTriggerRun:
         response = client.post(
             f"/api/v1/projects/{other_project.id}/run",
             headers={"X-Api-Key": test_api_key},
-            json={"requirement": "Test requirement"}
+            json={"requirement": "Test requirement"},
         )
 
         # 所有権がないので 404
@@ -297,7 +287,7 @@ class TestExternalTriggerRun:
                         "requirement": "Fix all bugs",
                         "autonomy_level": 2,
                         "fast_lane": True,
-                    }
+                    },
                 )
 
                 assert response.status_code == 200
@@ -335,7 +325,7 @@ class TestExternalTriggerRun:
                     json={
                         "requirement": "Fix all bugs",
                         "autonomy_level": 3,
-                    }
+                    },
                 )
 
                 assert response.status_code == 202  # Accepted
@@ -363,7 +353,7 @@ class TestExternalTriggerRun:
                 response = client.post(
                     f"/api/v1/projects/{test_project.id}/run",
                     headers={"X-Api-Key": test_api_key},
-                    json={"requirement": "Fix all bugs"}
+                    json={"requirement": "Fix all bugs"},
                 )
 
                 assert response.status_code == 500
@@ -375,14 +365,16 @@ class TestExternalTriggerRun:
                 # Run レコードは作成されている
                 assert "run_id" in data
 
-    def test_trigger_run_creates_run_with_uuid(self, db_session, client, test_api_key, test_project):
+    def test_trigger_run_creates_run_with_uuid(
+        self, db_session, client, test_api_key, test_project
+    ):
         """trigger_run() が UUID 形式の run_id を作成する"""
         with patch.dict("os.environ", {"NEXUS_USE_CELERY": "0"}):
             with patch("nexuscore.webapp.api_external.run_orchestrator_inline"):
                 response = client.post(
                     f"/api/v1/projects/{test_project.id}/run",
                     headers={"X-Api-Key": test_api_key},
-                    json={"requirement": "Test"}
+                    json={"requirement": "Test"},
                 )
 
                 data = response.get_json()
@@ -392,14 +384,16 @@ class TestExternalTriggerRun:
                 assert len(run_id) == 32
                 assert all(c in "0123456789abcdef" for c in run_id)
 
-    def test_trigger_run_default_autonomy_level(self, db_session, client, test_api_key, test_project):
+    def test_trigger_run_default_autonomy_level(
+        self, db_session, client, test_api_key, test_project
+    ):
         """trigger_run() がデフォルトの autonomy_level を2に設定する"""
         with patch.dict("os.environ", {"NEXUS_USE_CELERY": "0"}):
             with patch("nexuscore.webapp.api_external.run_orchestrator_inline"):
                 response = client.post(
                     f"/api/v1/projects/{test_project.id}/run",
                     headers={"X-Api-Key": test_api_key},
-                    json={"requirement": "Test"}
+                    json={"requirement": "Test"},
                 )
 
                 data = response.get_json()
@@ -419,8 +413,7 @@ class TestGetLatestRun:
     def test_get_latest_run_with_nonexistent_project(self, client, test_api_key):
         """存在しないプロジェクトで最新 Run を取得すると 404 が返る"""
         response = client.get(
-            "/api/v1/projects/99999/runs/latest",
-            headers={"X-Api-Key": test_api_key}
+            "/api/v1/projects/99999/runs/latest", headers={"X-Api-Key": test_api_key}
         )
 
         assert response.status_code == 404
@@ -428,15 +421,16 @@ class TestGetLatestRun:
     def test_get_latest_run_no_runs(self, client, test_api_key, test_project):
         """Run が存在しない場合は null を返す"""
         response = client.get(
-            f"/api/v1/projects/{test_project.id}/runs/latest",
-            headers={"X-Api-Key": test_api_key}
+            f"/api/v1/projects/{test_project.id}/runs/latest", headers={"X-Api-Key": test_api_key}
         )
 
         assert response.status_code == 200
         data = response.get_json()
         assert data["run"] is None
 
-    def test_get_latest_run_returns_most_recent(self, db_session, client, test_api_key, test_project):
+    def test_get_latest_run_returns_most_recent(
+        self, db_session, client, test_api_key, test_project
+    ):
         """get_latest_run() が最新の Run を返す"""
         from datetime import datetime, timedelta
 
@@ -467,8 +461,7 @@ class TestGetLatestRun:
         db_session.commit()
 
         response = client.get(
-            f"/api/v1/projects/{test_project.id}/runs/latest",
-            headers={"X-Api-Key": test_api_key}
+            f"/api/v1/projects/{test_project.id}/runs/latest", headers={"X-Api-Key": test_api_key}
         )
 
         assert response.status_code == 200
@@ -477,7 +470,9 @@ class TestGetLatestRun:
         assert data["run"]["run_id"] == "run-3"
         assert data["run"]["status"] == "RUNNING"
 
-    def test_get_latest_run_includes_timestamps(self, db_session, client, test_api_key, test_project):
+    def test_get_latest_run_includes_timestamps(
+        self, db_session, client, test_api_key, test_project
+    ):
         """get_latest_run() がタイムスタンプを含む"""
         from datetime import datetime
 
@@ -493,8 +488,7 @@ class TestGetLatestRun:
         db_session.commit()
 
         response = client.get(
-            f"/api/v1/projects/{test_project.id}/runs/latest",
-            headers={"X-Api-Key": test_api_key}
+            f"/api/v1/projects/{test_project.id}/runs/latest", headers={"X-Api-Key": test_api_key}
         )
 
         data = response.get_json()
@@ -503,7 +497,9 @@ class TestGetLatestRun:
         # ISO format
         assert "T" in data["run"]["started_at"]
 
-    def test_get_latest_run_handles_null_timestamps(self, db_session, client, test_api_key, test_project):
+    def test_get_latest_run_handles_null_timestamps(
+        self, db_session, client, test_api_key, test_project
+    ):
         """get_latest_run() が NULL のタイムスタンプを処理する"""
         run = Run(
             project_id=test_project.id,
@@ -516,8 +512,7 @@ class TestGetLatestRun:
         db_session.commit()
 
         response = client.get(
-            f"/api/v1/projects/{test_project.id}/runs/latest",
-            headers={"X-Api-Key": test_api_key}
+            f"/api/v1/projects/{test_project.id}/runs/latest", headers={"X-Api-Key": test_api_key}
         )
 
         data = response.get_json()
@@ -540,8 +535,7 @@ class TestGetLatestRun:
         db_session.commit()
 
         response = client.get(
-            f"/api/v1/projects/{other_project.id}/runs/latest",
-            headers={"X-Api-Key": test_api_key}
+            f"/api/v1/projects/{other_project.id}/runs/latest", headers={"X-Api-Key": test_api_key}
         )
 
         # 所有権がないので 404

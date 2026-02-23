@@ -1,8 +1,9 @@
 # ✅ app.py（Flask + Gradio 並行起動）
-from flask import Flask
-from routes_ai_repair import bp as repair_bp
 import threading
+
+from flask import Flask
 from gradio_ui import gradio_launch  # Gradio UI 関数インポート
+from routes_ai_repair import bp as repair_bp
 
 app = Flask(__name__)
 app.register_blueprint(repair_bp)

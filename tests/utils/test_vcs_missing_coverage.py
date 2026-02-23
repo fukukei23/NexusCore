@@ -3,12 +3,12 @@ Additional comprehensive tests for vcs module to achieve 100% coverage.
 Focuses on missing edge cases (lines 50-52: empty repository handling).
 """
 
-import pytest
+from unittest.mock import MagicMock, PropertyMock, patch
+
 import git
-from unittest.mock import patch, MagicMock, PropertyMock
+import pytest
 
 from nexuscore.utils.vcs import GitController
-
 
 # ==============================================================================
 # Empty Repository Edge Case Tests (Missing Coverage Lines 50-52)
@@ -18,7 +18,7 @@ from nexuscore.utils.vcs import GitController
 class TestGitControllerEmptyRepo:
     """Test GitController with empty repository (no commits yet)"""
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_commit_changes_empty_repo_value_error(self, mock_repo_class):
         """Commit to empty repository handles ValueError from no HEAD"""
         mock_repo = MagicMock()
@@ -49,7 +49,7 @@ class TestGitControllerEmptyRepo:
         # Should successfully commit even without HEAD
         assert result == "abc123"
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_commit_changes_empty_repo_bad_name(self, mock_repo_class):
         """Commit to empty repository handles git.BadName exception"""
         mock_repo = MagicMock()
@@ -80,7 +80,7 @@ class TestGitControllerEmptyRepo:
         # Should handle BadName and proceed with commit
         assert result == "def456"
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_commit_changes_empty_repo_with_files(self, mock_repo_class):
         """First commit to empty repository succeeds"""
         mock_repo = MagicMock()
@@ -112,7 +112,7 @@ class TestGitControllerEmptyRepo:
 
         assert result == "initial123"
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_commit_changes_non_empty_repo_with_diff(self, mock_repo_class):
         """Commit to non-empty repository with changes"""
         mock_repo = MagicMock()
@@ -145,7 +145,7 @@ class TestGitControllerEmptyRepo:
 
         assert result == "update789"
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_commit_changes_non_empty_repo_no_diff(self, mock_repo_class):
         """Commit to non-empty repository with no changes returns None"""
         mock_repo = MagicMock()
@@ -183,7 +183,7 @@ class TestGitControllerEmptyRepo:
 class TestGitControllerAdditionalCases:
     """Additional edge case tests"""
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_commit_changes_empty_file_list(self, mock_repo_class):
         """Empty file list returns None"""
         mock_repo = MagicMock()
@@ -196,7 +196,7 @@ class TestGitControllerAdditionalCases:
 
         assert result is None
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_commit_changes_exception_during_add(self, mock_repo_class):
         """Exception during git add returns None"""
         mock_repo = MagicMock()
@@ -216,7 +216,7 @@ class TestGitControllerAdditionalCases:
         # Should return None on exception
         assert result is None
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_commit_changes_exception_during_commit(self, mock_repo_class):
         """Exception during git commit returns None"""
         mock_repo = MagicMock()
@@ -240,7 +240,7 @@ class TestGitControllerAdditionalCases:
         # Should return None on commit exception
         assert result is None
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_commit_changes_multiple_files(self, mock_repo_class):
         """Commit multiple files successfully"""
         mock_repo = MagicMock()
@@ -267,7 +267,7 @@ class TestGitControllerAdditionalCases:
 
         assert result == "multi123"
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_git_controller_invalid_repo(self, mock_repo_class):
         """GitController raises exception for invalid repository"""
         # Mock Repo to raise InvalidGitRepositoryError
@@ -276,7 +276,7 @@ class TestGitControllerAdditionalCases:
         with pytest.raises(git.InvalidGitRepositoryError):
             GitController(repo_path="/invalid/path")
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_git_controller_prints_success_message(self, mock_repo_class, capsys):
         """GitController prints success message on init"""
         mock_repo = MagicMock()
@@ -289,7 +289,7 @@ class TestGitControllerAdditionalCases:
         assert "✅" in captured.out
         assert "Gitリポジトリを正常に読み込みました" in captured.out
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_commit_changes_prints_staging_message(self, mock_repo_class, capsys):
         """commit_changes prints staging message"""
         mock_repo = MagicMock()
@@ -313,7 +313,7 @@ class TestGitControllerAdditionalCases:
         captured = capsys.readouterr()
         assert "ステージングします" in captured.out
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_commit_changes_prints_success_message(self, mock_repo_class, capsys):
         """commit_changes prints success message with commit hash"""
         mock_repo = MagicMock()
@@ -339,7 +339,7 @@ class TestGitControllerAdditionalCases:
         assert "正常にコミットされました" in captured.out
         assert "abc123def" in captured.out
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_git_controller_invalid_git_repo_error_message(self, mock_repo_class, capsys):
         """GitController prints error message for invalid repository"""
         # Mock Repo to raise InvalidGitRepositoryError

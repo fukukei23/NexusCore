@@ -1,7 +1,5 @@
 import types
 
-import pytest
-
 from nexuscore.agents import patch_applier as pa_module
 from nexuscore.agents.patch_applier import PatchApplier
 

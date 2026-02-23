@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 import main_cli
 
@@ -44,7 +44,7 @@ def _patch_main_cli_to_be_lightweight(monkeypatch: Any) -> None:
 def test_cli_wires_authority_level_partial_to_runner(monkeypatch: Any, tmp_path: Any) -> None:
     _patch_main_cli_to_be_lightweight(monkeypatch)
 
-    called: Dict[str, Any] = {}
+    called: dict[str, Any] = {}
 
     def fake_run_with_authority(**kwargs: Any) -> None:
         called.update(kwargs)
@@ -71,7 +71,7 @@ def test_cli_wires_authority_level_partial_to_runner(monkeypatch: Any, tmp_path:
 def test_cli_wires_authority_level_none_to_runner(monkeypatch: Any, tmp_path: Any) -> None:
     _patch_main_cli_to_be_lightweight(monkeypatch)
 
-    called: Dict[str, Any] = {}
+    called: dict[str, Any] = {}
 
     def fake_run_with_authority(**kwargs: Any) -> None:
         called.update(kwargs)
@@ -88,5 +88,3 @@ def test_cli_wires_authority_level_none_to_runner(monkeypatch: Any, tmp_path: An
     main_cli.run_cli(argv)
 
     assert called["authority_level"] is None
-
-

@@ -1,6 +1,8 @@
 """Tests for nexuscore.modules.code_generator"""
+
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from nexuscore.modules import code_generator
@@ -167,7 +169,9 @@ def test_generate_code_from_text_code_block_extraction(monkeypatch):
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
     # コードブロックを含むレスポンス
-    mock_response.choices[0].message.content = "```python\ndef hello():\n    print('world')\n```\n\nThis is a test."
+    mock_response.choices[0].message.content = (
+        "```python\ndef hello():\n    print('world')\n```\n\nThis is a test."
+    )
 
     mock_client = MagicMock()
     mock_client.chat.completions.create.return_value = mock_response
@@ -296,12 +300,11 @@ def test_generate_code_from_text_multiple_requests(monkeypatch):
     responses = [
         "```python\ndef func1():\n    pass\n```",
         "```python\ndef func2():\n    pass\n```",
-        "```python\ndef func3():\n    pass\n```"
+        "```python\ndef func3():\n    pass\n```",
     ]
 
     mock_client.chat.completions.create.side_effect = [
-        MagicMock(choices=[MagicMock(message=MagicMock(content=r))])
-        for r in responses
+        MagicMock(choices=[MagicMock(message=MagicMock(content=r))]) for r in responses
     ]
 
     with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
@@ -373,7 +376,7 @@ def test_generate_code_from_text_error_recovery(monkeypatch):
     # 最初はエラー、次は成功
     mock_client.chat.completions.create.side_effect = [
         Exception("Network error"),
-        MagicMock(choices=[MagicMock(message=MagicMock(content="```python\npass\n```"))])
+        MagicMock(choices=[MagicMock(message=MagicMock(content="```python\npass\n```"))]),
     ]
 
     with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
@@ -446,7 +449,9 @@ def test_generate_code_from_text_with_multiple_code_blocks(monkeypatch):
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
     # 複数のコードブロック
-    mock_response.choices[0].message.content = """```python
+    mock_response.choices[
+        0
+    ].message.content = """```python
 def func1():
     pass
 ```
@@ -473,7 +478,9 @@ def test_generate_code_from_text_with_explanatory_text(monkeypatch):
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
     # 説明文 + コードブロック
-    mock_response.choices[0].message.content = """Here is the code:
+    mock_response.choices[
+        0
+    ].message.content = """Here is the code:
 
 ```python
 def example():
@@ -499,7 +506,9 @@ def test_generate_code_from_text_with_non_python_code_block(monkeypatch):
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
     # JavaScriptコードブロック
-    mock_response.choices[0].message.content = """```javascript
+    mock_response.choices[
+        0
+    ].message.content = """```javascript
 function example() {
     return true;
 }
@@ -567,8 +576,7 @@ def test_generate_code_from_text_stress_test_many_requests(monkeypatch):
     responses = [f"```python\ndef func{i}():\n    pass\n```" for i in range(100)]
 
     mock_client.chat.completions.create.side_effect = [
-        MagicMock(choices=[MagicMock(message=MagicMock(content=r))])
-        for r in responses
+        MagicMock(choices=[MagicMock(message=MagicMock(content=r))]) for r in responses
     ]
 
     with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
@@ -720,7 +728,7 @@ def test_generate_code_from_text_integration_with_file_creator(tmp_path, monkeyp
         result_path = create_code_file(filename, generated_code, folder)
 
         assert os.path.exists(result_path)
-        with open(result_path, "r", encoding="utf-8") as f:
+        with open(result_path, encoding="utf-8") as f:
             content = f.read()
             assert "def generated" in content or "generated" in content
 
@@ -746,11 +754,7 @@ def test_generate_code_from_text_integration_with_history_manager(tmp_path, monk
         code = code_generator.generate_code_from_text("Create test function")
 
         # 履歴に保存
-        state = {
-            "action": "code_generated",
-            "prompt": "Create test function",
-            "code": code
-        }
+        state = {"action": "code_generated", "prompt": "Create test function", "code": code}
         hm.add_state(state)
 
         # 履歴が正しく保存されていることを確認
@@ -765,7 +769,7 @@ def test_generate_code_from_text_code_quality_validation(monkeypatch):
 
     # 様々な品質のコードをテスト
     test_codes = [
-        "```python\ndef good_function():\n    \"\"\"Docstring.\"\"\"\n    return True\n```",
+        '```python\ndef good_function():\n    """Docstring."""\n    return True\n```',
         "```python\ndef simple():\n    pass\n```",
         "```python\nclass TestClass:\n    def method(self):\n        return self\n```",
     ]
@@ -882,4 +886,3 @@ def test_generate_code_from_text_max_tokens_limit(monkeypatch):
         if "max_tokens" in call_args.kwargs:
             assert call_args.kwargs["max_tokens"] > 0
             assert call_args.kwargs["max_tokens"] < 100000  # 合理的な上限
-

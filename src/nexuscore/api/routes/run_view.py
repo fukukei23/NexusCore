@@ -11,18 +11,18 @@ Deprecated paths /api/v1/run-view/runs are kept for backward compatibility (excl
 
 import logging
 import os
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from starlette.requests import Request
 
-from ..schemas.run_view import RunCreateRequest, RunViewResponse
-from ..schemas.error import ErrorResponse
-from ..dependencies.auth import get_current_user, AuthenticatedUser
+from ..dependencies.auth import AuthenticatedUser, get_current_user
 from ..deps.orchestrator import get_orchestrator
-from ..utils.run_view import build_run_view_response
+from ..schemas.error import ErrorResponse
+from ..schemas.run_view import RunCreateRequest, RunViewResponse
 from ..utils.errors import make_not_found_error
+from ..utils.run_view import build_run_view_response
 
 # Canonical router (primary endpoints)
 canonical_router = APIRouter(tags=["runs"])
@@ -37,7 +37,7 @@ deprecated_router = APIRouter(
 logger = logging.getLogger(__name__)
 
 
-def _get_project_path_from_run_state(run_state: Dict[str, Any] | None) -> str:
+def _get_project_path_from_run_state(run_state: dict[str, Any] | None) -> str:
     """
     Extract project_path from RunState or use default.
 
@@ -173,7 +173,9 @@ async def resume_run_view(
 
         # Get project_path from RunState or default
         project_path = _get_project_path_from_run_state(run_state)
-        language = run_state.get("execution_context", {}).get("language", "ja") if run_state else "ja"
+        language = (
+            run_state.get("execution_context", {}).get("language", "ja") if run_state else "ja"
+        )
 
         # Create orchestrator factory for this request (request-scoped, no global state)
         def orchestrator_factory():
@@ -258,7 +260,9 @@ async def create_run_view(
         from nexuscore.orchestrator.run_state_store import load_state
 
         # Get project_path from environment or default
-        project_path = os.getenv("NEXUSCORE_PROJECT_PATH", os.path.join(os.getcwd(), ".nexus", "api_runs"))
+        project_path = os.getenv(
+            "NEXUSCORE_PROJECT_PATH", os.path.join(os.getcwd(), ".nexus", "api_runs")
+        )
 
         # Generate Orchestrator via DI
         orchestrator = get_orchestrator(project_path=project_path, language=request.language)

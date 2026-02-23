@@ -8,13 +8,14 @@ WebApp HTML UI view.
 
 既存の Orchestrator / NPE とは独立して動作する。
 """
+
 from __future__ import annotations
 
-from flask import Blueprint, request, jsonify, render_template
-from sqlalchemy import desc, and_
+from flask import Blueprint, jsonify, request
+from sqlalchemy import desc
 
-from nexuscore.webapp.models import ExecutionLog, Run, Project
-from nexuscore.webapp.auth import require_auth, get_current_user
+from nexuscore.webapp.auth import get_current_user, require_auth
+from nexuscore.webapp.models import ExecutionLog, Project, Run
 
 bp = Blueprint("views_logs", __name__, url_prefix="/logs")
 
@@ -53,26 +54,30 @@ def project_logs(project_id: int):
 
     logs_data = []
     for log in logs.items:
-        logs_data.append({
-            "id": log.id,
-            "run_id": log.run_id,
-            "source": log.source,
-            "level": log.level,
-            "message": log.message,
-            "payload_json": log.payload_json,
-            "created_at": log.created_at.isoformat(),
-        })
+        logs_data.append(
+            {
+                "id": log.id,
+                "run_id": log.run_id,
+                "source": log.source,
+                "level": log.level,
+                "message": log.message,
+                "payload_json": log.payload_json,
+                "created_at": log.created_at.isoformat(),
+            }
+        )
 
     if request.headers.get("Accept", "").startswith("application/json"):
-        return jsonify({
-            "logs": logs_data,
-            "pagination": {
-                "page": page,
-                "per_page": per_page,
-                "total": logs.total,
-                "pages": logs.pages,
-            },
-        })
+        return jsonify(
+            {
+                "logs": logs_data,
+                "pagination": {
+                    "page": page,
+                    "per_page": per_page,
+                    "total": logs.total,
+                    "pages": logs.pages,
+                },
+            }
+        )
 
     html = f"""
     <!DOCTYPE html>
@@ -123,9 +128,14 @@ def run_logs(run_id: str):
     FastAPI equivalent: GET /api/v1/runs/{id} (for external clients, but different data structure)
     """
     import json
-    from nexuscore.webapp.views_projects import _format_duration, _compute_run_duration, _render_run_status_badge
-    from nexuscore.integration.github_pr_comment import _collect_run_metrics, load_run_markdown
+
+    from nexuscore.integration.github_pr_comment import _collect_run_metrics
     from nexuscore.integration.run_report_generator import get_markdown_report_path
+    from nexuscore.webapp.views_projects import (
+        _compute_run_duration,
+        _format_duration,
+        _render_run_status_badge,
+    )
 
     user = get_current_user()
     run = Run.query.filter_by(run_id=run_id).first_or_404()
@@ -140,6 +150,7 @@ def run_logs(run_id: str):
 
     # 4.4: details から retry_count と last_error_class を取得
     from nexuscore.webapp.models import PatchRecord
+
     patches = PatchRecord.query.filter_by(run_id=run.id).all()
     patch_files = {p.file_path for p in patches}
 
@@ -214,39 +225,43 @@ def run_logs(run_id: str):
 
     logs_data = []
     for log in logs_paginated.items:
-        logs_data.append({
-            "id": log.id,
-            "source": log.source,
-            "level": log.level,
-            "message": log.message,
-            "payload_json": log.payload_json,
-            "created_at": log.created_at.isoformat(),
-        })
+        logs_data.append(
+            {
+                "id": log.id,
+                "source": log.source,
+                "level": log.level,
+                "message": log.message,
+                "payload_json": log.payload_json,
+                "created_at": log.created_at.isoformat(),
+            }
+        )
 
     if request.headers.get("Accept", "").startswith("application/json"):
-        return jsonify({
-            "run": {
-                "run_id": run.run_id,
-                "status": run.status,
-                "started_at": run.started_at.isoformat() if run.started_at else None,
-                "finished_at": run.finished_at.isoformat() if run.finished_at else None,
-            },
-            "metrics": {
-                "duration_str": duration_str,
-                "retry_count": retry_count,
-                "last_error_class": last_error_class,
-                "model": model_name,
-                "files_changed": files_changed,
-                "cost_usd": cost_usd,
-            },
-            "logs": logs_data,
-            "pagination": {
-                "page": page,
-                "per_page": per_page,
-                "total": logs_paginated.total,
-                "pages": logs_paginated.pages,
-            },
-        })
+        return jsonify(
+            {
+                "run": {
+                    "run_id": run.run_id,
+                    "status": run.status,
+                    "started_at": run.started_at.isoformat() if run.started_at else None,
+                    "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+                },
+                "metrics": {
+                    "duration_str": duration_str,
+                    "retry_count": retry_count,
+                    "last_error_class": last_error_class,
+                    "model": model_name,
+                    "files_changed": files_changed,
+                    "cost_usd": cost_usd,
+                },
+                "logs": logs_data,
+                "pagination": {
+                    "page": page,
+                    "per_page": per_page,
+                    "total": logs_paginated.total,
+                    "pages": logs_paginated.pages,
+                },
+            }
+        )
 
     # 4.5: Self-Healing メトリクスを含むHTMLレスポンス
     status_badge = _render_run_status_badge(run.status)
@@ -425,4 +440,3 @@ def run_logs(run_id: str):
     </html>
     """
     return html
-

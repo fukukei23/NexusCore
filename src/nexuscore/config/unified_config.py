@@ -11,27 +11,29 @@ Usage:
     print(config.database.uri)
     print(config.llm.default_model)
 """
+
 from __future__ import annotations
+
+import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Any, Optional
-import os
-import json
+from typing import Any
 
 
 @dataclass
 class DatabaseConfig:
     """データベース設定"""
+
     uri: str
     track_modifications: bool = False
 
     @classmethod
-    def from_env(cls) -> "DatabaseConfig":
+    def from_env(cls) -> DatabaseConfig:
         return cls(
             uri=os.getenv("DATABASE_URI", "sqlite:///nexuscore.db"),
-            track_modifications=os.getenv(
-                "SQLALCHEMY_TRACK_MODIFICATIONS", "false"
-            ).lower() == "true"
+            track_modifications=os.getenv("SQLALCHEMY_TRACK_MODIFICATIONS", "false").lower()
+            == "true",
         )
 
     def validate(self) -> None:
@@ -43,18 +45,16 @@ class DatabaseConfig:
 @dataclass
 class CeleryConfig:
     """Celery設定"""
+
     broker_url: str
     result_backend: str
 
     @classmethod
-    def from_env(cls) -> "CeleryConfig":
+    def from_env(cls) -> CeleryConfig:
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         return cls(
             broker_url=os.getenv("CELERY_BROKER_URL", redis_url),
-            result_backend=os.getenv(
-                "CELERY_RESULT_BACKEND",
-                redis_url.replace(":0", ":1")
-            )
+            result_backend=os.getenv("CELERY_RESULT_BACKEND", redis_url.replace(":0", ":1")),
         )
 
     def validate(self) -> None:
@@ -66,16 +66,17 @@ class CeleryConfig:
 @dataclass
 class AutonomyConfig:
     """自律性レベル設定"""
+
     user: int = 1
     admin: int = 2
     system: int = 3
 
     @classmethod
-    def from_env(cls) -> "AutonomyConfig":
+    def from_env(cls) -> AutonomyConfig:
         return cls(
             user=int(os.getenv("NEXUS_ROLE_MAX_AUTONOMY_USER", "1")),
             admin=int(os.getenv("NEXUS_ROLE_MAX_AUTONOMY_ADMIN", "2")),
-            system=int(os.getenv("NEXUS_ROLE_MAX_AUTONOMY_SYSTEM", "3"))
+            system=int(os.getenv("NEXUS_ROLE_MAX_AUTONOMY_SYSTEM", "3")),
         )
 
     def validate(self) -> None:
@@ -91,16 +92,17 @@ class AutonomyConfig:
 @dataclass
 class LLMConfig:
     """LLM設定"""
+
     default_model: str = "gpt-4"
     timeout: int = 60
     max_retries: int = 3
 
     @classmethod
-    def from_env(cls) -> "LLMConfig":
+    def from_env(cls) -> LLMConfig:
         return cls(
             default_model=os.getenv("NEXUS_DEFAULT_MODEL", "gpt-4"),
             timeout=int(os.getenv("NEXUS_LLM_TIMEOUT", "60")),
-            max_retries=int(os.getenv("NEXUS_LLM_MAX_RETRIES", "3"))
+            max_retries=int(os.getenv("NEXUS_LLM_MAX_RETRIES", "3")),
         )
 
     def validate(self) -> None:
@@ -124,10 +126,10 @@ class NexusConfig:
     celery: CeleryConfig
     autonomy: AutonomyConfig
     llm: LLMConfig
-    self_healing: Dict[str, Any] = field(default_factory=dict)
+    self_healing: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_env(cls, config_file: Optional[Path] = None) -> "NexusConfig":
+    def from_env(cls, config_file: Path | None = None) -> NexusConfig:
         """
         環境変数とファイルから設定をロード
 
@@ -142,15 +144,12 @@ class NexusConfig:
 
         # 各サブシステムの設定を作成
         config = cls(
-            flask_secret_key=os.getenv(
-                "FLASK_SECRET_KEY",
-                "dev-secret-key-change-in-production"
-            ),
+            flask_secret_key=os.getenv("FLASK_SECRET_KEY", "dev-secret-key-change-in-production"),
             database=DatabaseConfig.from_env(),
             celery=CeleryConfig.from_env(),
             autonomy=AutonomyConfig.from_env(),
             llm=LLMConfig.from_env(),
-            self_healing=sh_config
+            self_healing=sh_config,
         )
 
         # 設定の妥当性を検証
@@ -159,9 +158,7 @@ class NexusConfig:
         return config
 
     @staticmethod
-    def _load_self_healing_config(
-        config_file: Optional[Path] = None
-    ) -> Dict[str, Any]:
+    def _load_self_healing_config(config_file: Path | None = None) -> dict[str, Any]:
         """Self-healing設定をファイルからロード"""
         if config_file is None:
             config_file = Path(".nexus/self_healing.config.json")
@@ -184,11 +181,9 @@ class NexusConfig:
         # Flask secret keyの検証
         if self.flask_secret_key == "dev-secret-key-change-in-production":
             if os.getenv("FLASK_ENV") == "production":
-                raise ValueError(
-                    "Must set FLASK_SECRET_KEY in production environment"
-                )
+                raise ValueError("Must set FLASK_SECRET_KEY in production environment")
 
-    def to_flask_config(self) -> Dict[str, Any]:
+    def to_flask_config(self) -> dict[str, Any]:
         """Flask設定辞書に変換"""
         return {
             "SECRET_KEY": self.flask_secret_key,
@@ -198,7 +193,7 @@ class NexusConfig:
 
 
 # グローバル設定インスタンス（シングルトン）
-_config: Optional[NexusConfig] = None
+_config: NexusConfig | None = None
 
 
 def get_config(reload: bool = False) -> NexusConfig:

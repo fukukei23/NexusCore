@@ -24,12 +24,9 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from nexuscore.llm.helpers import (
-    _env_flag,
-    _real_call_enabled,
-    _stub_response,
     normalize_model,
 )
 from nexuscore.llm.provider_factory import create_provider
@@ -39,7 +36,7 @@ from nexuscore.llm.routing_policy import (
     TASK_MODEL_MAP_DEFAULT,
     model_family,
 )
-from nexuscore.llm.runtime import REQUEST_TIMEOUT, HTTP_CLIENT_FACTORY, HTTP_CLIENT_FACTORY
+from nexuscore.llm.runtime import HTTP_CLIENT_FACTORY, REQUEST_TIMEOUT
 
 # ---- Budget / Logger import (v1/v2 後方互換) ------------------------------
 # (v2.2.1 既存)
@@ -48,49 +45,70 @@ from nexuscore.llm.runtime import REQUEST_TIMEOUT, HTTP_CLIENT_FACTORY, HTTP_CLI
 try:
     # v1系: クラス BudgetManager（check_budget / track_cost）
     from nexuscore.npe.budget import BudgetManager as _BudgetManagerV1  # type: ignore
+
     BUDGET_API = "v1"
+
     class BudgetManager(_BudgetManagerV1):
         pass
+
 except Exception:
     # v1が無い → v2（関数API）を探す
     try:
         from nexuscore.npe import budget as _budget_v2  # type: ignore
+
         BUDGET_API = "v2"
+
         class BudgetManager:  # v1互換の薄ラッパ
             def __init__(self, daily_limit_usd: float | None = None, log_dir=None):
                 self._b = _budget_v2
+
             def check_budget(self, model_name: str, est_input_tokens: int) -> tuple[bool, float]:
                 try:
                     # (v1 IF -> v2 IF 変換)
-                    return self._b.preflight_check(model_name=model_name, est_input_tokens=est_input_tokens)
+                    return self._b.preflight_check(
+                        model_name=model_name, est_input_tokens=est_input_tokens
+                    )
                 except Exception:
                     return True, 0.0
+
             def track_cost(self, model_name: str, input_tokens: int, output_tokens: int) -> float:
                 try:
                     # (v1 IF -> v2 IF 変換)
-                    return self._b.record_usage(model_name=model_name, input_tokens=input_tokens, output_tokens=output_tokens)
+                    return self._b.record_usage(
+                        model_name=model_name,
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                    )
                 except Exception:
                     return 0.0
+
     except Exception:
         # どちらも無い → No-Op で警告
         BUDGET_API = "none"
+
         class BudgetManager:
             def __init__(self, daily_limit_usd: float | None = None, log_dir=None):
                 logging.getLogger("LLMRouter").warning(
                     "[Budget] No BudgetManager found (v1/v2). Running with NO budget guard!"
                 )
+
             def check_budget(self, model_name: str, est_input_tokens: int) -> tuple[bool, float]:
                 return True, 0.0
+
             def track_cost(self, model_name: str, input_tokens: int, output_tokens: int) -> float:
                 return 0.0
+
+
 # ロガー: v1/v2 で両対応
 try:
     from nexuscore.npe.logger import log_transaction  # v1
 except Exception:
     try:
         from nexuscore.npe import logger as _logger_v2  # v2
+
         log_transaction = _logger_v2.log_transaction
     except Exception:
+
         def log_transaction(payload: dict, log_file: str):
             try:
                 # (v2.2.1 既存のフォールバック)
@@ -99,6 +117,8 @@ except Exception:
                     f.write(json.dumps(payload, ensure_ascii=False) + "\n")
             except Exception:
                 pass  # ログ失敗は致命にしない
+
+
 # ---- (アダプタ・ブロックここまで) ----------------------------------------
 
 
@@ -117,7 +137,7 @@ class RoutedLLM(BaseLLM):
     def __init__(
         self,
         inner_llm: BaseLLM,
-        router: "LLMRouter",
+        router: LLMRouter,
         task_type: str,
     ):
         # super() は inner_llm の model_name を引き継ぐ
@@ -161,7 +181,7 @@ class RoutedLLM(BaseLLM):
             )
 
         # --- 2) 実際のLLM呼び出し (実コール or スタブ) ------------------
-        self.inner._last_usage = None # usage 格納庫をリセット
+        self.inner._last_usage = None  # usage 格納庫をリセット
         # task別の温度上書き（code_generateなど）
         temp_override = self.router.task_temperature_overrides.get(self.task_type)
         if temp_override is not None and "temperature" not in kwargs:
@@ -182,9 +202,9 @@ class RoutedLLM(BaseLLM):
             if out_tokens_real:
                 out_tokens = int(out_tokens_real)
             else:
-                out_tokens = self._estimate_tokens(output_text) # out だけ推定
+                out_tokens = self._estimate_tokens(output_text)  # out だけ推定
 
-        if out_tokens == 0: # _last_usage が無い (Gemini等) or 失敗
+        if out_tokens == 0:  # _last_usage が無い (Gemini等) or 失敗
             out_tokens = self._estimate_tokens(output_text)
 
         actual_cost = self.router.budget_manager.track_cost(
@@ -202,7 +222,7 @@ class RoutedLLM(BaseLLM):
                 "ts": time.time(),
                 "task_type": self.task_type,
                 "model": self.model_name,
-                "provider": model_family(self.model_name), # ★ v2.3.5 provider追加
+                "provider": model_family(self.model_name),  # ★ v2.3.5 provider追加
                 # 実際の結果 (real / stub / stub-fallback)
                 "mode": getattr(self.inner, "last_call_mode", "stub"),
                 # 新キー（実測優先）
@@ -241,8 +261,8 @@ class LLMRouter:
 
     def __init__(
         self,
-        task_model_map: Optional[Dict[str, str]] = None,
-        daily_limit_usd: Optional[float] = None,
+        task_model_map: dict[str, str] | None = None,
+        daily_limit_usd: float | None = None,
         log_dir: str = "logs",
     ):
         self.logger = logging.getLogger("LLMRouter")
@@ -292,6 +312,7 @@ class LLMRouter:
         LLMRouter.CLASSIFIER_MODEL = classifier_model_name
         self.CLASSIFIER_MODEL = classifier_model_name
         from nexuscore.llm.task_classifier import TaskClassifier
+
         classifier_client = self._make_client(classifier_model_name)
         self._classifier = TaskClassifier(classifier_model_name, classifier_client)
 
@@ -315,20 +336,14 @@ class LLMRouter:
 
         # --- ★★★★★ v2.1.1 統合コード (リファイン) ★★★★★ ---
         # (v2.3.2でも完全維持)
-        raw = (self.env.get("FORCE_CHEAP_FOR_TASKS") or "")
+        raw = self.env.get("FORCE_CHEAP_FOR_TASKS") or ""
         # 空要素を除去しつつトリム
         self.force_tasks = {t for t in (x.strip() for x in raw.split(",")) if t}
         self.cheap_model = self.env.get("CHEAP_LLM_MODEL")
 
         if self.force_tasks and self.cheap_model:
-            self.logger.info(
-                "[Router] FORCE_CHEAP_FOR_TASKS enabled for: %s",
-                self.force_tasks
-            )
-            self.logger.info(
-                "[Router] CHEAP model override target: %s",
-                self.cheap_model
-            )
+            self.logger.info("[Router] FORCE_CHEAP_FOR_TASKS enabled for: %s", self.force_tasks)
+            self.logger.info("[Router] CHEAP model override target: %s", self.cheap_model)
         # --- ★★★★★ v2.1.1 統合コード (ここまで) ★★★★★ ---
 
     # -----------------------------------------------------------------
@@ -355,13 +370,23 @@ class LLMRouter:
                         all_models = [m["id"] for m in data.get("data", [])]
                         # chat/completionsエンドポイントで使えるモデルのみを抽出
                         # codex系やcompletions専用モデルを除外
-                        chat_compatible = [m for m in all_models if not m.endswith("-codex") and not m.endswith("-instruct")]
+                        chat_compatible = [
+                            m
+                            for m in all_models
+                            if not m.endswith("-codex") and not m.endswith("-instruct")
+                        ]
                         detected_models["openai"] = chat_compatible
-                        self.logger.info(f"[Model Detection] OpenAI: Found {len(all_models)} total models, {len(chat_compatible)} chat-compatible models")
+                        self.logger.info(
+                            f"[Model Detection] OpenAI: Found {len(all_models)} total models, {len(chat_compatible)} chat-compatible models"
+                        )
                         if chat_compatible:
-                            self.logger.debug(f"[Model Detection] OpenAI chat-compatible models (first 10): {chat_compatible[:10]}")
+                            self.logger.debug(
+                                f"[Model Detection] OpenAI chat-compatible models (first 10): {chat_compatible[:10]}"
+                            )
             except Exception as e:
-                self.logger.warning(f"[Model Detection] OpenAI models.list failed: {e}. Using static defaults.")
+                self.logger.warning(
+                    f"[Model Detection] OpenAI models.list failed: {e}. Using static defaults."
+                )
 
         # Gemini モデル検出（403回避のためURLエンコーディング使用）
         gemini_key = os.getenv("GEMINI_API_KEY")
@@ -384,18 +409,26 @@ class LLMRouter:
                                 # models/gemini-2.5-flash -> gemini-2.5-flash に変換
                                 pure_name = name.replace("models/", "")
                                 detected_models["gemini"].append(pure_name)
-                        self.logger.info(f"[Model Detection] Gemini: Found {len(detected_models['gemini'])} generateContent-compatible models")
+                        self.logger.info(
+                            f"[Model Detection] Gemini: Found {len(detected_models['gemini'])} generateContent-compatible models"
+                        )
                     elif resp.status_code == 403:
-                        self.logger.warning(f"[Model Detection] Gemini API returned 403 (key/permission issue). Gemini will be disabled for this run.")
+                        self.logger.warning(
+                            "[Model Detection] Gemini API returned 403 (key/permission issue). Gemini will be disabled for this run."
+                        )
                     else:
-                        self.logger.warning(f"[Model Detection] Gemini API returned status {resp.status_code}. Using static defaults.")
+                        self.logger.warning(
+                            f"[Model Detection] Gemini API returned status {resp.status_code}. Using static defaults."
+                        )
             except Exception as e:
-                self.logger.warning(f"[Model Detection] Gemini models.list failed: {e}. Using static defaults.")
+                self.logger.warning(
+                    f"[Model Detection] Gemini models.list failed: {e}. Using static defaults."
+                )
 
         # task model mapを検出結果に基づいて更新
         self._apply_detected_models(detected_models)
 
-    def _apply_detected_models(self, detected: Dict[str, List[str]]) -> None:
+    def _apply_detected_models(self, detected: dict[str, list[str]]) -> None:
         """
         検出されたモデル一覧に基づいてtask model mapを更新する。
         実在しないモデル名を実在するモデルに置き換える。
@@ -406,14 +439,18 @@ class LLMRouter:
         # OpenAIモデルの優先順位（chat/completionsエンドポイントで使えるもののみ）
         # codex系は除外（v1/chat/completionsで使えないため、検出結果にも含まれない）
         openai_chat_candidates = [
-            "gpt-5.2-chat-latest", "gpt-5.1-chat-latest", "gpt-5-chat-latest",
-            "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"
+            "gpt-5.2-chat-latest",
+            "gpt-5.1-chat-latest",
+            "gpt-5-chat-latest",
+            "gpt-4o",
+            "gpt-4-turbo",
+            "gpt-3.5-turbo",
         ]
         # code_generate用：codex系は除外し、chat系のみを使用（Smoke Test要件）
         openai_codex_candidates = ["gpt-4o"]  # codex系は除外済み、chat系のみ
         openai_mini_candidates = ["gpt-5-mini", "gpt-5.1-mini", "gpt-4o-mini", "gpt-3.5-turbo"]
 
-        def find_available_model(candidates: List[str], available_list: List[str]) -> Optional[str]:
+        def find_available_model(candidates: list[str], available_list: list[str]) -> str | None:
             """候補リストから実在する最初のモデルを返す"""
             for candidate in candidates:
                 if candidate in available_list:
@@ -447,8 +484,17 @@ class LLMRouter:
         updates = {}
         if chat_model:
             # general, requirement, planning, review, testing 系を更新（Smoke Test要件）
-            chat_tasks = ["general", "requirement", "requirement_elicit", "plan_generate", "planning",
-                         "code_review", "review", "testing", "test"]
+            chat_tasks = [
+                "general",
+                "requirement",
+                "requirement_elicit",
+                "plan_generate",
+                "planning",
+                "code_review",
+                "review",
+                "testing",
+                "test",
+            ]
             for task in chat_tasks:
                 if task in self.task_model_map:
                     current = self.task_model_map[task]
@@ -471,7 +517,9 @@ class LLMRouter:
                         else:
                             codex_model_with_provider = codex_model
                         updates[task] = {**current, "primary": codex_model_with_provider}
-                        self.logger.debug(f"[Model Detection] {task} will use {codex_model_with_provider} (chat-compatible for Smoke Test)")
+                        self.logger.debug(
+                            f"[Model Detection] {task} will use {codex_model_with_provider} (chat-compatible for Smoke Test)"
+                        )
 
         if mini_model:
             # routing_classify を更新
@@ -498,7 +546,9 @@ class LLMRouter:
             self.logger.info(f"[Model Detection] Updated {task}: {new_config.get('primary')}")
 
         if updates:
-            self.logger.info(f"[Model Detection] Updated {len(updates)} task model mappings based on detected models")
+            self.logger.info(
+                f"[Model Detection] Updated {len(updates)} task model mappings based on detected models"
+            )
         else:
             self.logger.info("[Model Detection] No model mappings updated (using static defaults)")
 
@@ -513,9 +563,7 @@ class LLMRouter:
         try:
             task = self._classifier.classify(prompt, self.task_model_map)
         except Exception as e:
-            self.logger.error(
-                "Task classification failed: %s. Falling back to 'general'.", e
-            )
+            self.logger.error("Task classification failed: %s. Falling back to 'general'.", e)
             task = "general"
 
         # 後方互換の別名(legacy)を吸収
@@ -542,7 +590,7 @@ class LLMRouter:
     # -----------------------------------------------------------------
     # public: 呼び出し側(BaseAgent)が使うエントリポイント
     # -----------------------------------------------------------------
-    def get_llm_for_task(self, prompt: str, task_type: Optional[str] = None) -> RoutedLLM:
+    def get_llm_for_task(self, prompt: str, task_type: str | None = None) -> RoutedLLM:
         """
         1. タスク分類
         2. (v2.1.1) 安価モデル強制対象かチェック
@@ -554,7 +602,7 @@ class LLMRouter:
 
         llm_mode = os.getenv("NEXUS_LLM_MODE", "production").strip().lower()
 
-        def _resolve(task: str) -> Tuple[str, List[str]]:
+        def _resolve(task: str) -> tuple[str, list[str]]:
             entry = self.task_model_map.get(task) or self.task_model_map.get("general", {})
             if isinstance(entry, dict):
                 primary = entry.get("primary")
@@ -581,15 +629,14 @@ class LLMRouter:
         # --- ★★★★★ v2.1.1 統合コード (リファイン) ★★★★★ ---
         if task_type in self.force_tasks and self.cheap_model:
             self.logger.info(
-                "[Router] FORCE_CHEAP_FOR_TASKS hit: %s -> %s",
-                task_type, self.cheap_model
+                "[Router] FORCE_CHEAP_FOR_TASKS hit: %s -> %s", task_type, self.cheap_model
             )
             model_name = self.cheap_model
         # --- ★★★★★ v2.1.1 統合コード (ここまで) ★★★★★ ---
 
         candidates = [m for m in [model_name] + fallbacks if m]
         base_client = None
-        last_err: Optional[Exception] = None
+        last_err: Exception | None = None
         for candidate in candidates:
             try:
                 base_client = self._make_client(candidate)
@@ -599,7 +646,9 @@ class LLMRouter:
                 last_err = e
                 self.logger.warning("Failed to init client for model='%s': %s", candidate, e)
         if base_client is None:
-            raise RuntimeError(f"No available LLM client for task '{task_type}'. last_error={last_err}")
+            raise RuntimeError(
+                f"No available LLM client for task '{task_type}'. last_error={last_err}"
+            )
 
         # RoutedLLM で包む (v2.3.5: ログ強化済みの RoutedLLM)
         routed = RoutedLLM(
@@ -610,7 +659,7 @@ class LLMRouter:
         self.logger.info(
             "Selecting model '%s' (Provider: %s) for task '%s'",
             routed.model_name,
-            model_family(routed.model_name), # ログにも provider を出す
+            model_family(routed.model_name),  # ログにも provider を出す
             task_type,
         )
         return routed
@@ -621,13 +670,13 @@ class LLMRouter:
     def complete(
         self,
         *,
-        model: Optional[str] = None,
+        model: str | None = None,
         system_prompt: str,
         user_prompt: str,
-        task: Optional[str] = None,
+        task: str | None = None,
         as_json: bool = False,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         guarded_llm_call から呼ばれる統一エントリ。
         戻り値は {"ok": bool, "reason": str, "content": str, "usage": {...}} 形式。
@@ -657,9 +706,14 @@ class LLMRouter:
                     return 0
                 return (len(text) + 2) // 3
 
-            prompt_tokens = usage.get("prompt_tokens") or _estimate_tokens(system_prompt + user_prompt)
+            prompt_tokens = usage.get("prompt_tokens") or _estimate_tokens(
+                system_prompt + user_prompt
+            )
             completion_tokens = usage.get("completion_tokens") or _estimate_tokens(str(output_text))
-            usage = {"prompt_tokens": int(prompt_tokens), "completion_tokens": int(completion_tokens)}
+            usage = {
+                "prompt_tokens": int(prompt_tokens),
+                "completion_tokens": int(completion_tokens),
+            }
 
             return {
                 "ok": True,
@@ -710,9 +764,7 @@ if __name__ == "__main__":
         print("\nTASK MAP:", json.dumps(router.task_model_map, indent=2, ensure_ascii=False))
 
         # --- Test 1: Debugging (default: gpt-5) ---
-        sample_prompt_debug = (
-            "pytestの失敗ログを分析し、原因を特定して修正案を提示してください。"
-        )
+        sample_prompt_debug = "pytestの失敗ログを分析し、原因を特定して修正案を提示してください。"
         print(f"\nSample Prompt (Debug): {sample_prompt_debug[:80]}...")
         llm_client_debug = router.get_llm_for_task(sample_prompt_debug)
         print(f"--> Selected Client: {type(llm_client_debug.inner).__name__}")
@@ -727,9 +779,7 @@ if __name__ == "__main__":
         print("\nLLM Response (Stub or Real):\n", resp_debug[:200], "...")
 
         # --- Test 2: JSON (default: gpt-5) ---
-        sample_prompt_json = (
-            "項目A:foo\n項目B:bar をJSONに"
-        )
+        sample_prompt_json = "項目A:foo\n項目B:bar をJSONに"
         print(f"\nSample Prompt (JSON): {sample_prompt_json[:80]}...")
         llm_client_json = router.get_llm_for_task(sample_prompt_json)
         print(f"--> Selected Client: {type(llm_client_json.inner).__name__}")
@@ -742,7 +792,6 @@ if __name__ == "__main__":
             as_json=True,
         )
         print("\nLLM Response (Stub or Real, JSON):\n", resp_json[:200], "...")
-
 
     except Exception as e:
         print(f"\n[SmokeTest] Unexpected error: {e}")

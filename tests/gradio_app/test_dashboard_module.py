@@ -23,8 +23,12 @@ def _write_patch(dir_path, name, content):
 def test_load_items_filters_by_date(patch_history_dir):
     recent_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     old_ts = "19700101_000000"
-    _write_patch(patch_history_dir, f"patch_{recent_ts}.json", {"timestamp": recent_ts, "status": "success"})
-    _write_patch(patch_history_dir, f"patch_{old_ts}.json", {"timestamp": old_ts, "status": "attempt"})
+    _write_patch(
+        patch_history_dir, f"patch_{recent_ts}.json", {"timestamp": recent_ts, "status": "success"}
+    )
+    _write_patch(
+        patch_history_dir, f"patch_{old_ts}.json", {"timestamp": old_ts, "status": "attempt"}
+    )
 
     items_today = dashboard._load_items(limit=None, date_filter="today")
     assert len(items_today) == 1

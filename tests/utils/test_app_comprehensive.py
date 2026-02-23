@@ -3,10 +3,8 @@ Comprehensive tests for app module.
 Tests legacy Flask + Gradio parallel startup application.
 """
 
-import pytest
 import sys
-from unittest.mock import patch, MagicMock, call
-
+from unittest.mock import MagicMock, patch
 
 # ==============================================================================
 # Module Import and Initialization Tests
@@ -24,15 +22,20 @@ class TestAppImport:
         mock_gradio_launch = MagicMock()
         mock_thread = MagicMock()
 
-        with patch.dict('sys.modules', {
-            'routes_ai_repair': MagicMock(bp=mock_blueprint),
-            'gradio_ui': MagicMock(gradio_launch=mock_gradio_launch),
-        }), \
-        patch('flask.Flask', return_value=mock_flask), \
-        patch('threading.Thread', return_value=mock_thread):
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "routes_ai_repair": MagicMock(bp=mock_blueprint),
+                    "gradio_ui": MagicMock(gradio_launch=mock_gradio_launch),
+                },
+            ),
+            patch("flask.Flask", return_value=mock_flask),
+            patch("threading.Thread", return_value=mock_thread),
+        ):
             # Remove module if already imported
-            if 'nexuscore.utils.app' in sys.modules:
-                del sys.modules['nexuscore.utils.app']
+            if "nexuscore.utils.app" in sys.modules:
+                del sys.modules["nexuscore.utils.app"]
 
             # Import the module
             import nexuscore.utils.app as app_module
@@ -47,16 +50,20 @@ class TestAppImport:
         mock_gradio_launch = MagicMock()
         mock_thread = MagicMock()
 
-        with patch.dict('sys.modules', {
-            'routes_ai_repair': MagicMock(bp=mock_blueprint),
-            'gradio_ui': MagicMock(gradio_launch=mock_gradio_launch),
-        }), \
-        patch('flask.Flask', return_value=mock_flask), \
-        patch('threading.Thread', return_value=mock_thread):
-            if 'nexuscore.utils.app' in sys.modules:
-                del sys.modules['nexuscore.utils.app']
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "routes_ai_repair": MagicMock(bp=mock_blueprint),
+                    "gradio_ui": MagicMock(gradio_launch=mock_gradio_launch),
+                },
+            ),
+            patch("flask.Flask", return_value=mock_flask),
+            patch("threading.Thread", return_value=mock_thread),
+        ):
+            if "nexuscore.utils.app" in sys.modules:
+                del sys.modules["nexuscore.utils.app"]
 
-            import nexuscore.utils.app as app_module
 
             # Verify blueprint was registered
             mock_flask.register_blueprint.assert_called_once_with(mock_blueprint)
@@ -68,22 +75,23 @@ class TestAppImport:
         mock_gradio_launch = MagicMock()
         mock_thread = MagicMock()
 
-        with patch.dict('sys.modules', {
-            'routes_ai_repair': MagicMock(bp=mock_blueprint),
-            'gradio_ui': MagicMock(gradio_launch=mock_gradio_launch),
-        }), \
-        patch('flask.Flask', return_value=mock_flask), \
-        patch('threading.Thread', return_value=mock_thread) as mock_thread_cls:
-            if 'nexuscore.utils.app' in sys.modules:
-                del sys.modules['nexuscore.utils.app']
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "routes_ai_repair": MagicMock(bp=mock_blueprint),
+                    "gradio_ui": MagicMock(gradio_launch=mock_gradio_launch),
+                },
+            ),
+            patch("flask.Flask", return_value=mock_flask),
+            patch("threading.Thread", return_value=mock_thread) as mock_thread_cls,
+        ):
+            if "nexuscore.utils.app" in sys.modules:
+                del sys.modules["nexuscore.utils.app"]
 
-            import nexuscore.utils.app as app_module
 
             # Verify thread was created with gradio_launch as target
-            mock_thread_cls.assert_called_once_with(
-                target=mock_gradio_launch,
-                daemon=True
-            )
+            mock_thread_cls.assert_called_once_with(target=mock_gradio_launch, daemon=True)
 
             # Verify thread was started
             mock_thread.start.assert_called_once()
@@ -95,20 +103,24 @@ class TestAppImport:
         mock_gradio_launch = MagicMock()
         mock_thread = MagicMock()
 
-        with patch.dict('sys.modules', {
-            'routes_ai_repair': MagicMock(bp=mock_blueprint),
-            'gradio_ui': MagicMock(gradio_launch=mock_gradio_launch),
-        }), \
-        patch('flask.Flask', return_value=mock_flask), \
-        patch('threading.Thread', return_value=mock_thread) as mock_thread_cls:
-            if 'nexuscore.utils.app' in sys.modules:
-                del sys.modules['nexuscore.utils.app']
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "routes_ai_repair": MagicMock(bp=mock_blueprint),
+                    "gradio_ui": MagicMock(gradio_launch=mock_gradio_launch),
+                },
+            ),
+            patch("flask.Flask", return_value=mock_flask),
+            patch("threading.Thread", return_value=mock_thread) as mock_thread_cls,
+        ):
+            if "nexuscore.utils.app" in sys.modules:
+                del sys.modules["nexuscore.utils.app"]
 
-            import nexuscore.utils.app as app_module
 
             # Verify daemon=True was passed
             call_kwargs = mock_thread_cls.call_args[1]
-            assert call_kwargs['daemon'] is True
+            assert call_kwargs["daemon"] is True
 
 
 # ==============================================================================
@@ -126,17 +138,22 @@ class TestAppMain:
         mock_gradio_launch = MagicMock()
         mock_thread = MagicMock()
 
-        with patch.dict('sys.modules', {
-            'routes_ai_repair': MagicMock(bp=mock_blueprint),
-            'gradio_ui': MagicMock(gradio_launch=mock_gradio_launch),
-        }), \
-        patch('flask.Flask', return_value=mock_flask), \
-        patch('threading.Thread', return_value=mock_thread):
-            if 'nexuscore.utils.app' in sys.modules:
-                del sys.modules['nexuscore.utils.app']
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "routes_ai_repair": MagicMock(bp=mock_blueprint),
+                    "gradio_ui": MagicMock(gradio_launch=mock_gradio_launch),
+                },
+            ),
+            patch("flask.Flask", return_value=mock_flask),
+            patch("threading.Thread", return_value=mock_thread),
+        ):
+            if "nexuscore.utils.app" in sys.modules:
+                del sys.modules["nexuscore.utils.app"]
 
             # Simulate __main__ execution
-            with patch('nexuscore.utils.app.__name__', '__main__'):
+            with patch("nexuscore.utils.app.__name__", "__main__"):
                 # This would trigger if __name__ == "__main__" block
                 # but since we're importing, not executing, we can't test this directly
                 # Instead, we verify the code exists in the module source
@@ -149,21 +166,27 @@ class TestAppMain:
         mock_gradio_launch = MagicMock()
         mock_thread = MagicMock()
 
-        with patch.dict('sys.modules', {
-            'routes_ai_repair': MagicMock(bp=mock_blueprint),
-            'gradio_ui': MagicMock(gradio_launch=mock_gradio_launch),
-        }), \
-        patch('flask.Flask', return_value=mock_flask), \
-        patch('threading.Thread', return_value=mock_thread):
-            if 'nexuscore.utils.app' in sys.modules:
-                del sys.modules['nexuscore.utils.app']
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "routes_ai_repair": MagicMock(bp=mock_blueprint),
+                    "gradio_ui": MagicMock(gradio_launch=mock_gradio_launch),
+                },
+            ),
+            patch("flask.Flask", return_value=mock_flask),
+            patch("threading.Thread", return_value=mock_thread),
+        ):
+            if "nexuscore.utils.app" in sys.modules:
+                del sys.modules["nexuscore.utils.app"]
+
+            import inspect
 
             import nexuscore.utils.app as app_module
-            import inspect
 
             source = inspect.getsource(app_module)
             assert 'if __name__ == "__main__"' in source
-            assert 'app.run(debug=True)' in source
+            assert "app.run(debug=True)" in source
 
 
 # ==============================================================================
@@ -181,16 +204,20 @@ class TestAppIntegration:
         mock_gradio_launch = MagicMock()
         mock_thread = MagicMock()
 
-        with patch.dict('sys.modules', {
-            'routes_ai_repair': MagicMock(bp=mock_blueprint),
-            'gradio_ui': MagicMock(gradio_launch=mock_gradio_launch),
-        }), \
-        patch('flask.Flask', return_value=mock_flask), \
-        patch('threading.Thread', return_value=mock_thread) as mock_thread_cls:
-            if 'nexuscore.utils.app' in sys.modules:
-                del sys.modules['nexuscore.utils.app']
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "routes_ai_repair": MagicMock(bp=mock_blueprint),
+                    "gradio_ui": MagicMock(gradio_launch=mock_gradio_launch),
+                },
+            ),
+            patch("flask.Flask", return_value=mock_flask),
+            patch("threading.Thread", return_value=mock_thread) as mock_thread_cls,
+        ):
+            if "nexuscore.utils.app" in sys.modules:
+                del sys.modules["nexuscore.utils.app"]
 
-            import nexuscore.utils.app as app_module
 
             # Verify all initialization steps occurred in order
             assert mock_flask.register_blueprint.called
@@ -204,21 +231,26 @@ class TestAppIntegration:
         mock_gradio_launch = MagicMock()
         mock_thread = MagicMock()
 
-        with patch.dict('sys.modules', {
-            'routes_ai_repair': MagicMock(bp=mock_blueprint),
-            'gradio_ui': MagicMock(gradio_launch=mock_gradio_launch),
-        }), \
-        patch('flask.Flask', return_value=mock_flask), \
-        patch('threading.Thread', return_value=mock_thread):
-            if 'nexuscore.utils.app' in sys.modules:
-                del sys.modules['nexuscore.utils.app']
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "routes_ai_repair": MagicMock(bp=mock_blueprint),
+                    "gradio_ui": MagicMock(gradio_launch=mock_gradio_launch),
+                },
+            ),
+            patch("flask.Flask", return_value=mock_flask),
+            patch("threading.Thread", return_value=mock_thread),
+        ):
+            if "nexuscore.utils.app" in sys.modules:
+                del sys.modules["nexuscore.utils.app"]
 
             import nexuscore.utils.app as app_module
 
             # Verify module has expected attributes
-            assert hasattr(app_module, 'Flask')
-            assert hasattr(app_module, 'threading')
-            assert hasattr(app_module, 'app')
+            assert hasattr(app_module, "Flask")
+            assert hasattr(app_module, "threading")
+            assert hasattr(app_module, "app")
 
 
 # ==============================================================================
@@ -236,16 +268,22 @@ class TestAppEdgeCases:
         mock_thread = MagicMock()
 
         # Don't provide routes_ai_repair module
-        with patch.dict('sys.modules', {
-            'gradio_ui': MagicMock(gradio_launch=mock_gradio_launch),
-        }), \
-        patch('flask.Flask', return_value=mock_flask), \
-        patch('threading.Thread', return_value=mock_thread):
-            if 'nexuscore.utils.app' in sys.modules:
-                del sys.modules['nexuscore.utils.app']
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "gradio_ui": MagicMock(gradio_launch=mock_gradio_launch),
+                },
+            ),
+            patch("flask.Flask", return_value=mock_flask),
+            patch("threading.Thread", return_value=mock_thread),
+        ):
+            if "nexuscore.utils.app" in sys.modules:
+                del sys.modules["nexuscore.utils.app"]
 
             try:
                 import nexuscore.utils.app as app_module
+
                 # Should raise ImportError or ModuleNotFoundError
             except (ImportError, ModuleNotFoundError):
                 # Expected behavior when dependency is missing
@@ -258,16 +296,22 @@ class TestAppEdgeCases:
         mock_thread = MagicMock()
 
         # Don't provide gradio_ui module
-        with patch.dict('sys.modules', {
-            'routes_ai_repair': MagicMock(bp=mock_blueprint),
-        }), \
-        patch('flask.Flask', return_value=mock_flask), \
-        patch('threading.Thread', return_value=mock_thread):
-            if 'nexuscore.utils.app' in sys.modules:
-                del sys.modules['nexuscore.utils.app']
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "routes_ai_repair": MagicMock(bp=mock_blueprint),
+                },
+            ),
+            patch("flask.Flask", return_value=mock_flask),
+            patch("threading.Thread", return_value=mock_thread),
+        ):
+            if "nexuscore.utils.app" in sys.modules:
+                del sys.modules["nexuscore.utils.app"]
 
             try:
                 import nexuscore.utils.app as app_module
+
                 # Should raise ImportError or ModuleNotFoundError
             except (ImportError, ModuleNotFoundError):
                 # Expected behavior when dependency is missing
@@ -280,16 +324,20 @@ class TestAppEdgeCases:
         mock_gradio_launch = MagicMock()
         mock_thread = MagicMock()
 
-        with patch.dict('sys.modules', {
-            'routes_ai_repair': MagicMock(bp=mock_blueprint),
-            'gradio_ui': MagicMock(gradio_launch=mock_gradio_launch),
-        }), \
-        patch('flask.Flask', return_value=mock_flask), \
-        patch('threading.Thread', return_value=mock_thread):
-            if 'nexuscore.utils.app' in sys.modules:
-                del sys.modules['nexuscore.utils.app']
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "routes_ai_repair": MagicMock(bp=mock_blueprint),
+                    "gradio_ui": MagicMock(gradio_launch=mock_gradio_launch),
+                },
+            ),
+            patch("flask.Flask", return_value=mock_flask),
+            patch("threading.Thread", return_value=mock_thread),
+        ):
+            if "nexuscore.utils.app" in sys.modules:
+                del sys.modules["nexuscore.utils.app"]
 
-            import nexuscore.utils.app as app_module
 
             # Verify thread start was called (non-blocking)
             mock_thread.start.assert_called_once()

@@ -10,9 +10,10 @@ FastAPI 全 API で統一されたエラー形式を提供する。
 
 詳細なエラーコード仕様は `docs/api/ERROR_CODE_CATALOG.md` を参照してください。
 """
+
 from fastapi import HTTPException, status
 
-from ..schemas.error import ErrorResponse, ErrorDetail
+from ..schemas.error import ErrorDetail, ErrorResponse
 
 
 def make_error(status_code: int, code: str, message: str) -> HTTPException:
@@ -40,9 +41,7 @@ def make_error(status_code: int, code: str, message: str) -> HTTPException:
     Note:
         詳細なエラーコード仕様は `docs/api/ERROR_CODE_CATALOG.md` を参照してください。
     """
-    error_response = ErrorResponse(
-        error=ErrorDetail(code=code, message=message)
-    )
+    error_response = ErrorResponse(error=ErrorDetail(code=code, message=message))
     return HTTPException(
         status_code=status_code,
         detail=error_response.model_dump(),
@@ -51,6 +50,7 @@ def make_error(status_code: int, code: str, message: str) -> HTTPException:
 
 # よく使用されるエラーのショートカット関数
 # 詳細なエラーコード仕様は `docs/api/ERROR_CODE_CATALOG.md` を参照してください。
+
 
 def make_not_found_error(resource: str, resource_id: str) -> HTTPException:
     """
@@ -192,4 +192,3 @@ def make_conflict_error(message: str) -> HTTPException:
         code="CONFLICT",
         message=message,
     )
-

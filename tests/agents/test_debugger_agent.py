@@ -20,7 +20,11 @@ def test_debug_and_patch_includes_solution(monkeypatch):
     agent = DebuggerAgent()
     files = {"src/foo.py": "print('hello')"}
 
-    solution = {"error_signature": "ValueError", "cause": "bad call", "solution_pattern": {"type": "patch"}}
+    solution = {
+        "error_signature": "ValueError",
+        "cause": "bad call",
+        "solution_pattern": {"type": "patch"},
+    }
     monkeypatch.setattr(agent, "_find_solution_from_kb", lambda log: solution)
 
     def fake_generate(error_log, source_path, source_code, instruction):

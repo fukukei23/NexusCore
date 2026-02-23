@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from nexuscore.agents.context_agent import ContextAgent
 
 
@@ -16,6 +17,7 @@ def test_request_human_dev_policy_uses_policy_interface(monkeypatch):
     class DummyPI:
         def launch_and_wait_for_input(self, timeout=180):
             return {"method": "ui"}
+
     monkeypatch.setattr(ContextAgent, "_find_project_root", lambda self: str(Path.cwd()))
     monkeypatch.setattr("nexuscore.agents.context_agent.PolicyInterface", DummyPI)
     agent = ContextAgent()

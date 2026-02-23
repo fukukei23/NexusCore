@@ -8,10 +8,10 @@ This module is intentionally lightweight and side-effect free.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 
-def validate_run_state(state: Dict[str, Any]) -> Tuple[bool, Optional[str], Optional[str]]:
+def validate_run_state(state: dict[str, Any]) -> tuple[bool, str | None, str | None]:
     """
     Validate RunState shape with minimal checks required by CR-020 MVP.
 
@@ -35,9 +35,11 @@ def validate_run_state(state: Dict[str, Any]) -> Tuple[bool, Optional[str], Opti
     # status == "PAUSED" -> next_phase must not be null.
     if status == "PAUSED":
         if state.get("next_phase") is None:
-            return False, "SCHEMA_PAUSED_NEXT_PHASE_REQUIRED", "next_phase must be set when status=PAUSED"
+            return (
+                False,
+                "SCHEMA_PAUSED_NEXT_PHASE_REQUIRED",
+                "next_phase must be set when status=PAUSED",
+            )
 
     # Unknown fields are allowed by design (Forward compatibility).
     return True, None, None
-
-

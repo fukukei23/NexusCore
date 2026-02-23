@@ -9,9 +9,7 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 from nexuscore.agents.tester_agent import TesterAgent
 
@@ -55,10 +53,12 @@ class TestTesterAgentIntegration:
             agent = TesterAgent(project_root=tmpdir)
 
             # LLM 呼び出しをモック
-            mock_response = json.dumps({
-                "test_code": "def test_example(): assert True",
-                "testimony": "Basic test",
-            })
+            mock_response = json.dumps(
+                {
+                    "test_code": "def test_example(): assert True",
+                    "testimony": "Basic test",
+                }
+            )
 
             with patch.object(agent, "execute_llm_task", return_value=mock_response):
                 result = agent.generate_tests_for_module(
@@ -76,7 +76,9 @@ class TestTesterAgentIntegration:
         """ファイルパスからモジュール名を推定"""
         agent = TesterAgent()
 
-        assert agent._infer_module_name_from_path("src/nexuscore/utils/file_utils.py") == "file_utils"
+        assert (
+            agent._infer_module_name_from_path("src/nexuscore/utils/file_utils.py") == "file_utils"
+        )
         assert agent._infer_module_name_from_path("sandbox_runner.py") == "sandbox_runner"
 
     def test_resolve_test_file_path(self):
@@ -135,17 +137,20 @@ def helper_function():
             agent = TesterAgent(project_root=tmpdir)
 
             # LLM 呼び出しをモック
-            mock_response = json.dumps({
-                "test_code": "def test_hello(): assert hello() == 'world'",
-                "testimony": "test",
-            })
+            mock_response = json.dumps(
+                {
+                    "test_code": "def test_hello(): assert hello() == 'world'",
+                    "testimony": "test",
+                }
+            )
 
             with patch.object(agent, "execute_llm_task", return_value=mock_response):
-                results = agent.handle_changed_files([
-                    "src/example.py",
-                ])
+                results = agent.handle_changed_files(
+                    [
+                        "src/example.py",
+                    ]
+                )
 
             assert "example" in results
             # sandbox_runner など自動生成不可のモジュールは None になる可能性がある
             # ここでは example が処理されたことを確認
-

@@ -5,6 +5,7 @@ views_api_test.py の包括的なテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask legacy views_api_test comprehensive tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -154,8 +155,12 @@ class TestApiTestGet:
 
     def test_api_test_get_with_multiple_api_keys(self, authenticated_client, test_user):
         """複数のAPIキーがすべて表示される"""
-        api_key1 = ApiKey(user_id=test_user.id, name="Key 1", token_hash=ApiKey.hash_token("token1"))
-        api_key2 = ApiKey(user_id=test_user.id, name="Key 2", token_hash=ApiKey.hash_token("token2"))
+        api_key1 = ApiKey(
+            user_id=test_user.id, name="Key 1", token_hash=ApiKey.hash_token("token1")
+        )
+        api_key2 = ApiKey(
+            user_id=test_user.id, name="Key 2", token_hash=ApiKey.hash_token("token2")
+        )
         db.session.add_all([api_key1, api_key2])
         db.session.commit()
 
@@ -194,50 +199,73 @@ class TestApiTestPost:
 
     def test_api_test_post_without_project_id_shows_error(self, authenticated_client, test_user):
         """project_idがない場合はエラーメッセージが表示される"""
-        response = authenticated_client.post("/api-test/", data={
-            "requirement": "Test requirement",
-        })
+        response = authenticated_client.post(
+            "/api-test/",
+            data={
+                "requirement": "Test requirement",
+            },
+        )
 
         assert response.status_code == 200
         assert b"Project ID and requirement are required" in response.data
 
-    def test_api_test_post_without_requirement_shows_error(self, authenticated_client, test_user, test_project):
+    def test_api_test_post_without_requirement_shows_error(
+        self, authenticated_client, test_user, test_project
+    ):
         """requirementがない場合はエラーメッセージが表示される"""
-        response = authenticated_client.post("/api-test/", data={
-            "project_id": test_project.id,
-        })
+        response = authenticated_client.post(
+            "/api-test/",
+            data={
+                "project_id": test_project.id,
+            },
+        )
 
         assert response.status_code == 200
         assert b"Project ID and requirement are required" in response.data
 
-    def test_api_test_post_with_valid_data_shows_result(self, authenticated_client, test_user, test_project):
+    def test_api_test_post_with_valid_data_shows_result(
+        self, authenticated_client, test_user, test_project
+    ):
         """有効なデータでPOSTするとAPI呼び出しシミュレーション結果が表示される"""
-        response = authenticated_client.post("/api-test/", data={
-            "project_id": test_project.id,
-            "requirement": "Fix all bugs",
-        })
+        response = authenticated_client.post(
+            "/api-test/",
+            data={
+                "project_id": test_project.id,
+                "requirement": "Fix all bugs",
+            },
+        )
 
         assert response.status_code == 200
         assert b"API Call Result" in response.data
         assert b"API call simulated" in response.data
 
-    def test_api_test_post_with_api_key_id(self, authenticated_client, test_user, test_project, test_api_key):
+    def test_api_test_post_with_api_key_id(
+        self, authenticated_client, test_user, test_project, test_api_key
+    ):
         """api_key_idパラメータも受け入れられる"""
-        response = authenticated_client.post("/api-test/", data={
-            "project_id": test_project.id,
-            "requirement": "Run tests",
-            "api_key_id": test_api_key.id,
-        })
+        response = authenticated_client.post(
+            "/api-test/",
+            data={
+                "project_id": test_project.id,
+                "requirement": "Run tests",
+                "api_key_id": test_api_key.id,
+            },
+        )
 
         assert response.status_code == 200
         assert b"API Call Result" in response.data
 
-    def test_api_test_post_sets_g_current_api_user(self, authenticated_client, test_user, test_project):
+    def test_api_test_post_sets_g_current_api_user(
+        self, authenticated_client, test_user, test_project
+    ):
         """g.current_api_userが設定される（APIコールシミュレーション）"""
-        response = authenticated_client.post("/api-test/", data={
-            "project_id": test_project.id,
-            "requirement": "Test",
-        })
+        response = authenticated_client.post(
+            "/api-test/",
+            data={
+                "project_id": test_project.id,
+                "requirement": "Test",
+            },
+        )
 
         # API呼び出しがシミュレートされ、結果が返される
         assert response.status_code == 200
@@ -246,10 +274,13 @@ class TestApiTestPost:
 
     def test_api_test_post_handles_exception(self, authenticated_client, test_user, test_project):
         """例外が発生した場合はエラーメッセージが表示される"""
-        response = authenticated_client.post("/api-test/", data={
-            "project_id": test_project.id,
-            "requirement": "Cause error",
-        })
+        response = authenticated_client.post(
+            "/api-test/",
+            data={
+                "project_id": test_project.id,
+                "requirement": "Cause error",
+            },
+        )
 
         # 実装上、tryブロックで囲まれているので例外は握りつぶされ、エラーメッセージが表示される可能性がある
         assert response.status_code == 200
@@ -258,9 +289,12 @@ class TestApiTestPost:
 
     def test_api_test_post_displays_form_on_error(self, authenticated_client, test_user):
         """エラー時もフォームが再表示される"""
-        response = authenticated_client.post("/api-test/", data={
-            "requirement": "Missing project_id",
-        })
+        response = authenticated_client.post(
+            "/api-test/",
+            data={
+                "requirement": "Missing project_id",
+            },
+        )
 
         assert response.status_code == 200
         # エラーメッセージとフォームの両方が表示される
@@ -269,42 +303,60 @@ class TestApiTestPost:
 
     def test_api_test_post_shows_curl_example(self, authenticated_client, test_user, test_project):
         """POSTレスポンスにcurlの使用例が含まれる"""
-        response = authenticated_client.post("/api-test/", data={
-            "project_id": test_project.id,
-            "requirement": "Test",
-        })
+        response = authenticated_client.post(
+            "/api-test/",
+            data={
+                "project_id": test_project.id,
+                "requirement": "Test",
+            },
+        )
 
         assert response.status_code == 200
         assert b"curl" in response.data
         assert b"X-Api-Key" in response.data
 
-    def test_api_test_post_result_contains_json(self, authenticated_client, test_user, test_project):
+    def test_api_test_post_result_contains_json(
+        self, authenticated_client, test_user, test_project
+    ):
         """結果にJSON形式のデータが含まれる"""
-        response = authenticated_client.post("/api-test/", data={
-            "project_id": test_project.id,
-            "requirement": "Generate tests",
-        })
+        response = authenticated_client.post(
+            "/api-test/",
+            data={
+                "project_id": test_project.id,
+                "requirement": "Generate tests",
+            },
+        )
 
         assert response.status_code == 200
         # JSONレスポンスがHTMLに埋め込まれている
         assert b"status_code" in response.data or b"message" in response.data
 
-    def test_api_test_post_with_empty_requirement(self, authenticated_client, test_user, test_project):
+    def test_api_test_post_with_empty_requirement(
+        self, authenticated_client, test_user, test_project
+    ):
         """空のrequirementはエラー"""
-        response = authenticated_client.post("/api-test/", data={
-            "project_id": test_project.id,
-            "requirement": "",
-        })
+        response = authenticated_client.post(
+            "/api-test/",
+            data={
+                "project_id": test_project.id,
+                "requirement": "",
+            },
+        )
 
         assert response.status_code == 200
         assert b"required" in response.data.lower()
 
-    def test_api_test_post_includes_note_about_actual_api(self, authenticated_client, test_user, test_project):
+    def test_api_test_post_includes_note_about_actual_api(
+        self, authenticated_client, test_user, test_project
+    ):
         """実際のAPI使用についての注意書きが含まれる"""
-        response = authenticated_client.post("/api-test/", data={
-            "project_id": test_project.id,
-            "requirement": "Test",
-        })
+        response = authenticated_client.post(
+            "/api-test/",
+            data={
+                "project_id": test_project.id,
+                "requirement": "Test",
+            },
+        )
 
         assert response.status_code == 200
         assert b"UI test page" in response.data or b"test page" in response.data.lower()

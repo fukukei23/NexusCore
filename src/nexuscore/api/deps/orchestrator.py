@@ -4,23 +4,22 @@ Orchestrator Dependency Injection for FastAPI (CR-NEXUS-029).
 Provides request-scoped Orchestrator instance generation for API endpoints.
 """
 
-import os
 import logging
+import os
 from pathlib import Path
-from typing import Any
 
-from nexuscore.core.orchestrator import Orchestrator
-from nexuscore.agents.requirement_agent import RequirementAgent
 from nexuscore.agents.architect_agent import ArchitectAgent
-from nexuscore.agents.planner_agent import PlannerAgent
 from nexuscore.agents.coder_agent import CoderAgent
-from nexuscore.agents.tester_agent import TesterAgent
 from nexuscore.agents.debugger_agent import DebuggerAgent
 from nexuscore.agents.guardian_agent import GuardianAgent
-from nexuscore.agents.policy_agent import PolicyAgent
-from nexuscore.agents.postmortem_agent import PostmortemAgent
 from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
 from nexuscore.agents.patch_applier import PatchApplier
+from nexuscore.agents.planner_agent import PlannerAgent
+from nexuscore.agents.policy_agent import PolicyAgent
+from nexuscore.agents.postmortem_agent import PostmortemAgent
+from nexuscore.agents.requirement_agent import RequirementAgent
+from nexuscore.agents.tester_agent import TesterAgent
+from nexuscore.core.orchestrator import Orchestrator
 from nexuscore.llm.llm_router import LLMRouter
 
 logger = logging.getLogger(__name__)
@@ -97,7 +96,9 @@ def get_orchestrator(project_path: str | None = None, language: str = "ja") -> O
 
     # Get project path from environment or use default
     if project_path is None:
-        project_path = os.getenv("NEXUSCORE_PROJECT_PATH", str(project_root / ".nexus" / "api_runs"))
+        project_path = os.getenv(
+            "NEXUSCORE_PROJECT_PATH", str(project_root / ".nexus" / "api_runs")
+        )
 
     # Ensure project path exists
     project_path = os.path.abspath(project_path)
@@ -117,7 +118,9 @@ def get_orchestrator(project_path: str | None = None, language: str = "ja") -> O
     tester = TesterAgent()
     debugger = DebuggerAgent(knowledge_base_path=local_kb_path)
     guardian = GuardianAgent(api_key=guardian_api_key, model=guardian_model)
-    policy_agent = PolicyAgent(policy_rules_path=os.path.join(str(project_root), "config", "policy_rules.json"))
+    policy_agent = PolicyAgent(
+        policy_rules_path=os.path.join(str(project_root), "config", "policy_rules.json")
+    )
     postmortem_agent = PostmortemAgent()
     knowledge_curator_agent = KnowledgeCuratorAgent(api_key=guardian_api_key, model=guardian_model)
     patch_applier = PatchApplier()
@@ -126,10 +129,7 @@ def get_orchestrator(project_path: str | None = None, language: str = "ja") -> O
     # Default constitution (can be overridden per request if needed)
     constitution = {
         "description": "",
-        "quality_gate": {
-            "MIN_COVERAGE": 90,
-            "MIN_PYLINT_SCORE": 8.0
-        }
+        "quality_gate": {"MIN_COVERAGE": 90, "MIN_PYLINT_SCORE": 8.0},
     }
 
     # Create Orchestrator instance
@@ -151,4 +151,3 @@ def get_orchestrator(project_path: str | None = None, language: str = "ja") -> O
     )
 
     return orchestrator
-

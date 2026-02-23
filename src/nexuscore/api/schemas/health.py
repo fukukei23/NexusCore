@@ -3,6 +3,7 @@ Health check レスポンススキーマ
 
 Health check エンドポイントのレスポンスモデル定義。
 """
+
 from datetime import datetime
 from typing import Literal
 
@@ -18,7 +19,7 @@ class HealthCheckResponse(BaseModel):
         version: API のバージョン
         timestamp: レスポンス生成時刻
     """
+
     status: Literal["ok"]
     version: str
     timestamp: datetime
-

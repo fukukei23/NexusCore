@@ -1,4 +1,4 @@
-# encoding: utf-8
+
 
 def add_two_integers(a, b):
     """

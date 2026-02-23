@@ -28,22 +28,20 @@
 
 from __future__ import annotations
 
-import os
-import sys
-import json
-import time
 import difflib
-import traceback
 import importlib
+import json
+import os
+import traceback
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Optional
-from datetime import datetime, timezone, timedelta
+from typing import Any
 
 # ---------- ルート推定 --------------------------------------------------------
 HERE = Path(__file__).resolve()
 # .../src/nexuscore/gradio_app/auto_revision_runner.py -> PROJECT_ROOT を 3階層上と定義
 PROJECT_ROOT = HERE.parents[3]
-SRC_ROOT = HERE.parents[2]   # .../src/nexuscore/
+SRC_ROOT = HERE.parents[2]  # .../src/nexuscore/
 
 PATCH_DIR = PROJECT_ROOT / "patch_history"
 PATCH_DIR.mkdir(parents=True, exist_ok=True)
@@ -59,14 +57,17 @@ for d in SANDBOX_DIRS:
 # ---------- JST タイムスタンプ ------------------------------------------------
 JST = timezone(timedelta(hours=9))
 
+
 def now_tag() -> str:
     return datetime.now(JST).strftime("%Y%m%d_%H%M%S")
+
 
 def now_iso() -> str:
     return datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S%z")
 
+
 # ---------- Policy 取得 (3段階フォールバック) ---------------------------------
-def read_json_safe(p: Path) -> Dict[str, Any]:
+def read_json_safe(p: Path) -> dict[str, Any]:
     try:
         if p.exists():
             return json.loads(p.read_text(encoding="utf-8"))
@@ -74,7 +75,8 @@ def read_json_safe(p: Path) -> Dict[str, Any]:
         pass
     return {}
 
-def load_policy_context() -> Dict[str, str]:
+
+def load_policy_context() -> dict[str, str]:
     # 1) .nexus_context.json を優先（gradio_app 配下 → PROJECT_ROOT 直下）
     ctx_paths = [
         SRC_ROOT / "gradio_app" / ".nexus_context.json",
@@ -103,6 +105,7 @@ def load_policy_context() -> Dict[str, str]:
     # 3) デフォルト
     return {"policy_profile": "general", "policy_version": "v1", "policy_icon": "🏷️"}
 
+
 # ---------- 既存 API の動的ディスパッチ (revision_tab) ------------------------
 def _import_revision_tab():
     """
@@ -124,6 +127,7 @@ def _import_revision_tab():
             continue
     return None
 
+
 RT = _import_revision_tab()
 
 # ---------- ステータス定数（保存値の仕様を明示） ------------------------------
@@ -131,11 +135,13 @@ STATUS_INITIAL = "initial_pass"
 STATUS_SUCCESS = "success"
 STATUS_ATTEMPT_ERROR = "attempt_error"
 
+
 def _status_attempt(i: int) -> str:
     """attempt ステータスを一元生成（例: attempt_3/5）。"""
     return f"attempt_{i}/5"
 
-def _coerce_bool_log(ret: Any) -> Tuple[bool, str]:
+
+def _coerce_bool_log(ret: Any) -> tuple[bool, str]:
     """戻り値が (bool,str) でなくても無理なく解釈する小ヘルパ"""
     if isinstance(ret, tuple) and len(ret) >= 2 and isinstance(ret[0], bool):
         return bool(ret[0]), str(ret[1])
@@ -143,7 +149,8 @@ def _coerce_bool_log(ret: Any) -> Tuple[bool, str]:
         return ret, ""
     return False, str(ret)
 
-def run_pytest_once() -> Tuple[bool, str]:
+
+def run_pytest_once() -> tuple[bool, str]:
     """
     既存の API を最大限利用。見つからなければ subprocess で pytest を実行。
     RT(run tab) 側の run_pytest/run_tests/run_test を優先的に呼び出す。
@@ -159,7 +166,9 @@ def run_pytest_once() -> Tuple[bool, str]:
                     return False, f"[rt.{fn_name}] exception: {e}\n{traceback.format_exc()}"
 
     # 2) サブプロセスで pytest 実行（-q）。sandbox_output 下のテストも広くカバー。
-    import subprocess, shlex
+    import shlex
+    import subprocess
+
     cmd = "pytest -q"
     try:
         proc = subprocess.run(
@@ -169,13 +178,14 @@ def run_pytest_once() -> Tuple[bool, str]:
             text=True,
             timeout=300,
         )
-        ok = (proc.returncode == 0)
+        ok = proc.returncode == 0
         log = (proc.stdout or "") + (proc.stderr or "")
         return ok, log
     except Exception as e:
         return False, f"[pytest subprocess] exception: {e}\n{traceback.format_exc()}"
 
-def attempt_auto_fix(prev_log: str) -> Tuple[bool, str, Dict[str, str]]:
+
+def attempt_auto_fix(prev_log: str) -> tuple[bool, str, dict[str, str]]:
     """
     既存ロジックを**できるだけ**呼び出す。
     戻り値: (ok, test_log, changes_dict) 変更ファイル名 -> 新内容
@@ -202,12 +212,14 @@ def attempt_auto_fix(prev_log: str) -> Tuple[bool, str, Dict[str, str]]:
     # 2) 何も無ければ no-op: 失敗ログを返す（安全フォールバック）
     return False, "[auto-fix] no available function; skipped.", {}
 
+
 # ---------- 統一 diff 生成 -----------------------------------------------------
 def read_file_text(p: Path) -> str:
     try:
         return p.read_text(encoding="utf-8")
     except Exception:
         return ""
+
 
 def unified_diff_text(before: str, after: str, path: str) -> str:
     before_lines = before.splitlines(keepends=True)
@@ -216,11 +228,12 @@ def unified_diff_text(before: str, after: str, path: str) -> str:
         difflib.unified_diff(before_lines, after_lines, fromfile=f"a/{path}", tofile=f"b/{path}")
     )
 
-def snapshot_sandbox_files() -> Dict[str, str]:
+
+def snapshot_sandbox_files() -> dict[str, str]:
     """
     sandbox_output 配下の *.py を**両方**のルートから収集して (相対パス -> 内容)
     """
-    files: Dict[str, str] = {}
+    files: dict[str, str] = {}
     for base in SANDBOX_DIRS:
         if not base.exists():
             continue
@@ -230,9 +243,10 @@ def snapshot_sandbox_files() -> Dict[str, str]:
             files.setdefault(rel, read_file_text(p))
     return files
 
-def build_unified_diff(old_snap: Dict[str, str], new_snap: Dict[str, str]) -> str:
+
+def build_unified_diff(old_snap: dict[str, str], new_snap: dict[str, str]) -> str:
     paths = sorted(set(old_snap.keys()) | set(new_snap.keys()))
-    chunks: List[str] = []
+    chunks: list[str] = []
     for rel in paths:
         before = old_snap.get(rel, "")
         after = new_snap.get(rel, "")
@@ -240,14 +254,20 @@ def build_unified_diff(old_snap: Dict[str, str], new_snap: Dict[str, str]) -> st
             chunks.append(unified_diff_text(before, after, rel))
     return "\n".join(chunks).strip()
 
+
 # ---------- 旧テキスト形式の後方互換保存 --------------------------------------
 def append_legacy_history_line(status: str, reason: str) -> None:
     line = f"{now_iso()} [{status}] {reason}\n"
     (PROJECT_ROOT / "patch_history.txt").write_text(
-        ((PROJECT_ROOT / "patch_history.txt").read_text(encoding="utf-8") if (PROJECT_ROOT / "patch_history.txt").exists() else "")
+        (
+            (PROJECT_ROOT / "patch_history.txt").read_text(encoding="utf-8")
+            if (PROJECT_ROOT / "patch_history.txt").exists()
+            else ""
+        )
         + line,
-        encoding="utf-8"
+        encoding="utf-8",
     )
+
 
 def write_legacy_log(timestamp: str, test_log: str) -> None:
     log_file = PATCH_DIR / f"patch_{timestamp}.log"
@@ -255,6 +275,7 @@ def write_legacy_log(timestamp: str, test_log: str) -> None:
         log_file.write_text(test_log, encoding="utf-8")
     except Exception:
         pass
+
 
 # ---------- パッチ JSON 保存（完全構造体 + policy フィールド） -----------------
 def write_patch_json(
@@ -264,12 +285,12 @@ def write_patch_json(
     reason: str,
     test_log: str,
     code_diff: str,
-    policy: Dict[str, str],
+    policy: dict[str, str],
     attempts: int,
 ) -> Path:
-    record: Dict[str, Any] = {
+    record: dict[str, Any] = {
         "timestamp": timestamp,
-        "status": status,                 # "initial_pass" / "success" / "attempt_i/5" / "attempt_error"
+        "status": status,  # "initial_pass" / "success" / "attempt_i/5" / "attempt_error"
         "reason": reason,
         "test_log": test_log,
         "code_diff": code_diff,
@@ -289,16 +310,19 @@ def write_patch_json(
     print(f"[AutoRevision] Structured patch history saved -> {out}")
     return out
 
+
 # ---------- メインループ ------------------------------------------------------
 def main():
     print(f"[AutoRevision] start (runner v2.7) JST={now_iso()}")
     policy = load_policy_context()
-    print(f"[AutoRevision] policy -> profile={policy['policy_profile']} ver={policy['policy_version']} icon={policy['policy_icon']}")
+    print(
+        f"[AutoRevision] policy -> profile={policy['policy_profile']} ver={policy['policy_version']} icon={policy['policy_icon']}"
+    )
 
     # 初期スナップショット
     snap_before = snapshot_sandbox_files()
 
-    def _run_initial_pytest(policy_ctx: Dict[str, str]) -> Tuple[bool, str]:
+    def _run_initial_pytest(policy_ctx: dict[str, str]) -> tuple[bool, str]:
         """初回 pytest を実行し、成功なら記録して終了フラグを返す。"""
         ok, log = run_pytest_once()
         ts = now_tag()
@@ -321,7 +345,7 @@ def main():
             return True, log
         return False, log
 
-    def _run_auto_fix_loop(policy_ctx: Dict[str, str], prev_log: str) -> None:
+    def _run_auto_fix_loop(policy_ctx: dict[str, str], prev_log: str) -> None:
         """自己修復ループ（最大5回）。挙動は従来通り。"""
         for i in range(1, 6):
             attempts = i
@@ -385,6 +409,7 @@ def main():
     if ok:
         return
     _run_auto_fix_loop(policy, log)
+
 
 if __name__ == "__main__":
     main()

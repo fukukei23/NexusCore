@@ -1,12 +1,13 @@
 # src/gradio_app/interactive_generator.py
-import gradio as gr
+import difflib
 import os
 import re
-import difflib
 import subprocess
-from pathlib import Path
 from datetime import datetime
-from typing import Optional, Tuple, List
+from pathlib import Path
+from typing import Optional
+
+import gradio as gr
 from dotenv import load_dotenv
 
 try:
@@ -28,6 +29,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 load_dotenv()
 _client: Optional["OpenAI"] = None
 
+
 def get_client() -> "OpenAI":
     """
     Lazy-load OpenAI client so import時にAPIキーがなくても落ちない。
@@ -43,6 +45,7 @@ def get_client() -> "OpenAI":
     _client = OpenAI(api_key=api_key)
     return _client
 
+
 # === GPT呼び出し ===
 def call_gpt(prompt: str) -> str:
     """Call OpenAI chat completions for a given prompt (model fixed to gpt-4)."""
@@ -52,13 +55,15 @@ def call_gpt(prompt: str) -> str:
     )
     return response.choices[0].message.content.strip()
 
+
 # === コードと理由の抽出 ===
-def extract_code_and_reason(full_response: str) -> Tuple[str, str]:
+def extract_code_and_reason(full_response: str) -> tuple[str, str]:
     code_match = re.search(r"```(?:python)?\n(.*?)```", full_response, re.DOTALL)
     reason_match = re.split(r"```.*?```", full_response, maxsplit=1)
     code = code_match.group(1).strip() if code_match else ""
     reason = reason_match[1].strip() if len(reason_match) > 1 else ""
     return code, reason
+
 
 # === ファイルパス抽出 ===
 def extract_file_path_from_code(
@@ -70,10 +75,12 @@ def extract_file_path_from_code(
         return match.group(1).strip()
     return default_path
 
+
 # === 差分取得 ===
 def get_diff(old, new):
     diff = difflib.HtmlDiff().make_file(old.splitlines(), new.splitlines(), context=True)
     return diff
+
 
 # === バージョン番号付与 ===
 def get_versioned_path(path):
@@ -84,6 +91,7 @@ def get_versioned_path(path):
         i += 1
     return path
 
+
 # === ファイル保存 ===
 def save_code_with_backup_and_diff(code: str, user_path: str):
     try:
@@ -93,7 +101,7 @@ def save_code_with_backup_and_diff(code: str, user_path: str):
 
         diff_html = ""
         if os.path.exists(full_path):
-            with open(full_path, "r", encoding="utf-8") as f:
+            with open(full_path, encoding="utf-8") as f:
                 old_code = f.read()
             diff_html = get_diff(old_code, code)
             backup_path = full_path + ".bak"
@@ -112,13 +120,16 @@ def save_code_with_backup_and_diff(code: str, user_path: str):
     except Exception as e:
         return f"❌ 保存失敗: {str(e)}", ""
 
+
 def build_ui() -> gr.Blocks:
     """Gradio Blocks factory for the interactive generator."""
     with gr.Blocks() as app:
         gr.Markdown("### 🧐 自然文からAI補足付き 初期コード自動生成")
 
         initial_input = gr.Textbox(label="📝 やりたいこと（自然文）")
-        output_path_input = gr.Textbox(label="📂 保存先（例: src/utils/my_func.py）", value="src/generated/sample.py")
+        output_path_input = gr.Textbox(
+            label="📂 保存先（例: src/utils/my_func.py）", value="src/generated/sample.py"
+        )
         submit_btn = gr.Button("🔍 質問を開始")
         gpt_question = gr.Textbox(label="🤠 GPTの補足質問", lines=2)
         user_reply = gr.Textbox(label="✍️ 回答を記入")
@@ -168,7 +179,7 @@ def build_ui() -> gr.Blocks:
             return code, result, diff
 
         def list_saved_files():
-            file_paths: List[str] = []
+            file_paths: list[str] = []
             for root, _, files in os.walk(PROJECT_ROOT / "src"):
                 for f in files:
                     if f.endswith(".py"):
@@ -183,9 +194,19 @@ def build_ui() -> gr.Blocks:
             except Exception as e:
                 return f"❌ VSCode起動失敗: {str(e)}"
 
-        submit_btn.click(fn=ask_gpt_question, inputs=[initial_input, history], outputs=[gpt_question])
-        loop_again_btn.click(fn=ask_more_questions, inputs=[initial_input, user_reply, gpt_question, history], outputs=[gpt_question, history])
-        generate_code_btn.click(fn=generate_final_code, inputs=[initial_input, history, output_path_input], outputs=[code_output, save_result, diff_output])
+        submit_btn.click(
+            fn=ask_gpt_question, inputs=[initial_input, history], outputs=[gpt_question]
+        )
+        loop_again_btn.click(
+            fn=ask_more_questions,
+            inputs=[initial_input, user_reply, gpt_question, history],
+            outputs=[gpt_question, history],
+        )
+        generate_code_btn.click(
+            fn=generate_final_code,
+            inputs=[initial_input, history, output_path_input],
+            outputs=[code_output, save_result, diff_output],
+        )
         generate_code_btn.click(fn=list_saved_files, inputs=[], outputs=[file_list])
         open_in_vscode_btn.click(fn=open_file_in_vscode, inputs=[file_list], outputs=[save_result])
 
@@ -200,7 +221,13 @@ def launch_ui(
 ):
     """Launch interactive generator UI."""
     demo = build_ui()
-    demo.launch(server_name=server_name, server_port=server_port, inbrowser=inbrowser, share=share, show_error=True)
+    demo.launch(
+        server_name=server_name,
+        server_port=server_port,
+        inbrowser=inbrowser,
+        share=share,
+        show_error=True,
+    )
 
 
 if __name__ == "__main__":

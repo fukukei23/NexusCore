@@ -93,4 +93,3 @@ def test_generate_sdk_module_has_required_functions():
     assert callable(generate_sdk.generate_typescript_sdk)
     assert callable(generate_sdk.verify_generated_sdk)
     assert callable(generate_sdk.main)
-

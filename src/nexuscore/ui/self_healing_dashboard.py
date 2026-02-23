@@ -14,12 +14,12 @@ import argparse
 import json
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import streamlit as st
 
 
-def load_history(project_root: str) -> List[Dict[str, Any]]:
+def load_history(project_root: str) -> list[dict[str, Any]]:
     """
     .nexus/history/self_healing.log.jsonl を読み込んで list[dict] として返す。
     """
@@ -27,7 +27,7 @@ def load_history(project_root: str) -> List[Dict[str, Any]]:
     if not path.exists():
         return []
 
-    records: List[Dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
     with path.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -167,5 +167,3 @@ if __name__ == "__main__":
         project_root = args.project_root
 
     main(project_root)
-
-

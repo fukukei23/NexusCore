@@ -3,6 +3,7 @@
 This module deliberately keeps the runtime dependencies optional so that
 importing it never fails even when audio/translation libraries are missing.
 """
+
 from __future__ import annotations
 
 import logging
@@ -10,8 +11,9 @@ import os
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, ContextManager, Dict, Optional, Tuple, Union
+from typing import ContextManager, Union
 
 import numpy as np
 import openai
@@ -36,23 +38,23 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 AudioInput = Union[str, bytes, np.ndarray]
 StreamFactory = Callable[[Callable[[np.ndarray, int, float, object], None]], ContextManager[object]]
 
-_DEFAULT_CONFIG: Dict[str, Union[str, int]] = {
+_DEFAULT_CONFIG: dict[str, str | int] = {
     "language": os.getenv("VOICE_TO_TEXT_TARGET_LANG", "en"),
     "model_size": os.getenv("VOICE_TO_TEXT_MODEL_SIZE", "base"),
     "sample_rate": int(os.getenv("VOICE_TO_TEXT_SAMPLE_RATE", 16000)),
     "channels": int(os.getenv("VOICE_TO_TEXT_CHANNELS", 1)),
 }
-_AUDIO_CONFIG: Dict[str, Union[str, int]] = dict(_DEFAULT_CONFIG)
+_AUDIO_CONFIG: dict[str, str | int] = dict(_DEFAULT_CONFIG)
 _MODEL_STATE = {"initialized": False, "loaded": False}
 
 
-def _update_audio_config(config: Dict[str, Union[str, int]]) -> Dict[str, Union[str, int]]:
+def _update_audio_config(config: dict[str, str | int]) -> dict[str, str | int]:
     """内部設定を書き換えてコピーを返す（直接の外部参照を避ける）。"""
     _AUDIO_CONFIG.update(config)
     return dict(_AUDIO_CONFIG)
 
 
-def _reset_audio_config() -> Dict[str, Union[str, int]]:
+def _reset_audio_config() -> dict[str, str | int]:
     """内部設定をデフォルトに戻す。"""
     _AUDIO_CONFIG.update(_DEFAULT_CONFIG)
     return dict(_AUDIO_CONFIG)
@@ -68,8 +70,8 @@ def _reset_model_state() -> None:
     _MODEL_STATE.update({"initialized": False, "loaded": False})
 
 
-_translate_client: Optional["google_translate.Client"] = None
-_whisper_client: Optional["WhisperClient"] = None
+_translate_client: google_translate.Client | None = None
+_whisper_client: WhisperClient | None = None
 
 # NOTE: 下記には内部ユーティリティも含まれるが、後方互換のため __all__ からは削除しない。
 __all__ = [
@@ -121,7 +123,7 @@ __all__ = [
 class WhisperClient:
     """Thin wrapper around the OpenAI Whisper API with graceful degradation."""
 
-    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None) -> None:
+    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model = model or os.getenv("WHISPER_MODEL", "whisper-1")
         self.default_language = os.getenv("WHISPER_LANGUAGE", "ja")
@@ -133,7 +135,7 @@ class WhisperClient:
         """APIキーが設定されているかどうかを返す。"""
         return bool(self.api_key)
 
-    def transcribe_file(self, audio_path: str, *, language: Optional[str] = None) -> Optional[str]:
+    def transcribe_file(self, audio_path: str, *, language: str | None = None) -> str | None:
         if not self.ready:
             logger.warning("OpenAI API キーが設定されていないため、Whisper を利用できません。")
             return None
@@ -160,7 +162,7 @@ def _get_whisper_client() -> WhisperClient:
     return _whisper_client
 
 
-def _get_translate_client() -> Optional["google_translate.Client"]:
+def _get_translate_client() -> google_translate.Client | None:
     """翻訳クライアントを遅延初期化し、失敗時はログを残して None を返す。"""
     global _translate_client
     if _translate_client is not None:
@@ -176,7 +178,7 @@ def _get_translate_client() -> Optional["google_translate.Client"]:
     return _translate_client
 
 
-def _as_audio_file(audio_input: AudioInput, sample_rate: int) -> Tuple[str, Callable[[], None]]:
+def _as_audio_file(audio_input: AudioInput, sample_rate: int) -> tuple[str, Callable[[], None]]:
     """Return a file path for the input and a cleanup callback."""
     if isinstance(audio_input, str):
         path = Path(audio_input)
@@ -197,11 +199,11 @@ def _as_audio_file(audio_input: AudioInput, sample_rate: int) -> Tuple[str, Call
 
 def record_until_keypress(
     max_duration: int = 60,
-    sample_rate: Optional[int] = None,
+    sample_rate: int | None = None,
     *,
     input_func: Callable[[], str] = input,
-    stream_factory: Optional[StreamFactory] = None,
-) -> Tuple[Optional[np.ndarray], int]:
+    stream_factory: StreamFactory | None = None,
+) -> tuple[np.ndarray | None, int]:
     """Record audio until Enter is pressed or the timeout hits.
 
     Parameters
@@ -251,7 +253,9 @@ def _wait_for_stream(stream_ctx: ContextManager[object], event: threading.Event)
         event.wait()
 
 
-def transcribe_with_whisper(audio_input: AudioInput, *, language: Optional[str] = None) -> Optional[str]:
+def transcribe_with_whisper(
+    audio_input: AudioInput, *, language: str | None = None
+) -> str | None:
     """Transcribe the provided audio input via Whisper."""
     client = _get_whisper_client()
     sample_rate = int(_AUDIO_CONFIG["sample_rate"])
@@ -266,11 +270,11 @@ def transcribe_with_whisper(audio_input: AudioInput, *, language: Optional[str] 
         cleanup()
 
 
-def transcribe(audio_input: AudioInput, *, language: Optional[str] = None) -> Optional[str]:
+def transcribe(audio_input: AudioInput, *, language: str | None = None) -> str | None:
     return transcribe_with_whisper(audio_input, language=language)
 
 
-def process_audio(audio_input: AudioInput) -> Dict[str, Union[int, float]]:
+def process_audio(audio_input: AudioInput) -> dict[str, int | float]:
     """Return simple statistics for the provided audio payload."""
     if isinstance(audio_input, bytes):
         length = len(audio_input)
@@ -283,7 +287,7 @@ def process_audio(audio_input: AudioInput) -> Dict[str, Union[int, float]]:
     return {"length": length, "sample_rate": _AUDIO_CONFIG["sample_rate"]}
 
 
-def load_audio_file(path: str) -> Optional[bytes]:
+def load_audio_file(path: str) -> bytes | None:
     try:
         with open(path, "rb") as stream:
             return stream.read()
@@ -306,21 +310,21 @@ def convert_audio(path: str, target_format: str = "wav") -> str:
     return str(path)
 
 
-def extract_features(audio_input: AudioInput) -> Dict[str, float]:
+def extract_features(audio_input: AudioInput) -> dict[str, float]:
     stats = process_audio(audio_input)
     stats.update({"mean": 0.0, "std": 0.0})
     return stats
 
 
-def recognize_speech(audio_input: AudioInput) -> Optional[str]:
+def recognize_speech(audio_input: AudioInput) -> str | None:
     return transcribe(audio_input)
 
 
-def whisper_transcribe(audio_input: AudioInput) -> Optional[str]:
+def whisper_transcribe(audio_input: AudioInput) -> str | None:
     return transcribe(audio_input)
 
 
-def whisper_process(audio_input: AudioInput) -> Dict[str, Union[int, float]]:
+def whisper_process(audio_input: AudioInput) -> dict[str, int | float]:
     return process_audio(audio_input)
 
 
@@ -332,18 +336,18 @@ def initialize_whisper() -> bool:
     return load_whisper_model()
 
 
-def process_audio_stream(stream) -> Optional[str]:
+def process_audio_stream(stream) -> str | None:
     chunk = stream.read()
     if not chunk:
         return None
     return transcribe(chunk)
 
 
-def stream_transcribe(stream) -> Optional[str]:
+def stream_transcribe(stream) -> str | None:
     return process_audio_stream(stream)
 
 
-def real_time_transcribe(stream) -> Optional[str]:
+def real_time_transcribe(stream) -> str | None:
     return process_audio_stream(stream)
 
 
@@ -352,7 +356,7 @@ def continuous_recognition(stream) -> list[str]:
     return [result] if result else []
 
 
-def streaming_decode(stream) -> Optional[str]:
+def streaming_decode(stream) -> str | None:
     result = process_audio_stream(stream)
     return result or None
 
@@ -397,13 +401,13 @@ def unload_model() -> bool:
     return True
 
 
-def get_model_info() -> Dict[str, Union[str, int, bool]]:
+def get_model_info() -> dict[str, str | int | bool]:
     info = dict(_AUDIO_CONFIG)
     info.update(_MODEL_STATE)
     return info
 
 
-def set_model_config(config: Dict[str, Union[str, int]]) -> Dict[str, Union[str, int]]:
+def set_model_config(config: dict[str, str | int]) -> dict[str, str | int]:
     return _update_audio_config(config)
 
 
@@ -433,27 +437,27 @@ def set_model_size(size: str) -> str:
     return str(_AUDIO_CONFIG["model_size"])
 
 
-def configure_audio(config: Dict[str, Union[str, int]]) -> Dict[str, Union[str, int]]:
+def configure_audio(config: dict[str, str | int]) -> dict[str, str | int]:
     return set_model_config(config)
 
 
-def configure_settings(config: Dict[str, Union[str, int]]) -> Dict[str, Union[str, int]]:
+def configure_settings(config: dict[str, str | int]) -> dict[str, str | int]:
     return configure_audio(config)
 
 
-def get_config() -> Dict[str, Union[str, int]]:
+def get_config() -> dict[str, str | int]:
     return dict(_AUDIO_CONFIG)
 
 
-def update_settings(config: Dict[str, Union[str, int]]) -> Dict[str, Union[str, int]]:
+def update_settings(config: dict[str, str | int]) -> dict[str, str | int]:
     return set_model_config(config)
 
 
-def reset_config() -> Dict[str, Union[str, int]]:
+def reset_config() -> dict[str, str | int]:
     return _reset_audio_config()
 
 
-def detect_language(text: Optional[str]) -> Optional[str]:
+def detect_language(text: str | None) -> str | None:
     """Detect language using langdetect or google translate client."""
     if not text:
         return None
@@ -477,7 +481,7 @@ def detect_language(text: Optional[str]) -> Optional[str]:
     return None
 
 
-def translate_text(text: Optional[str], target_lang: Optional[str] = None) -> Optional[str]:
+def translate_text(text: str | None, target_lang: str | None = None) -> str | None:
     """Translate text to target language when client is available."""
     if not text:
         return text
@@ -495,7 +499,7 @@ def translate_text(text: Optional[str], target_lang: Optional[str] = None) -> Op
     return response.get("translatedText", text)
 
 
-def multi_language_support(text: str, target_lang: Optional[str] = None) -> Optional[str]:
+def multi_language_support(text: str, target_lang: str | None = None) -> str | None:
     """Detect and translate text when必要; 同一言語ならそのまま返す。"""
     detected = detect_language(text)
     target = target_lang or _AUDIO_CONFIG["language"]

@@ -1,7 +1,6 @@
 import os
-import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -26,13 +25,14 @@ def test_generate_secrets_creates_files(env_setup, monkeypatch):
     project_root, config_dir = env_setup
 
     # 元のスクリプトを読み込む
-    script_source = Path(__file__).resolve().parents[2] / "src" / "nexuscore" / "config" / "generate_secrets.py"
+    script_source = (
+        Path(__file__).resolve().parents[2] / "src" / "nexuscore" / "config" / "generate_secrets.py"
+    )
     script_content = script_source.read_text(encoding="utf-8")
 
     # ROOT_PATHをテスト用に置き換える
     modified_script = script_content.replace(
-        "ROOT_PATH = Path(__file__).resolve().parents[3]",
-        f"ROOT_PATH = Path(r'{project_root}')"
+        "ROOT_PATH = Path(__file__).resolve().parents[3]", f"ROOT_PATH = Path(r'{project_root}')"
     )
 
     # 実行用のグローバルスコープ
@@ -45,11 +45,7 @@ def test_generate_secrets_creates_files(env_setup, monkeypatch):
 
     # dotenv_valuesをモック
     with patch("dotenv_values") as mock_dotenv:
-        mock_dotenv.return_value = {
-            "API_KEY": "123",
-            "EMPTY": "",
-            "SECRET_KEY": "test-secret"
-        }
+        mock_dotenv.return_value = {"API_KEY": "123", "EMPTY": "", "SECRET_KEY": "test-secret"}
 
         # スクリプトを実行
         exec(modified_script, exec_globals)
@@ -64,7 +60,7 @@ def test_generate_secrets_creates_files(env_setup, monkeypatch):
     secrets_text = secrets_path.read_text(encoding="utf-8")
     template_text = template_path.read_text(encoding="utf-8")
 
-    assert 'class Secrets:' in secrets_text
+    assert "class Secrets:" in secrets_text
     assert 'API_KEY = "123"' in secrets_text
     assert 'EMPTY = ""' in secrets_text
     assert 'SECRET_KEY = "test-secret"' in secrets_text
@@ -80,13 +76,14 @@ def test_generate_secrets_raises_error_when_env_missing(tmp_path, monkeypatch):
     config_dir = project_root / "src" / "nexuscore" / "config"
     config_dir.mkdir(parents=True)
 
-    script_source = Path(__file__).resolve().parents[2] / "src" / "nexuscore" / "config" / "generate_secrets.py"
+    script_source = (
+        Path(__file__).resolve().parents[2] / "src" / "nexuscore" / "config" / "generate_secrets.py"
+    )
     script_content = script_source.read_text(encoding="utf-8")
 
     # ROOT_PATHをテスト用に置き換える（.envが存在しないパス）
     modified_script = script_content.replace(
-        "ROOT_PATH = Path(__file__).resolve().parents[3]",
-        f"ROOT_PATH = Path(r'{project_root}')"
+        "ROOT_PATH = Path(__file__).resolve().parents[3]", f"ROOT_PATH = Path(r'{project_root}')"
     )
 
     exec_globals = {

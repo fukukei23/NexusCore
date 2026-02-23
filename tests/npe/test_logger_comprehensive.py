@@ -7,23 +7,15 @@ npe/logger.py の包括的テスト
 from __future__ import annotations
 
 import json
-import os
 import threading
 import time
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-
-import pytest
+from unittest.mock import Mock, patch
 
 from nexuscore.npe.logger import (
     _rotate_if_needed,
     log_transaction,
-    DEFAULT_LOG,
-    AUDIT_DIR,
-    ROTATE_BYTES,
-    ROTATE_KEEP,
 )
-
 
 # =============================================================================
 # Test _rotate_if_needed
@@ -237,7 +229,7 @@ class TestLogTransaction:
 
         def mock_path_open(self, *args, **kwargs):
             if "write_error.jsonl" in str(self):
-                raise IOError("Cannot write to file")
+                raise OSError("Cannot write to file")
             return original_open(self, *args, **kwargs)
 
         with patch.object(Path, "open", mock_path_open):
@@ -520,9 +512,7 @@ class TestEdgeCases:
 
         # エラーが発生せず、いくつかのバックアップファイルが作られている
         # （正確な数は競合のタイミングに依存するため、存在チェックのみ）
-        assert any(
-            (log_file.parent / f"{log_file.name}.{i}").exists() for i in range(1, 10)
-        )
+        assert any((log_file.parent / f"{log_file.name}.{i}").exists() for i in range(1, 10))
 
     def test_log_data_with_none_values(self, tmp_path):
         """None 値を含むログデータ"""

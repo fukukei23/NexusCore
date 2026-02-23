@@ -6,17 +6,16 @@ NexusCore SaaS基盤 - Gradioダッシュボード
 既存の RequirementAgent Gradio UI を参考にしつつ、
 複数プロジェクト・複数ユーザーで共通利用できるテンプレ化を実現。
 """
+
 from __future__ import annotations
 
 import gradio as gr
-from typing import Optional, Dict, Any
-from pathlib import Path
 
 # 既存のエージェントをインポート（必要に応じて）
 try:
+    from nexuscore.agents.coder_agent import CoderAgent
     from nexuscore.agents.context_agent import ContextAgent
     from nexuscore.agents.debugger_agent import DebuggerAgent
-    from nexuscore.agents.coder_agent import CoderAgent
     from nexuscore.agents.patch_applier import PatchApplier
 except ImportError:
     # エージェントが存在しない場合は None として扱う
@@ -26,7 +25,9 @@ except ImportError:
     PatchApplier = None
 
 
-def create_nexus_dashboard(project_id: Optional[int] = None, project_path: Optional[str] = None) -> gr.Blocks:
+def create_nexus_dashboard(
+    project_id: int | None = None, project_path: str | None = None
+) -> gr.Blocks:
     """
     NexusCore Gradioダッシュボードを作成
 
@@ -48,7 +49,7 @@ def create_nexus_dashboard(project_id: Optional[int] = None, project_path: Optio
                 context_display = gr.Textbox(label="Context", lines=10, interactive=False)
                 analyze_btn = gr.Button("Analyze Project")
 
-                def analyze_project(proj_id: Optional[int], proj_path: Optional[str]):
+                def analyze_project(proj_id: int | None, proj_path: str | None):
                     """プロジェクトを解析"""
                     if not proj_path:
                         return "No project path specified", "No context available"
@@ -66,19 +67,24 @@ def create_nexus_dashboard(project_id: Optional[int] = None, project_path: Optio
 
                 analyze_btn.click(
                     fn=analyze_project,
-                    inputs=[gr.Number(value=project_id, visible=False), gr.Textbox(value=project_path, visible=False)],
+                    inputs=[
+                        gr.Number(value=project_id, visible=False),
+                        gr.Textbox(value=project_path, visible=False),
+                    ],
                     outputs=[project_info, context_display],
                 )
 
             # Tab2: 修正
             with gr.Tab("修正"):
                 gr.Markdown("## 自己修復フロー")
-                error_log = gr.Textbox(label="Error Log", lines=10, placeholder="Paste error log here...")
+                error_log = gr.Textbox(
+                    label="Error Log", lines=10, placeholder="Paste error log here..."
+                )
                 patch_preview = gr.Textbox(label="Patch Preview", lines=20, interactive=False)
                 apply_patch_btn = gr.Button("Apply Patch", variant="primary")
                 patch_status = gr.Textbox(label="Status", interactive=False)
 
-                def generate_patch(error_log_text: str, proj_path: Optional[str]):
+                def generate_patch(error_log_text: str, proj_path: str | None):
                     """パッチを生成"""
                     if not error_log_text or not proj_path:
                         return "No error log or project path", ""
@@ -94,7 +100,7 @@ def create_nexus_dashboard(project_id: Optional[int] = None, project_path: Optio
                     except Exception as e:
                         return "", f"Patch generation failed: {str(e)}"
 
-                def apply_patch(patch_text: str, proj_path: Optional[str]):
+                def apply_patch(patch_text: str, proj_path: str | None):
                     """パッチを適用"""
                     if not patch_text or not proj_path:
                         return "No patch or project path"
@@ -137,13 +143,14 @@ def create_nexus_dashboard(project_id: Optional[int] = None, project_path: Optio
                 test_output = gr.Textbox(label="Test Output", lines=20, interactive=False)
                 run_test_btn = gr.Button("Run Tests", variant="primary")
 
-                def run_tests(cmd: str, proj_path: Optional[str]):
+                def run_tests(cmd: str, proj_path: str | None):
                     """テストを実行"""
                     if not proj_path:
                         return "No project path specified"
 
                     try:
                         import subprocess
+
                         result = subprocess.run(
                             cmd.split(),
                             cwd=proj_path,
@@ -170,17 +177,21 @@ def create_nexus_dashboard(project_id: Optional[int] = None, project_path: Optio
                 history_display = gr.Textbox(label="History", lines=20, interactive=False)
                 refresh_btn = gr.Button("Refresh History")
 
-                def load_history(proj_id: Optional[int]):
+                def load_history(proj_id: int | None):
                     """履歴を読み込む"""
                     if not proj_id:
                         return "No project ID specified"
 
                     try:
-                        from nexuscore.webapp import db
-                        from nexuscore.webapp.models import Run, ExecutionLog, PatchRecord
+                        from nexuscore.webapp.models import Run
 
                         # 最新のRunを取得
-                        runs = Run.query.filter_by(project_id=proj_id).order_by(Run.created_at.desc()).limit(10).all()
+                        runs = (
+                            Run.query.filter_by(project_id=proj_id)
+                            .order_by(Run.created_at.desc())
+                            .limit(10)
+                            .all()
+                        )
 
                         history_text = "Recent Runs:\n\n"
                         for run in runs:
@@ -203,7 +214,9 @@ def create_nexus_dashboard(project_id: Optional[int] = None, project_path: Optio
     return app
 
 
-def launch_dashboard(project_id: Optional[int] = None, project_path: Optional[str] = None, server_port: int = 7860):
+def launch_dashboard(
+    project_id: int | None = None, project_path: str | None = None, server_port: int = 7860
+):
     """
     ダッシュボードを起動
 
@@ -218,7 +231,7 @@ def launch_dashboard(project_id: Optional[int] = None, project_path: Optional[st
 
 if __name__ == "__main__":
     import sys
+
     project_id = int(sys.argv[1]) if len(sys.argv) > 1 else None
     project_path = sys.argv[2] if len(sys.argv) > 2 else None
     launch_dashboard(project_id=project_id, project_path=project_path)
-

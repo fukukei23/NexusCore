@@ -12,22 +12,20 @@ Run レポート生成の包括的テスト
 - get_markdown_report_path: パス生成
 """
 
-import json
+from datetime import datetime
+from unittest.mock import Mock, patch
+
 import pytest
-from datetime import datetime, timedelta
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from collections import defaultdict
 
 from nexuscore.integration.run_report_generator import (
-    _format_duration,
-    _estimate_diff_lines,
     _collect_run_metrics,
-    _compute_recent_success_rate,
     _collect_test_results,
+    _compute_recent_success_rate,
+    _estimate_diff_lines,
+    _format_duration,
     generate_run_report_markdown,
-    write_run_report_file,
     get_markdown_report_path,
+    write_run_report_file,
 )
 
 
@@ -219,10 +217,7 @@ class TestCollectTestResults:
         mock_run = Mock(id=1)
 
         # 30件のログを作成
-        logs = [
-            Mock(level="ERROR", source="SANDBOX", message=f"Error {i}")
-            for i in range(30)
-        ]
+        logs = [Mock(level="ERROR", source="SANDBOX", message=f"Error {i}") for i in range(30)]
 
         mock_query = Mock()
         mock_query.filter_by.return_value.all.return_value = logs
@@ -289,7 +284,7 @@ class TestGenerateRunReportMarkdown:
             id=1,
             name="TestProject",
             repo_url="https://github.com/test/repo",
-            local_path="/path/to/project"
+            local_path="/path/to/project",
         )
 
         mock_run = Mock(
@@ -299,7 +294,7 @@ class TestGenerateRunReportMarkdown:
             started_at=datetime(2025, 1, 1, 10, 0, 0),
             finished_at=datetime(2025, 1, 1, 10, 5, 30),
             autonomy_level=2,
-            project=mock_project
+            project=mock_project,
         )
 
         mock_query = Mock()
@@ -325,10 +320,21 @@ class TestGenerateRunReportMarkdown:
         mock_patch_query.filter_by.return_value.all.return_value = [mock_patch]
 
         with patch("nexuscore.integration.run_report_generator.Run") as mock_run_cls:
-            with patch("nexuscore.integration.run_report_generator._collect_run_metrics", return_value=mock_metrics):
-                with patch("nexuscore.integration.run_report_generator._collect_test_results", return_value=mock_test_results):
-                    with patch("nexuscore.integration.run_report_generator._compute_recent_success_rate", return_value=0.85):
-                        with patch("nexuscore.integration.run_report_generator.PatchRecord") as mock_patch_cls:
+            with patch(
+                "nexuscore.integration.run_report_generator._collect_run_metrics",
+                return_value=mock_metrics,
+            ):
+                with patch(
+                    "nexuscore.integration.run_report_generator._collect_test_results",
+                    return_value=mock_test_results,
+                ):
+                    with patch(
+                        "nexuscore.integration.run_report_generator._compute_recent_success_rate",
+                        return_value=0.85,
+                    ):
+                        with patch(
+                            "nexuscore.integration.run_report_generator.PatchRecord"
+                        ) as mock_patch_cls:
                             mock_run_cls.query = mock_query
                             mock_patch_cls.query = mock_patch_query
 
@@ -382,7 +388,10 @@ class TestWriteRunReportFile:
         mock_markdown = "# Run Report: RUN-123\n\nTest content"
 
         with patch("nexuscore.integration.run_report_generator.Run") as mock_run_cls:
-            with patch("nexuscore.integration.run_report_generator.generate_run_report_markdown", return_value=mock_markdown):
+            with patch(
+                "nexuscore.integration.run_report_generator.generate_run_report_markdown",
+                return_value=mock_markdown,
+            ):
                 mock_run_cls.query = mock_query
 
                 result = write_run_report_file(1, base_dir=tmp_path)
@@ -406,7 +415,10 @@ class TestWriteRunReportFile:
         mock_markdown = "# Run Report"
 
         with patch("nexuscore.integration.run_report_generator.Run") as mock_run_cls:
-            with patch("nexuscore.integration.run_report_generator.generate_run_report_markdown", return_value=mock_markdown):
+            with patch(
+                "nexuscore.integration.run_report_generator.generate_run_report_markdown",
+                return_value=mock_markdown,
+            ):
                 with patch("pathlib.Path.write_text") as mock_write:
                     mock_run_cls.query = mock_query
 

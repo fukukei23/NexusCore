@@ -1,9 +1,8 @@
 """run_history.py のテスト"""
+
 import json
 import time
 from pathlib import Path
-
-import pytest
 
 from nexuscore.core.run_history import RunHistoryLogger, RunRecord
 
@@ -302,7 +301,7 @@ def test_log_run_handles_write_failure(tmp_path, monkeypatch):
 
     # 書き込みを失敗させる
     def mock_open(*args, **kwargs):
-        raise IOError("Disk full")
+        raise OSError("Disk full")
 
     monkeypatch.setattr("builtins.open", mock_open)
 
@@ -392,4 +391,3 @@ def test_load_runs_preserves_order(tmp_path):
     for i in range(5):
         assert records[i]["run_id"] == f"test-run-{i:03d}"
         assert records[i]["started_at"] == 1000.0 + i
-

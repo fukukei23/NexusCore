@@ -1,24 +1,31 @@
 """
 Celery タスクと JobStateMachine の統合テスト
 """
+
 from __future__ import annotations
 
-import tempfile
-import sys
 import importlib
-from unittest.mock import MagicMock, patch, Mock
-from datetime import datetime
+import sys
+import tempfile
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nexuscore.core.job_state_machine import JobStateMachine, PendingState, RunningState, CompletedState, FailedState
-from nexuscore.core.session_control import SessionController
+from nexuscore.core.job_state_machine import (
+    CompletedState,
+    FailedState,
+    JobStateMachine,
+    PendingState,
+    RunningState,
+)
 from nexuscore.core.run_history import RunHistoryLogger
+from nexuscore.core.session_control import SessionController
 
 # webapp モジュールが利用可能かどうかを確認
 try:
     from nexuscore.webapp import create_app, db
     from nexuscore.webapp.models import Project, Run
+
     HAS_WEBAPP = True
 except ImportError:
     HAS_WEBAPP = False
@@ -32,8 +39,8 @@ class TestCeleryTaskWithJobStateMachine:
         """Celery タスクが正常に状態遷移することを確認"""
         # パッチを適用する前に、モジュールを先にインポート
         # これにより、パッチが正しく適用される
-        import nexuscore.webapp.models
         import nexuscore.webapp.celery_app
+        import nexuscore.webapp.models
         import nexuscore.webapp.orchestrator_helper
 
         # パッチを関数内で適用（遅延パッチ）
@@ -41,10 +48,14 @@ class TestCeleryTaskWithJobStateMachine:
         # celery_app.py では `from nexuscore.webapp.models import Run, Project` とインポート
         # その後、`Run.query.get()` という形で使用される
         # db は `from nexuscore.webapp import db` でインポートされているため、nexuscore.webapp.db をパッチ
-        with patch.object(nexuscore.webapp.models, 'Run') as mock_run_class, \
-             patch.object(nexuscore.webapp.models, 'Project') as mock_project_class, \
-             patch('nexuscore.webapp.celery_app.db') as mock_db, \
-             patch.object(nexuscore.webapp.orchestrator_helper, 'run_orchestrator_sync') as mock_run_orchestrator_sync:
+        with (
+            patch.object(nexuscore.webapp.models, "Run") as mock_run_class,
+            patch.object(nexuscore.webapp.models, "Project") as mock_project_class,
+            patch("nexuscore.webapp.celery_app.db") as mock_db,
+            patch.object(
+                nexuscore.webapp.orchestrator_helper, "run_orchestrator_sync"
+            ) as mock_run_orchestrator_sync,
+        ):
 
             # モックの設定
             mock_run = MagicMock()
@@ -71,8 +82,8 @@ class TestCeleryTaskWithJobStateMachine:
             # Celery タスクをインポート（パッチ適用後）
             # パッチが適用された状態でインポートすることで、モックが使用される
             # モジュールを再読み込みしてパッチを反映
-            if 'nexuscore.webapp.celery_app' in sys.modules:
-                importlib.reload(sys.modules['nexuscore.webapp.celery_app'])
+            if "nexuscore.webapp.celery_app" in sys.modules:
+                importlib.reload(sys.modules["nexuscore.webapp.celery_app"])
             from nexuscore.webapp.celery_app import run_orchestrator_task
 
             # タスクを実行
@@ -88,16 +99,20 @@ class TestCeleryTaskWithJobStateMachine:
     def test_celery_task_state_transition_failure(self):
         """Celery タスクが失敗時に適切に状態遷移することを確認"""
         # パッチを適用する前に、モジュールを先にインポート
-        import nexuscore.webapp.models
         import nexuscore.webapp.celery_app
+        import nexuscore.webapp.models
         import nexuscore.webapp.orchestrator_helper
 
         # パッチを関数内で適用（遅延パッチ）
         # db は `from nexuscore.webapp import db` でインポートされているため、nexuscore.webapp.db をパッチ
-        with patch.object(nexuscore.webapp.models, 'Run') as mock_run_class, \
-             patch.object(nexuscore.webapp.models, 'Project') as mock_project_class, \
-             patch('nexuscore.webapp.celery_app.db') as mock_db, \
-             patch.object(nexuscore.webapp.orchestrator_helper, 'run_orchestrator_sync') as mock_run_orchestrator_sync:
+        with (
+            patch.object(nexuscore.webapp.models, "Run") as mock_run_class,
+            patch.object(nexuscore.webapp.models, "Project") as mock_project_class,
+            patch("nexuscore.webapp.celery_app.db") as mock_db,
+            patch.object(
+                nexuscore.webapp.orchestrator_helper, "run_orchestrator_sync"
+            ) as mock_run_orchestrator_sync,
+        ):
 
             # モックの設定
             mock_run = MagicMock()
@@ -126,8 +141,8 @@ class TestCeleryTaskWithJobStateMachine:
 
             # Celery タスクをインポート（パッチ適用後）
             # モジュールを再読み込みしてパッチを反映
-            if 'nexuscore.webapp.celery_app' in sys.modules:
-                importlib.reload(sys.modules['nexuscore.webapp.celery_app'])
+            if "nexuscore.webapp.celery_app" in sys.modules:
+                importlib.reload(sys.modules["nexuscore.webapp.celery_app"])
             from nexuscore.webapp.celery_app import run_orchestrator_task
 
             # タスクを実行
@@ -143,19 +158,21 @@ class TestCeleryTaskWithJobStateMachine:
     def test_celery_task_with_missing_run(self):
         """Run が見つからない場合の処理を確認"""
         # パッチを適用する前に、モジュールを先にインポート
-        import nexuscore.webapp.models
         import nexuscore.webapp.celery_app
+        import nexuscore.webapp.models
 
         # パッチを関数内で適用（遅延パッチ）
-        with patch.object(nexuscore.webapp.models, 'Run') as mock_run_class, \
-             patch.object(nexuscore.webapp.celery_app, 'db') as mock_db:
+        with (
+            patch.object(nexuscore.webapp.models, "Run") as mock_run_class,
+            patch.object(nexuscore.webapp.celery_app, "db") as mock_db,
+        ):
 
             mock_run_class.query.get.return_value = None
 
             # Celery タスクをインポート（パッチ適用後）
             # モジュールを再読み込みしてパッチを反映
-            if 'nexuscore.webapp.celery_app' in sys.modules:
-                importlib.reload(sys.modules['nexuscore.webapp.celery_app'])
+            if "nexuscore.webapp.celery_app" in sys.modules:
+                importlib.reload(sys.modules["nexuscore.webapp.celery_app"])
             from nexuscore.webapp.celery_app import run_orchestrator_task
 
             # タスクを実行（エラーが発生しないことを確認）
@@ -168,14 +185,16 @@ class TestCeleryTaskWithJobStateMachine:
     def test_celery_task_with_missing_requirement(self):
         """requirement が空の場合の処理を確認"""
         # パッチを適用する前に、モジュールを先にインポート
-        import nexuscore.webapp.models
         import nexuscore.webapp.celery_app
+        import nexuscore.webapp.models
 
         # パッチを関数内で適用（遅延パッチ）
         # db は `from nexuscore.webapp import db` でインポートされているため、nexuscore.webapp.db をパッチ
-        with patch.object(nexuscore.webapp.models, 'Run') as mock_run_class, \
-             patch.object(nexuscore.webapp.models, 'Project') as mock_project_class, \
-             patch('nexuscore.webapp.celery_app.db') as mock_db:
+        with (
+            patch.object(nexuscore.webapp.models, "Run") as mock_run_class,
+            patch.object(nexuscore.webapp.models, "Project") as mock_project_class,
+            patch("nexuscore.webapp.celery_app.db") as mock_db,
+        ):
 
             mock_run = MagicMock()
             mock_run.id = 3
@@ -192,10 +211,11 @@ class TestCeleryTaskWithJobStateMachine:
 
             # Celery タスクをインポート（パッチ適用後）
             # モジュールを再読み込みしてパッチを反映
-            if 'nexuscore.webapp.celery_app' in sys.modules:
-                importlib.reload(sys.modules['nexuscore.webapp.celery_app'])
+            if "nexuscore.webapp.celery_app" in sys.modules:
+                importlib.reload(sys.modules["nexuscore.webapp.celery_app"])
             # パッチを適用した後、モジュール内の db を直接置き換える
             import nexuscore.webapp.celery_app as celery_app_module
+
             celery_app_module.db = mock_db
 
             from nexuscore.webapp.celery_app import run_orchestrator_task
@@ -259,6 +279,7 @@ class TestJobStateMachineInCeleryContext:
 
             # 履歴が記録されていることを確認
             from pathlib import Path
+
             history_file = Path(tmpdir) / ".nexus" / "history" / "orchestrator.log.jsonl"
             assert history_file.exists()
 
@@ -290,11 +311,13 @@ class TestJobStateMachineInCeleryContext:
 
             # 履歴が記録されていることを確認
             from pathlib import Path
+
             history_file = Path(tmpdir) / ".nexus" / "history" / "orchestrator.log.jsonl"
             assert history_file.exists()
 
             # 履歴の内容を確認
             import json
+
             with history_file.open() as f:
                 lines = [line.strip() for line in f if line.strip()]
                 assert len(lines) == 1
@@ -311,7 +334,7 @@ class TestAsyncJobProcessing:
         # このテストは実際の Celery インスタンスが必要なため、簡略化
         # 実際の Celery タスクの登録は celery_app.py の初期化時に実行される
         try:
-            from nexuscore.webapp.celery_app import celery, _register_tasks
+
             # Celery が初期化されていれば、タスクが登録されていることを確認
             assert True  # インポートが成功すればOK
         except Exception:
@@ -340,12 +363,13 @@ class TestAsyncJobProcessing:
 
             # セッション状態が保存されていることを確認
             from pathlib import Path
+
             state_file = Path(tmpdir) / "test-session.state.json"
             assert state_file.exists()
 
             import json
+
             with state_file.open() as f:
                 state_data = json.load(f)
                 assert state_data["last_phase"] == "state_completed"
                 assert state_data["metadata"]["state"] == "completed"
-

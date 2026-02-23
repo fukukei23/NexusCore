@@ -6,13 +6,18 @@ tree_sitter_checker の最適化機能のテスト
 - タイムアウトとフェイルセーフのテスト
 """
 
-import pytest
-import time
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
+import pytest
 
 try:
-    from nexuscore.utils.tree_sitter_checker import SemanticAnalyzer, AnalysisResult, CONFIG, TREE_SITTER_AVAILABLE
+    from nexuscore.utils.tree_sitter_checker import (
+        CONFIG,
+        TREE_SITTER_AVAILABLE,
+        AnalysisResult,
+        SemanticAnalyzer,
+    )
 except ImportError:
     TREE_SITTER_AVAILABLE = False
     SemanticAnalyzer = AnalysisResult = CONFIG = None  # type: ignore[assignment]
@@ -31,19 +36,23 @@ def sample_project_dir(tmp_path: Path):
     project_dir.mkdir()
 
     # Python ファイルを複数作成
-    (project_dir / "main.py").write_text("""
+    (project_dir / "main.py").write_text(
+        """
 def hello():
     print("Hello, World!")
 
 class MyClass:
     def method(self):
         pass
-""")
+"""
+    )
 
-    (project_dir / "utils.py").write_text("""
+    (project_dir / "utils.py").write_text(
+        """
 def helper():
     return 42
-""")
+"""
+    )
 
     return project_dir
 
@@ -54,7 +63,7 @@ def analyzer():
     analyzer = SemanticAnalyzer(enable_cache=True)
     # パーサーをセットアップ（利用可能な場合のみ）
     try:
-        analyzer.setup_parsers(['python'])
+        analyzer.setup_parsers(["python"])
     except Exception:
         pytest.skip("Tree-sitter parser setup failed")
     return analyzer
@@ -78,24 +87,24 @@ class TestTreeSitterCheckerOptimized:
 
         # キャッシュヒットが記録されていることを確認
         stats = analyzer.get_profiling_stats()
-        assert stats['cache_hits'] > 0
-        assert stats['cache_misses'] > 0
+        assert stats["cache_hits"] > 0
+        assert stats["cache_misses"] > 0
 
     def test_profiling_stats(self, analyzer, sample_project_dir):
         """プロファイリング統計が記録されることを確認"""
         # プロファイリングを有効化
-        with patch.dict(CONFIG, {'enable_profiling': True}):
+        with patch.dict(CONFIG, {"enable_profiling": True}):
             results = analyzer.analyze_project(sample_project_dir)
 
             stats = analyzer.get_profiling_stats()
-            assert stats['total_files'] > 0
-            assert 'file_times' in stats
-            assert len(stats['file_times']) > 0
+            assert stats["total_files"] > 0
+            assert "file_times" in stats
+            assert len(stats["file_times"]) > 0
 
     def test_timeout_handling(self, analyzer, sample_project_dir):
         """タイムアウト処理が動作することを確認"""
         # タイムアウトを短く設定
-        with patch.dict(CONFIG, {'timeout_seconds': 0.001}):
+        with patch.dict(CONFIG, {"timeout_seconds": 0.001}):
             # 通常のファイルはタイムアウトしないはず
             result = analyzer.analyze_file(sample_project_dir / "main.py")
             # タイムアウトが発生してもエラーで落ちないことを確認
@@ -130,7 +139,7 @@ class TestTreeSitterCheckerOptimized:
         non_existent = tmp_path / "nonexistent.py"
         result = analyzer.analyze_file(non_existent)
         assert not result.success
-        assert 'error' in result.data
+        assert "error" in result.data
 
         # サポートされていない拡張子
         unsupported = tmp_path / "file.txt"
@@ -150,7 +159,7 @@ def test_tree_sitter_checker_smoke(sample_project_dir):
         pytest.skip(f"Tree-sitter not available: {msg}")
 
     # パーサーをセットアップ
-    if not analyzer.setup_parsers(['python']):
+    if not analyzer.setup_parsers(["python"]):
         pytest.skip("Parser setup failed")
 
     # プロジェクト解析を実行
@@ -162,4 +171,3 @@ def test_tree_sitter_checker_smoke(sample_project_dir):
     # 少なくとも1つのファイルが成功していることを確認
     successful = [r for r in results.values() if r.success]
     assert len(successful) > 0
-

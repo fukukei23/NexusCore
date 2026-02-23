@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
-from nexuscore.config.self_healing_config import SelfHealingConfig
-from nexuscore.core.session_control import SessionController
-from nexuscore.core.run_history import RunHistoryLogger
 from nexuscore.agents.patch_applier import PatchApplier
+from nexuscore.config.self_healing_config import SelfHealingConfig
+from nexuscore.core.run_history import RunHistoryLogger
+from nexuscore.core.session_control import SessionController
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +39,9 @@ except ImportError:
 
 
 def parse_pull_request_event(
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     config: SelfHealingConfig,
-) -> Optional[Tuple[str, int, str]]:
+) -> tuple[str, int, str] | None:
     """
     GitHub pull_request イベントから必要な情報を抜き出す。
 
@@ -99,11 +99,11 @@ def parse_pull_request_event(
 
 
 def format_pr_comment(
-    result: Dict[str, Any],
-    project_root: Optional[str] = None,
-    repo_full_name: Optional[str] = None,
-    pr_number: Optional[int] = None,
-    commit_sha: Optional[str] = None,  # CR-E3: 対象コミットの SHA
+    result: dict[str, Any],
+    project_root: str | None = None,
+    repo_full_name: str | None = None,
+    pr_number: int | None = None,
+    commit_sha: str | None = None,  # CR-E3: 対象コミットの SHA
 ) -> str:
     """
     Self-Healing の実行結果を GitHub PR コメント形式の Markdown に整形する。
@@ -145,6 +145,7 @@ def format_pr_comment(
     if not markdown_report and run_id != "N/A":
         try:
             from nexuscore.integration.github_pr_comment import load_run_markdown
+
             markdown_report = load_run_markdown(run_id)
         except Exception as e:
             logger.warning(f"Failed to load run markdown: {e}", exc_info=True)
@@ -266,11 +267,11 @@ def _init_self_healing_service(
 
 
 def github_webhook(
-    payload: Dict[str, Any],
-    project_root: Optional[str] = None,
-    event: Optional[str] = None,
-    delivery: Optional[str] = None,
-) -> Dict[str, Any]:
+    payload: dict[str, Any],
+    project_root: str | None = None,
+    event: str | None = None,
+    delivery: str | None = None,
+) -> dict[str, Any]:
     """
     GitHub pull_request Webhook を処理して Self-Healing を実行する。
 
@@ -335,8 +336,12 @@ def github_webhook(
                     details = result.get("details") or {}
 
                     # Guardian のコメント・ステータスを統合
-                    guardian_comment = guardian_result.get("comment") or guardian_result.get("message")
-                    guardian_status = guardian_result.get("status") or guardian_result.get("decision")
+                    guardian_comment = guardian_result.get("comment") or guardian_result.get(
+                        "message"
+                    )
+                    guardian_status = guardian_result.get("status") or guardian_result.get(
+                        "decision"
+                    )
 
                     if guardian_comment:
                         details["guardian_comment"] = guardian_comment
@@ -370,4 +375,3 @@ def github_webhook(
             "summary": f"Self-healing execution failed: {str(e)}",
             "details": {},
         }
-

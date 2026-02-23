@@ -6,10 +6,11 @@ WSL環境での出力取得問題の検証スクリプト。
 ログファイルに結果を書き込むことで、Cursorのrun_terminal_cmdでも結果を確認できる。
 """
 
+import os
 import subprocess
 import sys
-import os
 from datetime import datetime
+
 
 def main():
     log_file = "verify_output_fix.log"
@@ -23,10 +24,7 @@ def main():
         f.flush()
         try:
             result = subprocess.run(
-                ["echo", "Hello from WSL"],
-                capture_output=True,
-                text=True,
-                timeout=5
+                ["echo", "Hello from WSL"], capture_output=True, text=True, timeout=5
             )
             f.write(f"  終了コード: {result.returncode}\n")
             f.write(f"  出力: {result.stdout}\n")
@@ -40,11 +38,15 @@ def main():
         f.flush()
         try:
             result = subprocess.run(
-                [sys.executable, "-c", "print('Python test output'); import sys; sys.stdout.flush()"],
+                [
+                    sys.executable,
+                    "-c",
+                    "print('Python test output'); import sys; sys.stdout.flush()",
+                ],
                 capture_output=True,
                 text=True,
                 timeout=5,
-                env={**os.environ, "PYTHONUNBUFFERED": "1"}
+                env={**os.environ, "PYTHONUNBUFFERED": "1"},
             )
             f.write(f"  終了コード: {result.returncode}\n")
             f.write(f"  出力: {result.stdout}\n")
@@ -64,11 +66,11 @@ def main():
                     [sys.executable, script_path, "--help"],
                     capture_output=True,
                     text=True,
-                    timeout=5
+                    timeout=5,
                 )
                 f.write(f"  終了コード: {result.returncode}\n")
                 if result.stdout:
-                    f.write(f"  出力（最初の5行）:\n")
+                    f.write("  出力（最初の5行）:\n")
                     for line in result.stdout.split("\n")[:5]:
                         f.write(f"    {line}\n")
             except Exception as e:
@@ -84,9 +86,9 @@ def main():
         if os.path.exists(script_path):
             f.write(f"  ✓ スクリプトが存在します: {script_path}\n")
             if os.access(script_path, os.X_OK):
-                f.write(f"  ✓ 実行権限があります\n")
+                f.write("  ✓ 実行権限があります\n")
             else:
-                f.write(f"  ✗ 実行権限がありません\n")
+                f.write("  ✗ 実行権限がありません\n")
         else:
             f.write(f"  ✗ スクリプトが見つかりません: {script_path}\n")
         f.flush()
@@ -96,7 +98,7 @@ def main():
 
     # ログファイルの内容を標準出力にも表示（可能な場合）
     try:
-        with open(log_file, "r", encoding="utf-8") as f:
+        with open(log_file, encoding="utf-8") as f:
             content = f.read()
             # 標準出力に出力を試みる（WSL環境では表示されない可能性がある）
             print(content, flush=True)
@@ -106,6 +108,6 @@ def main():
     print(f"\n✅ 検証結果をログファイルに保存しました: {log_file}", flush=True)
     return 0
 
+
 if __name__ == "__main__":
     sys.exit(main())
-

@@ -4,9 +4,10 @@ Projects API Contract Tests
 CR-NEXUS-040: Projects API のレスポンス shape を契約として固定するテスト。
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
 from nexuscore.api.fastapi_app import app
 
@@ -28,11 +29,13 @@ def mock_api_key(monkeypatch):
 @pytest.fixture
 def mock_db_models():
     """データベースモデルをモック"""
-    with patch("nexuscore.webapp.models.Project") as mock_project_model, \
-         patch("nexuscore.webapp.models.Run") as mock_run_model, \
-         patch("nexuscore.webapp.models.User") as mock_user_model, \
-         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.webapp.db") as mock_db:
+    with (
+        patch("nexuscore.webapp.models.Project") as mock_project_model,
+        patch("nexuscore.webapp.models.Run") as mock_run_model,
+        patch("nexuscore.webapp.models.User") as mock_user_model,
+        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.webapp.db") as mock_db,
+    ):
 
         mock_user = MagicMock()
         mock_user.id = 1
@@ -77,7 +80,9 @@ def test_get_projects_response_shape(client: TestClient, mock_api_key, mock_db_m
 
     with patch("nexuscore.api.routes.projects.desc", side_effect=mock_desc):
         mock_query = MagicMock()
-        mock_query.filter_by.return_value.order_by.return_value.all.return_value = [mock_db_models["project"]]
+        mock_query.filter_by.return_value.order_by.return_value.all.return_value = [
+            mock_db_models["project"]
+        ]
         mock_db_models["Project"].query = mock_query
 
         headers = {"X-API-Key": mock_api_key}
@@ -105,7 +110,9 @@ def test_get_latest_run_response_shape_with_run(client: TestClient, mock_api_key
     """
     from datetime import datetime
 
-    mock_db_models["Project"].query.filter_by.return_value.first.return_value = mock_db_models["project"]
+    mock_db_models["Project"].query.filter_by.return_value.first.return_value = mock_db_models[
+        "project"
+    ]
 
     mock_run = MagicMock()
     mock_run.id = 1
@@ -140,12 +147,16 @@ def test_get_latest_run_response_shape_with_run(client: TestClient, mock_api_key
         assert "status" in data["run"]
 
 
-def test_get_latest_run_response_shape_without_run(client: TestClient, mock_api_key, mock_db_models):
+def test_get_latest_run_response_shape_without_run(
+    client: TestClient, mock_api_key, mock_db_models
+):
     """
     GET /api/v1/projects/{project_id}/runs/latest の成功レスポンス shape を検証（run なし）
     Contract: トップレベルに "run" キーを持ち、run が null であること
     """
-    mock_db_models["Project"].query.filter_by.return_value.first.return_value = mock_db_models["project"]
+    mock_db_models["Project"].query.filter_by.return_value.first.return_value = mock_db_models[
+        "project"
+    ]
 
     with patch("nexuscore.api.routes.projects.desc") as mock_desc:
         mock_desc.return_value = MagicMock()
@@ -268,4 +279,3 @@ def test_projects_openapi_schema_includes_response_model(client: TestClient):
 
     json_content_latest = content_latest["application/json"]
     assert "schema" in json_content_latest
-

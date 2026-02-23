@@ -5,6 +5,7 @@ webapp/auth_api.py の高品質なテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側の認証テストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask legacy auth_api tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -48,6 +49,7 @@ def client(app):
 def db_session(app):
     """Database session for tests"""
     from nexuscore.webapp import db
+
     with app.app_context():
         yield db.session
 
@@ -174,7 +176,9 @@ class TestResolveUserFromApiKey:
 class TestApiKeyRequired:
     """api_key_required() デコレータのテスト"""
 
-    def test_api_key_required_allows_valid_key_in_header(self, app, client, test_user, test_api_key):
+    def test_api_key_required_allows_valid_key_in_header(
+        self, app, client, test_user, test_api_key
+    ):
         """有効な API キーが X-Api-Key ヘッダにある場合アクセスを許可"""
         from nexuscore.webapp.auth_api import api_key_required
 
@@ -189,10 +193,7 @@ class TestApiKeyRequired:
 
         app.register_blueprint(test_bp)
 
-        response = client.get(
-            "/test",
-            headers={"X-Api-Key": test_api_key}
-        )
+        response = client.get("/test", headers={"X-Api-Key": test_api_key})
 
         assert response.status_code == 200
         data = response.get_json()
@@ -232,10 +233,7 @@ class TestApiKeyRequired:
 
         app.register_blueprint(test_bp)
 
-        response = client.get(
-            "/test3",
-            headers={"X-Api-Key": "invalid_key"}
-        )
+        response = client.get("/test3", headers={"X-Api-Key": "invalid_key"})
 
         assert response.status_code == 401
         data = response.get_json()
@@ -261,7 +259,9 @@ class TestApiKeyRequired:
         data = response.get_json()
         assert "error" in data
 
-    def test_api_key_required_prefers_header_over_query(self, app, client, db_session, test_user, test_api_key):
+    def test_api_key_required_prefers_header_over_query(
+        self, app, client, db_session, test_user, test_api_key
+    ):
         """ヘッダーとクエリパラメータの両方がある場合ヘッダーを優先"""
         from nexuscore.webapp.auth_api import api_key_required
 
@@ -285,15 +285,14 @@ class TestApiKeyRequired:
         app.register_blueprint(test_bp)
 
         # ヘッダーに有効なキー、クエリに無効なキー
-        response = client.get(
-            f"/test5?api_key=invalid_key",
-            headers={"X-Api-Key": test_api_key}
-        )
+        response = client.get("/test5?api_key=invalid_key", headers={"X-Api-Key": test_api_key})
 
         # ヘッダーが優先されるので成功
         assert response.status_code == 200
 
-    def test_api_key_required_sets_current_api_user_in_g(self, app, client, test_user, test_api_key):
+    def test_api_key_required_sets_current_api_user_in_g(
+        self, app, client, test_user, test_api_key
+    ):
         """api_key_required が g.current_api_user をセットする"""
         from nexuscore.webapp.auth_api import api_key_required
 
@@ -309,10 +308,7 @@ class TestApiKeyRequired:
 
         app.register_blueprint(test_bp)
 
-        response = client.get(
-            "/test6",
-            headers={"X-Api-Key": test_api_key}
-        )
+        response = client.get("/test6", headers={"X-Api-Key": test_api_key})
 
         assert response.status_code == 200
 

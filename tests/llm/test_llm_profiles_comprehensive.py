@@ -3,6 +3,7 @@ Comprehensive tests for llm/llm_profiles.py
 
 LLMプロファイルレジストリとヘルパー関数のテスト
 """
+
 import pytest
 
 from nexuscore.llm.llm_profiles import (
@@ -20,9 +21,7 @@ from nexuscore.llm.llm_profiles import (
 class TestLLMProfile:
     def test_profile_creation_minimal(self):
         """最小限のパラメータでプロファイル作成"""
-        profile = LLMProfile(
-            name="test_profile", provider="openai", model="gpt-4"
-        )
+        profile = LLMProfile(name="test_profile", provider="openai", model="gpt-4")
 
         assert profile.name == "test_profile"
         assert profile.provider == "openai"
@@ -48,18 +47,14 @@ class TestLLMProfile:
 
     def test_profile_is_frozen(self):
         """frozenデータクラスのため変更不可"""
-        profile = LLMProfile(
-            name="test", provider="openai", model="gpt-4"
-        )
+        profile = LLMProfile(name="test", provider="openai", model="gpt-4")
 
         with pytest.raises(Exception):  # FrozenInstanceError
             profile.name = "new_name"  # type: ignore
 
     def test_profile_default_temperature(self):
         """デフォルトtemperatureは0.2"""
-        profile = LLMProfile(
-            name="test", provider="openai", model="gpt-4"
-        )
+        profile = LLMProfile(name="test", provider="openai", model="gpt-4")
 
         assert profile.default_temperature == 0.2
 

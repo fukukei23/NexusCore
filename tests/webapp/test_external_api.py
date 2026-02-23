@@ -5,6 +5,7 @@
 CR-FASTAPI-010 でこれらのファイルが削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask API (api_external.py, api_badges.py) は削除済み
@@ -12,18 +13,20 @@ import pytest
 pytest.skip(
     "Flask API (api_external.py, api_badges.py) has been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
 @pytest.fixture
 def app():
     """テスト用 Flask アプリケーション"""
-    app = create_app({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "SECRET_KEY": "test-secret-key",
-    })
+    app = create_app(
+        {
+            "TESTING": True,
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+            "SECRET_KEY": "test-secret-key",
+        }
+    )
 
     with app.app_context():
         db.create_all()
@@ -57,6 +60,7 @@ def test_api_key(app, test_user):
     """テスト用 API キー"""
     with app.app_context():
         from nexuscore.webapp.models import ApiKey
+
         raw_token = ApiKey.generate_token()
         token_hash = ApiKey.hash_token(raw_token)
 
@@ -98,10 +102,7 @@ def test_list_projects_with_valid_api_key(client, test_user, test_api_key, test_
     """有効な API キーでプロジェクト一覧を取得できる"""
     raw_token, _ = test_api_key
 
-    response = client.get(
-        "/api/v1/projects",
-        headers={"X-Api-Key": raw_token}
-    )
+    response = client.get("/api/v1/projects", headers={"X-Api-Key": raw_token})
 
     assert response.status_code == 200
     data = response.get_json()
@@ -113,10 +114,7 @@ def test_list_projects_with_valid_api_key(client, test_user, test_api_key, test_
 
 def test_list_projects_with_invalid_api_key(client):
     """無効な API キーでプロジェクト一覧を取得すると 401 が返る"""
-    response = client.get(
-        "/api/v1/projects",
-        headers={"X-Api-Key": "invalid-token"}
-    )
+    response = client.get("/api/v1/projects", headers={"X-Api-Key": "invalid-token"})
 
     assert response.status_code == 401
     data = response.get_json()
@@ -128,9 +126,7 @@ def test_trigger_run_without_requirement(client, test_user, test_api_key, test_p
     raw_token, _ = test_api_key
 
     response = client.post(
-        f"/api/v1/projects/{test_project.id}/run",
-        headers={"X-Api-Key": raw_token},
-        json={}
+        f"/api/v1/projects/{test_project.id}/run", headers={"X-Api-Key": raw_token}, json={}
     )
 
     assert response.status_code == 400
@@ -153,7 +149,7 @@ def test_trigger_run_with_valid_request(client, test_user, test_api_key, test_pr
                 "requirement": "Test requirement",
                 "autonomy_level": 2,
                 "fast_lane": True,
-            }
+            },
         )
 
         # Celery が有効な場合は 202、無効な場合は 200 または 500
@@ -171,7 +167,7 @@ def test_trigger_run_with_nonexistent_project(client, test_user, test_api_key):
     response = client.post(
         "/api/v1/projects/999/run",
         headers={"X-Api-Key": raw_token},
-        json={"requirement": "Test requirement"}
+        json={"requirement": "Test requirement"},
     )
 
     assert response.status_code == 404
@@ -185,8 +181,9 @@ def test_get_latest_run(client, test_user, test_api_key, test_project):
     raw_token, _ = test_api_key
 
     with client.application.app_context():
-        from nexuscore.webapp.models import Run
         from datetime import datetime
+
+        from nexuscore.webapp.models import Run
 
         run = Run(
             project_id=test_project.id,
@@ -200,8 +197,7 @@ def test_get_latest_run(client, test_user, test_api_key, test_project):
         db.session.commit()
 
     response = client.get(
-        f"/api/v1/projects/{test_project.id}/runs/latest",
-        headers={"X-Api-Key": raw_token}
+        f"/api/v1/projects/{test_project.id}/runs/latest", headers={"X-Api-Key": raw_token}
     )
 
     assert response.status_code == 200
@@ -217,12 +213,10 @@ def test_get_latest_run_no_runs(client, test_user, test_api_key, test_project):
     raw_token, _ = test_api_key
 
     response = client.get(
-        f"/api/v1/projects/{test_project.id}/runs/latest",
-        headers={"X-Api-Key": raw_token}
+        f"/api/v1/projects/{test_project.id}/runs/latest", headers={"X-Api-Key": raw_token}
     )
 
     assert response.status_code == 200
     data = response.get_json()
     assert "run" in data
     assert data["run"] is None
-
