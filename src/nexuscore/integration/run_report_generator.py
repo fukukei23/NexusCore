@@ -12,14 +12,15 @@ import logging
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 # Webapp モデルはオプショナルインポート
 try:
-    from nexuscore.webapp.models import Run, Project, PatchRecord, ExecutionLog
     from nexuscore.webapp import db
+    from nexuscore.webapp.models import ExecutionLog, PatchRecord, Project, Run
+
     HAS_WEBAPP = True
 except ImportError:
     HAS_WEBAPP = False
@@ -34,6 +35,7 @@ try:
     from nexuscore.config.config import AppConfig
 except ImportError:
     import os
+
     class AppConfig:  # type: ignore
         WEBAPP_BASE_URL = os.getenv("WEBAPP_BASE_URL", "http://localhost:5000")
 
@@ -72,10 +74,11 @@ def _estimate_diff_lines(diff_text: str) -> int:
     return count
 
 
-def _collect_run_metrics(run: Run) -> Dict[str, Any]:
+def _collect_run_metrics(run: Run) -> dict[str, Any]:
     """Run からメトリクスを収集する（github_pr_comment.py の関数を再利用）"""
     try:
         from nexuscore.integration.github_pr_comment import _collect_run_metrics as _collect_metrics
+
         return _collect_metrics(run)
     except ImportError:
         # フォールバック: 自前で実装
@@ -117,7 +120,11 @@ def _collect_run_metrics(run: Run) -> Dict[str, Any]:
                 model = payload.get("model") or payload.get("model_name") or "unknown"
                 models[model] += 1
 
-                cost = payload.get("estimated_cost") or payload.get("cost_jpy") or payload.get("usage", {}).get("cost_jpy", 0.0)
+                cost = (
+                    payload.get("estimated_cost")
+                    or payload.get("cost_jpy")
+                    or payload.get("usage", {}).get("cost_jpy", 0.0)
+                )
                 try:
                     total_cost += float(cost)
                 except Exception:
@@ -137,7 +144,10 @@ def _collect_run_metrics(run: Run) -> Dict[str, Any]:
 def _compute_recent_success_rate(project_id: int, limit: int = 30) -> float:
     """過去N回の成功率を計算する（github_pr_comment.py の関数を再利用）"""
     try:
-        from nexuscore.integration.github_pr_comment import _compute_recent_success_rate as _compute_rate
+        from nexuscore.integration.github_pr_comment import (
+            _compute_recent_success_rate as _compute_rate,
+        )
+
         return _compute_rate(project_id, limit)
     except ImportError:
         # フォールバック: 自前で実装
@@ -146,9 +156,9 @@ def _compute_recent_success_rate(project_id: int, limit: int = 30) -> float:
 
         try:
             from sqlalchemy import desc
+
             q = (
-                Run.query
-                .filter(Run.project_id == project_id)
+                Run.query.filter(Run.project_id == project_id)
                 .order_by(desc(Run.started_at))
                 .limit(limit)
             )
@@ -164,7 +174,7 @@ def _compute_recent_success_rate(project_id: int, limit: int = 30) -> float:
             return 0.0
 
 
-def _collect_test_results(run: Run) -> Dict[str, Any]:
+def _collect_test_results(run: Run) -> dict[str, Any]:
     """テスト結果を収集する"""
     if not HAS_WEBAPP or not ExecutionLog:
         return {
@@ -217,11 +227,11 @@ def generate_run_report_markdown(run_db_id: int) -> str:
         return "# Run Report\n\nWebapp models not available.\n"
 
     try:
-        run: Optional[Run] = Run.query.get(run_db_id)
+        run: Run | None = Run.query.get(run_db_id)
         if not run:
             return f"# Run Report\n\nRun not found: ID={run_db_id}\n"
 
-        project: Optional[Project] = run.project
+        project: Project | None = run.project
         if not project:
             return f"# Run Report\n\nProject not found for Run ID={run_db_id}\n"
 
@@ -240,14 +250,18 @@ def generate_run_report_markdown(run_db_id: int) -> str:
         models_str_lines = []
         for model, count in metrics["model_call_counts"].items():
             models_str_lines.append(f"- `{model}`: {count} calls")
-        models_str = "\n".join(models_str_lines) if models_str_lines else "- (no LLM calls recorded)"
+        models_str = (
+            "\n".join(models_str_lines) if models_str_lines else "- (no LLM calls recorded)"
+        )
 
         # パッチファイル一覧
         patch_files_list = []
         try:
             patches = PatchRecord.query.filter_by(run_id=run.id).all()
             for p in patches:
-                patch_files_list.append(f"- `{p.file_path}` ({'applied' if p.applied else 'not applied'})")
+                patch_files_list.append(
+                    f"- `{p.file_path}` ({'applied' if p.applied else 'not applied'})"
+                )
         except Exception:
             pass
 
@@ -326,7 +340,7 @@ def generate_run_report_markdown(run_db_id: int) -> str:
         return f"# Run Report\n\nError generating report: {e}\n"
 
 
-def write_run_report_file(run_db_id: int, base_dir: Optional[Path] = None) -> Path:
+def write_run_report_file(run_db_id: int, base_dir: Path | None = None) -> Path:
     """
     docs/run_reports/RUN_{run_id}.md に Markdown を書き出し、ファイルパスを返す。
 
@@ -341,7 +355,7 @@ def write_run_report_file(run_db_id: int, base_dir: Optional[Path] = None) -> Pa
         raise RuntimeError("Webapp models not available")
 
     try:
-        run: Optional[Run] = Run.query.get(run_db_id)
+        run: Run | None = Run.query.get(run_db_id)
         if not run:
             raise ValueError(f"Run not found: ID={run_db_id}")
 
@@ -372,7 +386,7 @@ def write_run_report_file(run_db_id: int, base_dir: Optional[Path] = None) -> Pa
         raise
 
 
-def get_markdown_report_path(run_id: str, base_dir: Optional[Path] = None) -> Path:
+def get_markdown_report_path(run_id: str, base_dir: Path | None = None) -> Path:
     """
     Run レポートの Markdown ファイルパスを返す。
 
@@ -395,4 +409,3 @@ def get_markdown_report_path(run_id: str, base_dir: Optional[Path] = None) -> Pa
     # ファイル名
     filename = f"RUN_{run_id}.md"
     return reports_dir / filename
-

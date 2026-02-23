@@ -3,7 +3,7 @@ Tests for NPE (Non-Prompt Exposure) policy scanner and secure context builder
 
 機密情報検出・マスキング機能の正確性を保証するテスト群
 """
-import pytest
+
 from src.nexuscore.npe.policies import context_scanner, secure_context_builder
 
 
@@ -130,14 +130,18 @@ class TestSecureContextBuilder:
         code = "AWS_ACCESS_KEY_ID = 'AKIAIOSFODNN7EXAMPLE'"
         masked = secure_context_builder(code)
         assert "AKIAIOSFODNN7EXAMPLE" not in masked, "Original AWS key should be masked"
-        assert "[REDACTED_AWS_KEY_BY_NPE]" in masked, "AWS key should be replaced with redaction marker"
+        assert (
+            "[REDACTED_AWS_KEY_BY_NPE]" in masked
+        ), "AWS key should be replaced with redaction marker"
 
     def test_masks_aws_asia_keys(self):
         """AWS ASIA キーをマスキングするテスト"""
         code = "session_token = 'ASIATESTACCESSKEY123'"
         masked = secure_context_builder(code)
         assert "ASIATESTACCESSKEY123" not in masked, "Original ASIA key should be masked"
-        assert "[REDACTED_AWS_KEY_BY_NPE]" in masked, "ASIA key should be replaced with redaction marker"
+        assert (
+            "[REDACTED_AWS_KEY_BY_NPE]" in masked
+        ), "ASIA key should be replaced with redaction marker"
 
     def test_masks_api_key_env_var(self):
         """API_KEY環境変数をマスキングするテスト"""
@@ -200,7 +204,9 @@ Full key content here...
 -----END PRIVATE KEY-----"""
         masked = secure_context_builder(code)
         assert "MIIEvQIBADANBgkqhkiG9" not in masked, "PKCS#8 key content should be masked"
-        assert "[REDACTED_PEM_BY_NPE]" in masked, "PKCS#8 key should be replaced with redaction marker"
+        assert (
+            "[REDACTED_PEM_BY_NPE]" in masked
+        ), "PKCS#8 key should be replaced with redaction marker"
         assert "-----BEGIN PRIVATE KEY-----" in masked, "PEM header should be preserved"
 
     def test_masks_email_addresses(self):

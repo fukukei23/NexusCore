@@ -10,16 +10,16 @@ from __future__ import annotations
 import logging
 import random
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from typing import Any
 
 from nexuscore.core.errors import (
+    InvalidModelOutputError,
+    ModelConnectionError,
     ModelRateLimitError,
     ModelTimeoutError,
-    ModelConnectionError,
-    InvalidModelOutputError,
+    PatchApplyError,
     SandboxExecutionError,
     SandboxSecurityError,
-    PatchApplyError,
     UnexpectedSystemError,
 )
 
@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RetryDecision:
     """Retry 判断結果"""
+
     action: str  # "retry" | "abort" | "skip"
     reason: str  # 判断理由
     wait_seconds: float  # 次回試行までの待機時間（秒）
@@ -78,7 +79,9 @@ DECISION_TABLE = {
 }
 
 
-def _calculate_exponential_backoff(attempt: int, base: float = 2.0, jitter_max: float = 1.0) -> float:
+def _calculate_exponential_backoff(
+    attempt: int, base: float = 2.0, jitter_max: float = 1.0
+) -> float:
     """
     Exponential Backoff + Jitter を計算する。
 
@@ -90,7 +93,7 @@ def _calculate_exponential_backoff(attempt: int, base: float = 2.0, jitter_max: 
     Returns:
         待機時間（秒）
     """
-    wait_time = (base ** attempt) + random.uniform(0, jitter_max)
+    wait_time = (base**attempt) + random.uniform(0, jitter_max)
     return wait_time
 
 
@@ -108,9 +111,7 @@ def _calculate_linear_backoff(base_interval: float) -> float:
 
 
 def decide_retry(
-    error: Exception,
-    attempt: int,
-    context: Optional[Dict[str, Any]] = None
+    error: Exception, attempt: int, context: dict[str, Any] | None = None
 ) -> RetryDecision:
     """
     例外に対する Retry / Abort / Skip を判断する。
@@ -147,7 +148,7 @@ def decide_retry(
             action="abort",
             reason=f"Unknown exception type: {error_type.__name__}",
             wait_seconds=0.0,
-            should_retry=False
+            should_retry=False,
         )
 
     max_attempts = config["max_attempts"]
@@ -163,20 +164,17 @@ def decide_retry(
             action="abort",
             reason=f"Max attempts ({max_attempts}) exceeded",
             wait_seconds=0.0,
-            should_retry=False
+            should_retry=False,
         )
 
     # Step 3: Max Attempts が 0 の場合は即座に Abort
     if max_attempts == 0:
-        logger.warning(
-            f"Immediate abort for {error_type.__name__}. "
-            f"Error: {str(error)[:200]}"
-        )
+        logger.warning(f"Immediate abort for {error_type.__name__}. " f"Error: {str(error)[:200]}")
         return RetryDecision(
             action="abort",
             reason=f"{error_type.__name__} is not retryable (max_attempts=0)",
             wait_seconds=0.0,
-            should_retry=False
+            should_retry=False,
         )
 
     # Step 4: Backoff 戦略に従って待機時間を計算
@@ -205,5 +203,5 @@ def decide_retry(
         action="retry",
         reason=f"Retryable exception (attempt {attempt}/{max_attempts})",
         wait_seconds=wait_seconds,
-        should_retry=True
+        should_retry=True,
     )

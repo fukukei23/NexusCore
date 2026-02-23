@@ -15,6 +15,7 @@ exclude = """
   | data
   | logs
   | tmp
+  | src/sandbox_logs
 )/
 """
 line-length = 100
@@ -37,6 +38,7 @@ extend-exclude = [
   "data",
   "logs",
   "tmp",
+  "src/sandbox_logs",
 ]
 
 [tool.ruff.lint]

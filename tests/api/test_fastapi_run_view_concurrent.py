@@ -5,12 +5,12 @@ FastAPI RunView API 並行実行テスト (CR-NEXUS-030).
 """
 
 import json
-import pytest
 import threading
 import time
-from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
 from nexuscore.api.fastapi_app import app
 
@@ -33,9 +33,11 @@ def mock_api_key(monkeypatch):
 @pytest.fixture
 def mock_db_models():
     """データベースモデルをモック（認証用）"""
-    with patch("nexuscore.webapp.models.User") as mock_user, \
-         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.webapp.db") as mock_db:
+    with (
+        patch("nexuscore.webapp.models.User") as mock_user,
+        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.webapp.db") as mock_db,
+    ):
         # API Key認証のモック
         mock_user_obj = MagicMock()
         mock_user_obj.id = 1
@@ -113,7 +115,9 @@ def test_resume_run_view_concurrent_same_run_id(
 
     def mock_resume_run(run_id_param: str, *, orchestrator_factory=None):
         # Verify orchestrator_factory is provided (API route should always provide it)
-        assert orchestrator_factory is not None, "orchestrator_factory should be provided by API route"
+        assert (
+            orchestrator_factory is not None
+        ), "orchestrator_factory should be provided by API route"
 
         # Call factory to create orchestrator instance (even if we don't use it, it verifies isolation)
         if orchestrator_factory:
@@ -135,6 +139,7 @@ def test_resume_run_view_concurrent_same_run_id(
             else:
                 # Second call: CONFLICT (lock already held)
                 from nexuscore.orchestrator.explainability import build_explainability
+
                 return {
                     "status": "CONFLICT",
                     "run_id": run_id_param,
@@ -155,16 +160,20 @@ def test_resume_run_view_concurrent_same_run_id(
                 headers={"X-API-Key": mock_api_key},
             )
             with results_lock:
-                results.append({
-                    "status_code": response.status_code,
-                    "data": response.json(),
-                })
+                results.append(
+                    {
+                        "status_code": response.status_code,
+                        "data": response.json(),
+                    }
+                )
         except Exception as e:
             with results_lock:
                 results.append({"error": str(e)})
 
-    with patch("nexuscore.api.routes.run_view.get_orchestrator", side_effect=mock_get_orchestrator), \
-         patch("nexuscore.orchestrator.authority_runner.resume_run", side_effect=mock_resume_run):
+    with (
+        patch("nexuscore.api.routes.run_view.get_orchestrator", side_effect=mock_get_orchestrator),
+        patch("nexuscore.orchestrator.authority_runner.resume_run", side_effect=mock_resume_run),
+    ):
         # Launch two concurrent requests
         thread1 = threading.Thread(target=make_request)
         thread2 = threading.Thread(target=make_request)
@@ -188,7 +197,9 @@ def test_resume_run_view_concurrent_same_run_id(
 
     # Verify orchestrator instances are unique (if multiple were created)
     if len(factory_call_tracker) >= 2:
-        assert len(factory_call_tracker) == len(set(factory_call_tracker)), "Orchestrator instances should be unique"
+        assert len(factory_call_tracker) == len(
+            set(factory_call_tracker)
+        ), "Orchestrator instances should be unique"
 
 
 def test_resume_run_view_concurrent_different_run_ids(
@@ -253,17 +264,21 @@ def test_resume_run_view_concurrent_different_run_ids(
                 headers={"X-API-Key": mock_api_key},
             )
             with results_lock:
-                results.append({
-                    "run_id": run_id,
-                    "status_code": response.status_code,
-                    "data": response.json(),
-                })
+                results.append(
+                    {
+                        "run_id": run_id,
+                        "status_code": response.status_code,
+                        "data": response.json(),
+                    }
+                )
         except Exception as e:
             with results_lock:
                 results.append({"run_id": run_id, "error": str(e)})
 
-    with patch("nexuscore.api.routes.run_view.get_orchestrator", side_effect=mock_get_orchestrator), \
-         patch("nexuscore.orchestrator.authority_runner.resume_run", side_effect=mock_resume_run):
+    with (
+        patch("nexuscore.api.routes.run_view.get_orchestrator", side_effect=mock_get_orchestrator),
+        patch("nexuscore.orchestrator.authority_runner.resume_run", side_effect=mock_resume_run),
+    ):
         # Launch two concurrent requests with different run_ids
         thread1 = threading.Thread(target=make_request, args=(run_id1,))
         thread2 = threading.Thread(target=make_request, args=(run_id2,))
@@ -284,4 +299,3 @@ def test_resume_run_view_concurrent_different_run_ids(
     assert len(orchestrator_instances) >= 2
     instance_ids = [o.instance_id for o in orchestrator_instances]
     assert len(instance_ids) == len(set(instance_ids)), "Orchestrator instances should be unique"
-

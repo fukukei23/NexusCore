@@ -18,9 +18,9 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
-from typing import TypeVar, Optional, Any, Dict
+from typing import Any, TypeVar
 
-from nexuscore.core.errors import classify_error, NexusCoreError
+from nexuscore.core.errors import NexusCoreError, classify_error
 from nexuscore.logging_standard import get_logger
 
 logger = get_logger(__name__)
@@ -30,6 +30,7 @@ T = TypeVar("T")
 
 class BackoffStrategy(Enum):
     """Backoff 戦略の意味論レベル定義（3.3.3）"""
+
     INCREASING_LONG = "increasing_long"  # 増加型待機戦略（長）
     INCREASING_MEDIUM = "increasing_medium"  # 増加型待機戦略（中）
     INCREASING_SHORT = "increasing_short"  # 増加型待機戦略（短）
@@ -49,11 +50,12 @@ class RetryConfig:
         backoff_multiplier: 増加型戦略の係数（設定可能、デフォルトは実装詳細）
         strategy_map: エラー種別ごとの Backoff 戦略マッピング
     """
+
     max_retries: int = 3
     base_delay: float = 1.0
     fixed_delay: float = 1.0
     backoff_multiplier: float = 2.0
-    strategy_map: Dict[str, BackoffStrategy] = None
+    strategy_map: dict[str, BackoffStrategy] = None
 
     def __post_init__(self):
         """デフォルトの戦略マッピングを設定"""
@@ -73,12 +75,13 @@ class RetryContext:
     各試行で retry_count と error_class を記録し、
     最終的に details に反映するために使用する。
     """
+
     def __init__(self) -> None:
         self.retry_count: int = 0
-        self.last_error_class: Optional[str] = None
+        self.last_error_class: str | None = None
         self.error_summary: list[str] = []
 
-    def record_attempt(self, attempt: int, error: Optional[Exception] = None) -> None:
+    def record_attempt(self, attempt: int, error: Exception | None = None) -> None:
         """
         試行を記録する。
 
@@ -93,7 +96,7 @@ class RetryContext:
             self.last_error_class = error_class
             self.error_summary.append(f"Attempt {attempt}: {error_class} - {str(error)[:100]}")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         details に追加するための辞書を返す。
 
@@ -121,11 +124,7 @@ def _is_retryable(error_class: str) -> bool:
     return error_class in retryable_categories
 
 
-def _calculate_backoff_delay(
-    attempt: int,
-    error_class: str,
-    config: RetryConfig
-) -> float:
+def _calculate_backoff_delay(attempt: int, error_class: str, config: RetryConfig) -> float:
     """
     Backoff 戦略に基づいて待機時間を計算（3.3.3）
 
@@ -145,13 +144,17 @@ def _calculate_backoff_delay(
     elif strategy == BackoffStrategy.FIXED:
         # 一定待機戦略
         return config.fixed_delay
-    elif strategy in (BackoffStrategy.INCREASING_LONG, BackoffStrategy.INCREASING_MEDIUM, BackoffStrategy.INCREASING_SHORT):
+    elif strategy in (
+        BackoffStrategy.INCREASING_LONG,
+        BackoffStrategy.INCREASING_MEDIUM,
+        BackoffStrategy.INCREASING_SHORT,
+    ):
         # 増加型待機戦略（長/中/短の違いは base_delay の初期値で調整）
         # 意味論レベル: リトライ回数の増加に応じて、待機時間を段階的に延長
-        return config.base_delay * (config.backoff_multiplier ** attempt)
+        return config.base_delay * (config.backoff_multiplier**attempt)
     else:
         # フォールバック: 増加型（中）
-        return config.base_delay * (config.backoff_multiplier ** attempt)
+        return config.base_delay * (config.backoff_multiplier**attempt)
 
 
 def retry_with_context(
@@ -159,10 +162,10 @@ def retry_with_context(
     *,
     max_retries: int = 3,
     base_delay: float = 1.0,
-    retry_on: Optional[Iterable[type[Exception]]] = None,
-    logger_instance: Optional[Any] = None,  # logging.Logger の型ヒントを避ける
-    context: Optional[RetryContext] = None,
-    retry_config: Optional[RetryConfig] = None,
+    retry_on: Iterable[type[Exception]] | None = None,
+    logger_instance: Any | None = None,  # logging.Logger の型ヒントを避ける
+    context: RetryContext | None = None,
+    retry_config: RetryConfig | None = None,
 ) -> Callable[..., T]:
     """
     指定した例外クラスに対して、Spec CR-NEXUS-051 に準拠した再試行を提供するデコレータ。
@@ -201,10 +204,11 @@ def retry_with_context(
     retry_on_tuple: tuple[type[Exception], ...]
     if retry_on is None:
         from nexuscore.core.errors import (
+            ModelConnectionError,
             ModelRateLimitError,
             ModelTimeoutError,
-            ModelConnectionError,
         )
+
         retry_on_tuple = (ModelRateLimitError, ModelTimeoutError, ModelConnectionError)
     else:
         # Iterable を tuple に変換
@@ -212,7 +216,7 @@ def retry_with_context(
 
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> T:
-        last_exception: Optional[Exception] = None
+        last_exception: Exception | None = None
 
         # 3.3.2 SHALL要件: リトライの有限性保証
         # max_retries は RetryConfig から取得し、無限ループを防止
@@ -240,7 +244,12 @@ def retry_with_context(
                         if error_class == "unexpected":
                             should_retry = False
                         # 3.3.1: retryable: rate_limit, timeout, connection, invalid_output
-                        elif error_class in ("rate_limit", "timeout", "connection", "invalid_output"):
+                        elif error_class in (
+                            "rate_limit",
+                            "timeout",
+                            "connection",
+                            "invalid_output",
+                        ):
                             should_retry = True
                         # 3.3.1: non-retryable: sandbox, patch_apply
                         else:
@@ -252,7 +261,12 @@ def retry_with_context(
                         if error_class == "unexpected":
                             should_retry = False
                         # 3.3.1: retryable: rate_limit, timeout, connection, invalid_output
-                        elif error_class in ("rate_limit", "timeout", "connection", "invalid_output"):
+                        elif error_class in (
+                            "rate_limit",
+                            "timeout",
+                            "connection",
+                            "invalid_output",
+                        ):
                             should_retry = True
                         else:
                             should_retry = False
@@ -301,13 +315,13 @@ def retry_with_context(
 
 
 def retry(
-    func: Optional[Callable[..., T]] = None,
+    func: Callable[..., T] | None = None,
     *,
     max_retries: int = 3,
     base_delay: float = 1.0,
-    retry_on: Optional[Iterable[type[Exception]]] = None,
-    logger_instance: Optional[Any] = None,  # logging.Logger の型ヒントを避ける
-    retry_config: Optional[RetryConfig] = None,
+    retry_on: Iterable[type[Exception]] | None = None,
+    logger_instance: Any | None = None,  # logging.Logger の型ヒントを避ける
+    retry_config: RetryConfig | None = None,
 ) -> Callable[..., T] | Callable[[Callable[..., T]], Callable[..., T]]:
     """
     デコレータとして使用する場合の簡易版。
@@ -339,6 +353,7 @@ def retry(
                 logger_instance=logger_instance,
                 retry_config=retry_config,
             )
+
         return decorator  # type: ignore[return-value]
     else:
         # 関数を直接渡された場合

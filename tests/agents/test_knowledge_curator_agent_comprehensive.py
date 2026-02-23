@@ -8,13 +8,12 @@ Comprehensive Tests for KnowledgeCuratorAgent
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
-import pytest
+
 import tempfile
-import os
-import json
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock, call
-import logging
+from unittest.mock import Mock, patch
+
+import pytest
 
 from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
 
@@ -49,17 +48,20 @@ def temp_project_dir():
 
         # ソースファイル
         source_file = src_dir / "calculator.py"
-        source_file.write_text("""
+        source_file.write_text(
+            """
 def add(a, b):
     return a + b
 
 def subtract(a, b):
     return a - b  # Bug: should be a - b but returns a + b
-""")
+"""
+        )
 
         # テストファイル
         test_file = tests_dir / "test_calculator.py"
-        test_file.write_text("""
+        test_file.write_text(
+            """
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -71,7 +73,8 @@ def test_add():
 
 def test_subtract():
     assert subtract(5, 3) == 2  # This will fail with the bug
-""")
+"""
+        )
 
         yield {
             "project_path": tmpdir,
@@ -130,7 +133,13 @@ class TestValidateFkbSuggestion:
     @patch("nexuscore.agents.knowledge_curator_agent.DebuggerAgent")
     @patch("nexuscore.agents.knowledge_curator_agent.PatchApplier")
     def test_validate_with_successful_fix(
-        self, mock_patch_applier_class, mock_debugger_class, curator_agent, temp_project_dir, fkb_suggestion, test_output
+        self,
+        mock_patch_applier_class,
+        mock_debugger_class,
+        curator_agent,
+        temp_project_dir,
+        fkb_suggestion,
+        test_output,
     ):
         """成功するFKB提案の検証"""
         # DebuggerAgentのモック
@@ -162,7 +171,13 @@ class TestValidateFkbSuggestion:
     @patch("nexuscore.agents.knowledge_curator_agent.DebuggerAgent")
     @patch("nexuscore.agents.knowledge_curator_agent.PatchApplier")
     def test_validate_with_debugger_no_patch(
-        self, mock_patch_applier_class, mock_debugger_class, curator_agent, temp_project_dir, fkb_suggestion, test_output
+        self,
+        mock_patch_applier_class,
+        mock_debugger_class,
+        curator_agent,
+        temp_project_dir,
+        fkb_suggestion,
+        test_output,
     ):
         """DebuggerAgentがパッチを生成しない場合"""
         mock_debugger = Mock()
@@ -182,7 +197,13 @@ class TestValidateFkbSuggestion:
     @patch("nexuscore.agents.knowledge_curator_agent.DebuggerAgent")
     @patch("nexuscore.agents.knowledge_curator_agent.PatchApplier")
     def test_validate_with_patch_application_failure(
-        self, mock_patch_applier_class, mock_debugger_class, curator_agent, temp_project_dir, fkb_suggestion, test_output
+        self,
+        mock_patch_applier_class,
+        mock_debugger_class,
+        curator_agent,
+        temp_project_dir,
+        fkb_suggestion,
+        test_output,
     ):
         """パッチ適用に失敗した場合"""
         mock_debugger = Mock()
@@ -206,7 +227,13 @@ class TestValidateFkbSuggestion:
     @patch("nexuscore.agents.knowledge_curator_agent.DebuggerAgent")
     @patch("nexuscore.agents.knowledge_curator_agent.PatchApplier")
     def test_validate_with_tests_still_failing(
-        self, mock_patch_applier_class, mock_debugger_class, curator_agent, temp_project_dir, fkb_suggestion, test_output
+        self,
+        mock_patch_applier_class,
+        mock_debugger_class,
+        curator_agent,
+        temp_project_dir,
+        fkb_suggestion,
+        test_output,
     ):
         """パッチ適用後もテストが失敗する場合"""
         mock_debugger = Mock()
@@ -218,7 +245,9 @@ class TestValidateFkbSuggestion:
         mock_patch_applier_class.return_value = mock_patcher
 
         # テストが失敗する
-        with patch.object(curator_agent, "_run_tests_in_sandbox", return_value=(False, "Tests failed")):
+        with patch.object(
+            curator_agent, "_run_tests_in_sandbox", return_value=(False, "Tests failed")
+        ):
             result = curator_agent.validate_fkb_suggestion(
                 suggestion=fkb_suggestion,
                 original_project_path=temp_project_dir["project_path"],
@@ -249,7 +278,13 @@ class TestValidateFkbSuggestion:
     @patch("nexuscore.agents.knowledge_curator_agent.DebuggerAgent")
     @patch("nexuscore.agents.knowledge_curator_agent.PatchApplier")
     def test_validate_creates_temporary_fkb(
-        self, mock_patch_applier_class, mock_debugger_class, curator_agent, temp_project_dir, fkb_suggestion, test_output
+        self,
+        mock_patch_applier_class,
+        mock_debugger_class,
+        curator_agent,
+        temp_project_dir,
+        fkb_suggestion,
+        test_output,
     ):
         """一時的なFKBファイルが作成されることを確認"""
         mock_debugger = Mock()
@@ -278,7 +313,13 @@ class TestValidateFkbSuggestion:
     @patch("nexuscore.agents.knowledge_curator_agent.DebuggerAgent")
     @patch("nexuscore.agents.knowledge_curator_agent.PatchApplier")
     def test_validate_with_missing_source_file(
-        self, mock_patch_applier_class, mock_debugger_class, curator_agent, temp_project_dir, fkb_suggestion, test_output
+        self,
+        mock_patch_applier_class,
+        mock_debugger_class,
+        curator_agent,
+        temp_project_dir,
+        fkb_suggestion,
+        test_output,
     ):
         """ソースファイルが見つからない場合（サンドボックス内）"""
         mock_debugger = Mock()
@@ -308,10 +349,12 @@ class TestRunTestsInSandbox:
         """テストが成功する場合"""
         with tempfile.TemporaryDirectory() as tmpdir:
             test_file = Path(tmpdir) / "test_simple.py"
-            test_file.write_text("""
+            test_file.write_text(
+                """
 def test_always_pass():
     assert True
-""")
+"""
+            )
 
             passed, output = curator_agent._run_tests_in_sandbox(tmpdir, "test_simple.py")
 
@@ -322,10 +365,12 @@ def test_always_pass():
         """テストが失敗する場合"""
         with tempfile.TemporaryDirectory() as tmpdir:
             test_file = Path(tmpdir) / "test_fail.py"
-            test_file.write_text("""
+            test_file.write_text(
+                """
 def test_always_fail():
     assert False, "This test always fails"
-""")
+"""
+            )
 
             passed, output = curator_agent._run_tests_in_sandbox(tmpdir, "test_fail.py")
 
@@ -336,11 +381,13 @@ def test_always_fail():
         """構文エラーがある場合"""
         with tempfile.TemporaryDirectory() as tmpdir:
             test_file = Path(tmpdir) / "test_syntax_error.py"
-            test_file.write_text("""
+            test_file.write_text(
+                """
 def test_syntax_error(
     # Missing closing parenthesis
     assert True
-""")
+"""
+            )
 
             passed, output = curator_agent._run_tests_in_sandbox(tmpdir, "test_syntax_error.py")
 
@@ -365,7 +412,12 @@ class TestIntegrationScenarios:
     @patch("nexuscore.agents.knowledge_curator_agent.DebuggerAgent")
     @patch("nexuscore.agents.knowledge_curator_agent.PatchApplier")
     def test_full_validation_workflow(
-        self, mock_patch_applier_class, mock_debugger_class, curator_agent, temp_project_dir, test_output
+        self,
+        mock_patch_applier_class,
+        mock_debugger_class,
+        curator_agent,
+        temp_project_dir,
+        test_output,
     ):
         """完全な検証ワークフロー"""
         suggestion = {
@@ -384,7 +436,9 @@ class TestIntegrationScenarios:
         mock_patcher.apply.return_value = True
         mock_patch_applier_class.return_value = mock_patcher
 
-        with patch.object(curator_agent, "_run_tests_in_sandbox", return_value=(True, "All tests passed")):
+        with patch.object(
+            curator_agent, "_run_tests_in_sandbox", return_value=(True, "All tests passed")
+        ):
             result = curator_agent.validate_fkb_suggestion(
                 suggestion=suggestion,
                 original_project_path=temp_project_dir["project_path"],
@@ -402,7 +456,13 @@ class TestIntegrationScenarios:
     @patch("nexuscore.agents.knowledge_curator_agent.DebuggerAgent")
     @patch("nexuscore.agents.knowledge_curator_agent.PatchApplier")
     def test_sandbox_isolation(
-        self, mock_patch_applier_class, mock_debugger_class, curator_agent, temp_project_dir, fkb_suggestion, test_output
+        self,
+        mock_patch_applier_class,
+        mock_debugger_class,
+        curator_agent,
+        temp_project_dir,
+        fkb_suggestion,
+        test_output,
     ):
         """サンドボックスの分離が機能することを確認"""
         original_file_content = Path(temp_project_dir["source_file"]).read_text()

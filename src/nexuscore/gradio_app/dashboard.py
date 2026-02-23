@@ -22,16 +22,18 @@ from __future__ import annotations
 
 # --- Matplotlib を Tk 非依存化（Gradio と相性◎） ------------------------------
 import os
+
 os.environ.setdefault("MPLBACKEND", "Agg")
 import matplotlib
+
 matplotlib.use("Agg")
 import atexit
 
 # -----------------------------------------------------------------------------
 import json
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
-from datetime import datetime, timedelta, date
+from typing import Any
 
 import gradio as gr
 import matplotlib.pyplot as plt
@@ -54,6 +56,7 @@ PATCH_HISTORY_DIRS = [
     PROJECT_ROOT / "src" / "src" / "nexuscore" / "gradio_app" / "patch_history",
 ]
 
+
 # ====== ユーティリティ =========================================================
 def _parse_ts(ts: str) -> datetime:
     for fmt in ("%Y%m%d_%H%M%S", "%Y-%m-%d %H:%M:%S"):
@@ -63,21 +66,24 @@ def _parse_ts(ts: str) -> datetime:
             pass
     return datetime(1970, 1, 1)
 
-def _read_json(f: Path) -> Dict[str, Any]:
+
+def _read_json(f: Path) -> dict[str, Any]:
     try:
         return json.loads(f.read_text(encoding="utf-8"))
     except Exception:
         return {}
 
-def _collect_files() -> List[Path]:
+
+def _collect_files() -> list[Path]:
     """patch_history ディレクトリを探索し、patch_*.json を新しい順に返す。"""
-    files: List[Path] = []
+    files: list[Path] = []
     for d in PATCH_HISTORY_DIRS:
         if d.exists():
             files.extend(d.glob("patch_*.json"))
     return sorted(files, key=lambda p: p.stem, reverse=True)
 
-def _load_items(limit: int | None, date_filter: str) -> List[Dict[str, Any]]:
+
+def _load_items(limit: int | None, date_filter: str) -> list[dict[str, Any]]:
     """ファイル群からフィルタを適用し、タイムラインエントリを返す。"""
     files = _collect_files()
     if limit:
@@ -93,7 +99,7 @@ def _load_items(limit: int | None, date_filter: str) -> List[Dict[str, Any]]:
     else:
         start = datetime(1970, 1, 1)
 
-    items: List[Dict[str, Any]] = []
+    items: list[dict[str, Any]] = []
     for f in files:
         data = _read_json(f)
         ts = data.get("timestamp") or f.stem.replace("patch_", "")
@@ -102,14 +108,17 @@ def _load_items(limit: int | None, date_filter: str) -> List[Dict[str, Any]]:
             items.append(data)
     return sorted(items, key=lambda x: x.get("timestamp", ""), reverse=True)
 
+
 # ====== カテゴリ判定（repair_timeline と揃える軽量版） =========================
-_RULES: List[Tuple[str, List[str]]] = [
+_RULES: list[tuple[str, list[str]]] = [
     ("境界値/特例", ["n=0", "n=1", "n=2", "edge", "boundary", "off-by-one", "<= 2", "< 2"]),
     ("アルゴリズム/計算量", ["two pointers", "binary search", "O(", "while i * i"]),
     ("I/O・パス・環境", ["path", "windows", "encoding", "permission", "ENV"]),
     ("テスト修正/品質", ["test", "pytest", "assert", "fixture"]),
     ("設計/仕様", ["spec", "仕様", "contract", "interface"]),
 ]
+
+
 def _categorize(text: str) -> str:
     t = (text or "").lower()
     for name, keys in _RULES:
@@ -120,8 +129,9 @@ def _categorize(text: str) -> str:
         return "境界値/特例"
     return "不明"
 
+
 # ====== 集計 ===================================================================
-def _metrics(items: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _metrics(items: list[dict[str, Any]]) -> dict[str, Any]:
     """集計メトリクス。戻り値は dashboard/repair_timeline で共有する dict 構造。"""
     total = len(items)
     success = sum(1 for x in items if (x.get("status") or "").startswith("success"))
@@ -135,7 +145,7 @@ def _metrics(items: List[Dict[str, Any]]) -> Dict[str, Any]:
     # 連勝/連敗（新→旧）
     streak_win = streak_lose = 0
     for x in items:
-        st = (x.get("status") or "")
+        st = x.get("status") or ""
         if st.startswith("success"):
             if streak_lose == 0:
                 streak_win += 1
@@ -153,16 +163,16 @@ def _metrics(items: List[Dict[str, Any]]) -> Dict[str, Any]:
     avg_attempts = attempts / max(1, success)
 
     # カテゴリ分布
-    cats: Dict[str, int] = {}
+    cats: dict[str, int] = {}
     for x in items:
         c = _categorize(x.get("reason", "") or x.get("summary", ""))
         cats[c] = cats.get(c, 0) + 1
 
     # 日次推移
-    by_day: Dict[date, Dict[str, int]] = {}
+    by_day: dict[date, dict[str, int]] = {}
     for x in items:
         d = _parse_ts(x.get("timestamp", "")).date()
-        st = (x.get("status") or "")
+        st = x.get("status") or ""
         bucket = by_day.setdefault(d, {"success": 0, "attempt": 0, "initial": 0})
         if st.startswith("success"):
             bucket["success"] += 1
@@ -185,8 +195,9 @@ def _metrics(items: List[Dict[str, Any]]) -> Dict[str, Any]:
         "by_day": dict(sorted(by_day.items(), key=lambda kv: kv[0])),
     }
 
+
 # ====== 図作成 =================================================================
-def _make_cat_plot(cats: Dict[str, int]):
+def _make_cat_plot(cats: dict[str, int]):
     fig, ax = plt.subplots(figsize=(4, 3))
     if not cats:
         ax.text(0.5, 0.5, "カテゴリデータなし", ha="center", va="center")
@@ -198,7 +209,8 @@ def _make_cat_plot(cats: Dict[str, int]):
     ax.set_title("修正理由カテゴリ構成")
     return fig
 
-def _make_daily_plot(by_day: Dict[date, Dict[str, int]]):
+
+def _make_daily_plot(by_day: dict[date, dict[str, int]]):
     fig, ax = plt.subplots(figsize=(6, 3))
     if not by_day:
         ax.text(0.5, 0.5, "日次データなし", ha="center", va="center")
@@ -217,6 +229,7 @@ def _make_daily_plot(by_day: Dict[date, Dict[str, int]]):
     fig.autofmt_xdate()
     return fig
 
+
 # ====== UI ====================================================================
 def build_ui():
     with gr.Blocks(title="NexusCore — Self-Healing Dashboard", theme=gr.themes.Soft()) as demo:
@@ -234,7 +247,9 @@ def build_ui():
                     label="対象期間 / 件数",
                 )
                 reload_btn = gr.Button("🔁 再集計", variant="secondary")
-                link_tl = gr.Markdown("[➡ Repair Timeline を開く](http://127.0.0.1:7861)", visible=True)
+                link_tl = gr.Markdown(
+                    "[➡ Repair Timeline を開く](http://127.0.0.1:7861)", visible=True
+                )
                 srcs = gr.Markdown("")
 
             with gr.Column(scale=2):
@@ -309,8 +324,10 @@ def build_ui():
 
     return demo
 
+
 def main():
     import os
+
     port = int(os.getenv("NEXUS_DASHBOARD_PORT", "7860"))
     share = os.getenv("NEXUS_DASHBOARD_SHARE", "0") == "1"
     demo = build_ui()
@@ -319,9 +336,10 @@ def main():
         server_name="127.0.0.1",
         server_port=port,
         share=share,
-        prevent_thread_lock=False,   # ← ここがポイント
+        prevent_thread_lock=False,  # ← ここがポイント
         inbrowser=False,
     )
+
 
 if __name__ == "__main__":
     main()

@@ -9,14 +9,13 @@ MutationTesterAgent: Tier 2品質ゲートの実装
 """
 # from __future__ import annotations  # mutmut パーサーとの互換性のためコメントアウト
 
-import subprocess
 import re
-import json
-import tempfile
 import shutil
-from pathlib import Path
-from typing import Dict, Any, List
+import subprocess
+import tempfile
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
 from nexuscore.agents.base_agent import BaseAgent
 
@@ -34,17 +33,19 @@ class MutationTestTimeoutError(MutationTestError):
 @dataclass
 class Mutant:
     """生き残ったミュータント（バグ）の情報"""
+
     file_path: str
     line_number: int
-    mutator: str          # 変異の種類 (例: "BinaryOperator", "ConditionalOperator")
+    mutator: str  # 変異の種類 (例: "BinaryOperator", "ConditionalOperator")
     original_code: str
     mutated_code: str
-    status: str           # "survived", "killed", "timeout", "suspicious"
+    status: str  # "survived", "killed", "timeout", "suspicious"
 
 
 @dataclass
 class MutationReport:
     """Tier 2 品質ゲートの結果レポート"""
+
     passed: bool
     mutation_score: float
     total_mutants: int
@@ -53,10 +54,10 @@ class MutationReport:
     timeout: int
     suspicious: int
 
-    survived_mutants: List[Mutant] = field(default_factory=list)
+    survived_mutants: list[Mutant] = field(default_factory=list)
     feedback: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """MutationReportを辞書形式に変換"""
         return {
             "passed": self.passed,
@@ -66,7 +67,7 @@ class MutationReport:
             "survived": self.survived,
             "timeout": self.timeout,
             "suspicious": self.suspicious,
-            "survived_count": len(self.survived_mutants)
+            "survived_count": len(self.survived_mutants),
         }
 
 
@@ -94,8 +95,8 @@ class MutationTesterAgent(BaseAgent):
         self,
         source_path: str,
         test_path: str,
-        constitution: Dict[str, Any],
-        timeout_per_test: int = 10
+        constitution: dict[str, Any],
+        timeout_per_test: int = 10,
     ) -> MutationReport:
         """
         ミューテーションテストを実行
@@ -131,10 +132,10 @@ class MutationTesterAgent(BaseAgent):
                 suspicious=0,
                 survived_mutants=[],
                 feedback="❌ Tier 2品質ゲート実行エラー\n\n"
-                        "ミューテーションテストがタイムアウトしました (600秒)。\n"
-                        "テスト実行時間が長すぎる可能性があります。\n"
-                        "- テストの実行時間を確認してください\n"
-                        "- 無限ループや遅い処理がないか確認してください"
+                "ミューテーションテストがタイムアウトしました (600秒)。\n"
+                "テスト実行時間が長すぎる可能性があります。\n"
+                "- テストの実行時間を確認してください\n"
+                "- 無限ループや遅い処理がないか確認してください",
             )
         except MutationTestError as e:
             # その他のエラー時の処理
@@ -149,12 +150,12 @@ class MutationTesterAgent(BaseAgent):
                 suspicious=0,
                 survived_mutants=[],
                 feedback=f"❌ Tier 2品質ゲート実行エラー\n\n"
-                        f"ミューテーションテストの実行に失敗しました。\n"
-                        f"エラー詳細: {str(e)}\n\n"
-                        f"考えられる原因:\n"
-                        f"- mutmutがインストールされていない\n"
-                        f"- テストパスが正しくない\n"
-                        f"- ソースコードに構文エラーがある"
+                f"ミューテーションテストの実行に失敗しました。\n"
+                f"エラー詳細: {str(e)}\n\n"
+                f"考えられる原因:\n"
+                f"- mutmutがインストールされていない\n"
+                f"- テストパスが正しくない\n"
+                f"- ソースコードに構文エラーがある",
             )
 
         # Step 2: 結果パース
@@ -171,11 +172,7 @@ class MutationTesterAgent(BaseAgent):
         survived_mutants = self._get_survived_mutants() if survived > 0 else []
 
         # Step 4: フィードバック生成
-        feedback = self._generate_feedback(
-            survived_mutants,
-            mutation_score,
-            min_mutation_score
-        )
+        feedback = self._generate_feedback(survived_mutants, mutation_score, min_mutation_score)
 
         return MutationReport(
             passed=passed,
@@ -186,15 +183,10 @@ class MutationTesterAgent(BaseAgent):
             timeout=timeout,
             suspicious=suspicious,
             survived_mutants=survived_mutants,
-            feedback=feedback
+            feedback=feedback,
         )
 
-    def _run_mutmut(
-        self,
-        source_path: str,
-        test_path: str,
-        timeout: int
-    ) -> Dict[str, int]:
+    def _run_mutmut(self, source_path: str, test_path: str, timeout: int) -> dict[str, int]:
         """
         mutmut v3.4.0を実行して結果を取得
 
@@ -215,7 +207,7 @@ class MutationTesterAgent(BaseAgent):
                 "tool": {
                     "mutmut": {
                         "paths_to_mutate": [source_path],
-                        "runner": f"python -m pytest {test_path} -x --tb=no -q"
+                        "runner": f"python -m pytest {test_path} -x --tb=no -q",
                     }
                 }
             }
@@ -235,7 +227,7 @@ class MutationTesterAgent(BaseAgent):
                 text=True,
                 timeout=600,  # 全体のタイムアウト: 10分
                 check=False,
-                cwd=temp_dir
+                cwd=temp_dir,
             )
 
             # 結果パース
@@ -262,7 +254,7 @@ class MutationTesterAgent(BaseAgent):
             except Exception as e:  # pylint: disable=broad-exception-caught
                 self.logger.warning("一時ディレクトリ削除失敗: %s", e)
 
-    def _parse_mutmut_output(self, output: str) -> Dict[str, int]:
+    def _parse_mutmut_output(self, output: str) -> dict[str, int]:
         """
         mutmut の出力をパース（v2.x/v3.x 両対応）
 
@@ -282,13 +274,7 @@ class MutationTesterAgent(BaseAgent):
             🫥 = skipped
             🔇 = muted
         """
-        result = {
-            "total": 0,
-            "killed": 0,
-            "survived": 0,
-            "timeout": 0,
-            "suspicious": 0
-        }
+        result = {"total": 0, "killed": 0, "survived": 0, "timeout": 0, "suspicious": 0}
 
         # まず v3.x の絵文字ベースのパターンを試す
         emoji_patterns = {
@@ -296,7 +282,7 @@ class MutationTesterAgent(BaseAgent):
             "killed": r"🎉\s*(\d+)",
             "survived": r"🙁\s*(\d+)",
             "timeout": r"⏰\s*(\d+)",
-            "suspicious": r"🤔\s*(\d+)"
+            "suspicious": r"🤔\s*(\d+)",
         }
 
         emoji_found = False
@@ -313,7 +299,7 @@ class MutationTesterAgent(BaseAgent):
                 "killed": r"Killed:\s*(\d+)",
                 "survived": r"Survived:\s*(\d+)",
                 "timeout": r"Timeout:\s*(\d+)",
-                "suspicious": r"Suspicious:\s*(\d+)"
+                "suspicious": r"Suspicious:\s*(\d+)",
             }
 
             for key, pattern in text_patterns.items():
@@ -324,15 +310,12 @@ class MutationTesterAgent(BaseAgent):
         # totalが見つからない場合、killed + survived + timeout + suspicious
         if result["total"] == 0:
             result["total"] = (
-                result["killed"] +
-                result["survived"] +
-                result["timeout"] +
-                result["suspicious"]
+                result["killed"] + result["survived"] + result["timeout"] + result["suspicious"]
             )
 
         return result
 
-    def _get_survived_mutants(self) -> List[Mutant]:
+    def _get_survived_mutants(self) -> list[Mutant]:
         """
         生き残ったミュータントの詳細を取得
 
@@ -340,10 +323,7 @@ class MutationTesterAgent(BaseAgent):
         """
         try:
             result = subprocess.run(
-                ["mutmut", "results"],
-                capture_output=True,
-                text=True,
-                check=False
+                ["mutmut", "results"], capture_output=True, text=True, check=False
             )
 
             return self._parse_survived_mutants(result.stdout)
@@ -352,7 +332,7 @@ class MutationTesterAgent(BaseAgent):
             self.logger.error("ミュータント詳細取得エラー: %s", e)
             return []
 
-    def _parse_survived_mutants(self, output: str) -> List[Mutant]:
+    def _parse_survived_mutants(self, output: str) -> list[Mutant]:
         """
         mutmut resultsの出力をパース
 
@@ -369,12 +349,12 @@ class MutationTesterAgent(BaseAgent):
         mutants = []
 
         # 簡易実装: 実際のmutmut出力に合わせて調整が必要
-        lines = output.split('\n')
+        lines = output.split("\n")
         current_mutant = None
 
         for line in lines:
             # ファイル:行番号のパターン
-            match = re.match(r'(\d+)\.\s+(.+?):(\d+)', line)
+            match = re.match(r"(\d+)\.\s+(.+?):(\d+)", line)
             if match:
                 if current_mutant:
                     mutants.append(current_mutant)
@@ -385,7 +365,7 @@ class MutationTesterAgent(BaseAgent):
                     mutator="Unknown",
                     original_code="",
                     mutated_code="",
-                    status="survived"
+                    status="survived",
                 )
 
             # from/toのパターン
@@ -400,10 +380,7 @@ class MutationTesterAgent(BaseAgent):
         return mutants
 
     def _generate_feedback(
-        self,
-        survived_mutants: List[Mutant],
-        mutation_score: float,
-        min_score: float
+        self, survived_mutants: list[Mutant], mutation_score: float, min_score: float
     ) -> str:
         """
         TesterAgentへの具体的なフィードバックを生成
@@ -415,7 +392,7 @@ class MutationTesterAgent(BaseAgent):
             "❌ Tier 2品質ゲート不合格",
             f"ミューテーションスコア: {mutation_score:.1f}% < {min_score}% (最低基準)\n",
             f"以下の{len(survived_mutants)}個のミュータントが生き残りました。",
-            "テストを追加してバグ検出能力を向上させてください。\n"
+            "テストを追加してバグ検出能力を向上させてください。\n",
         ]
 
         for i, mutant in enumerate(survived_mutants[:10], 1):  # 最初の10個のみ

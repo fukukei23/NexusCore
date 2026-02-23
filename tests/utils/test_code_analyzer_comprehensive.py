@@ -3,22 +3,20 @@ Comprehensive tests for code_analyzer module.
 Covers all functions, data classes, and edge cases.
 """
 
-import pytest
 import json
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
-from nexuscore.utils.code_analyzer import (
-    SecurityIssue,
-    QualityReport,
-    run_pylint,
-    run_mypy,
-    run_bandit,
-    run_pytest_cov,
-    analyze_code_quality,
-    _parse_bandit_issues,
-    _generate_feedback,
-)
+from unittest.mock import Mock, patch
 
+from nexuscore.utils.code_analyzer import (
+    QualityReport,
+    SecurityIssue,
+    _generate_feedback,
+    _parse_bandit_issues,
+    analyze_code_quality,
+    run_bandit,
+    run_mypy,
+    run_pylint,
+    run_pytest_cov,
+)
 
 # ==============================================================================
 # Data Class Tests
@@ -35,7 +33,7 @@ class TestSecurityIssue:
             confidence="MEDIUM",
             issue_text="SQL injection vulnerability",
             filename="app.py",
-            line_number=42
+            line_number=42,
         )
 
         assert issue.severity == "HIGH"
@@ -47,11 +45,7 @@ class TestSecurityIssue:
     def test_security_issue_defaults(self):
         """SecurityIssue can be created with minimal fields"""
         issue = SecurityIssue(
-            severity="LOW",
-            confidence="LOW",
-            issue_text="Test",
-            filename="test.py",
-            line_number=1
+            severity="LOW", confidence="LOW", issue_text="Test", filename="test.py", line_number=1
         )
 
         assert issue is not None
@@ -95,7 +89,7 @@ class TestQualityReport:
             bandit_passed=False,
             security_issues=issues,
             violations=violations,
-            feedback="Fix these issues"
+            feedback="Fix these issues",
         )
 
         assert report.passed is False
@@ -114,7 +108,7 @@ class TestQualityReport:
             mypy_passed=True,
             mypy_output="Success",
             bandit_passed=True,
-            violations=["test violation"]
+            violations=["test violation"],
         )
 
         result = report.to_dict()
@@ -139,61 +133,46 @@ class TestQualityReport:
 class TestRunPylint:
     """Test run_pylint function"""
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_pylint_success(self, mock_run):
         """run_pylint returns score when successful"""
-        mock_run.return_value = Mock(
-            stdout="Your code has been rated at 8.50/10",
-            returncode=0
-        )
+        mock_run.return_value = Mock(stdout="Your code has been rated at 8.50/10", returncode=0)
 
         score = run_pylint("test.py")
 
         assert score == 8.50
         mock_run.assert_called_once_with(
-            ["pylint", "test.py"],
-            capture_output=True,
-            text=True,
-            encoding='utf-8'
+            ["pylint", "test.py"], capture_output=True, text=True, encoding="utf-8"
         )
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_pylint_perfect_score(self, mock_run):
         """run_pylint handles perfect 10/10 score"""
-        mock_run.return_value = Mock(
-            stdout="Your code has been rated at 10.00/10",
-            returncode=0
-        )
+        mock_run.return_value = Mock(stdout="Your code has been rated at 10.00/10", returncode=0)
 
         score = run_pylint("perfect.py")
 
         assert score == 10.00
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_pylint_low_score(self, mock_run):
         """run_pylint handles low scores"""
-        mock_run.return_value = Mock(
-            stdout="Your code has been rated at 2.35/10",
-            returncode=0
-        )
+        mock_run.return_value = Mock(stdout="Your code has been rated at 2.35/10", returncode=0)
 
         score = run_pylint("bad.py")
 
         assert score == 2.35
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_pylint_no_score_found(self, mock_run):
         """run_pylint returns 0.0 when score not found"""
-        mock_run.return_value = Mock(
-            stdout="Some other output without score",
-            returncode=0
-        )
+        mock_run.return_value = Mock(stdout="Some other output without score", returncode=0)
 
         score = run_pylint("test.py")
 
         assert score == 0.0
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_pylint_exception(self, mock_run):
         """run_pylint returns 0.0 on exception"""
         mock_run.side_effect = Exception("Command failed")
@@ -206,13 +185,11 @@ class TestRunPylint:
 class TestRunMypy:
     """Test run_mypy function"""
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_mypy_success(self, mock_run):
         """run_mypy returns True when no issues found"""
         mock_run.return_value = Mock(
-            stdout="Success: no issues found in 1 source file",
-            stderr="",
-            returncode=0
+            stdout="Success: no issues found in 1 source file", stderr="", returncode=0
         )
 
         passed, output = run_mypy("test.py")
@@ -220,23 +197,16 @@ class TestRunMypy:
         assert passed is True
         assert output == "Passed"
         mock_run.assert_called_once_with(
-            ["mypy", "test.py"],
-            capture_output=True,
-            text=True,
-            encoding='utf-8'
+            ["mypy", "test.py"], capture_output=True, text=True, encoding="utf-8"
         )
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_mypy_with_errors(self, mock_run):
         """run_mypy returns False and error messages when issues found"""
         error_output = """test.py:10: error: Incompatible types
 test.py:20: error: Name not defined"""
 
-        mock_run.return_value = Mock(
-            stdout=error_output,
-            stderr="",
-            returncode=1
-        )
+        mock_run.return_value = Mock(stdout=error_output, stderr="", returncode=1)
 
         passed, output = run_mypy("test.py")
 
@@ -244,13 +214,11 @@ test.py:20: error: Name not defined"""
         assert "error: Incompatible types" in output
         assert "error: Name not defined" in output
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_mypy_with_stderr(self, mock_run):
         """run_mypy includes stderr in output"""
         mock_run.return_value = Mock(
-            stdout="",
-            stderr="test.py:5: error: Import error",
-            returncode=1
+            stdout="", stderr="test.py:5: error: Import error", returncode=1
         )
 
         passed, output = run_mypy("test.py")
@@ -258,7 +226,7 @@ test.py:20: error: Name not defined"""
         assert passed is False
         assert "error: Import error" in output
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_mypy_exception(self, mock_run):
         """run_mypy returns False with exception message on error"""
         mock_run.side_effect = Exception("MyPy not installed")
@@ -272,30 +240,22 @@ test.py:20: error: Name not defined"""
 class TestRunBandit:
     """Test run_bandit function"""
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_bandit_no_issues(self, mock_run):
         """run_bandit returns True when no issues found"""
-        bandit_output = {
-            "results": []
-        }
+        bandit_output = {"results": []}
 
-        mock_run.return_value = Mock(
-            stdout=json.dumps(bandit_output),
-            returncode=0
-        )
+        mock_run.return_value = Mock(stdout=json.dumps(bandit_output), returncode=0)
 
         passed, issues = run_bandit("src/")
 
         assert passed is True
         assert issues == []
         mock_run.assert_called_once_with(
-            ["bandit", "-r", "src/", "-f", "json"],
-            capture_output=True,
-            text=True,
-            encoding='utf-8'
+            ["bandit", "-r", "src/", "-f", "json"], capture_output=True, text=True, encoding="utf-8"
         )
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_bandit_with_high_severity(self, mock_run):
         """run_bandit detects HIGH severity issues"""
         bandit_output = {
@@ -305,15 +265,12 @@ class TestRunBandit:
                     "issue_confidence": "HIGH",
                     "issue_text": "Use of exec detected",
                     "filename": "app.py",
-                    "line_number": 42
+                    "line_number": 42,
                 }
             ]
         }
 
-        mock_run.return_value = Mock(
-            stdout=json.dumps(bandit_output),
-            returncode=1
-        )
+        mock_run.return_value = Mock(stdout=json.dumps(bandit_output), returncode=1)
 
         passed, issues = run_bandit("src/")
 
@@ -321,7 +278,7 @@ class TestRunBandit:
         assert len(issues) == 1
         assert issues[0]["issue_severity"] == "HIGH"
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_bandit_with_medium_severity(self, mock_run):
         """run_bandit detects MEDIUM severity issues"""
         bandit_output = {
@@ -331,22 +288,19 @@ class TestRunBandit:
                     "issue_confidence": "MEDIUM",
                     "issue_text": "Hardcoded password",
                     "filename": "config.py",
-                    "line_number": 10
+                    "line_number": 10,
                 }
             ]
         }
 
-        mock_run.return_value = Mock(
-            stdout=json.dumps(bandit_output),
-            returncode=1
-        )
+        mock_run.return_value = Mock(stdout=json.dumps(bandit_output), returncode=1)
 
         passed, issues = run_bandit("src/")
 
         assert passed is False
         assert len(issues) == 1
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_bandit_ignores_low_severity(self, mock_run):
         """run_bandit ignores LOW severity issues"""
         bandit_output = {
@@ -356,35 +310,29 @@ class TestRunBandit:
                     "issue_confidence": "LOW",
                     "issue_text": "Minor issue",
                     "filename": "util.py",
-                    "line_number": 5
+                    "line_number": 5,
                 }
             ]
         }
 
-        mock_run.return_value = Mock(
-            stdout=json.dumps(bandit_output),
-            returncode=0
-        )
+        mock_run.return_value = Mock(stdout=json.dumps(bandit_output), returncode=0)
 
         passed, issues = run_bandit("src/")
 
         assert passed is True
         assert issues == []
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_bandit_json_decode_error(self, mock_run):
         """run_bandit handles JSON decode errors gracefully"""
-        mock_run.return_value = Mock(
-            stdout="Invalid JSON output",
-            returncode=0
-        )
+        mock_run.return_value = Mock(stdout="Invalid JSON output", returncode=0)
 
         passed, issues = run_bandit("src/")
 
         assert passed is True
         assert issues == []
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_bandit_exception(self, mock_run):
         """run_bandit returns False on exception"""
         mock_run.side_effect = Exception("Bandit not installed")
@@ -398,7 +346,7 @@ class TestRunBandit:
 class TestRunPytestCov:
     """Test run_pytest_cov function"""
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_pytest_cov_success(self, mock_run):
         """run_pytest_cov returns coverage percentage"""
         output = """
@@ -414,63 +362,47 @@ src/app.py           100     15    85%
 TOTAL                100     15    85%
 """
 
-        mock_run.return_value = Mock(
-            stdout=output,
-            returncode=0
-        )
+        mock_run.return_value = Mock(stdout=output, returncode=0)
 
         coverage = run_pytest_cov("/project/path")
 
         assert coverage == 85.0
         mock_run.assert_called_once_with(
-            ["pytest"],
-            cwd="/project/path",
-            capture_output=True,
-            text=True,
-            encoding='utf-8'
+            ["pytest"], cwd="/project/path", capture_output=True, text=True, encoding="utf-8"
         )
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_pytest_cov_100_percent(self, mock_run):
         """run_pytest_cov handles 100% coverage"""
         output = "TOTAL  100  0  100%"
 
-        mock_run.return_value = Mock(
-            stdout=output,
-            returncode=0
-        )
+        mock_run.return_value = Mock(stdout=output, returncode=0)
 
         coverage = run_pytest_cov("/project/path")
 
         assert coverage == 100.0
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_pytest_cov_zero_percent(self, mock_run):
         """run_pytest_cov handles 0% coverage"""
         output = "TOTAL  100  100  0%"
 
-        mock_run.return_value = Mock(
-            stdout=output,
-            returncode=0
-        )
+        mock_run.return_value = Mock(stdout=output, returncode=0)
 
         coverage = run_pytest_cov("/project/path")
 
         assert coverage == 0.0
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_pytest_cov_no_match(self, mock_run):
         """run_pytest_cov returns 0.0 when no match found"""
-        mock_run.return_value = Mock(
-            stdout="No coverage information",
-            returncode=0
-        )
+        mock_run.return_value = Mock(stdout="No coverage information", returncode=0)
 
         coverage = run_pytest_cov("/project/path")
 
         assert coverage == 0.0
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_pytest_cov_exception(self, mock_run):
         """run_pytest_cov returns 0.0 on exception"""
         mock_run.side_effect = Exception("Pytest not found")
@@ -496,7 +428,7 @@ class TestParseBanditIssues:
                 "issue_confidence": "HIGH",
                 "issue_text": "SQL injection",
                 "filename": "db.py",
-                "line_number": 100
+                "line_number": 100,
             }
         ]
 
@@ -514,7 +446,7 @@ class TestParseBanditIssues:
                 "issue_confidence": "MEDIUM",
                 "issue_text": "Weak crypto",
                 "filename": "crypto.py",
-                "line_number": 50
+                "line_number": 50,
             }
         ]
 
@@ -531,7 +463,7 @@ class TestParseBanditIssues:
                 "issue_confidence": "LOW",
                 "issue_text": "Minor issue",
                 "filename": "util.py",
-                "line_number": 10
+                "line_number": 10,
             }
         ]
 
@@ -542,12 +474,27 @@ class TestParseBanditIssues:
     def test_parse_mixed_severity(self):
         """_parse_bandit_issues correctly filters mixed severities"""
         issues = [
-            {"issue_severity": "HIGH", "issue_confidence": "HIGH",
-             "issue_text": "High", "filename": "a.py", "line_number": 1},
-            {"issue_severity": "MEDIUM", "issue_confidence": "MEDIUM",
-             "issue_text": "Medium", "filename": "b.py", "line_number": 2},
-            {"issue_severity": "LOW", "issue_confidence": "LOW",
-             "issue_text": "Low", "filename": "c.py", "line_number": 3},
+            {
+                "issue_severity": "HIGH",
+                "issue_confidence": "HIGH",
+                "issue_text": "High",
+                "filename": "a.py",
+                "line_number": 1,
+            },
+            {
+                "issue_severity": "MEDIUM",
+                "issue_confidence": "MEDIUM",
+                "issue_text": "Medium",
+                "filename": "b.py",
+                "line_number": 2,
+            },
+            {
+                "issue_severity": "LOW",
+                "issue_confidence": "LOW",
+                "issue_text": "Low",
+                "filename": "c.py",
+                "line_number": 3,
+            },
         ]
 
         result = _parse_bandit_issues(issues, "MEDIUM")
@@ -607,11 +554,7 @@ class TestGenerateFeedback:
 
     def test_generate_feedback_multiple_violations(self):
         """_generate_feedback handles multiple violations"""
-        violations = [
-            "テストカバレッジ不足: 50%",
-            "Pylintスコア不足: 6.0",
-            "MyPy型チェック失敗"
-        ]
+        violations = ["テストカバレッジ不足: 50%", "Pylintスコア不足: 6.0", "MyPy型チェック失敗"]
 
         feedback = _generate_feedback(violations, "src/app.py")
 
@@ -629,13 +572,11 @@ class TestGenerateFeedback:
 class TestAnalyzeCodeQuality:
     """Test analyze_code_quality integration function"""
 
-    @patch('nexuscore.utils.code_analyzer.run_pytest_cov')
-    @patch('nexuscore.utils.code_analyzer.run_pylint')
-    @patch('nexuscore.utils.code_analyzer.run_mypy')
-    @patch('nexuscore.utils.code_analyzer.run_bandit')
-    def test_analyze_code_quality_all_pass(
-        self, mock_bandit, mock_mypy, mock_pylint, mock_cov
-    ):
+    @patch("nexuscore.utils.code_analyzer.run_pytest_cov")
+    @patch("nexuscore.utils.code_analyzer.run_pylint")
+    @patch("nexuscore.utils.code_analyzer.run_mypy")
+    @patch("nexuscore.utils.code_analyzer.run_bandit")
+    def test_analyze_code_quality_all_pass(self, mock_bandit, mock_mypy, mock_pylint, mock_cov):
         """analyze_code_quality returns passing report when all checks pass"""
         mock_cov.return_value = 95.0
         mock_pylint.return_value = 9.5
@@ -647,16 +588,12 @@ class TestAnalyzeCodeQuality:
                 "tier1": {
                     "test_coverage_min": 90,
                     "pylint_score_min": 8.0,
-                    "bandit_severity_max": "MEDIUM"
+                    "bandit_severity_max": "MEDIUM",
                 }
             }
         }
 
-        report = analyze_code_quality(
-            "src/app.py",
-            "tests/test_app.py",
-            constitution
-        )
+        report = analyze_code_quality("src/app.py", "tests/test_app.py", constitution)
 
         assert report.passed is True
         assert report.coverage_percentage == 95.0
@@ -665,10 +602,10 @@ class TestAnalyzeCodeQuality:
         assert report.bandit_passed is True
         assert len(report.violations) == 0
 
-    @patch('nexuscore.utils.code_analyzer.run_pytest_cov')
-    @patch('nexuscore.utils.code_analyzer.run_pylint')
-    @patch('nexuscore.utils.code_analyzer.run_mypy')
-    @patch('nexuscore.utils.code_analyzer.run_bandit')
+    @patch("nexuscore.utils.code_analyzer.run_pytest_cov")
+    @patch("nexuscore.utils.code_analyzer.run_pylint")
+    @patch("nexuscore.utils.code_analyzer.run_mypy")
+    @patch("nexuscore.utils.code_analyzer.run_bandit")
     def test_analyze_code_quality_coverage_fail(
         self, mock_bandit, mock_mypy, mock_pylint, mock_cov
     ):
@@ -679,32 +616,21 @@ class TestAnalyzeCodeQuality:
         mock_bandit.return_value = (True, [])
 
         constitution = {
-            "quality_gates": {
-                "tier1": {
-                    "test_coverage_min": 90,
-                    "pylint_score_min": 8.0
-                }
-            }
+            "quality_gates": {"tier1": {"test_coverage_min": 90, "pylint_score_min": 8.0}}
         }
 
-        report = analyze_code_quality(
-            "src/app.py",
-            "tests/test_app.py",
-            constitution
-        )
+        report = analyze_code_quality("src/app.py", "tests/test_app.py", constitution)
 
         assert report.passed is False
         assert report.coverage_passed is False
         assert len(report.violations) >= 1
         assert any("カバレッジ" in v for v in report.violations)
 
-    @patch('nexuscore.utils.code_analyzer.run_pytest_cov')
-    @patch('nexuscore.utils.code_analyzer.run_pylint')
-    @patch('nexuscore.utils.code_analyzer.run_mypy')
-    @patch('nexuscore.utils.code_analyzer.run_bandit')
-    def test_analyze_code_quality_pylint_fail(
-        self, mock_bandit, mock_mypy, mock_pylint, mock_cov
-    ):
+    @patch("nexuscore.utils.code_analyzer.run_pytest_cov")
+    @patch("nexuscore.utils.code_analyzer.run_pylint")
+    @patch("nexuscore.utils.code_analyzer.run_mypy")
+    @patch("nexuscore.utils.code_analyzer.run_bandit")
+    def test_analyze_code_quality_pylint_fail(self, mock_bandit, mock_mypy, mock_pylint, mock_cov):
         """analyze_code_quality detects Pylint failures"""
         mock_cov.return_value = 95.0
         mock_pylint.return_value = 6.0  # Below threshold
@@ -712,31 +638,20 @@ class TestAnalyzeCodeQuality:
         mock_bandit.return_value = (True, [])
 
         constitution = {
-            "quality_gates": {
-                "tier1": {
-                    "test_coverage_min": 90,
-                    "pylint_score_min": 8.0
-                }
-            }
+            "quality_gates": {"tier1": {"test_coverage_min": 90, "pylint_score_min": 8.0}}
         }
 
-        report = analyze_code_quality(
-            "src/app.py",
-            "tests/test_app.py",
-            constitution
-        )
+        report = analyze_code_quality("src/app.py", "tests/test_app.py", constitution)
 
         assert report.passed is False
         assert report.pylint_passed is False
         assert any("Pylint" in v for v in report.violations)
 
-    @patch('nexuscore.utils.code_analyzer.run_pytest_cov')
-    @patch('nexuscore.utils.code_analyzer.run_pylint')
-    @patch('nexuscore.utils.code_analyzer.run_mypy')
-    @patch('nexuscore.utils.code_analyzer.run_bandit')
-    def test_analyze_code_quality_mypy_fail(
-        self, mock_bandit, mock_mypy, mock_pylint, mock_cov
-    ):
+    @patch("nexuscore.utils.code_analyzer.run_pytest_cov")
+    @patch("nexuscore.utils.code_analyzer.run_pylint")
+    @patch("nexuscore.utils.code_analyzer.run_mypy")
+    @patch("nexuscore.utils.code_analyzer.run_bandit")
+    def test_analyze_code_quality_mypy_fail(self, mock_bandit, mock_mypy, mock_pylint, mock_cov):
         """analyze_code_quality detects MyPy failures"""
         mock_cov.return_value = 95.0
         mock_pylint.return_value = 9.0
@@ -744,29 +659,20 @@ class TestAnalyzeCodeQuality:
         mock_bandit.return_value = (True, [])
 
         constitution = {
-            "quality_gates": {
-                "tier1": {
-                    "test_coverage_min": 90,
-                    "pylint_score_min": 8.0
-                }
-            }
+            "quality_gates": {"tier1": {"test_coverage_min": 90, "pylint_score_min": 8.0}}
         }
 
-        report = analyze_code_quality(
-            "src/app.py",
-            "tests/test_app.py",
-            constitution
-        )
+        report = analyze_code_quality("src/app.py", "tests/test_app.py", constitution)
 
         assert report.passed is False
         assert report.mypy_passed is False
         assert any("MyPy" in v for v in report.violations)
 
-    @patch('nexuscore.utils.code_analyzer.run_pytest_cov')
-    @patch('nexuscore.utils.code_analyzer.run_pylint')
-    @patch('nexuscore.utils.code_analyzer.run_mypy')
-    @patch('nexuscore.utils.code_analyzer.run_bandit')
-    @patch('nexuscore.utils.code_analyzer._parse_bandit_issues')
+    @patch("nexuscore.utils.code_analyzer.run_pytest_cov")
+    @patch("nexuscore.utils.code_analyzer.run_pylint")
+    @patch("nexuscore.utils.code_analyzer.run_mypy")
+    @patch("nexuscore.utils.code_analyzer.run_bandit")
+    @patch("nexuscore.utils.code_analyzer._parse_bandit_issues")
     def test_analyze_code_quality_bandit_fail(
         self, mock_parse, mock_bandit, mock_mypy, mock_pylint, mock_cov
     ):
@@ -775,38 +681,30 @@ class TestAnalyzeCodeQuality:
         mock_pylint.return_value = 9.0
         mock_mypy.return_value = (True, "Success")
         mock_bandit.return_value = (False, [{"issue_severity": "HIGH"}])
-        mock_parse.return_value = [
-            SecurityIssue("HIGH", "HIGH", "SQL injection", "app.py", 10)
-        ]
+        mock_parse.return_value = [SecurityIssue("HIGH", "HIGH", "SQL injection", "app.py", 10)]
 
         constitution = {
             "quality_gates": {
                 "tier1": {
                     "test_coverage_min": 90,
                     "pylint_score_min": 8.0,
-                    "bandit_severity_max": "MEDIUM"
+                    "bandit_severity_max": "MEDIUM",
                 }
             }
         }
 
-        report = analyze_code_quality(
-            "src/app.py",
-            "tests/test_app.py",
-            constitution
-        )
+        report = analyze_code_quality("src/app.py", "tests/test_app.py", constitution)
 
         assert report.passed is False
         assert report.bandit_passed is False
         assert len(report.security_issues) == 1
         assert any("セキュリティ" in v for v in report.violations)
 
-    @patch('nexuscore.utils.code_analyzer.run_pytest_cov')
-    @patch('nexuscore.utils.code_analyzer.run_pylint')
-    @patch('nexuscore.utils.code_analyzer.run_mypy')
-    @patch('nexuscore.utils.code_analyzer.run_bandit')
-    def test_analyze_code_quality_all_fail(
-        self, mock_bandit, mock_mypy, mock_pylint, mock_cov
-    ):
+    @patch("nexuscore.utils.code_analyzer.run_pytest_cov")
+    @patch("nexuscore.utils.code_analyzer.run_pylint")
+    @patch("nexuscore.utils.code_analyzer.run_mypy")
+    @patch("nexuscore.utils.code_analyzer.run_bandit")
+    def test_analyze_code_quality_all_fail(self, mock_bandit, mock_mypy, mock_pylint, mock_cov):
         """analyze_code_quality handles all checks failing"""
         mock_cov.return_value = 40.0
         mock_pylint.return_value = 4.0
@@ -814,27 +712,18 @@ class TestAnalyzeCodeQuality:
         mock_bandit.return_value = (False, [{"issue_severity": "HIGH"}])
 
         constitution = {
-            "quality_gates": {
-                "tier1": {
-                    "test_coverage_min": 90,
-                    "pylint_score_min": 8.0
-                }
-            }
+            "quality_gates": {"tier1": {"test_coverage_min": 90, "pylint_score_min": 8.0}}
         }
 
-        report = analyze_code_quality(
-            "src/app.py",
-            "tests/test_app.py",
-            constitution
-        )
+        report = analyze_code_quality("src/app.py", "tests/test_app.py", constitution)
 
         assert report.passed is False
         assert len(report.violations) >= 4  # All checks failed
 
-    @patch('nexuscore.utils.code_analyzer.run_pytest_cov')
-    @patch('nexuscore.utils.code_analyzer.run_pylint')
-    @patch('nexuscore.utils.code_analyzer.run_mypy')
-    @patch('nexuscore.utils.code_analyzer.run_bandit')
+    @patch("nexuscore.utils.code_analyzer.run_pytest_cov")
+    @patch("nexuscore.utils.code_analyzer.run_pylint")
+    @patch("nexuscore.utils.code_analyzer.run_mypy")
+    @patch("nexuscore.utils.code_analyzer.run_bandit")
     def test_analyze_code_quality_custom_thresholds(
         self, mock_bandit, mock_mypy, mock_pylint, mock_cov
     ):
@@ -854,11 +743,7 @@ class TestAnalyzeCodeQuality:
             }
         }
 
-        report = analyze_code_quality(
-            "src/app.py",
-            "tests/test_app.py",
-            constitution
-        )
+        report = analyze_code_quality("src/app.py", "tests/test_app.py", constitution)
 
         assert report.passed is False
         assert report.coverage_passed is False

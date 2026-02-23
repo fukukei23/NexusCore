@@ -4,8 +4,9 @@ Plan API リクエスト・レスポンススキーマ
 FastAPI の Plan エンドポイント用の Pydantic モデル定義。
 将来的な拡張を考慮した構造。
 """
+
 from datetime import datetime
-from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -19,6 +20,7 @@ class PlanTask(BaseModel):
         priority: 優先度（P0, P1, P2）
         status: ステータス（pending, in_progress, completed）
     """
+
     name: str = Field(..., description="タスク名")
     description: str = Field(..., description="タスクの説明")
     priority: str = Field(..., description="優先度（P0, P1, P2）")
@@ -36,6 +38,7 @@ class PlanSummary(BaseModel):
         created_at: 作成日時
         updated_at: 更新日時
     """
+
     id: int = Field(..., description="Plan ID")
     project_id: int = Field(..., description="プロジェクトID")
     name: str = Field(..., description="計画名")
@@ -55,7 +58,8 @@ class PlanResponse(PlanSummary):
         created_at: 作成日時
         updated_at: 更新日時
     """
-    tasks: List[PlanTask] = Field(default_factory=list, description="タスク一覧")
+
+    tasks: list[PlanTask] = Field(default_factory=list, description="タスク一覧")
 
 
 class PlanListResponse(BaseModel):
@@ -65,6 +69,7 @@ class PlanListResponse(BaseModel):
     Attributes:
         plans: Plan一覧
     """
+
     plans: list[PlanSummary] = Field(..., description="Plan一覧")
 
     class Config:
@@ -76,9 +81,8 @@ class PlanListResponse(BaseModel):
                         "project_id": 1,
                         "name": "Implementation Plan",
                         "created_at": "2025-01-01T00:00:00",
-                        "updated_at": "2025-01-01T00:00:00"
+                        "updated_at": "2025-01-01T00:00:00",
                     }
                 ]
             }
         }
-

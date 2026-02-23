@@ -10,14 +10,17 @@ Tests cover:
 - Error handling
 - Header validation
 """
+
 import os
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch, call
 from flask import Flask
+
 from nexuscore.api.github_webhook_handler import (
-    handle_github_webhook,
     _post_pr_comment_if_configured,
     _send_slack_notification_if_configured,
+    handle_github_webhook,
 )
 
 
@@ -56,7 +59,10 @@ class TestHandleGitHubWebhook:
         self, mock_slack, mock_pr_comment, mock_github_webhook, mock_request_patch
     ):
         """Should handle valid pull_request webhook successfully"""
-        mock_request_patch.headers = {"X-GitHub-Event": "pull_request", "X-GitHub-Delivery": "delivery-123"}
+        mock_request_patch.headers = {
+            "X-GitHub-Event": "pull_request",
+            "X-GitHub-Delivery": "delivery-123",
+        }
         mock_request_patch.get_json.return_value = {
             "action": "opened",
             "repository": {"full_name": "owner/repo"},
@@ -85,7 +91,10 @@ class TestHandleGitHubWebhook:
     @patch("nexuscore.api.github_webhook_handler.request")
     def test_handles_missing_payload(self, mock_request_patch):
         """Should handle missing JSON payload"""
-        mock_request_patch.headers = {"X-GitHub-Event": "pull_request", "X-GitHub-Delivery": "delivery-123"}
+        mock_request_patch.headers = {
+            "X-GitHub-Event": "pull_request",
+            "X-GitHub-Delivery": "delivery-123",
+        }
         mock_request_patch.get_json.return_value = None
 
         result, status_code = handle_github_webhook()
@@ -98,7 +107,10 @@ class TestHandleGitHubWebhook:
     @patch("nexuscore.api.github_webhook_handler.github_webhook")
     def test_handles_webhook_processing_error(self, mock_github_webhook, mock_request_patch):
         """Should handle errors during webhook processing"""
-        mock_request_patch.headers = {"X-GitHub-Event": "pull_request", "X-GitHub-Delivery": "delivery-123"}
+        mock_request_patch.headers = {
+            "X-GitHub-Event": "pull_request",
+            "X-GitHub-Delivery": "delivery-123",
+        }
         mock_request_patch.get_json.return_value = {"action": "opened"}
         mock_github_webhook.side_effect = Exception("Processing failed")
 
@@ -136,7 +148,10 @@ class TestHandleGitHubWebhook:
     @patch("nexuscore.api.github_webhook_handler.request")
     def test_handles_unknown_event_type(self, mock_request_patch):
         """Should reject unknown event types"""
-        mock_request_patch.headers = {"X-GitHub-Event": "unknown_event", "X-GitHub-Delivery": "delivery-123"}
+        mock_request_patch.headers = {
+            "X-GitHub-Event": "unknown_event",
+            "X-GitHub-Delivery": "delivery-123",
+        }
 
         result = handle_github_webhook()
 
@@ -211,7 +226,11 @@ class TestPostPRComment:
 
         assert "Cannot post PR comment" in caplog.text
 
-    @patch.dict(os.environ, {"GITHUB_SELF_HEALING_TOKEN": "test-token", "NEXUS_PROJECT_ROOT": "/custom/path"}, clear=True)
+    @patch.dict(
+        os.environ,
+        {"GITHUB_SELF_HEALING_TOKEN": "test-token", "NEXUS_PROJECT_ROOT": "/custom/path"},
+        clear=True,
+    )
     @patch("nexuscore.api.github_webhook_handler.format_pr_comment")
     @patch("requests.post")
     def test_uses_custom_project_root(self, mock_post, mock_format_comment):
@@ -313,7 +332,11 @@ class TestSlackNotification:
         result = {"status": "success", "coverage": "85%"}
         payload = {
             "repository": {"full_name": "owner/repo"},
-            "pull_request": {"number": 456, "title": "Feature: Add tests", "html_url": "https://github.com/owner/repo/pull/456"},
+            "pull_request": {
+                "number": 456,
+                "title": "Feature: Add tests",
+                "html_url": "https://github.com/owner/repo/pull/456",
+            },
         }
 
         _send_slack_notification_if_configured(result, payload)
@@ -332,7 +355,10 @@ class TestWebhookEdgeCases:
     @patch("nexuscore.api.github_webhook_handler.github_webhook")
     def test_handles_malformed_json(self, mock_github_webhook, mock_request_patch):
         """Should handle malformed JSON payloads"""
-        mock_request_patch.headers = {"X-GitHub-Event": "pull_request", "X-GitHub-Delivery": "delivery-123"}
+        mock_request_patch.headers = {
+            "X-GitHub-Event": "pull_request",
+            "X-GitHub-Delivery": "delivery-123",
+        }
         mock_request_patch.get_json.side_effect = ValueError("Invalid JSON")
 
         result, status_code = handle_github_webhook()
@@ -347,7 +373,10 @@ class TestWebhookEdgeCases:
         self, mock_pr_comment, mock_github_webhook, mock_request_patch
     ):
         """Should continue even if PR comment posting fails"""
-        mock_request_patch.headers = {"X-GitHub-Event": "pull_request", "X-GitHub-Delivery": "delivery-123"}
+        mock_request_patch.headers = {
+            "X-GitHub-Event": "pull_request",
+            "X-GitHub-Delivery": "delivery-123",
+        }
         mock_request_patch.get_json.return_value = {
             "repository": {"full_name": "owner/repo"},
             "pull_request": {"number": 123},
@@ -362,11 +391,12 @@ class TestWebhookEdgeCases:
     @patch("nexuscore.api.github_webhook_handler.request")
     @patch("nexuscore.api.github_webhook_handler.github_webhook")
     @patch("nexuscore.api.github_webhook_handler._send_slack_notification_if_configured")
-    def test_continues_on_slack_error(
-        self, mock_slack, mock_github_webhook, mock_request_patch
-    ):
+    def test_continues_on_slack_error(self, mock_slack, mock_github_webhook, mock_request_patch):
         """Should continue even if Slack notification fails"""
-        mock_request_patch.headers = {"X-GitHub-Event": "pull_request", "X-GitHub-Delivery": "delivery-123"}
+        mock_request_patch.headers = {
+            "X-GitHub-Event": "pull_request",
+            "X-GitHub-Delivery": "delivery-123",
+        }
         mock_request_patch.get_json.return_value = {
             "repository": {"full_name": "owner/repo"},
             "pull_request": {"number": 123},

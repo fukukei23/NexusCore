@@ -1,5 +1,5 @@
-import sys
 import importlib
+import sys
 
 
 def test_test_generator_generate(monkeypatch):

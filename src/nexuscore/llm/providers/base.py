@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from nexuscore.llm.helpers import normalize_model
 
@@ -15,17 +15,18 @@ class BaseLLM:
     def __init__(self, model_name: str):
         self.model_name = normalize_model(model_name)
         self.logger = logging.getLogger(self.__class__.__name__)
-        self._last_usage: Optional[Dict[str, Optional[int]]] = None
+        self._last_usage: dict[str, int | None] | None = None
         self.last_call_mode: str = "stub"
-        self.session: Optional["Session"] = None
+        self.session: Session | None = None
 
     def record_usage(
         self,
-        prompt_tokens: Optional[int] = None,
-        completion_tokens: Optional[int] = None,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
     ) -> None:
         """Store usage info in a consistent shape for RoutedLLM."""
-        def _cast(value: Optional[int]) -> Optional[int]:
+
+        def _cast(value: int | None) -> int | None:
             if value is None:
                 return None
             try:
@@ -42,7 +43,7 @@ class BaseLLM:
         self,
         context: str,
         exc: Exception,
-        response_text: Optional[str] = None,
+        response_text: str | None = None,
         level: int = logging.ERROR,
     ) -> None:
         """Emit a normalized log message for provider failures."""
@@ -52,7 +53,9 @@ class BaseLLM:
         message = f"{self.__class__.__name__} {context}: {exc}{snippet}"
         self.logger.log(level, message)
 
-    def execute(self, prompt: str, system_prompt: str, **kwargs) -> str:  # pragma: no cover - interface
+    def execute(
+        self, prompt: str, system_prompt: str, **kwargs
+    ) -> str:  # pragma: no cover - interface
         raise NotImplementedError("Subclasses must implement execute()")
 
 

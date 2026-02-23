@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 
@@ -57,10 +56,9 @@ def setup_file_logging(
             logger.removeHandler(handler)
 
     # FileHandler を追加
-    file_handler = logging.FileHandler(log_path, mode='a', encoding='utf-8')
+    file_handler = logging.FileHandler(log_path, mode="a", encoding="utf-8")
     file_handler.setLevel(log_level)
     file_handler.setFormatter(logging.Formatter(format_string))
     logger.addHandler(file_handler)
 
     return logger
-

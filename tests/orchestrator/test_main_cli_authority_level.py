@@ -23,7 +23,9 @@ def test_authority_level_is_none_when_omitted() -> None:
     assert args.authority_level is None
 
 
-def test_authority_level_rejects_invalid_value_and_shows_choices(capsys: pytest.CaptureFixture[str]) -> None:
+def test_authority_level_rejects_invalid_value_and_shows_choices(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     parser = main_cli._build_arg_parser()
     with pytest.raises(SystemExit) as exc:
         parser.parse_args([*_base_args(), "--authority-level", "HUMAN"])
@@ -35,5 +37,3 @@ def test_authority_level_rejects_invalid_value_and_shows_choices(capsys: pytest.
     assert "human" in captured.err
     assert "partial" in captured.err
     assert "full" in captured.err
-
-

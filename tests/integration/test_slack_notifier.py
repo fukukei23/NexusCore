@@ -1,8 +1,8 @@
 """
 Slack 通知のテスト
 """
-import pytest
-from unittest.mock import Mock, patch
+
+from unittest.mock import patch
 
 from nexuscore.core.notifier import SlackNotifier
 
@@ -59,4 +59,3 @@ def test_notify_self_healing_complete_without_metrics():
 
         assert success is True
         assert mock_send.called
-

@@ -1,12 +1,10 @@
 """session_control.py の包括的なテスト"""
+
 import json
 import os
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 from nexuscore.core.session_control import SessionController, SessionState
 
@@ -18,7 +16,7 @@ def test_session_state_creation():
         status="running",
         last_phase="test_phase",
         last_updated=time.time(),
-        metadata={"key": "value"}
+        metadata={"key": "value"},
     )
 
     assert state.session_id == "test-001"
@@ -31,8 +29,7 @@ def test_session_controller_initialization():
     """SessionControllerの初期化テスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
-            session_id="test-session",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            session_id="test-session", root_dir=os.path.join(tmpdir, ".nexus", "sessions")
         )
 
         assert controller.session_id == "test-session"
@@ -45,8 +42,7 @@ def test_session_controller_checkpoint():
     """checkpointメソッドのテスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
-            session_id="test-checkpoint",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            session_id="test-checkpoint", root_dir=os.path.join(tmpdir, ".nexus", "sessions")
         )
 
         controller.checkpoint("phase1", {"step": 1})
@@ -66,8 +62,7 @@ def test_session_controller_checkpoint_no_metadata():
     """checkpointメソッド（メタデータなし）のテスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
-            session_id="test-checkpoint-empty",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            session_id="test-checkpoint-empty", root_dir=os.path.join(tmpdir, ".nexus", "sessions")
         )
 
         controller.checkpoint("phase1")
@@ -82,8 +77,7 @@ def test_session_controller_should_stop_initial():
     """should_stopの初期状態テスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
-            session_id="test-should-stop",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            session_id="test-should-stop", root_dir=os.path.join(tmpdir, ".nexus", "sessions")
         )
 
         assert not controller.should_stop()
@@ -93,8 +87,7 @@ def test_session_controller_request_stop():
     """request_stopメソッドのテスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
-            session_id="test-request-stop",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            session_id="test-request-stop", root_dir=os.path.join(tmpdir, ".nexus", "sessions")
         )
 
         controller.request_stop()
@@ -112,8 +105,7 @@ def test_session_controller_request_pause():
     """request_pauseメソッドのテスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
-            session_id="test-request-pause",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            session_id="test-request-pause", root_dir=os.path.join(tmpdir, ".nexus", "sessions")
         )
 
         controller.request_pause()
@@ -131,8 +123,7 @@ def test_session_controller_request_continue():
     """request_continueメソッドのテスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
-            session_id="test-request-continue",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            session_id="test-request-continue", root_dir=os.path.join(tmpdir, ".nexus", "sessions")
         )
 
         controller.request_stop()
@@ -152,7 +143,7 @@ def test_session_controller_multiple_checkpoints():
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
             session_id="test-multiple-checkpoints",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            root_dir=os.path.join(tmpdir, ".nexus", "sessions"),
         )
 
         controller.checkpoint("phase1", {"step": 1})
@@ -172,8 +163,7 @@ def test_session_controller_read_control_nonexistent():
     """存在しないcontrol.jsonの読み込みテスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
-            session_id="test-read-nonexistent",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            session_id="test-read-nonexistent", root_dir=os.path.join(tmpdir, ".nexus", "sessions")
         )
 
         result = controller._read_control()
@@ -184,8 +174,7 @@ def test_session_controller_read_control_corrupted():
     """破損したcontrol.jsonの読み込みテスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
-            session_id="test-read-corrupted",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            session_id="test-read-corrupted", root_dir=os.path.join(tmpdir, ".nexus", "sessions")
         )
 
         # 破損したJSONファイルを作成
@@ -202,10 +191,7 @@ def test_session_controller_write_state_creates_directory():
     """_write_stateがディレクトリを作成するテスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         root_dir = os.path.join(tmpdir, "new", "sessions", "path")
-        controller = SessionController(
-            session_id="test-create-dir",
-            root_dir=root_dir
-        )
+        controller = SessionController(session_id="test-create-dir", root_dir=root_dir)
 
         controller.checkpoint("test_phase")
 
@@ -217,10 +203,7 @@ def test_session_controller_write_control_creates_directory():
     """_write_controlがディレクトリを作成するテスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         root_dir = os.path.join(tmpdir, "new", "control", "path")
-        controller = SessionController(
-            session_id="test-create-control-dir",
-            root_dir=root_dir
-        )
+        controller = SessionController(session_id="test-create-control-dir", root_dir=root_dir)
 
         controller.request_stop()
 
@@ -232,8 +215,7 @@ def test_session_controller_checkpoint_timestamp():
     """checkpointのタイムスタンプ更新テスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
-            session_id="test-timestamp",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            session_id="test-timestamp", root_dir=os.path.join(tmpdir, ".nexus", "sessions")
         )
 
         before = time.time()
@@ -251,8 +233,7 @@ def test_session_controller_complex_metadata():
     """複雑なメタデータの保存テスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
-            session_id="test-complex-metadata",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            session_id="test-complex-metadata", root_dir=os.path.join(tmpdir, ".nexus", "sessions")
         )
 
         complex_metadata = {
@@ -260,7 +241,7 @@ def test_session_controller_complex_metadata():
             "list": [1, 2, 3],
             "number": 42,
             "boolean": True,
-            "null": None
+            "null": None,
         }
 
         controller.checkpoint("phase1", complex_metadata)
@@ -280,7 +261,7 @@ def test_session_controller_stop_after_checkpoint():
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
             session_id="test-stop-after-checkpoint",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            root_dir=os.path.join(tmpdir, ".nexus", "sessions"),
         )
 
         controller.checkpoint("phase1", {"step": 1})
@@ -300,15 +281,10 @@ def test_session_controller_unicode_metadata():
     """Unicode文字を含むメタデータのテスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
-            session_id="test-unicode",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            session_id="test-unicode", root_dir=os.path.join(tmpdir, ".nexus", "sessions")
         )
 
-        unicode_metadata = {
-            "japanese": "日本語テスト",
-            "emoji": "🎉🚀",
-            "chinese": "中文测试"
-        }
+        unicode_metadata = {"japanese": "日本語テスト", "emoji": "🎉🚀", "chinese": "中文测试"}
 
         controller.checkpoint("phase1", unicode_metadata)
 
@@ -324,14 +300,13 @@ def test_session_controller_large_metadata():
     """大きなメタデータの保存テスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
         controller = SessionController(
-            session_id="test-large-metadata",
-            root_dir=os.path.join(tmpdir, ".nexus", "sessions")
+            session_id="test-large-metadata", root_dir=os.path.join(tmpdir, ".nexus", "sessions")
         )
 
         large_metadata = {
             "large_string": "x" * 10000,
             "large_list": list(range(1000)),
-            "nested": {f"key_{i}": f"value_{i}" for i in range(100)}
+            "nested": {f"key_{i}": f"value_{i}" for i in range(100)},
         }
 
         controller.checkpoint("phase1", large_metadata)
@@ -342,4 +317,3 @@ def test_session_controller_large_metadata():
         assert len(data["metadata"]["large_string"]) == 10000
         assert len(data["metadata"]["large_list"]) == 1000
         assert len(data["metadata"]["nested"]) == 100
-

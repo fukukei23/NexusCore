@@ -5,19 +5,18 @@ CR-003: サンドボックス実行の最低限のセキュリティ強化テス
 """
 
 import os
-import pytest
-from unittest.mock import patch, MagicMock, call
-from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from nexuscore.core.errors import SandboxSecurityError
 from nexuscore.core.sandbox_executor import (
+    _CPU_TIME_LIMIT_SEC,
+    _MEMORY_LIMIT_MB,
     SandboxExecutor,
     _apply_resource_limits,
     _check_forbidden_modules,
-    _MEMORY_LIMIT_MB,
-    _CPU_TIME_LIMIT_SEC,
-    _FORBIDDEN_MODULE_NAMES,
 )
-from nexuscore.core.errors import SandboxSecurityError
 
 
 @pytest.fixture
@@ -187,4 +186,3 @@ def test_sandbox_no_preexec_fn_on_non_posix(monkeypatch, executor):
         assert mock_run.called
         call_kwargs = mock_run.call_args[1]
         assert call_kwargs.get("preexec_fn") is None
-

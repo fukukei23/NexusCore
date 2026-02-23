@@ -4,9 +4,9 @@ CR-006-1: Orchestrator のフェーズ分割と Happy Path テスト
 Orchestrator の正常系フローを検証するテスト。
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
-from dataclasses import dataclass
+
+import pytest
 
 from nexuscore.core.orchestrator import (
     Orchestrator,
@@ -73,45 +73,24 @@ def test_run_full_project_calls_phases_in_order(orchestrator, initial_context, m
         def wrapper(context):
             call_order.append(phase_name)
             return context
+
         return wrapper
 
     # 各フェーズメソッドをモックで差し替え
-    monkeypatch.setattr(
-        orchestrator,
-        "run_requirements_phase",
-        track_call("REQUIREMENTS")
-    )
-    monkeypatch.setattr(
-        orchestrator,
-        "run_planning_phase",
-        track_call("PLAN")
-    )
-    monkeypatch.setattr(
-        orchestrator,
-        "run_architecture_phase",
-        track_call("ARCHITECTURE")
-    )
-    monkeypatch.setattr(
-        orchestrator,
-        "run_implementation_phase",
-        track_call("IMPLEMENTATION")
-    )
-    monkeypatch.setattr(
-        orchestrator,
-        "run_testing_phase",
-        track_call("TESTING")
-    )
-    monkeypatch.setattr(
-        orchestrator,
-        "run_review_phase",
-        track_call("REVIEW")
-    )
+    monkeypatch.setattr(orchestrator, "run_requirements_phase", track_call("REQUIREMENTS"))
+    monkeypatch.setattr(orchestrator, "run_planning_phase", track_call("PLAN"))
+    monkeypatch.setattr(orchestrator, "run_architecture_phase", track_call("ARCHITECTURE"))
+    monkeypatch.setattr(orchestrator, "run_implementation_phase", track_call("IMPLEMENTATION"))
+    monkeypatch.setattr(orchestrator, "run_testing_phase", track_call("TESTING"))
+    monkeypatch.setattr(orchestrator, "run_review_phase", track_call("REVIEW"))
 
     # _maybe_stop をモック化（SessionStopped を投げないように）
     monkeypatch.setattr(orchestrator, "_maybe_stop", lambda *args, **kwargs: None)
 
     # orchestrator_db_hook のインポートエラーを回避
-    with patch("nexuscore.core.orchestrator_db_hook.log_orchestrator_event", side_effect=ImportError):
+    with patch(
+        "nexuscore.core.orchestrator_db_hook.log_orchestrator_event", side_effect=ImportError
+    ):
         orchestrator.run_full_project(
             user_requirement="テスト要件",
             language="ja",
@@ -125,6 +104,7 @@ def test_run_full_project_calls_phases_in_order(orchestrator, initial_context, m
 
 def test_each_phase_receives_and_returns_context(orchestrator, initial_context):
     """各フェーズメソッドが context を受け取り、返すことを確認"""
+
     # 各フェーズメソッドをモック化
     def mock_phase(context: OrchestratorContext) -> OrchestratorContext:
         context.phase_log.append(f"PHASE_{len(context.phase_log)}")
@@ -141,7 +121,9 @@ def test_each_phase_receives_and_returns_context(orchestrator, initial_context):
     orchestrator._maybe_stop = lambda *args, **kwargs: None
 
     # orchestrator_db_hook のインポートエラーを回避
-    with patch("nexuscore.core.orchestrator_db_hook.log_orchestrator_event", side_effect=ImportError):
+    with patch(
+        "nexuscore.core.orchestrator_db_hook.log_orchestrator_event", side_effect=ImportError
+    ):
         orchestrator.run_full_project(
             user_requirement="テスト要件",
             language="ja",
@@ -167,7 +149,9 @@ def test_requirements_phase_updates_context(orchestrator, initial_context):
     orchestrator._maybe_stop = lambda *args, **kwargs: None
 
     # orchestrator_db_hook のインポートエラーを回避
-    with patch("nexuscore.core.orchestrator_db_hook.log_orchestrator_event", side_effect=ImportError):
+    with patch(
+        "nexuscore.core.orchestrator_db_hook.log_orchestrator_event", side_effect=ImportError
+    ):
         context = orchestrator.run_requirements_phase(initial_context)
 
     # コンテキストが更新されていることを確認
@@ -189,7 +173,9 @@ def test_planning_phase_updates_context(orchestrator, initial_context):
     orchestrator._maybe_stop = lambda *args, **kwargs: None
 
     # orchestrator_db_hook のインポートエラーを回避
-    with patch("nexuscore.core.orchestrator_db_hook.log_orchestrator_event", side_effect=ImportError):
+    with patch(
+        "nexuscore.core.orchestrator_db_hook.log_orchestrator_event", side_effect=ImportError
+    ):
         context = orchestrator.run_planning_phase(initial_context)
 
     # コンテキストが更新されていることを確認
@@ -248,18 +234,16 @@ def test_fast_lane_mode_executes_planning_code_test_in_parallel(orchestrator, in
     orchestrator.planner_agent.generate_plan = MagicMock(
         return_value='{"functions_to_implement": ["func1"]}'
     )
-    orchestrator.coder_agent.implement_code = MagicMock(
-        return_value="def func1():\n    pass"
-    )
-    orchestrator.tester_agent.generate_tests = MagicMock(
-        return_value="def test_func1():\n    pass"
-    )
+    orchestrator.coder_agent.implement_code = MagicMock(return_value="def func1():\n    pass")
+    orchestrator.tester_agent.generate_tests = MagicMock(return_value="def test_func1():\n    pass")
 
     # _maybe_stop をモック化
     orchestrator._maybe_stop = lambda *args, **kwargs: None
 
     # orchestrator_db_hook のインポートエラーを回避
-    with patch("nexuscore.core.orchestrator_db_hook.log_orchestrator_event", side_effect=ImportError):
+    with patch(
+        "nexuscore.core.orchestrator_db_hook.log_orchestrator_event", side_effect=ImportError
+    ):
         context = orchestrator.run_planning_phase(initial_context)
 
         # FastLane の場合、Planning フェーズで Implementation と Testing も実行される
@@ -296,4 +280,3 @@ def test_orchestrator_phase_enum():
     assert OrchestratorPhase.IMPLEMENTATION.value == 4
     assert OrchestratorPhase.TESTING.value == 5
     assert OrchestratorPhase.REVIEW.value == 6
-

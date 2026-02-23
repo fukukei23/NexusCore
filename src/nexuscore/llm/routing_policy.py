@@ -4,11 +4,11 @@ Routing policy utilities and task-model mappings for LLMRouter.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from nexuscore.llm.task_model_map import LEGACY_TO_TASK, build_task_model_map_dict
 
-TASK_MODEL_MAP_DEFAULT: Dict[str, Dict[str, Any]] = build_task_model_map_dict()
+TASK_MODEL_MAP_DEFAULT: dict[str, dict[str, Any]] = build_task_model_map_dict()
 
 
 def model_family(name: str) -> str:

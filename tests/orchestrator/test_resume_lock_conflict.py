@@ -8,17 +8,16 @@ from __future__ import annotations
 
 import json
 import time
-from pathlib import Path
-from typing import Any, Dict
-
-import pytest
+from typing import Any
 
 from nexuscore.orchestrator import authority_runner
-from nexuscore.orchestrator.run_lock import _lock_file_path, _safe_run_id
+from nexuscore.orchestrator.run_lock import _lock_file_path
 from nexuscore.orchestrator.run_state_store import load_state, save_state
 
 
-def test_resume_lock_conflict_does_not_fail_or_mutate_state(monkeypatch: Any, tmp_path: Any) -> None:
+def test_resume_lock_conflict_does_not_fail_or_mutate_state(
+    monkeypatch: Any, tmp_path: Any
+) -> None:
     """Test that resume_run() returns CONFLICT and does not update RunState when lock is held."""
     monkeypatch.setenv("NEXUSCORE_RUN_STATE_DIR", str(tmp_path / "run_state"))
     monkeypatch.setenv("NEXUSCORE_RUNSTATE_HMAC_SECRET", "test-secret-key")
@@ -27,7 +26,7 @@ def test_resume_lock_conflict_does_not_fail_or_mutate_state(monkeypatch: Any, tm
     monkeypatch.setenv("NEXUSCORE_RUN_LOCK_DIR", str(lock_dir))
 
     run_id = "run-lock-conflict"
-    state: Dict[str, Any] = {
+    state: dict[str, Any] = {
         "schema_version": "1.0",
         "run_id": run_id,
         "status": "PAUSED",
@@ -62,14 +61,21 @@ def test_resume_lock_conflict_does_not_fail_or_mutate_state(monkeypatch: Any, tm
     # 2) CONFLICT-equivalent reason/why_code is present
     assert "explainability" in result, "Result must include explainability"
     explain = result["explainability"]
-    assert "why_code" in explain or "why" in explain or "reason" in explain, "explainability must include why_code/why/reason"
+    assert (
+        "why_code" in explain or "why" in explain or "reason" in explain
+    ), "explainability must include why_code/why/reason"
     why_code = explain.get("why_code") or explain.get("why") or explain.get("reason")
-    assert "CONFLICT" in str(why_code).upper() or "LOCK" in str(why_code).upper(), f"why_code must indicate CONFLICT (got {why_code})"
+    assert (
+        "CONFLICT" in str(why_code).upper() or "LOCK" in str(why_code).upper()
+    ), f"why_code must indicate CONFLICT (got {why_code})"
 
     # Secondary assertion (optional, format-dependent):
     if "status" in result:
         assert result["status"] == "CONFLICT", "Result status should be CONFLICT"
 
     assert result["run_id"] == run_id, "Result must include run_id"
-    assert explain.get("next_action") in ["wait/retry", "retry", "wait"], "next_action should suggest wait/retry"
-
+    assert explain.get("next_action") in [
+        "wait/retry",
+        "retry",
+        "wait",
+    ], "next_action should suggest wait/retry"

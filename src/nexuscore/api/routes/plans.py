@@ -4,15 +4,14 @@ Plans エンドポイント
 Plan管理用の FastAPI エンドポイント。
 将来的な拡張を考慮した構造。
 """
+
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, status
 
-from ..schemas.plan import PlanListResponse, PlanResponse, PlanSummary
+from ..dependencies.auth import AuthenticatedUser, get_current_user
 from ..schemas.error import ErrorResponse
-from ..dependencies.auth import get_current_user, AuthenticatedUser
-from ..utils.errors import make_internal_error
+from ..schemas.plan import PlanListResponse
 
 router = APIRouter(tags=["plans"])
 
@@ -30,7 +29,7 @@ logger = logging.getLogger(__name__)
     },
 )
 async def list_plans(
-    project_id: Optional[int] = Query(None, description="プロジェクトIDでフィルタ"),
+    project_id: int | None = Query(None, description="プロジェクトIDでフィルタ"),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> PlanListResponse:
     """
@@ -74,4 +73,3 @@ async def list_plans(
     # 将来的に Plan モデルが実装されたら、実際のデータを返すように更新
     logger.info("Plan list endpoint called (not yet implemented)")
     return PlanListResponse(plans=[])
-

@@ -1,9 +1,7 @@
-from types import SimpleNamespace
 
-import pytest
 
-from nexuscore.npe import budget
 import nexuscore.npe.engine as engine
+from nexuscore.npe import budget
 
 
 class DummyDecision(budget.BudgetDecision):
@@ -41,12 +39,14 @@ def test_guarded_llm_call_tracks_usage(monkeypatch):
     monkeypatch.setattr(budget, "record_estimate", lambda *args, **kwargs: None)
     usage_calls = []
     monkeypatch.setattr(budget, "record_usage", lambda **kwargs: usage_calls.append(kwargs))
-    monkeypatch.setattr(
-        engine, "log_transaction", lambda *args, **kwargs: None
-    )
+    monkeypatch.setattr(engine, "log_transaction", lambda *args, **kwargs: None)
 
     def fake_complete(**kwargs):
-        return {"ok": True, "content": "done", "usage": {"prompt_tokens": 5, "completion_tokens": 3}}
+        return {
+            "ok": True,
+            "content": "done",
+            "usage": {"prompt_tokens": 5, "completion_tokens": 3},
+        }
 
     response = engine.guarded_llm_call(
         model="gpt-5",

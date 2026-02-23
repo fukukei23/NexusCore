@@ -3,15 +3,17 @@ Tests for error classification system
 
 エラー分類ロジックの正確性を保証するテスト群（リトライ戦略の基盤）
 """
+
 import pytest
+
 from src.nexuscore.core.errors import (
-    NexusCoreError,
+    InvalidModelOutputError,
+    ModelConnectionError,
     ModelRateLimitError,
     ModelTimeoutError,
-    ModelConnectionError,
-    InvalidModelOutputError,
-    SandboxExecutionError,
+    NexusCoreError,
     PatchApplyError,
+    SandboxExecutionError,
     UnexpectedSystemError,
     classify_error,
     convert_http_error_to_nexus_error,
@@ -106,6 +108,7 @@ class TestErrorClassification:
 
     def test_classify_json_parse_error_by_type_name(self):
         """型名に JSON/parse キーワードがある場合、invalid_output として分類"""
+
         class JSONParseError(Exception):
             pass
 
@@ -121,6 +124,7 @@ class TestErrorClassification:
 
     def test_classify_json_decode_error(self):
         """JSON デコードエラーを invalid_output として分類"""
+
         class JSONDecodeError(Exception):
             pass
 
@@ -153,6 +157,7 @@ class TestErrorClassification:
 
     def test_classify_from_exception_type_timeout(self):
         """例外型名に 'Timeout' が含まれる場合の分類"""
+
         class CustomTimeoutError(Exception):
             pass
 
@@ -161,6 +166,7 @@ class TestErrorClassification:
 
     def test_classify_from_exception_type_connection(self):
         """例外型名に 'Connection' が含まれる場合の分類"""
+
         class ConnectionRefusedError(Exception):
             pass
 
@@ -217,6 +223,7 @@ class TestConvertHttpErrorToNexusError:
 
     def test_convert_invalid_output_error(self):
         """JSON パースエラーを InvalidModelOutputError に変換"""
+
         class JSONParseError(Exception):
             pass
 
@@ -363,6 +370,7 @@ class TestUnclassifiableErrorHandling:
 
     def test_classify_error_with_exception_during_classification(self):
         """分類処理中の例外発生テスト（3.4.3）"""
+
         # 分類処理中に例外が発生した場合、"unexpected" を返すことを確認
         # このテストは実装が例外処理を含んでいることを前提とする
         class BadError:
@@ -377,6 +385,7 @@ class TestUnclassifiableErrorHandling:
 
     def test_convert_unclassifiable_error(self):
         """分類不能エラーの変換テスト（3.4.2 Step 3）"""
+
         class BadError:
             def __str__(self):
                 raise RuntimeError("Cannot stringify")

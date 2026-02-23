@@ -17,37 +17,37 @@ import json
 import logging
 import os
 import sys
-import tempfile
 from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import MagicMock, Mock, call, patch
+from typing import Any
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 # orchestrator.py が依存する全モジュールをモック
-sys.modules['gradio'] = MagicMock()
-sys.modules['nexuscore.agents.requirement_agent'] = MagicMock()
-sys.modules['nexuscore.agents.architect_agent'] = MagicMock()
-sys.modules['nexuscore.agents.planner_agent'] = MagicMock()
-sys.modules['nexuscore.agents.coder_agent'] = MagicMock()
-sys.modules['nexuscore.agents.tester_agent'] = MagicMock()
-sys.modules['nexuscore.agents.debugger_agent'] = MagicMock()
-sys.modules['nexuscore.agents.guardian_agent'] = MagicMock()
-sys.modules['nexuscore.agents.policy_agent'] = MagicMock()
-sys.modules['nexuscore.agents.postmortem_agent'] = MagicMock()
-sys.modules['nexuscore.agents.knowledge_curator_agent'] = MagicMock()
-sys.modules['nexuscore.agents.patch_applier'] = MagicMock()
+sys.modules["gradio"] = MagicMock()
+sys.modules["nexuscore.agents.requirement_agent"] = MagicMock()
+sys.modules["nexuscore.agents.architect_agent"] = MagicMock()
+sys.modules["nexuscore.agents.planner_agent"] = MagicMock()
+sys.modules["nexuscore.agents.coder_agent"] = MagicMock()
+sys.modules["nexuscore.agents.tester_agent"] = MagicMock()
+sys.modules["nexuscore.agents.debugger_agent"] = MagicMock()
+sys.modules["nexuscore.agents.guardian_agent"] = MagicMock()
+sys.modules["nexuscore.agents.policy_agent"] = MagicMock()
+sys.modules["nexuscore.agents.postmortem_agent"] = MagicMock()
+sys.modules["nexuscore.agents.knowledge_curator_agent"] = MagicMock()
+sys.modules["nexuscore.agents.patch_applier"] = MagicMock()
 
 try:
     from nexuscore.core.orchestrator import (
         Orchestrator,
-        assemble_agent_team,
         _build_arg_parser,
+        assemble_agent_team,
     )
     from nexuscore.core.session_control import SessionController
     from nexuscore.llm.llm_router import LLMRouter
+
     HAS_ORCHESTRATOR = True
-except ImportError as e:
+except ImportError:
     HAS_ORCHESTRATOR = False
     Orchestrator = None
     assemble_agent_team = None
@@ -81,7 +81,7 @@ class TestOrchestratorInit:
         assert orchestrator.llm_router == llm_router
         assert orchestrator.max_retries == 5
         assert orchestrator.session_controller is None
-        assert hasattr(orchestrator, 'logger')
+        assert hasattr(orchestrator, "logger")
 
     def test_init_with_session_controller(self, tmp_path):
         """SessionController付き初期化"""
@@ -145,7 +145,7 @@ class TestOrchestratorInit:
         assert len(orchestrator.logger.handlers) >= 2  # FileHandler + StreamHandler
 
     @staticmethod
-    def _create_mock_agents() -> Dict[str, Any]:
+    def _create_mock_agents() -> dict[str, Any]:
         """モックエージェント群を作成"""
         return {
             "requirement_agent": Mock(),
@@ -236,8 +236,8 @@ class TestOrchestratorMaybeStop:
 class TestOrchestratorExecuteTaskViaNPE:
     """Orchestrator._execute_task_via_npe() のテスト"""
 
-    @patch('nexuscore.core.orchestrator.guarded_llm_call')
-    @patch('nexuscore.core.orchestrator.clean_output')
+    @patch("nexuscore.core.orchestrator.guarded_llm_call")
+    @patch("nexuscore.core.orchestrator.clean_output")
     def test_execute_task_basic(self, mock_clean, mock_guarded_call, tmp_path):
         """基本的なタスク実行"""
         mock_guarded_call.return_value = {"ok": True, "content": "LLM response", "usage": {}}
@@ -257,8 +257,7 @@ class TestOrchestratorExecuteTaskViaNPE:
         )
 
         result = orchestrator._execute_task_via_npe(
-            prompt="Test prompt",
-            metadata={"task_type": "planning"}
+            prompt="Test prompt", metadata={"task_type": "planning"}
         )
 
         assert result == "LLM response"
@@ -266,8 +265,8 @@ class TestOrchestratorExecuteTaskViaNPE:
         assert mock_guarded_call.call_args[1]["model"] == "gpt-4"
         assert mock_guarded_call.call_args[1]["task"] == "planning"
 
-    @patch('nexuscore.core.orchestrator.guarded_llm_call')
-    @patch('nexuscore.core.orchestrator.clean_output')
+    @patch("nexuscore.core.orchestrator.guarded_llm_call")
+    @patch("nexuscore.core.orchestrator.clean_output")
     def test_execute_task_default_model(self, mock_clean, mock_guarded_call, tmp_path):
         """デフォルトモデルを使用"""
         mock_guarded_call.return_value = {"ok": True, "content": "Default response", "usage": {}}
@@ -287,15 +286,14 @@ class TestOrchestratorExecuteTaskViaNPE:
         )
 
         result = orchestrator._execute_task_via_npe(
-            prompt="Test prompt",
-            metadata={"task_type": "unknown_task"}
+            prompt="Test prompt", metadata={"task_type": "unknown_task"}
         )
 
         assert result == "Default response"
         assert mock_guarded_call.call_args[1]["model"] == "gpt-3.5-turbo"
 
-    @patch('nexuscore.core.orchestrator.guarded_llm_call')
-    @patch('nexuscore.core.orchestrator.clean_output')
+    @patch("nexuscore.core.orchestrator.guarded_llm_call")
+    @patch("nexuscore.core.orchestrator.clean_output")
     def test_execute_task_string_response(self, mock_clean, mock_guarded_call, tmp_path):
         """NPEが文字列を返す場合"""
         mock_guarded_call.return_value = "Direct string response"
@@ -315,14 +313,13 @@ class TestOrchestratorExecuteTaskViaNPE:
         )
 
         result = orchestrator._execute_task_via_npe(
-            prompt="Test prompt",
-            metadata={"task_type": "generic"}
+            prompt="Test prompt", metadata={"task_type": "generic"}
         )
 
         assert result == "Direct string response"
 
-    @patch('nexuscore.core.orchestrator.guarded_llm_call')
-    @patch('nexuscore.core.orchestrator.clean_output')
+    @patch("nexuscore.core.orchestrator.guarded_llm_call")
+    @patch("nexuscore.core.orchestrator.clean_output")
     def test_execute_task_no_task_type(self, mock_clean, mock_guarded_call, tmp_path):
         """task_typeが指定されていない場合"""
         mock_guarded_call.return_value = {"ok": True, "content": "Generic response", "usage": {}}
@@ -341,10 +338,7 @@ class TestOrchestratorExecuteTaskViaNPE:
             **agents,
         )
 
-        result = orchestrator._execute_task_via_npe(
-            prompt="Test prompt",
-            metadata={}
-        )
+        result = orchestrator._execute_task_via_npe(prompt="Test prompt", metadata={})
 
         assert result == "Generic response"
         assert mock_guarded_call.call_args[1]["task"] == "generic"
@@ -354,10 +348,14 @@ class TestOrchestratorExecuteTaskViaNPE:
 class TestOrchestratorRunFullProject:
     """Orchestrator.run_full_project() のテスト"""
 
-    @patch('nexuscore.core.orchestrator.guarded_llm_call')
+    @patch("nexuscore.core.orchestrator.guarded_llm_call")
     def test_run_full_project_basic(self, mock_guarded_call, tmp_path):
         """基本的なプロジェクト実行フロー"""
-        mock_guarded_call.return_value = {"ok": True, "content": '{"functions_to_implement": []}', "usage": {}}
+        mock_guarded_call.return_value = {
+            "ok": True,
+            "content": '{"functions_to_implement": []}',
+            "usage": {},
+        }
 
         llm_router = Mock(spec=LLMRouter)
         llm_router.task_model_map = {}
@@ -373,9 +371,7 @@ class TestOrchestratorRunFullProject:
         )
 
         # planner_agentにgenerate_planメソッドを追加
-        agents["planner_agent"].generate_plan = Mock(
-            return_value='{"functions_to_implement": []}'
-        )
+        agents["planner_agent"].generate_plan = Mock(return_value='{"functions_to_implement": []}')
 
         orchestrator = Orchestrator(
             project_path=str(tmp_path),
@@ -396,7 +392,7 @@ class TestOrchestratorRunFullProject:
         # planner_agentが呼ばれたことを確認
         agents["planner_agent"].generate_plan.assert_called_once()
 
-    @patch('nexuscore.core.orchestrator.guarded_llm_call')
+    @patch("nexuscore.core.orchestrator.guarded_llm_call")
     def test_run_full_project_with_session_stop(self, mock_guarded_call, tmp_path):
         """セッション中断時の動作"""
         session_controller = Mock(spec=SessionController)
@@ -424,7 +420,7 @@ class TestOrchestratorRunFullProject:
         # チェックポイントが呼ばれたことを確認
         assert session_controller.checkpoint.call_count > 0
 
-    @patch('nexuscore.core.orchestrator.guarded_llm_call')
+    @patch("nexuscore.core.orchestrator.guarded_llm_call")
     def test_run_full_project_requirement_failure(self, mock_guarded_call, tmp_path):
         """要件定義フェーズ失敗時の動作"""
         llm_router = Mock(spec=LLMRouter)
@@ -449,7 +445,7 @@ class TestOrchestratorRunFullProject:
             fast_lane=False,
         )
 
-    @patch('nexuscore.core.orchestrator.guarded_llm_call')
+    @patch("nexuscore.core.orchestrator.guarded_llm_call")
     def test_run_full_project_empty_specs(self, mock_guarded_call, tmp_path):
         """要件定義が空の場合の動作"""
         llm_router = Mock(spec=LLMRouter)
@@ -472,13 +468,19 @@ class TestOrchestratorRunFullProject:
         )
 
         # planner_agentが呼ばれないことを確認
-        assert not hasattr(agents["planner_agent"], "generate_plan") or \
-               not agents["planner_agent"].generate_plan.called
+        assert (
+            not hasattr(agents["planner_agent"], "generate_plan")
+            or not agents["planner_agent"].generate_plan.called
+        )
 
-    @patch('nexuscore.core.orchestrator.guarded_llm_call')
+    @patch("nexuscore.core.orchestrator.guarded_llm_call")
     def test_run_full_project_fast_lane(self, mock_guarded_call, tmp_path):
         """FastLaneモードでの実行"""
-        mock_guarded_call.return_value = {"ok": True, "content": '{"functions_to_implement": []}', "usage": {}}
+        mock_guarded_call.return_value = {
+            "ok": True,
+            "content": '{"functions_to_implement": []}',
+            "usage": {},
+        }
 
         llm_router = Mock(spec=LLMRouter)
         llm_router.task_model_map = {}
@@ -491,9 +493,7 @@ class TestOrchestratorRunFullProject:
         agents["requirement_agent"].analyze_requirement = Mock(
             return_value={"raw_requirement": "Test"}
         )
-        agents["planner_agent"].generate_plan = Mock(
-            return_value='{"functions_to_implement": []}'
-        )
+        agents["planner_agent"].generate_plan = Mock(return_value='{"functions_to_implement": []}')
         agents["coder_agent"].implement_code = Mock(return_value="# code")
         agents["tester_agent"].generate_tests = Mock(return_value="# tests")
 
@@ -511,10 +511,10 @@ class TestOrchestratorRunFullProject:
         )
 
         # FastLaneモードで並列実行されたことを確認
-        assert hasattr(orchestrator, 'last_fastlane_outputs')
-        assert 'code' in orchestrator.last_fastlane_outputs
-        assert 'tests' in orchestrator.last_fastlane_outputs
-        assert 'plan' in orchestrator.last_fastlane_outputs
+        assert hasattr(orchestrator, "last_fastlane_outputs")
+        assert "code" in orchestrator.last_fastlane_outputs
+        assert "tests" in orchestrator.last_fastlane_outputs
+        assert "plan" in orchestrator.last_fastlane_outputs
 
 
 @pytest.mark.skipif(not HAS_ORCHESTRATOR, reason="orchestrator module not available")
@@ -539,9 +539,7 @@ class TestOrchestratorEnsureFastlaneTests:
         orchestrator = self._create_orchestrator(tmp_path)
 
         # tester_agentにgenerate_tests_from_planメソッドを追加
-        orchestrator.tester_agent.generate_tests_from_plan = Mock(
-            return_value="Tests from plan"
-        )
+        orchestrator.tester_agent.generate_tests_from_plan = Mock(return_value="Tests from plan")
 
         plan = {"functions_to_implement": [{"name": "test_func"}]}
 
@@ -572,16 +570,16 @@ class TestOrchestratorEnsureFastlaneTests:
         )
 
         assert result == "Tests from code"
-        orchestrator.tester_agent.generate_tests_and_testimony.assert_called_once_with("def test_func(): pass")
+        orchestrator.tester_agent.generate_tests_and_testimony.assert_called_once_with(
+            "def test_func(): pass"
+        )
 
     def test_ensure_fastlane_tests_fallback_to_requirement(self, tmp_path):
         """要件からのフォールバック生成"""
         orchestrator = self._create_orchestrator(tmp_path)
 
         # tester_agentにgenerate_testsメソッドを追加
-        orchestrator.tester_agent.generate_tests = Mock(
-            return_value="Tests from requirement"
-        )
+        orchestrator.tester_agent.generate_tests = Mock(return_value="Tests from requirement")
 
         result = orchestrator._ensure_fastlane_tests(
             initial_result="",
@@ -636,18 +634,18 @@ class TestAssembleAgentTeam:
     """assemble_agent_team() のテスト"""
 
     @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
-    @patch('nexuscore.core.orchestrator.RequirementAgent')
-    @patch('nexuscore.core.orchestrator.ArchitectAgent')
-    @patch('nexuscore.core.orchestrator.PlannerAgent')
-    @patch('nexuscore.core.orchestrator.CoderAgent')
-    @patch('nexuscore.core.orchestrator.TesterAgent')
-    @patch('nexuscore.core.orchestrator.DebuggerAgent')
-    @patch('nexuscore.core.orchestrator.GuardianAgent')
-    @patch('nexuscore.core.orchestrator.PolicyAgent')
-    @patch('nexuscore.core.orchestrator.PostmortemAgent')
-    @patch('nexuscore.core.orchestrator.KnowledgeCuratorAgent')
-    @patch('nexuscore.core.orchestrator.PatchApplier')
-    @patch('nexuscore.core.orchestrator.LLMRouter')
+    @patch("nexuscore.core.orchestrator.RequirementAgent")
+    @patch("nexuscore.core.orchestrator.ArchitectAgent")
+    @patch("nexuscore.core.orchestrator.PlannerAgent")
+    @patch("nexuscore.core.orchestrator.CoderAgent")
+    @patch("nexuscore.core.orchestrator.TesterAgent")
+    @patch("nexuscore.core.orchestrator.DebuggerAgent")
+    @patch("nexuscore.core.orchestrator.GuardianAgent")
+    @patch("nexuscore.core.orchestrator.PolicyAgent")
+    @patch("nexuscore.core.orchestrator.PostmortemAgent")
+    @patch("nexuscore.core.orchestrator.KnowledgeCuratorAgent")
+    @patch("nexuscore.core.orchestrator.PatchApplier")
+    @patch("nexuscore.core.orchestrator.LLMRouter")
     def test_assemble_agent_team_success(
         self,
         mock_router,
@@ -666,9 +664,20 @@ class TestAssembleAgentTeam:
     ):
         """エージェントチームの正常な組成"""
         # 各モックの戻り値を設定
-        for mock in [mock_requirement, mock_architect, mock_planner, mock_coder,
-                    mock_tester, mock_debugger, mock_guardian, mock_policy,
-                    mock_postmortem, mock_curator, mock_patch_applier, mock_router]:
+        for mock in [
+            mock_requirement,
+            mock_architect,
+            mock_planner,
+            mock_coder,
+            mock_tester,
+            mock_debugger,
+            mock_guardian,
+            mock_policy,
+            mock_postmortem,
+            mock_curator,
+            mock_patch_applier,
+            mock_router,
+        ]:
             mock.return_value = Mock()
 
         result = assemble_agent_team(str(tmp_path))
@@ -699,19 +708,21 @@ class TestAssembleAgentTeam:
         with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
             assemble_agent_team(str(tmp_path))
 
-    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key", "NEXUS_TASK_MODEL_KNOWLEDGE": "claude-3-opus"})
-    @patch('nexuscore.core.orchestrator.RequirementAgent')
-    @patch('nexuscore.core.orchestrator.ArchitectAgent')
-    @patch('nexuscore.core.orchestrator.PlannerAgent')
-    @patch('nexuscore.core.orchestrator.CoderAgent')
-    @patch('nexuscore.core.orchestrator.TesterAgent')
-    @patch('nexuscore.core.orchestrator.DebuggerAgent')
-    @patch('nexuscore.core.orchestrator.GuardianAgent')
-    @patch('nexuscore.core.orchestrator.PolicyAgent')
-    @patch('nexuscore.core.orchestrator.PostmortemAgent')
-    @patch('nexuscore.core.orchestrator.KnowledgeCuratorAgent')
-    @patch('nexuscore.core.orchestrator.PatchApplier')
-    @patch('nexuscore.core.orchestrator.LLMRouter')
+    @patch.dict(
+        os.environ, {"ANTHROPIC_API_KEY": "test-key", "NEXUS_TASK_MODEL_KNOWLEDGE": "claude-3-opus"}
+    )
+    @patch("nexuscore.core.orchestrator.RequirementAgent")
+    @patch("nexuscore.core.orchestrator.ArchitectAgent")
+    @patch("nexuscore.core.orchestrator.PlannerAgent")
+    @patch("nexuscore.core.orchestrator.CoderAgent")
+    @patch("nexuscore.core.orchestrator.TesterAgent")
+    @patch("nexuscore.core.orchestrator.DebuggerAgent")
+    @patch("nexuscore.core.orchestrator.GuardianAgent")
+    @patch("nexuscore.core.orchestrator.PolicyAgent")
+    @patch("nexuscore.core.orchestrator.PostmortemAgent")
+    @patch("nexuscore.core.orchestrator.KnowledgeCuratorAgent")
+    @patch("nexuscore.core.orchestrator.PatchApplier")
+    @patch("nexuscore.core.orchestrator.LLMRouter")
     def test_assemble_agent_team_custom_model(
         self,
         mock_router,
@@ -729,9 +740,20 @@ class TestAssembleAgentTeam:
         tmp_path,
     ):
         """カスタムモデル設定"""
-        for mock in [mock_requirement, mock_architect, mock_planner, mock_coder,
-                    mock_tester, mock_debugger, mock_guardian, mock_policy,
-                    mock_postmortem, mock_curator, mock_patch_applier, mock_router]:
+        for mock in [
+            mock_requirement,
+            mock_architect,
+            mock_planner,
+            mock_coder,
+            mock_tester,
+            mock_debugger,
+            mock_guardian,
+            mock_policy,
+            mock_postmortem,
+            mock_curator,
+            mock_patch_applier,
+            mock_router,
+        ]:
             mock.return_value = Mock()
 
         result = assemble_agent_team(str(tmp_path))
@@ -761,13 +783,19 @@ class TestCLI:
     def test_arg_parser_custom_values(self):
         """カスタム引数"""
         parser = _build_arg_parser()
-        args = parser.parse_args([
-            "--project", "/path/to/project",
-            "--requirement", "Custom requirement",
-            "--autonomy-level", "2",
-            "--fast-lane",
-            "--session-id", "test-session-123",
-        ])
+        args = parser.parse_args(
+            [
+                "--project",
+                "/path/to/project",
+                "--requirement",
+                "Custom requirement",
+                "--autonomy-level",
+                "2",
+                "--fast-lane",
+                "--session-id",
+                "test-session-123",
+            ]
+        )
 
         assert args.project == "/path/to/project"
         assert args.requirement == "Custom requirement"
@@ -802,8 +830,8 @@ class TestEdgeCases:
 
         assert orchestrator.constitution == {}
 
-    @patch('nexuscore.core.orchestrator.guarded_llm_call')
-    @patch('nexuscore.core.orchestrator.clean_output')
+    @patch("nexuscore.core.orchestrator.guarded_llm_call")
+    @patch("nexuscore.core.orchestrator.clean_output")
     def test_execute_task_with_empty_content(self, mock_clean, mock_guarded_call, tmp_path):
         """NPEが空のcontentを返す場合"""
         mock_guarded_call.return_value = {"ok": True, "content": "", "usage": {}}
@@ -823,8 +851,7 @@ class TestEdgeCases:
         )
 
         result = orchestrator._execute_task_via_npe(
-            prompt="Test prompt",
-            metadata={"task_type": "generic"}
+            prompt="Test prompt", metadata={"task_type": "generic"}
         )
 
         assert result == ""

@@ -18,29 +18,28 @@ GitHub PR コメント組み立ての包括的テスト
 NOTE: format_diff_summary_block は source code に関数定義行が欠けているためスキップ
 """
 
-import json
+from datetime import datetime
+from unittest.mock import Mock, patch
+
 import pytest
-from datetime import datetime, timedelta
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from collections import defaultdict
 
 try:
     from nexuscore.integration.github_pr_comment import (
-        _format_duration,
-        _estimate_diff_lines,
+        PRCommentContext,
         _collect_run_metrics,
         _compute_recent_success_rate,
-        build_run_logs_url,
-        build_project_logs_url,
-        build_project_dashboard_url,
-        load_run_markdown,
-        format_markdown_report_block,
-        render_summary_card,
-        format_semantic_diff_block,
+        _estimate_diff_lines,
+        _format_duration,
         build_pr_comment,
-        PRCommentContext,
+        build_project_dashboard_url,
+        build_project_logs_url,
+        build_run_logs_url,
+        format_markdown_report_block,
+        format_semantic_diff_block,
+        load_run_markdown,
+        render_summary_card,
     )
+
     HAS_GITHUB_PR_COMMENT = True
 except ImportError:
     HAS_GITHUB_PR_COMMENT = False
@@ -198,7 +197,9 @@ class TestComputeRecentSuccessRate:
         mock_runs = [Mock(status="SUCCESS") for _ in range(10)]
 
         mock_query = Mock()
-        mock_query.filter.return_value.order_by.return_value.limit.return_value.all.return_value = mock_runs
+        mock_query.filter.return_value.order_by.return_value.limit.return_value.all.return_value = (
+            mock_runs
+        )
 
         with patch("nexuscore.integration.github_pr_comment.Run") as mock_run:
             mock_run.query = mock_query
@@ -218,7 +219,9 @@ class TestComputeRecentSuccessRate:
         ]
 
         mock_query = Mock()
-        mock_query.filter.return_value.order_by.return_value.limit.return_value.all.return_value = mock_runs
+        mock_query.filter.return_value.order_by.return_value.limit.return_value.all.return_value = (
+            mock_runs
+        )
 
         with patch("nexuscore.integration.github_pr_comment.Run") as mock_run:
             mock_run.query = mock_query
@@ -526,7 +529,9 @@ class TestBuildPrComment:
         )
 
         with patch("nexuscore.integration.github_pr_comment._collect_run_metrics") as mock_metrics:
-            with patch("nexuscore.integration.github_pr_comment._compute_recent_success_rate") as mock_rate:
+            with patch(
+                "nexuscore.integration.github_pr_comment._compute_recent_success_rate"
+            ) as mock_rate:
                 mock_metrics.return_value = {
                     "duration_str": "2m 30s",
                     "patch_files_count": 1,

@@ -6,15 +6,16 @@ HTTP error conversion.
 """
 
 import pytest
+
 from nexuscore.core.errors import (
-    NexusCoreError,
+    InvalidModelOutputError,
+    ModelConnectionError,
     ModelRateLimitError,
     ModelTimeoutError,
-    ModelConnectionError,
-    InvalidModelOutputError,
+    NexusCoreError,
+    PatchApplyError,
     SandboxExecutionError,
     SandboxSecurityError,
-    PatchApplyError,
     UnexpectedSystemError,
     classify_error,
     convert_http_error_to_nexus_error,
@@ -164,6 +165,7 @@ class TestClassifyErrorHTTPErrors:
 
     def test_classify_timeout_error_by_type_name(self):
         """Test classify_error identifies timeout from exception type."""
+
         class TimeoutException(Exception):
             pass
 
@@ -191,6 +193,7 @@ class TestClassifyErrorHTTPErrors:
 
     def test_classify_connection_error_by_type_name(self):
         """Test classify_error identifies connection from exception type."""
+
         class ConnectionError(Exception):
             pass
 
@@ -222,6 +225,7 @@ class TestClassifyErrorJSONErrors:
 
     def test_classify_json_error_by_type_name(self):
         """Test classify_error identifies JSON errors from type name."""
+
         class JSONDecodeError(Exception):
             pass
 
@@ -369,6 +373,7 @@ class TestConvertHTTPErrorToNexusError:
 
     def test_convert_includes_error_type_name(self):
         """Test conversion includes original exception type name."""
+
         class CustomHTTPError(Exception):
             pass
 

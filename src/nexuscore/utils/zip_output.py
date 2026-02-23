@@ -2,6 +2,7 @@ import os
 import zipfile
 from datetime import datetime
 
+
 def zip_project(output_dir="deploy_output"):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     zip_filename = os.path.join(output_dir, f"OpenCodeInterpreter_{timestamp}.zip")

@@ -3,8 +3,8 @@ import os
 
 import pytest
 
-from nexuscore.llm.llm_router import _real_call_enabled, _stub_response
 from nexuscore.llm.config import synchronize_aliases
+from nexuscore.llm.llm_router import _real_call_enabled, _stub_response
 
 
 @pytest.fixture(autouse=True)

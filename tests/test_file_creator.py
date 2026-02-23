@@ -1,9 +1,8 @@
 """Tests for file_creator.py"""
+
 import os
-import tempfile
-from pathlib import Path
-import pytest
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 # プロジェクトルートをパスに追加
@@ -24,7 +23,7 @@ def test_create_code_file_basic(tmp_path):
 
     assert os.path.exists(result_path)
     assert result_path.endswith("test.py")
-    with open(result_path, "r", encoding="utf-8") as f:
+    with open(result_path, encoding="utf-8") as f:
         assert f.read() == code
 
 
@@ -40,7 +39,7 @@ def test_create_code_file_default_folder(tmp_path, monkeypatch):
 
     assert os.path.exists(result_path)
     assert os.path.exists(default_folder)
-    with open(result_path, "r", encoding="utf-8") as f:
+    with open(result_path, encoding="utf-8") as f:
         assert f.read() == code
 
 
@@ -55,7 +54,7 @@ def test_create_code_file_multiline_code(tmp_path):
 
     result_path = create_code_file(filename, code, folder)
 
-    with open(result_path, "r", encoding="utf-8") as f:
+    with open(result_path, encoding="utf-8") as f:
         content = f.read()
         assert "def hello():" in content
         assert 'print("world")' in content
@@ -96,7 +95,7 @@ def test_create_code_file_empty_code(tmp_path):
     result_path = create_code_file(filename, code, folder)
 
     assert os.path.exists(result_path)
-    with open(result_path, "r", encoding="utf-8") as f:
+    with open(result_path, encoding="utf-8") as f:
         assert f.read() == ""
 
 
@@ -109,7 +108,7 @@ def test_create_code_file_unicode_content(tmp_path):
     result_path = create_code_file(filename, code, folder)
 
     assert os.path.exists(result_path)
-    with open(result_path, "r", encoding="utf-8") as f:
+    with open(result_path, encoding="utf-8") as f:
         content = f.read()
         assert "日本語コメント" in content
         assert "こんにちは" in content
@@ -124,7 +123,7 @@ def test_create_code_file_very_long_code(tmp_path):
     result_path = create_code_file(filename, code, folder)
 
     assert os.path.exists(result_path)
-    with open(result_path, "r", encoding="utf-8") as f:
+    with open(result_path, encoding="utf-8") as f:
         content = f.read()
         assert len(content) > 1000
         assert "Line 0" in content
@@ -203,13 +202,13 @@ def test_create_code_file_overwrite_existing(tmp_path):
     # 最初のファイル作成
     result_path1 = create_code_file(filename, code1, folder)
     assert os.path.exists(result_path1)
-    with open(result_path1, "r", encoding="utf-8") as f:
+    with open(result_path1, encoding="utf-8") as f:
         assert f.read() == code1
 
     # 同じファイル名で上書き
     result_path2 = create_code_file(filename, code2, folder)
     assert result_path1 == result_path2  # 同じパスが返される
-    with open(result_path2, "r", encoding="utf-8") as f:
+    with open(result_path2, encoding="utf-8") as f:
         assert f.read() == code2
 
 
@@ -223,7 +222,7 @@ def test_create_code_file_binary_like_content(tmp_path):
     result_path = create_code_file(filename, code, folder)
 
     assert os.path.exists(result_path)
-    with open(result_path, "r", encoding="utf-8", errors="replace") as f:
+    with open(result_path, encoding="utf-8", errors="replace") as f:
         content = f.read()
         assert "print('test')" in content
 
@@ -250,7 +249,7 @@ def test_create_code_file_code_with_encoding_issues(tmp_path):
     result_path = create_code_file(filename, code, folder)
 
     assert os.path.exists(result_path)
-    with open(result_path, "r", encoding="utf-8") as f:
+    with open(result_path, encoding="utf-8") as f:
         content = f.read()
         assert "テスト" in content
         assert "🐍" in content
@@ -284,6 +283,7 @@ def test_create_code_file_absolute_path(tmp_path):
 def test_create_code_file_relative_path_handling(tmp_path, monkeypatch):
     """相対パスの処理テスト"""
     import os
+
     original_cwd = os.getcwd()
 
     try:
@@ -310,12 +310,12 @@ def test_create_code_file_encoding_consistency(tmp_path):
         "print('ASCII')",
         "print('日本語')",
         "print('émoji: 🐍')",
-        "print('Mixed: ASCII + 日本語 + 🐍')"
+        "print('Mixed: ASCII + 日本語 + 🐍')",
     ]
 
     for code in test_cases:
         result_path = create_code_file(filename, code, folder)
-        with open(result_path, "r", encoding="utf-8") as f:
+        with open(result_path, encoding="utf-8") as f:
             read_content = f.read()
             assert read_content == code
 
@@ -336,7 +336,7 @@ def test_create_code_file_idempotency(tmp_path):
     # すべて同じパスが返されることを確認
     assert len(set(paths)) == 1
     # ファイル内容が正しいことを確認
-    with open(paths[0], "r", encoding="utf-8") as f:
+    with open(paths[0], encoding="utf-8") as f:
         assert f.read() == code
 
 
@@ -353,7 +353,7 @@ def test_create_code_file_with_newlines_variations(tmp_path):
 
     for code, expected_newline in test_cases:
         result_path = create_code_file(filename, code, folder)
-        with open(result_path, "r", encoding="utf-8", newline="") as f:
+        with open(result_path, encoding="utf-8", newline="") as f:
             content = f.read()
             # 改行が含まれていることを確認
             assert "\n" in content or "\r" in content
@@ -370,7 +370,7 @@ def test_create_code_file_none_values_handling(tmp_path):
     result_path = create_code_file(filename, code, folder)
 
     assert os.path.exists(result_path)
-    with open(result_path, "r", encoding="utf-8") as f:
+    with open(result_path, encoding="utf-8") as f:
         assert "None" in f.read()
 
 
@@ -398,6 +398,7 @@ def test_create_code_file_performance_large_content(tmp_path):
     large_code = "# " + "x" * (1024 * 1024)
 
     import time
+
     start_time = time.time()
     result_path = create_code_file(filename, large_code, folder)
     elapsed = time.time() - start_time
@@ -497,7 +498,7 @@ def test_create_code_file_with_control_characters(tmp_path):
 
     assert os.path.exists(result_path)
     # ファイルが読み込めることを確認（エラー処理あり）
-    with open(result_path, "r", encoding="utf-8", errors="replace") as f:
+    with open(result_path, encoding="utf-8", errors="replace") as f:
         content = f.read()
         assert "print" in content
 
@@ -517,11 +518,7 @@ def test_create_code_file_integration_with_history_manager(tmp_path):
     result_path = create_code_file(filename, code, folder)
 
     # 履歴に状態を追加
-    state = {
-        "action": "file_created",
-        "file_path": result_path,
-        "filename": filename
-    }
+    state = {"action": "file_created", "file_path": result_path, "filename": filename}
     hm.add_state(state)
 
     # 履歴が正しく保存されていることを確認
@@ -534,6 +531,7 @@ def test_create_code_file_integration_with_vcs(tmp_path):
     import subprocess
     import sys
     from pathlib import Path
+
     project_root = Path(__file__).parent.parent
     sys.path.insert(0, str(project_root / "src"))
     from nexuscore.utils import vcs
@@ -566,6 +564,7 @@ def test_create_code_file_with_code_generator_output(tmp_path, monkeypatch):
     """コードジェネレーター出力との統合テスト"""
     import sys
     from pathlib import Path
+
     project_root = Path(__file__).parent.parent
     sys.path.insert(0, str(project_root / "src"))
     from nexuscore.modules import code_generator
@@ -575,7 +574,9 @@ def test_create_code_file_with_code_generator_output(tmp_path, monkeypatch):
     # コードジェネレーターをモック
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
-    mock_response.choices[0].message.content = "```python\ndef generated_func():\n    return 42\n```"
+    mock_response.choices[0].message.content = (
+        "```python\ndef generated_func():\n    return 42\n```"
+    )
 
     mock_client = MagicMock()
     mock_client.chat.completions.create.return_value = mock_response
@@ -591,7 +592,7 @@ def test_create_code_file_with_code_generator_output(tmp_path, monkeypatch):
         result_path = create_code_file(filename, generated_code, folder)
 
         assert os.path.exists(result_path)
-        with open(result_path, "r", encoding="utf-8") as f:
+        with open(result_path, encoding="utf-8") as f:
             content = f.read()
             assert "generated_func" in content or "42" in content
 
@@ -623,8 +624,18 @@ def {function_name}({args}):
 
     # 複数の関数を生成
     functions = [
-        {"function_name": "add", "args": "a, b", "docstring": "Add two numbers", "return_value": "a + b"},
-        {"function_name": "multiply", "args": "x, y", "docstring": "Multiply two numbers", "return_value": "x * y"},
+        {
+            "function_name": "add",
+            "args": "a, b",
+            "docstring": "Add two numbers",
+            "return_value": "a + b",
+        },
+        {
+            "function_name": "multiply",
+            "args": "x, y",
+            "docstring": "Multiply two numbers",
+            "return_value": "x * y",
+        },
     ]
 
     for func in functions:
@@ -632,7 +643,7 @@ def {function_name}({args}):
         filename = f"{func['function_name']}.py"
         result_path = create_code_file(filename, code, folder)
         assert os.path.exists(result_path)
-        with open(result_path, "r", encoding="utf-8") as f:
+        with open(result_path, encoding="utf-8") as f:
             content = f.read()
             assert func["function_name"] in content
 
@@ -654,7 +665,7 @@ class Service:
     result_path = create_code_file("service.py", code, folder)
 
     assert os.path.exists(result_path)
-    with open(result_path, "r", encoding="utf-8") as f:
+    with open(result_path, encoding="utf-8") as f:
         content = f.read()
         assert "class Service" in content
         assert "dependency" in content
@@ -682,7 +693,7 @@ def decorated_function():
     result_path = create_code_file("decorator.py", code, folder)
 
     assert os.path.exists(result_path)
-    with open(result_path, "r", encoding="utf-8") as f:
+    with open(result_path, encoding="utf-8") as f:
         content = f.read()
         assert "@decorator" in content
         assert "def decorated_function" in content
@@ -700,7 +711,7 @@ def test_create_code_file_resource_cleanup(tmp_path):
     assert os.path.exists(result_path)
 
     # ファイルハンドルが適切に閉じられていることを確認（再度開ける）
-    with open(result_path, "r", encoding="utf-8") as f:
+    with open(result_path, encoding="utf-8") as f:
         content = f.read()
         assert content == code
 
@@ -711,7 +722,6 @@ def test_create_code_file_memory_usage_stress(tmp_path):
 
     # 大量のファイルを作成してメモリリークを検出
     import gc
-    import sys
 
     initial_objects = len(gc.get_objects())
 
@@ -748,7 +758,7 @@ def test_create_code_file_file_descriptor_leak(tmp_path):
         assert os.path.exists(result_path)
 
         # 各ファイルが読み込めることを確認
-        with open(result_path, "r", encoding="utf-8") as f:
+        with open(result_path, encoding="utf-8") as f:
             assert f.read() == code
 
 
@@ -817,7 +827,7 @@ def test_create_code_file_atomic_write_simulation(tmp_path):
     assert file_size > 0
 
     # ファイルが読み込めることを確認
-    with open(result_path, "r", encoding="utf-8") as f:
+    with open(result_path, encoding="utf-8") as f:
         content = f.read()
         assert content == code
 

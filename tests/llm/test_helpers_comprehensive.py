@@ -8,19 +8,18 @@ Comprehensive Tests for helpers.py
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
-import pytest
+
 import json
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 
 from nexuscore.llm.helpers import (
     DEFAULT_STUB_CONTENT,
-    normalize_model,
     _env_flag,
     _real_call_enabled,
-    _stub_response,
     _strip_jsonish,
+    _stub_response,
+    normalize_model,
 )
-
 
 # ============================================================================
 # Tests: DEFAULT_STUB_CONTENT
@@ -191,7 +190,7 @@ class TestRealCallEnabled:
         monkeypatch.setenv("LLM_DRY_RUN", "false")
         monkeypatch.setenv("NEXUS_REAL_CALLS", "true")
 
-        with patch('nexuscore.llm.helpers.CONFIG') as mock_config:
+        with patch("nexuscore.llm.helpers.CONFIG") as mock_config:
             mock_config.dry_run = False
             mock_config.real_calls_enabled = True
 
@@ -202,7 +201,7 @@ class TestRealCallEnabled:
         monkeypatch.setenv("LLM_DRY_RUN", "true")
         monkeypatch.setenv("NEXUS_REAL_CALLS", "true")
 
-        with patch('nexuscore.llm.helpers.CONFIG') as mock_config:
+        with patch("nexuscore.llm.helpers.CONFIG") as mock_config:
             mock_config.dry_run = True
             mock_config.real_calls_enabled = True
 
@@ -213,7 +212,7 @@ class TestRealCallEnabled:
         monkeypatch.setenv("LLM_DRY_RUN", "false")
         monkeypatch.setenv("NEXUS_REAL_CALLS", "true")
 
-        with patch('nexuscore.llm.helpers.CONFIG') as mock_config:
+        with patch("nexuscore.llm.helpers.CONFIG") as mock_config:
             mock_config.dry_run = False
             mock_config.real_calls_enabled = True
 
@@ -225,7 +224,7 @@ class TestRealCallEnabled:
         monkeypatch.setenv("LLM_DRY_RUN", "false")
         monkeypatch.setenv("NEXUS_REAL_CALLS", "false")
 
-        with patch('nexuscore.llm.helpers.CONFIG') as mock_config:
+        with patch("nexuscore.llm.helpers.CONFIG") as mock_config:
             mock_config.dry_run = False
             mock_config.real_calls_enabled = False
 
@@ -235,7 +234,7 @@ class TestRealCallEnabled:
         """環境変数がCONFIGを上書き"""
         monkeypatch.setenv("LLM_DRY_RUN", "true")
 
-        with patch('nexuscore.llm.helpers.CONFIG') as mock_config:
+        with patch("nexuscore.llm.helpers.CONFIG") as mock_config:
             mock_config.dry_run = False  # CONFIGはFalse
             mock_config.real_calls_enabled = True
 
@@ -252,10 +251,7 @@ class TestStubResponse:
     def test_stub_response_as_json_true(self):
         """JSONフォーマットでスタブレスポンス"""
         result = _stub_response(
-            model_name="gpt-4",
-            mode="stub",
-            reason="API key not configured",
-            as_json=True
+            model_name="gpt-4", mode="stub", reason="API key not configured", as_json=True
         )
 
         # JSON文字列が返される
@@ -269,10 +265,7 @@ class TestStubResponse:
     def test_stub_response_as_json_false(self):
         """プレーンテキストでスタブレスポンス"""
         result = _stub_response(
-            model_name="claude-3",
-            mode="stub",
-            reason="Dry run mode",
-            as_json=False
+            model_name="claude-3", mode="stub", reason="Dry run mode", as_json=False
         )
 
         # プレーンテキストが返される
@@ -282,10 +275,7 @@ class TestStubResponse:
     def test_stub_response_with_unicode(self):
         """Unicode文字を含むスタブレスポンス"""
         result = _stub_response(
-            model_name="gemini",
-            mode="stub",
-            reason="テストモード 🚀",
-            as_json=True
+            model_name="gemini", mode="stub", reason="テストモード 🚀", as_json=True
         )
 
         data = json.loads(result)
@@ -293,12 +283,7 @@ class TestStubResponse:
 
     def test_stub_response_ensure_ascii_false(self):
         """ensure_ascii=Falseでエンコード"""
-        result = _stub_response(
-            model_name="test",
-            mode="stub",
-            reason="日本語",
-            as_json=True
-        )
+        result = _stub_response(model_name="test", mode="stub", reason="日本語", as_json=True)
 
         # Unicode文字がそのまま含まれる
         assert "日本語" in result
@@ -307,12 +292,7 @@ class TestStubResponse:
     def test_stub_response_different_modes(self):
         """異なるモードでスタブレスポンス"""
         for mode in ["stub", "dry_run", "preview", "test"]:
-            result = _stub_response(
-                model_name="model",
-                mode=mode,
-                reason="test",
-                as_json=True
-            )
+            result = _stub_response(model_name="model", mode=mode, reason="test", as_json=True)
 
             data = json.loads(result)
             assert data["mode"] == mode
@@ -394,7 +374,7 @@ class TestStripJsonish:
 
     def test_strip_jsonish_complex_markdown(self):
         """複雑なMarkdownフェンス"""
-        text = '''```json
+        text = """```json
         {
           "name": "test",
           "value": 123,
@@ -402,7 +382,7 @@ class TestStripJsonish:
             "key": "value"
           }
         }
-        ```'''
+        ```"""
         result = _strip_jsonish(text)
         assert "name" in result
         assert "test" in result
@@ -421,7 +401,7 @@ class TestIntegrationScenarios:
         # 1. 環境変数を設定
         monkeypatch.setenv("LLM_DRY_RUN", "true")
 
-        with patch('nexuscore.llm.helpers.CONFIG') as mock_config:
+        with patch("nexuscore.llm.helpers.CONFIG") as mock_config:
             mock_config.dry_run = True
 
             # 2. 実呼び出しは無効
@@ -432,7 +412,7 @@ class TestIntegrationScenarios:
                 model_name=normalize_model("gpt-4"),
                 mode="dry_run",
                 reason="DRY_RUN mode enabled",
-                as_json=True
+                as_json=True,
             )
 
             # 4. レスポンスを検証
@@ -506,7 +486,7 @@ class TestEdgeCases:
         monkeypatch.setenv("LLM_DRY_RUN", "false")
         monkeypatch.setenv("NEXUS_REAL_CALLS", "true")
 
-        with patch('nexuscore.llm.helpers.CONFIG') as mock_config:
+        with patch("nexuscore.llm.helpers.CONFIG") as mock_config:
             mock_config.dry_run = False
             mock_config.real_calls_enabled = True
 
@@ -516,10 +496,7 @@ class TestEdgeCases:
     def test_stub_response_with_special_characters(self):
         """特殊文字を含むスタブレスポンス"""
         result = _stub_response(
-            model_name="test<>\"'&",
-            mode="stub",
-            reason="Special chars: <>\"'&",
-            as_json=True
+            model_name="test<>\"'&", mode="stub", reason="Special chars: <>\"'&", as_json=True
         )
 
         data = json.loads(result)

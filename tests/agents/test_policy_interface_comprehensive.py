@@ -10,8 +10,7 @@ policy_interface.py の包括的テスト
 """
 
 import sys
-from datetime import datetime
-from unittest.mock import MagicMock, Mock, patch, PropertyMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -20,20 +19,21 @@ import pytest
 def mock_gradio():
     """各テストの前後でgradioをモック化/復元（テスト分離のため）"""
     # テスト前：元の状態を保存してモック化
-    original_gradio = sys.modules.get('gradio')
-    sys.modules['gradio'] = MagicMock()
+    original_gradio = sys.modules.get("gradio")
+    sys.modules["gradio"] = MagicMock()
 
     yield  # ← ここでテストが実行される
 
     # テスト後：元の状態に復元
     if original_gradio is None:
-        sys.modules.pop('gradio', None)
+        sys.modules.pop("gradio", None)
     else:
-        sys.modules['gradio'] = original_gradio
+        sys.modules["gradio"] = original_gradio
 
 
 try:
-    from nexuscore.agents.policy_interface import PolicyInterface, GRADIO_AVAILABLE
+    from nexuscore.agents.policy_interface import GRADIO_AVAILABLE, PolicyInterface
+
     HAS_POLICY_INTERFACE = True
 except ImportError:
     HAS_POLICY_INTERFACE = False
@@ -49,8 +49,8 @@ class TestPolicyInterfaceInit:
         """基本的な初期化"""
         interface = PolicyInterface()
 
-        assert hasattr(interface, 'result_queue')
-        assert hasattr(interface, 'interface')
+        assert hasattr(interface, "result_queue")
+        assert hasattr(interface, "interface")
         assert interface.interface is None
 
     def test_init_creates_queue(self):
@@ -58,8 +58,8 @@ class TestPolicyInterfaceInit:
         interface = PolicyInterface()
 
         assert interface.result_queue is not None
-        assert hasattr(interface.result_queue, 'put')
-        assert hasattr(interface.result_queue, 'get')
+        assert hasattr(interface.result_queue, "put")
+        assert hasattr(interface.result_queue, "get")
 
 
 @pytest.mark.skipif(not HAS_POLICY_INTERFACE, reason="policy_interface module not available")
@@ -115,7 +115,7 @@ class TestGetSafeDefaultPolicy:
 class TestCreateGradioInterface:
     """PolicyInterface.create_gradio_interface() のテスト"""
 
-    @patch('nexuscore.agents.policy_interface.gr')
+    @patch("nexuscore.agents.policy_interface.gr")
     def test_create_gradio_interface_returns_blocks(self, mock_gr):
         """Gradio Blocksオブジェクトを返す"""
         mock_blocks = Mock()
@@ -124,7 +124,7 @@ class TestCreateGradioInterface:
         interface = PolicyInterface()
 
         # GRADIO_AVAILABLEがFalseの場合はImportErrorを投げる
-        with patch('nexuscore.agents.policy_interface.GRADIO_AVAILABLE', True):
+        with patch("nexuscore.agents.policy_interface.GRADIO_AVAILABLE", True):
             result = interface.create_gradio_interface()
 
         assert result is not None
@@ -134,7 +134,7 @@ class TestCreateGradioInterface:
 class TestLaunchAndWaitForInput:
     """PolicyInterface.launch_and_wait_for_input() のテスト"""
 
-    @patch('nexuscore.agents.policy_interface.GRADIO_AVAILABLE', False)
+    @patch("nexuscore.agents.policy_interface.GRADIO_AVAILABLE", False)
     def test_launch_without_gradio_returns_default(self):
         """Gradioが利用できない場合はデフォルトポリシーを返す"""
         interface = PolicyInterface()
@@ -143,9 +143,9 @@ class TestLaunchAndWaitForInput:
         assert result is not None
         assert result["method"] == "safe_default"
 
-    @patch('nexuscore.agents.policy_interface.GRADIO_AVAILABLE', True)
-    @patch('nexuscore.agents.policy_interface.PolicyInterface.create_gradio_interface')
-    @patch('threading.Thread')
+    @patch("nexuscore.agents.policy_interface.GRADIO_AVAILABLE", True)
+    @patch("nexuscore.agents.policy_interface.PolicyInterface.create_gradio_interface")
+    @patch("threading.Thread")
     def test_launch_with_timeout_returns_default(self, mock_thread, mock_create_interface):
         """タイムアウト時はデフォルトポリシーを返す"""
         mock_ui = Mock()
@@ -158,8 +158,8 @@ class TestLaunchAndWaitForInput:
         assert result is not None
         assert "method" in result
 
-    @patch('nexuscore.agents.policy_interface.GRADIO_AVAILABLE', True)
-    @patch('nexuscore.agents.policy_interface.PolicyInterface.create_gradio_interface')
+    @patch("nexuscore.agents.policy_interface.GRADIO_AVAILABLE", True)
+    @patch("nexuscore.agents.policy_interface.PolicyInterface.create_gradio_interface")
     def test_launch_exception_returns_default(self, mock_create_interface):
         """UIの起動に失敗した場合はデフォルトポリシーを返す"""
         mock_create_interface.side_effect = Exception("UI launch failed")
@@ -196,7 +196,7 @@ class TestEdgeCases:
 
         assert result == test_policy
 
-    @patch('nexuscore.agents.policy_interface.GRADIO_AVAILABLE', False)
+    @patch("nexuscore.agents.policy_interface.GRADIO_AVAILABLE", False)
     def test_graceful_degradation(self):
         """Gradio不在時のグレースフルデグラデーション"""
         interface = PolicyInterface()
@@ -276,7 +276,7 @@ class TestIntegration:
         assert "configured_at" in policy
         assert policy["method"] == "safe_default"
 
-    @patch('nexuscore.agents.policy_interface.GRADIO_AVAILABLE', False)
+    @patch("nexuscore.agents.policy_interface.GRADIO_AVAILABLE", False)
     def test_launch_workflow_graceful_fallback(self):
         """launch時のグレースフルフォールバック"""
         interface = PolicyInterface()

@@ -8,19 +8,19 @@ Comprehensive Tests for test_metrics.py
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
-import pytest
+
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime, timezone
+from unittest.mock import MagicMock
+
+import pytest
 
 from nexuscore.core.test_metrics import (
     TestGenerationRecord,
     TestMetrics,
     TestMetricsCollector,
 )
-
 
 # ============================================================================
 # Fixtures
@@ -55,7 +55,7 @@ class TestTestGenerationRecord:
             strategy="property_based",
             test_file_path="tests/test_example.py",
             test_count=10,
-            generated_by="ai"
+            generated_by="ai",
         )
 
         assert record.module_name == "example.py"
@@ -78,7 +78,7 @@ class TestTestGenerationRecord:
             coverage_after=85.3,
             bugs_found=3,
             deleted=True,
-            deleted_reason="Low quality"
+            deleted_reason="Low quality",
         )
 
         assert record.coverage_before == 60.5
@@ -106,7 +106,7 @@ class TestTestMetrics:
             coverage_target=80,
             ai_generation_count=40,
             human_generation_count=10,
-            effectiveness_score=0.2
+            effectiveness_score=0.2,
         )
 
         assert metrics.module_name == "example.py"
@@ -156,7 +156,7 @@ class TestRecordTestGeneration:
             risk_level="A",
             strategy="property_based",
             test_file_path="tests/test_example.py",
-            test_count=10
+            test_count=10,
         )
 
         # 履歴ファイルが作成される
@@ -182,7 +182,7 @@ class TestRecordTestGeneration:
             test_count=25,
             generated_by="ai+human",
             coverage_before=60.5,
-            coverage_after=85.3
+            coverage_after=85.3,
         )
 
         with collector.history_file.open("r") as f:
@@ -200,7 +200,7 @@ class TestRecordTestGeneration:
                 risk_level="B",
                 strategy="unit",
                 test_file_path=f"tests/test_module{i}.py",
-                test_count=i * 10
+                test_count=i * 10,
             )
 
         # 5行記録される
@@ -216,7 +216,7 @@ class TestRecordTestGeneration:
             risk_level="A",
             strategy="property_based",
             test_file_path="tests/test_example.py",
-            test_count=10
+            test_count=10,
         )
 
         with collector.history_file.open("r") as f:
@@ -242,7 +242,7 @@ class TestRecordBugFound:
             risk_level="A",
             strategy="mutation",
             test_file_path="tests/test_buggy.py",
-            test_count=20
+            test_count=20,
         )
 
         # バグ発見を記録
@@ -259,7 +259,7 @@ class TestRecordBugFound:
             risk_level="S",
             strategy="mutation",
             test_file_path="tests/test_buggy.py",
-            test_count=30
+            test_count=30,
         )
 
         # 3回バグを発見
@@ -290,12 +290,11 @@ class TestRecordTestDeletion:
             risk_level="B",
             strategy="unit",
             test_file_path="tests/test_bad.py",
-            test_count=5
+            test_count=5,
         )
 
         collector.record_test_deletion(
-            test_file_path="tests/test_bad.py",
-            reason="Too many false positives"
+            test_file_path="tests/test_bad.py", reason="Too many false positives"
         )
 
         records = collector._load_history()
@@ -304,10 +303,7 @@ class TestRecordTestDeletion:
 
     def test_record_deletion_nonexistent(self, collector):
         """存在しないテストの削除を記録しても例外なし"""
-        collector.record_test_deletion(
-            test_file_path="tests/nonexistent.py",
-            reason="Not found"
-        )
+        collector.record_test_deletion(test_file_path="tests/nonexistent.py", reason="Not found")
         # 例外が発生しないことを確認
 
 
@@ -327,13 +323,13 @@ class TestGetMetrics:
 
         # インポート時にモックを使用
         def mock_import(name, *args, **kwargs):
-            if 'test_strategy' in name:
+            if "test_strategy" in name:
                 mock_module = MagicMock()
                 mock_module.TestStrategyManager = mock_strategy_class
                 return mock_module
             return __import__(name, *args, **kwargs)
 
-        monkeypatch.setattr('builtins.__import__', mock_import)
+        monkeypatch.setattr("builtins.__import__", mock_import)
 
         # テスト生成を記録
         collector.record_test_generation(
@@ -342,7 +338,7 @@ class TestGetMetrics:
             strategy="property_based",
             test_file_path="tests/test_example.py",
             test_count=20,
-            coverage_after=85.5
+            coverage_after=85.5,
         )
 
         metrics = collector.get_metrics("example.py")
@@ -367,13 +363,13 @@ class TestGetMetrics:
         mock_strategy_class.return_value = mock_manager
 
         def mock_import(name, *args, **kwargs):
-            if 'test_strategy' in name:
+            if "test_strategy" in name:
                 mock_module = MagicMock()
                 mock_module.TestStrategyManager = mock_strategy_class
                 return mock_module
             return __import__(name, *args, **kwargs)
 
-        monkeypatch.setattr('builtins.__import__', mock_import)
+        monkeypatch.setattr("builtins.__import__", mock_import)
 
         collector.record_test_generation(
             module_name="buggy.py",
@@ -381,7 +377,7 @@ class TestGetMetrics:
             strategy="mutation",
             test_file_path="tests/test_buggy.py",
             test_count=30,
-            coverage_after=90.0
+            coverage_after=90.0,
         )
 
         collector.record_bug_found("tests/test_buggy.py", bug_count=5)
@@ -399,13 +395,13 @@ class TestGetMetrics:
         mock_strategy_class.return_value = mock_manager
 
         def mock_import(name, *args, **kwargs):
-            if 'test_strategy' in name:
+            if "test_strategy" in name:
                 mock_module = MagicMock()
                 mock_module.TestStrategyManager = mock_strategy_class
                 return mock_module
             return __import__(name, *args, **kwargs)
 
-        monkeypatch.setattr('builtins.__import__', mock_import)
+        monkeypatch.setattr("builtins.__import__", mock_import)
 
         # 3つのテストを生成
         for i in range(3):
@@ -414,7 +410,7 @@ class TestGetMetrics:
                 risk_level="B",
                 strategy="unit",
                 test_file_path=f"tests/test_{i}.py",
-                test_count=10
+                test_count=10,
             )
 
         # 1つを削除
@@ -433,13 +429,13 @@ class TestGetMetrics:
         mock_strategy_class.return_value = mock_manager
 
         def mock_import(name, *args, **kwargs):
-            if 'test_strategy' in name:
+            if "test_strategy" in name:
                 mock_module = MagicMock()
                 mock_module.TestStrategyManager = mock_strategy_class
                 return mock_module
             return __import__(name, *args, **kwargs)
 
-        monkeypatch.setattr('builtins.__import__', mock_import)
+        monkeypatch.setattr("builtins.__import__", mock_import)
 
         # AI 生成
         collector.record_test_generation(
@@ -448,7 +444,7 @@ class TestGetMetrics:
             strategy="property_based",
             test_file_path="tests/test_mixed_ai.py",
             test_count=20,
-            generated_by="ai"
+            generated_by="ai",
         )
 
         # 人間が作成
@@ -458,7 +454,7 @@ class TestGetMetrics:
             strategy="manual",
             test_file_path="tests/test_mixed_human.py",
             test_count=10,
-            generated_by="human"
+            generated_by="human",
         )
 
         # AI+人間の協働
@@ -468,7 +464,7 @@ class TestGetMetrics:
             strategy="hybrid",
             test_file_path="tests/test_mixed_hybrid.py",
             test_count=15,
-            generated_by="ai+human"
+            generated_by="ai+human",
         )
 
         metrics = collector.get_metrics("mixed.py")
@@ -498,7 +494,7 @@ class TestGetAIEffectivenessByRisk:
             strategy="mutation",
             test_file_path="tests/test_critical.py",
             test_count=30,
-            generated_by="ai"
+            generated_by="ai",
         )
         collector.record_bug_found("tests/test_critical.py", bug_count=5)
 
@@ -509,7 +505,7 @@ class TestGetAIEffectivenessByRisk:
             strategy="property_based",
             test_file_path="tests/test_important.py",
             test_count=20,
-            generated_by="ai"
+            generated_by="ai",
         )
         collector.record_bug_found("tests/test_important.py", bug_count=2)
 
@@ -535,7 +531,7 @@ class TestGetAIEffectivenessByRisk:
             strategy="property_based",
             test_file_path="tests/test_ai.py",
             test_count=20,
-            generated_by="ai"
+            generated_by="ai",
         )
 
         # 人間が作成（カウントされない）
@@ -545,7 +541,7 @@ class TestGetAIEffectivenessByRisk:
             strategy="manual",
             test_file_path="tests/test_human.py",
             test_count=10,
-            generated_by="human"
+            generated_by="human",
         )
 
         results = collector.get_ai_effectiveness_by_risk()
@@ -560,7 +556,7 @@ class TestGetAIEffectivenessByRisk:
             strategy="unit",
             test_file_path="tests/test_deleted.py",
             test_count=10,
-            generated_by="ai"
+            generated_by="ai",
         )
 
         collector.record_test_deletion("tests/test_deleted.py", reason="Low quality")
@@ -579,7 +575,7 @@ class TestGetAIEffectivenessByRisk:
                 strategy="property_based",
                 test_file_path=f"tests/test_module{i}.py",
                 test_count=20,
-                generated_by="ai"
+                generated_by="ai",
             )
 
         results = collector.get_ai_effectiveness_by_risk()
@@ -607,14 +603,14 @@ class TestHistoryManagement:
             risk_level="A",
             strategy="property_based",
             test_file_path="tests/test1.py",
-            test_count=10
+            test_count=10,
         )
         collector.record_test_generation(
             module_name="test2.py",
             risk_level="B",
             strategy="unit",
             test_file_path="tests/test2.py",
-            test_count=5
+            test_count=5,
         )
 
         records = collector._load_history()
@@ -628,7 +624,7 @@ class TestHistoryManagement:
             risk_level="A",
             strategy="property_based",
             test_file_path="tests/test1.py",
-            test_count=10
+            test_count=10,
         )
 
         # 無効なJSON行を追加
@@ -640,7 +636,7 @@ class TestHistoryManagement:
             risk_level="B",
             strategy="unit",
             test_file_path="tests/test2.py",
-            test_count=5
+            test_count=5,
         )
 
         records = collector._load_history()
@@ -655,7 +651,7 @@ class TestHistoryManagement:
             risk_level="A",
             strategy="property_based",
             test_file_path="tests/test1.py",
-            test_count=10
+            test_count=10,
         )
 
         # レコードを読み込み、変更して再書き込み
@@ -687,7 +683,7 @@ class TestEdgeCases:
             risk_level="B",
             strategy="unit",
             test_file_path="tests/test_empty.py",
-            test_count=0
+            test_count=0,
         )
 
         records = collector._load_history()
@@ -702,7 +698,7 @@ class TestEdgeCases:
             test_file_path="tests/test_weird.py",
             test_count=10,
             coverage_before=-1.0,
-            coverage_after=50.0
+            coverage_after=50.0,
         )
 
         records = collector._load_history()
@@ -716,20 +712,20 @@ class TestEdgeCases:
         mock_strategy_class.return_value = mock_manager
 
         def mock_import(name, *args, **kwargs):
-            if 'test_strategy' in name:
+            if "test_strategy" in name:
                 mock_module = MagicMock()
                 mock_module.TestStrategyManager = mock_strategy_class
                 return mock_module
             return __import__(name, *args, **kwargs)
 
-        monkeypatch.setattr('builtins.__import__', mock_import)
+        monkeypatch.setattr("builtins.__import__", mock_import)
 
         collector.record_test_generation(
             module_name="no_coverage.py",
             risk_level="B",
             strategy="unit",
             test_file_path="tests/test_no_coverage.py",
-            test_count=10
+            test_count=10,
         )
 
         metrics = collector.get_metrics("no_coverage.py")

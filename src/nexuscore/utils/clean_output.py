@@ -1,6 +1,7 @@
 # nexuscore/utils/clean_output.py
 import re
 
+
 def clean_output(text: str) -> str:
     """
     LLM が返した ```code``` ブロックを外して中身だけ返す簡易サニタイザ

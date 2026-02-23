@@ -14,8 +14,6 @@ CR ガバナンス定義（Single Source of Truth）
 """
 
 from dataclasses import dataclass
-from typing import Literal
-
 
 # ============================================================================
 # 1. Completion Report 定義

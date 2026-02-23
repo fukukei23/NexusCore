@@ -13,21 +13,20 @@ guardian_auto_reviewer.py の包括的テスト
   - _check_atelier_specific: Atelier固有チェック
 """
 
-import sys
-from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 try:
     from nexuscore.agents.guardian_auto_reviewer import (
+        FileChange,
         GuardianAutoReviewer,
+        Hunk,
+        ProjectType,
         ReviewDecision,
         ReviewIssue,
         ReviewResult,
-        FileChange,
-        Hunk,
-        ProjectType
     )
+
     HAS_GUARDIAN = True
 except ImportError:
     HAS_GUARDIAN = False
@@ -45,7 +44,7 @@ class TestDataClasses:
             code="SEC-001",
             message="Security violation",
             file_path="src/test.py",
-            line_no=10
+            line_no=10,
         )
 
         assert issue.level == "error"
@@ -67,11 +66,7 @@ class TestDataClasses:
     def test_review_result_summary(self):
         """ReviewResult.summaryメソッド"""
         issue = ReviewIssue(
-            level="error",
-            code="SEC-001",
-            message="Violation",
-            file_path="test.py",
-            line_no=5
+            level="error", code="SEC-001", message="Violation", file_path="test.py", line_no=5
         )
         result = ReviewResult(decision=ReviewDecision.REJECT, issues=[issue])
 
@@ -89,7 +84,7 @@ class TestDataClasses:
             old_lines=3,
             new_start=10,
             new_lines=4,
-            lines=["+new line", " unchanged", "-old line"]
+            lines=["+new line", " unchanged", "-old line"],
         )
 
         assert hunk.old_start == 10
@@ -472,7 +467,11 @@ class TestEdgeCases:
         result = reviewer.review_unified_diff(malformed_diff)
 
         # パースエラーでも処理は継続
-        assert result.decision in [ReviewDecision.APPROVE, ReviewDecision.REJECT, ReviewDecision.MANUAL_REVIEW]
+        assert result.decision in [
+            ReviewDecision.APPROVE,
+            ReviewDecision.REJECT,
+            ReviewDecision.MANUAL_REVIEW,
+        ]
 
     def test_multiple_violations_in_one_file(self):
         """1ファイル内の複数違反"""

@@ -10,15 +10,24 @@ NexusCore API の FastAPI ベース実装。
 - Public API は /api/v1/* プレフィックスを使用
 - 認証依存関係は src/nexuscore/api/dependencies/ 配下に配置
 """
-import os
-from fastapi import FastAPI, Request, HTTPException, status
-from fastapi.responses import JSONResponse
+
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .routes import health, execute, github_webhook, projects, runs, plans, badges, api_keys
-from .routes import run_view
-from .schemas.error import ErrorResponse, ErrorDetail
+from .routes import (
+    api_keys,
+    badges,
+    execute,
+    github_webhook,
+    health,
+    plans,
+    projects,
+    run_view,
+    runs,
+)
+from .schemas.error import ErrorDetail, ErrorResponse
 
 
 def create_app(test_db_path: str | None = None) -> FastAPI:
@@ -105,7 +114,7 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
             error_response = ErrorResponse(
                 error=ErrorDetail(
                     code=error_detail.get("code", "UNKNOWN_ERROR"),
-                    message=error_detail.get("message", str(exc.detail))
+                    message=error_detail.get("message", str(exc.detail)),
                 )
             )
         else:
@@ -126,10 +135,7 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
                 error=ErrorDetail(code=error_code, message=error_message)
             )
 
-        return JSONResponse(
-            status_code=exc.status_code,
-            content=error_response.model_dump()
-        )
+        return JSONResponse(status_code=exc.status_code, content=error_response.model_dump())
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -148,8 +154,7 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
         )
 
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content=error_response.model_dump()
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content=error_response.model_dump()
         )
 
     @app.exception_handler(Exception)
@@ -163,15 +168,11 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
             raise exc
 
         error_response = ErrorResponse(
-            error=ErrorDetail(
-                code="INTERNAL_ERROR",
-                message="Internal server error"
-            )
+            error=ErrorDetail(code="INTERNAL_ERROR", message="Internal server error")
         )
 
         return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=error_response.model_dump()
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content=error_response.model_dump()
         )
 
     # 将来、以下のような router を追加予定:
@@ -193,4 +194,3 @@ app = create_app()
 # - Flask アプリ: ポート 5000（既存の Web UI）
 # - FastAPI アプリ: ポート 8000（新規 API）
 # 両方を同時に起動可能（別ポートのため）
-

@@ -8,23 +8,25 @@ test_generator の軽量 E2E テスト
 
 from __future__ import annotations
 
+import importlib.util
 import os
-import pytest
 import subprocess
 import sys
-import importlib.util
 from pathlib import Path
+
+import pytest
 
 try:
     from nexuscore.utils.test_generator import (
-        generate_unit_tests,
         generate_and_validate_test_code,
+        generate_unit_tests,
     )
     from nexuscore.utils.test_utils import (
-        validate_test_code,
         extract_code_from_markdown,
         project_path_to_module_path,
+        validate_test_code,
     )
+
     HAS_TEST_GENERATOR = True
 except ImportError:
     HAS_TEST_GENERATOR = False
@@ -35,7 +37,7 @@ except ImportError:
 @pytest.mark.skipif(not HAS_TEST_GENERATOR, reason="Test generator not available")
 @pytest.mark.skipif(
     not Path(".env").exists() or "OPENAI_API_KEY" not in Path(".env").read_text(),
-    reason="OPENAI_API_KEY not configured (skipping LLM-based test)"
+    reason="OPENAI_API_KEY not configured (skipping LLM-based test)",
 )
 def test_test_generator_creates_runnable_pytest_file(sample_project_dir, tmp_path):
     """
@@ -141,7 +143,7 @@ def test_test_generator_creates_runnable_pytest_file(sample_project_dir, tmp_pat
 @pytest.mark.skipif(not HAS_TEST_GENERATOR, reason="Test generator not available")
 @pytest.mark.skipif(
     not Path(".env").exists() or "OPENAI_API_KEY" not in Path(".env").read_text(),
-    reason="OPENAI_API_KEY not configured (skipping LLM-based test)"
+    reason="OPENAI_API_KEY not configured (skipping LLM-based test)",
 )
 def test_test_generator_validation(sample_project_dir, tmp_path):
     """生成されたテストコードの検証ロジックが動作することを確認"""
@@ -184,4 +186,3 @@ def test_project_path_to_module_path():
     external_path = Path("/other/project/file.py")
     module_path = project_path_to_module_path(project_root, external_path)
     assert module_path == "file"  # ファイル名のみ
-

@@ -3,12 +3,14 @@ NexusCore SaaS基盤 - GitHub OAuth認証
 
 既存の Orchestrator / NPE とは独立して動作する。
 """
+
 from __future__ import annotations
 
 import os
-from flask import Blueprint, redirect, url_for, session, request, jsonify
-from authlib.integrations.flask_client import OAuth
+
 import requests
+from authlib.integrations.flask_client import OAuth
+from flask import Blueprint, jsonify, redirect, session, url_for
 
 from nexuscore.webapp import db
 from nexuscore.webapp.models import User
@@ -69,7 +71,9 @@ def github_callback():
         github_user = user_response.json()
 
         # メールアドレスを取得（別エンドポイント）
-        email_response = requests.get("https://api.github.com/user/emails", headers=headers, timeout=10)
+        email_response = requests.get(
+            "https://api.github.com/user/emails", headers=headers, timeout=10
+        )
         email = None
         if email_response.status_code == 200:
             emails = email_response.json()
@@ -152,4 +156,3 @@ def require_auth(f):
         return f(*args, **kwargs)
 
     return decorated_function
-

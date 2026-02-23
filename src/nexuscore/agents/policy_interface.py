@@ -9,17 +9,17 @@ from __future__ import annotations
 # 安全性強化のためのインポート
 try:
     import gradio as gr
+
     GRADIO_AVAILABLE = True
 except ImportError:
     GRADIO_AVAILABLE = False
     gr = None  # type: ignore
     print("⚠️ Gradio未インストール：コマンドライン版を使用します")
 
-from typing import Dict, Callable, Optional
-from datetime import datetime
-import threading
 import queue
-import time
+import threading
+from datetime import datetime
+
 
 class PolicyInterface:
     def __init__(self):
@@ -33,7 +33,9 @@ class PolicyInterface:
 
         with gr.Blocks(title="Context Agent - 開発方針設定", theme=gr.themes.Soft()) as interface:
             gr.Markdown("# 🤖 Context Agent: 開発方針の設定")
-            gr.Markdown("プロジェクトの開発方針を設定してください。この設定はコード生成とエラー予防に使用されます。")
+            gr.Markdown(
+                "プロジェクトの開発方針を設定してください。この設定はコード生成とエラー予防に使用されます。"
+            )
 
             with gr.Row():
                 with gr.Column(scale=2):
@@ -43,7 +45,7 @@ class PolicyInterface:
                         choices=["関数を直接埋め込み", "インポート文を使用", "混在OK"],
                         label="テストファイルでのインポート方針",
                         value="関数を直接埋め込み",
-                        info="「関数を直接埋め込み」を選ぶと、from your_module importエラーを回避できます"
+                        info="「関数を直接埋め込み」を選ぶと、from your_module importエラーを回避できます",
                     )
 
                     # エラー表示言語
@@ -51,7 +53,7 @@ class PolicyInterface:
                     error_lang = gr.Radio(
                         choices=["日本語", "英語", "自動"],
                         label="エラーメッセージとコメントの言語",
-                        value="日本語"
+                        value="日本語",
                     )
 
                     # コード品質ポリシー
@@ -59,7 +61,7 @@ class PolicyInterface:
                     quality_policy = gr.CheckboxGroup(
                         choices=["docstring必須", "型ヒント必須", "エラーハンドリング必須"],
                         label="生成されるコードに含める要素",
-                        value=["docstring必須", "エラーハンドリング必須"]
+                        value=["docstring必須", "エラーハンドリング必須"],
                     )
 
                     # セキュリティポリシー
@@ -67,22 +69,17 @@ class PolicyInterface:
                     security_policy = gr.CheckboxGroup(
                         choices=["APIキー環境変数管理", "ハードコーディング禁止", "ログ出力制限"],
                         label="セキュリティに関する方針",
-                        value=["APIキー環境変数管理", "ハードコーディング禁止"]
+                        value=["APIキー環境変数管理", "ハードコーディング禁止"],
                     )
 
                 with gr.Column(scale=1):
                     gr.Markdown("## 📊 プレビュー")
-                    preview_json = gr.JSON(
-                        label="現在の設定",
-                        value={}
-                    )
+                    preview_json = gr.JSON(label="現在の設定", value={})
 
                     gr.Markdown("## 💾 保存")
                     submit_btn = gr.Button("設定を保存", variant="primary", size="lg")
                     status_output = gr.Textbox(
-                        label="ステータス",
-                        value="設定を変更してください",
-                        interactive=False
+                        label="ステータス", value="設定を変更してください", interactive=False
                     )
 
             # リアルタイムプレビュー
@@ -92,7 +89,7 @@ class PolicyInterface:
                     "error_language": err_lang,
                     "quality_requirements": quality_pol,
                     "security_policy": security_pol,
-                    "preview_generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    "preview_generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 }
                 return preview
 
@@ -104,7 +101,7 @@ class PolicyInterface:
                     "quality_requirements": quality_pol,
                     "security_policy": security_pol,
                     "configured_at": datetime.now().isoformat(),
-                    "method": "gradio_ui"
+                    "method": "gradio_ui",
                 }
 
                 # 結果をキューに格納
@@ -116,30 +113,25 @@ class PolicyInterface:
 
             # リアルタイムプレビュー更新
             for input_component in inputs:
-                input_component.change(
-                    fn=update_preview,
-                    inputs=inputs,
-                    outputs=preview_json
-                )
+                input_component.change(fn=update_preview, inputs=inputs, outputs=preview_json)
 
             # 保存ボタン
-            submit_btn.click(
-                fn=save_policy,
-                inputs=inputs,
-                outputs=[preview_json, status_output]
-            )
+            submit_btn.click(fn=save_policy, inputs=inputs, outputs=[preview_json, status_output])
 
             # 初期プレビュー
             interface.load(
-                fn=lambda: update_preview("関数を直接埋め込み", "日本語",
-                                        ["docstring必須", "エラーハンドリング必須"],
-                                        ["APIキー環境変数管理", "ハードコーディング禁止"]),
-                outputs=preview_json
+                fn=lambda: update_preview(
+                    "関数を直接埋め込み",
+                    "日本語",
+                    ["docstring必須", "エラーハンドリング必須"],
+                    ["APIキー環境変数管理", "ハードコーディング禁止"],
+                ),
+                outputs=preview_json,
             )
 
         return interface
 
-    def launch_and_wait_for_input(self, timeout: int = 300) -> Optional[Dict]:
+    def launch_and_wait_for_input(self, timeout: int = 300) -> dict | None:
         """UIを起動してユーザー入力を待機（安全性強化版）"""
 
         # 安全性チェック追加
@@ -161,7 +153,7 @@ class PolicyInterface:
                         server_port=7890,
                         share=False,
                         inbrowser=True,
-                        quiet=True
+                        quiet=True,
                     )
                 except Exception as e:
                     print(f"⚠️ Gradio起動エラー: {e}")
@@ -194,11 +186,11 @@ class PolicyInterface:
                 except Exception as e:
                     print(f"⚠️ Gradioを閉じる際にエラーが発生: {e}")
 
-    def _get_default_policy(self) -> Dict:
+    def _get_default_policy(self) -> dict:
         """デフォルト開発方針を取得（互換性維持）"""
         return self._get_safe_default_policy()
 
-    def _get_safe_default_policy(self) -> Dict:
+    def _get_safe_default_policy(self) -> dict:
         """安全なデフォルト開発方針（エラー回避最適化）"""
         return {
             "test_import_policy": "関数を直接埋め込み",  # 今回のエラー解決の鍵
@@ -206,8 +198,9 @@ class PolicyInterface:
             "quality_requirements": ["docstring必須", "エラーハンドリング必須"],
             "security_policy": ["APIキー環境変数管理", "ハードコーディング禁止"],
             "configured_at": datetime.now().isoformat(),
-            "method": "safe_default"
+            "method": "safe_default",
         }
+
 
 if __name__ == "__main__":
     # テスト実行

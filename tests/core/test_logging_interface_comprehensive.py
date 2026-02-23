@@ -8,18 +8,19 @@ Comprehensive Tests for logging_interface.py
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
-import pytest
+
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from typing import Dict, Any
+from typing import Any
+from unittest.mock import patch
+
+import pytest
 
 from nexuscore.core.logging_interface import (
     LoggingProvider,
     NoOpLoggingProvider,
-    register_logging_provider,
     get_logging_provider,
+    register_logging_provider,
 )
-
 
 # ============================================================================
 # Fixtures
@@ -30,6 +31,7 @@ from nexuscore.core.logging_interface import (
 def reset_global_provider():
     """各テスト前後でグローバルプロバイダーをリセット"""
     import nexuscore.core.logging_interface as logging_interface
+
     original_provider = logging_interface._logging_provider
 
     # テスト前にリセット
@@ -48,15 +50,13 @@ class MockLoggingProvider(LoggingProvider):
         self.name = name
         self.enhance_calls = []
 
-    def enhance_transaction(
-        self,
-        log_data: Dict[str, Any],
-        log_file: Path
-    ) -> None:
-        self.enhance_calls.append({
-            "log_data": log_data,
-            "log_file": log_file,
-        })
+    def enhance_transaction(self, log_data: dict[str, Any], log_file: Path) -> None:
+        self.enhance_calls.append(
+            {
+                "log_data": log_data,
+                "log_file": log_file,
+            }
+        )
 
     def get_provider_name(self) -> str:
         return self.name
@@ -77,6 +77,7 @@ class TestLoggingProviderAbstract:
 
     def test_must_implement_enhance_transaction(self):
         """enhance_transaction メソッドを実装する必要がある"""
+
         class IncompleteProvider(LoggingProvider):
             def get_provider_name(self) -> str:
                 return "incomplete"
@@ -88,6 +89,7 @@ class TestLoggingProviderAbstract:
 
     def test_must_implement_get_provider_name(self):
         """get_provider_name メソッドを実装する必要がある"""
+
         class IncompleteProvider(LoggingProvider):
             def enhance_transaction(self, log_data, log_file):
                 pass
@@ -99,6 +101,7 @@ class TestLoggingProviderAbstract:
 
     def test_can_create_concrete_implementation(self):
         """両方のメソッドを実装すればインスタンス化可能"""
+
         class CompleteProvider(LoggingProvider):
             def enhance_transaction(self, log_data, log_file):
                 pass
@@ -149,10 +152,7 @@ class TestNoOpLoggingProvider:
         log_data = {
             "message": "test",
             "level": "INFO",
-            "nested": {
-                "data": [1, 2, 3],
-                "more": {"deep": "value"}
-            }
+            "nested": {"data": [1, 2, 3], "more": {"deep": "value"}},
         }
 
         provider.enhance_transaction(log_data, Path("/tmp/test.log"))
@@ -168,7 +168,7 @@ class TestRegisterLoggingProvider:
         """カスタムプロバイダーを登録できる"""
         provider = MockLoggingProvider("TestProvider")
 
-        with patch('builtins.print') as mock_print:
+        with patch("builtins.print") as mock_print:
             register_logging_provider(provider)
 
         # 登録メッセージが出力される
@@ -181,7 +181,7 @@ class TestRegisterLoggingProvider:
         """NoOpProvider を登録できる"""
         provider = NoOpLoggingProvider()
 
-        with patch('builtins.print') as mock_print:
+        with patch("builtins.print") as mock_print:
             register_logging_provider(provider)
 
         mock_print.assert_called_once()
@@ -193,7 +193,7 @@ class TestRegisterLoggingProvider:
         provider1 = MockLoggingProvider("Provider1")
         provider2 = MockLoggingProvider("Provider2")
 
-        with patch('builtins.print'):
+        with patch("builtins.print"):
             register_logging_provider(provider1)
             register_logging_provider(provider2)
 
@@ -204,10 +204,11 @@ class TestRegisterLoggingProvider:
         """グローバル状態が更新される"""
         provider = MockLoggingProvider()
 
-        with patch('builtins.print'):
+        with patch("builtins.print"):
             register_logging_provider(provider)
 
         import nexuscore.core.logging_interface as logging_interface
+
         assert logging_interface._logging_provider is provider
 
 
@@ -228,7 +229,7 @@ class TestGetLoggingProvider:
         """登録されたプロバイダーが返される"""
         custom_provider = MockLoggingProvider("CustomProvider")
 
-        with patch('builtins.print'):
+        with patch("builtins.print"):
             register_logging_provider(custom_provider)
 
         provider = get_logging_provider()
@@ -250,7 +251,7 @@ class TestGetLoggingProvider:
 
         # カスタムプロバイダーを登録
         custom_provider = MockLoggingProvider()
-        with patch('builtins.print'):
+        with patch("builtins.print"):
             register_logging_provider(custom_provider)
 
         # カスタムプロバイダーが返される
@@ -272,7 +273,7 @@ class TestIntegrationScenarios:
 
         # 2. カスタムプロバイダーを登録
         custom = MockLoggingProvider("Integration")
-        with patch('builtins.print'):
+        with patch("builtins.print"):
             register_logging_provider(custom)
 
         # 3. カスタムプロバイダーが返される
@@ -297,7 +298,7 @@ class TestIntegrationScenarios:
             MockLoggingProvider("Provider3"),
         ]
 
-        with patch('builtins.print'):
+        with patch("builtins.print"):
             for provider in providers:
                 register_logging_provider(provider)
                 current = get_logging_provider()
@@ -307,7 +308,7 @@ class TestIntegrationScenarios:
         """複雑なログデータを処理"""
         provider = MockLoggingProvider()
 
-        with patch('builtins.print'):
+        with patch("builtins.print"):
             register_logging_provider(provider)
 
         log_data = {
@@ -317,13 +318,9 @@ class TestIntegrationScenarios:
             "exception": {
                 "type": "ValueError",
                 "message": "Invalid value",
-                "traceback": ["line1", "line2", "line3"]
+                "traceback": ["line1", "line2", "line3"],
             },
-            "context": {
-                "user_id": "user123",
-                "request_id": "req456",
-                "metadata": {"key": "value"}
-            }
+            "context": {"user_id": "user123", "request_id": "req456", "metadata": {"key": "value"}},
         }
 
         log_file = Path("/var/log/nexuscore/test.log")
@@ -338,7 +335,7 @@ class TestIntegrationScenarios:
         """Pathlib Path オブジェクトを使用"""
         provider = MockLoggingProvider()
 
-        with patch('builtins.print'):
+        with patch("builtins.print"):
             register_logging_provider(provider)
 
         log_file = Path("/tmp") / "nested" / "directory" / "log.txt"
@@ -357,6 +354,7 @@ class TestIntegrationScenarios:
 class TestCustomProviderImplementations:
     def test_provider_with_state(self):
         """状態を持つプロバイダー"""
+
         class StatefulProvider(LoggingProvider):
             def __init__(self):
                 self.call_count = 0
@@ -371,7 +369,7 @@ class TestCustomProviderImplementations:
 
         provider = StatefulProvider()
 
-        with patch('builtins.print'):
+        with patch("builtins.print"):
             register_logging_provider(provider)
 
         current = get_logging_provider()
@@ -385,6 +383,7 @@ class TestCustomProviderImplementations:
 
     def test_provider_with_validation(self):
         """バリデーションを行うプロバイダー"""
+
         class ValidatingProvider(LoggingProvider):
             def __init__(self):
                 self.valid_calls = []
@@ -401,7 +400,7 @@ class TestCustomProviderImplementations:
 
         provider = ValidatingProvider()
 
-        with patch('builtins.print'):
+        with patch("builtins.print"):
             register_logging_provider(provider)
 
         current = get_logging_provider()
@@ -426,7 +425,7 @@ class TestCustomProviderImplementations:
 
         provider = SideEffectProvider()
 
-        with patch('builtins.print'):
+        with patch("builtins.print"):
             register_logging_provider(provider)
 
         current = get_logging_provider()
@@ -448,7 +447,7 @@ class TestEdgeCases:
         """同じプロバイダーを2回登録"""
         provider = MockLoggingProvider()
 
-        with patch('builtins.print') as mock_print:
+        with patch("builtins.print") as mock_print:
             register_logging_provider(provider)
             register_logging_provider(provider)
 
@@ -463,7 +462,7 @@ class TestEdgeCases:
         """None 値を含むログデータ"""
         provider = MockLoggingProvider()
 
-        with patch('builtins.print'):
+        with patch("builtins.print"):
             register_logging_provider(provider)
 
         log_data = {
@@ -481,7 +480,7 @@ class TestEdgeCases:
         """大量のデータを含むログ"""
         provider = MockLoggingProvider()
 
-        with patch('builtins.print'):
+        with patch("builtins.print"):
             register_logging_provider(provider)
 
         log_data = {

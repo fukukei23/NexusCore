@@ -4,17 +4,18 @@
 # メモ: 【情報伝達修正版】検証プロセスにおいて、PostmortemAgentが分析した
 #      のと同一の「生のエラーログ」をDebuggerAgentに引き継ぐように修正。
 # ==============================================================================
+import json
+import logging
 import os
 import shutil
-import tempfile
-import logging
-import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from .debugger_agent import DebuggerAgent
 from .patch_applier import PatchApplier
+
 
 class KnowledgeCuratorAgent:
     def __init__(self, api_key: str, model: str):
@@ -29,34 +30,50 @@ class KnowledgeCuratorAgent:
         failed_test_path: str,
         related_source_path: str,
         # ▼▼▼▼▼ 【最重要修正点】生のテスト失敗ログを追加 ▼▼▼▼▼
-        original_test_output: str
+        original_test_output: str,
         # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
     ) -> bool:
         """
         提案されたFKBエントリを一時的なサンドボックス環境で検証する。
         """
         self.logger.info(f"Starting validation for FKB suggestion: {suggestion.get('id', 'N/A')}")
-        
+
         with tempfile.TemporaryDirectory(prefix="k_curator_") as sandbox_path:
             try:
                 # 1. プロジェクトの関連ファイルのみをサンドボックスにコピー
                 self.logger.debug(f"Creating minimal sandbox at: {sandbox_path}")
-                
+
                 # 必要なディレクトリ構造を作成
-                Path(sandbox_path, os.path.dirname(os.path.relpath(related_source_path, original_project_path))).mkdir(parents=True, exist_ok=True)
-                Path(sandbox_path, os.path.dirname(os.path.relpath(failed_test_path, original_project_path))).mkdir(parents=True, exist_ok=True)
+                Path(
+                    sandbox_path,
+                    os.path.dirname(os.path.relpath(related_source_path, original_project_path)),
+                ).mkdir(parents=True, exist_ok=True)
+                Path(
+                    sandbox_path,
+                    os.path.dirname(os.path.relpath(failed_test_path, original_project_path)),
+                ).mkdir(parents=True, exist_ok=True)
 
                 # 関連ファイルのみをコピー
-                shutil.copy(related_source_path, os.path.join(sandbox_path, os.path.relpath(related_source_path, original_project_path)))
-                shutil.copy(failed_test_path, os.path.join(sandbox_path, os.path.relpath(failed_test_path, original_project_path)))
-                
+                shutil.copy(
+                    related_source_path,
+                    os.path.join(
+                        sandbox_path, os.path.relpath(related_source_path, original_project_path)
+                    ),
+                )
+                shutil.copy(
+                    failed_test_path,
+                    os.path.join(
+                        sandbox_path, os.path.relpath(failed_test_path, original_project_path)
+                    ),
+                )
+
                 # __init__.pyを作成
                 for dirpath, _, _ in os.walk(sandbox_path):
                     Path(dirpath, "__init__.py").touch()
 
                 # 2. 一時的なFKBを作成
                 temp_fkb_path = os.path.join(sandbox_path, "temp_fkb.json")
-                with open(temp_fkb_path, 'w', encoding='utf-8') as f:
+                with open(temp_fkb_path, "w", encoding="utf-8") as f:
                     json.dump([suggestion], f, ensure_ascii=False, indent=2)
                 self.logger.debug("Created temporary FKB with new suggestion.")
 
@@ -72,28 +89,32 @@ class KnowledgeCuratorAgent:
 
                 files_content = {}
                 try:
-                    with open(sandbox_source_path, "r", encoding="utf-8") as src_file:
+                    with open(sandbox_source_path, encoding="utf-8") as src_file:
                         files_content[sandbox_source_path] = src_file.read()
                 except FileNotFoundError:
                     self.logger.warning("Source file missing in sandbox: %s", sandbox_source_path)
                 try:
-                    with open(sandbox_test_path, "r", encoding="utf-8") as test_file:
+                    with open(sandbox_test_path, encoding="utf-8") as test_file:
                         files_content[sandbox_test_path] = test_file.read()
                 except FileNotFoundError:
                     self.logger.warning("Test file missing in sandbox: %s", sandbox_test_path)
 
                 if not files_content:
-                    self.logger.error("No files available for debugging in sandbox. Aborting validation.")
+                    self.logger.error(
+                        "No files available for debugging in sandbox. Aborting validation."
+                    )
                     return False
 
                 debug_result = debugger.debug_and_patch(
                     error_log=original_test_output,
                     files_content=files_content,
-                    project_path=sandbox_path
+                    project_path=sandbox_path,
                 )
 
                 if not (debug_result and debug_result.get("patch")):
-                    self.logger.warning("Validation failed: Debugger did not generate a patch with the new knowledge.")
+                    self.logger.warning(
+                        "Validation failed: Debugger did not generate a patch with the new knowledge."
+                    )
                     return False
 
                 # 5. パッチを適用し、テストが成功するか確認
@@ -102,12 +123,18 @@ class KnowledgeCuratorAgent:
                     self.logger.warning("Validation failed: Generated patch could not be applied.")
                     return False
 
-                tests_passed, _ = self._run_tests_in_sandbox(sandbox_path, os.path.relpath(failed_test_path, original_project_path))
+                tests_passed, _ = self._run_tests_in_sandbox(
+                    sandbox_path, os.path.relpath(failed_test_path, original_project_path)
+                )
                 if tests_passed:
-                    self.logger.info("✅ Validation successful! The new knowledge correctly fixed the bug.")
+                    self.logger.info(
+                        "✅ Validation successful! The new knowledge correctly fixed the bug."
+                    )
                     return True
                 else:
-                    self.logger.warning("Validation failed: Tests still fail after applying the patch.")
+                    self.logger.warning(
+                        "Validation failed: Tests still fail after applying the patch."
+                    )
                     return False
 
             except Exception as e:
@@ -119,7 +146,10 @@ class KnowledgeCuratorAgent:
         result = subprocess.run(
             [sys.executable, "-m", "pytest", test_file_rel_path],
             cwd=sandbox_path,
-            capture_output=True, text=True, encoding='utf-8', errors='replace'
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
         )
         output = result.stdout + "\n" + result.stderr
         return result.returncode == 0, output

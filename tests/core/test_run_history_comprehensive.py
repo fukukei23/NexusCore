@@ -7,12 +7,10 @@ and Orchestrator runs.
 
 import json
 import tempfile
-import time
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-import pytest
+from unittest.mock import Mock, patch
 
-from nexuscore.core.run_history import RunRecord, RunHistoryLogger
+from nexuscore.core.run_history import RunHistoryLogger, RunRecord
 
 
 class TestRunRecord:
@@ -31,7 +29,7 @@ class TestRunRecord:
             pr_number=42,
             head_sha="abc123",
             summary="Fixed 3 issues",
-            details={"fixes": 3}
+            details={"fixes": 3},
         )
 
         assert record.run_id == "run-123"
@@ -54,7 +52,7 @@ class TestRunRecord:
             kind="full_project",
             status="completed",
             started_at=100.0,
-            finished_at=200.0
+            finished_at=200.0,
         )
 
         assert record.run_id == "run-1"
@@ -72,7 +70,7 @@ class TestRunRecord:
             kind="test",
             status="test",
             started_at=0.0,
-            finished_at=1.0
+            finished_at=1.0,
         )
 
         assert record.details == {}
@@ -122,7 +120,7 @@ class TestLogRun:
                 kind="self_healing",
                 status="fixed",
                 started_at=1000.0,
-                finished_at=2000.0
+                finished_at=2000.0,
             )
 
             logger.log_run(record)
@@ -141,7 +139,7 @@ class TestLogRun:
                 status="success",
                 started_at=100.0,
                 finished_at=200.0,
-                summary="Test summary"
+                summary="Test summary",
             )
 
             logger.log_run(record)
@@ -161,12 +159,20 @@ class TestLogRun:
             logger = RunHistoryLogger(tmpdir)
 
             record1 = RunRecord(
-                run_id="run-1", session_id="s1", kind="test",
-                status="fixed", started_at=100.0, finished_at=200.0
+                run_id="run-1",
+                session_id="s1",
+                kind="test",
+                status="fixed",
+                started_at=100.0,
+                finished_at=200.0,
             )
             record2 = RunRecord(
-                run_id="run-2", session_id="s2", kind="test",
-                status="not_fixed", started_at=300.0, finished_at=400.0
+                run_id="run-2",
+                session_id="s2",
+                kind="test",
+                status="not_fixed",
+                started_at=300.0,
+                finished_at=400.0,
             )
 
             logger.log_run(record1)
@@ -187,8 +193,12 @@ class TestLogRun:
         with tempfile.TemporaryDirectory() as tmpdir:
             logger = RunHistoryLogger(tmpdir)
             record = RunRecord(
-                run_id="test", session_id="s", kind="test",
-                status="fixed", started_at=0.0, finished_at=1.0
+                run_id="test",
+                session_id="s",
+                kind="test",
+                status="fixed",
+                started_at=0.0,
+                finished_at=1.0,
             )
 
             # Make history_dir read-only to cause write error
@@ -206,15 +216,19 @@ class TestLogRun:
         with tempfile.TemporaryDirectory() as tmpdir:
             logger = RunHistoryLogger(tmpdir)
             record = RunRecord(
-                run_id="test", session_id="s", kind="test",
-                status="fixed", started_at=0.0, finished_at=1.0,
+                run_id="test",
+                session_id="s",
+                kind="test",
+                status="fixed",
+                started_at=0.0,
+                finished_at=1.0,
                 details={
                     "fixes": [
                         {"file": "a.py", "lines": [1, 2, 3]},
-                        {"file": "b.py", "lines": [10, 20]}
+                        {"file": "b.py", "lines": [10, 20]},
                     ],
-                    "metadata": {"complexity": "high"}
-                }
+                    "metadata": {"complexity": "high"},
+                },
             )
 
             logger.log_run(record)
@@ -245,7 +259,7 @@ class TestNewSelfHealingRecord:
                 summary="Fixed 3 tests",
                 details={"test_count": 3},
                 started_at=1000.0,
-                finished_at=2000.0
+                finished_at=2000.0,
             )
 
             assert record.run_id == "heal-123"
@@ -301,7 +315,7 @@ class TestLoadRuns:
             # Write valid and invalid lines
             with log_file.open("w") as f:
                 f.write('{"run_id": "r1", "status": "fixed"}\n')
-                f.write('{ invalid json }\n')  # Corrupted
+                f.write("{ invalid json }\n")  # Corrupted
                 f.write('{"run_id": "r2", "status": "not_fixed"}\n')
 
             loaded = logger.load_runs("test")
@@ -319,8 +333,8 @@ class TestLoadRuns:
 
             with log_file.open("w") as f:
                 f.write('{"run_id": "r1"}\n')
-                f.write('\n')  # Empty line
-                f.write('  \n')  # Whitespace only
+                f.write("\n")  # Empty line
+                f.write("  \n")  # Whitespace only
                 f.write('{"run_id": "r2"}\n')
 
             loaded = logger.load_runs("test")
@@ -339,9 +353,12 @@ class TestGetLastSelfHealingRuns:
             # Create runs with different timestamps
             for i in range(5):
                 record = RunRecord(
-                    f"r{i}", f"s{i}", "self_healing", "fixed",
+                    f"r{i}",
+                    f"s{i}",
+                    "self_healing",
+                    "fixed",
                     started_at=float(i * 100),
-                    finished_at=float(i * 100 + 50)
+                    finished_at=float(i * 100 + 50),
                 )
                 logger.log_run(record)
 
@@ -361,8 +378,12 @@ class TestGetLastSelfHealingRuns:
             # Create 50 runs
             for i in range(50):
                 record = RunRecord(
-                    f"r{i}", f"s{i}", "self_healing", "fixed",
-                    started_at=float(i), finished_at=float(i + 1)
+                    f"r{i}",
+                    f"s{i}",
+                    "self_healing",
+                    "fixed",
+                    started_at=float(i),
+                    finished_at=float(i + 1),
                 )
                 logger.log_run(record)
 
@@ -403,8 +424,7 @@ class TestCalculateSuccessRate:
 
             for i in range(10):
                 record = RunRecord(
-                    f"r{i}", f"s{i}", "self_healing", "fixed",
-                    float(i), float(i + 1)
+                    f"r{i}", f"s{i}", "self_healing", "fixed", float(i), float(i + 1)
                 )
                 logger.log_run(record)
 
@@ -421,8 +441,7 @@ class TestCalculateSuccessRate:
 
             for i in range(5):
                 record = RunRecord(
-                    f"r{i}", f"s{i}", "self_healing", "not_fixed",
-                    float(i), float(i + 1)
+                    f"r{i}", f"s{i}", "self_healing", "not_fixed", float(i), float(i + 1)
                 )
                 logger.log_run(record)
 
@@ -439,10 +458,7 @@ class TestCalculateSuccessRate:
 
             statuses = ["fixed", "fixed", "not_fixed", "fixed", "error"]
             for i, status in enumerate(statuses):
-                record = RunRecord(
-                    f"r{i}", f"s{i}", "self_healing", status,
-                    float(i), float(i + 1)
-                )
+                record = RunRecord(f"r{i}", f"s{i}", "self_healing", status, float(i), float(i + 1))
                 logger.log_run(record)
 
             rate, success, total = logger.calculate_success_rate(limit=10)
@@ -471,10 +487,7 @@ class TestCalculateSuccessRate:
             # Create 10 runs: first 5 fixed, last 5 not_fixed
             for i in range(10):
                 status = "fixed" if i < 5 else "not_fixed"
-                record = RunRecord(
-                    f"r{i}", f"s{i}", "self_healing", status,
-                    float(i), float(i + 1)
-                )
+                record = RunRecord(f"r{i}", f"s{i}", "self_healing", status, float(i), float(i + 1))
                 logger.log_run(record)
 
             # Get last 5 (should be the not_fixed ones)
@@ -492,10 +505,7 @@ class TestCalculateSuccessRate:
             # 1 fixed out of 3 = 33.333...%
             statuses = ["fixed", "not_fixed", "not_fixed"]
             for i, status in enumerate(statuses):
-                record = RunRecord(
-                    f"r{i}", f"s{i}", "self_healing", status,
-                    float(i), float(i + 1)
-                )
+                record = RunRecord(f"r{i}", f"s{i}", "self_healing", status, float(i), float(i + 1))
                 logger.log_run(record)
 
             rate, success, total = logger.calculate_success_rate()
@@ -513,15 +523,19 @@ class TestSendNotification:
         with tempfile.TemporaryDirectory() as tmpdir:
             logger = RunHistoryLogger(tmpdir)
             record = RunRecord(
-                "r1", "s1", "self_healing", "fixed",
-                100.0, 200.0,
+                "r1",
+                "s1",
+                "self_healing",
+                "fixed",
+                100.0,
+                200.0,
                 repo_full_name="owner/repo",
                 pr_number=42,
-                summary="Fixed tests"
+                summary="Fixed tests",
             )
 
             mock_notifier = Mock()
-            with patch('nexuscore.core.notifier.get_notifier', return_value=mock_notifier):
+            with patch("nexuscore.core.notifier.get_notifier", return_value=mock_notifier):
                 logger.log_run(record)
 
             mock_notifier.notify_self_healing_complete.assert_called_once_with(
@@ -530,18 +544,16 @@ class TestSendNotification:
                 status="fixed",
                 summary="Fixed tests",
                 run_id="r1",
-                details={}
+                details={},
             )
 
     def test_send_notification_handles_no_notifier(self):
         """Test _send_notification handles None notifier gracefully."""
         with tempfile.TemporaryDirectory() as tmpdir:
             logger = RunHistoryLogger(tmpdir)
-            record = RunRecord(
-                "r1", "s1", "self_healing", "fixed", 100.0, 200.0
-            )
+            record = RunRecord("r1", "s1", "self_healing", "fixed", 100.0, 200.0)
 
-            with patch('nexuscore.core.notifier.get_notifier', return_value=None):
+            with patch("nexuscore.core.notifier.get_notifier", return_value=None):
                 # Should not raise
                 logger.log_run(record)
 
@@ -549,11 +561,9 @@ class TestSendNotification:
         """Test _send_notification handles import errors gracefully."""
         with tempfile.TemporaryDirectory() as tmpdir:
             logger = RunHistoryLogger(tmpdir)
-            record = RunRecord(
-                "r1", "s1", "self_healing", "fixed", 100.0, 200.0
-            )
+            record = RunRecord("r1", "s1", "self_healing", "fixed", 100.0, 200.0)
 
-            with patch('nexuscore.core.notifier.get_notifier', side_effect=ImportError):
+            with patch("nexuscore.core.notifier.get_notifier", side_effect=ImportError):
                 # Should not raise
                 logger.log_run(record)
 
@@ -561,12 +571,10 @@ class TestSendNotification:
         """Test notification only sent for self_healing kind."""
         with tempfile.TemporaryDirectory() as tmpdir:
             logger = RunHistoryLogger(tmpdir)
-            record = RunRecord(
-                "r1", "s1", "other_kind", "fixed", 100.0, 200.0
-            )
+            record = RunRecord("r1", "s1", "other_kind", "fixed", 100.0, 200.0)
 
             mock_notifier = Mock()
-            with patch('nexuscore.core.notifier.get_notifier', return_value=mock_notifier):
+            with patch("nexuscore.core.notifier.get_notifier", return_value=mock_notifier):
                 logger.log_run(record)
 
             # Should not call notify for non-self_healing kind
@@ -593,7 +601,7 @@ class TestRunHistoryIntegration:
                     summary=f"Summary {i}",
                     details={"count": i},
                     started_at=float(i * 100),
-                    finished_at=float(i * 100 + 50)
+                    finished_at=float(i * 100 + 50),
                 )
                 logger.log_run(record)
 

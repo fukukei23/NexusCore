@@ -9,35 +9,40 @@
 #   - ここは「ルータの前に立つ保安員」。依存は最小限に保つ
 # ==============================================================================
 from __future__ import annotations
+
 import dataclasses
 import json
 import os
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any
 
 # -------- コスト表（概算, JPY/1k tokens）--------------------------------------
 # 必要なら環境変数で上書き（例: NPE_COST_OPENAI_GPT5_PROMPT=1.5）
 DEFAULT_COST_TABLE = {
-    "gpt-5":                {"prompt": 1.6, "completion": 5.0},
-    "gpt-5-mini":           {"prompt": 0.2, "completion": 0.6},
-    "gemini-2.5-pro":       {"prompt": 1.2, "completion": 3.0},
-    "gemini-2.5-flash":     {"prompt": 0.15, "completion": 0.30},
+    "gpt-5": {"prompt": 1.6, "completion": 5.0},
+    "gpt-5-mini": {"prompt": 0.2, "completion": 0.6},
+    "gemini-2.5-pro": {"prompt": 1.2, "completion": 3.0},
+    "gemini-2.5-flash": {"prompt": 0.15, "completion": 0.30},
     "kimi-k2-turbo-preview": {"prompt": 0.20, "completion": 0.40},
-    "deepseek-coder":       {"prompt": 0.14, "completion": 0.28},
+    "deepseek-coder": {"prompt": 0.14, "completion": 0.28},
 }
+
 
 def _cost(model: str, kind: str) -> float:
     # env override: NPE_COST_{MODEL_UPPER}_{PROMPT|COMPLETION}
-    key = f"NPE_COST_{model.replace('-', '_').upper()}_{'PROMPT' if kind=='prompt' else 'COMPLETION'}"
+    key = (
+        f"NPE_COST_{model.replace('-', '_').upper()}_{'PROMPT' if kind=='prompt' else 'COMPLETION'}"
+    )
     if key in os.environ:
         try:
             return float(os.environ[key])
         except Exception:
             pass
     return DEFAULT_COST_TABLE.get(model, DEFAULT_COST_TABLE["gpt-5"]).get(kind, 1.0)
+
 
 # -------- 設定 ----------------------------------------------------------------
 def _env_float(name: str, default: float) -> float:
@@ -46,21 +51,24 @@ def _env_float(name: str, default: float) -> float:
     except Exception:
         return default
 
+
 def _env_int(name: str, default: int) -> int:
     try:
         return int(os.getenv(name, default))
     except Exception:
         return default
 
-DAILY_HARD_CAP_JPY   = _env_float("NPE_DAILY_HARD_CAP_JPY",   1500.0)  # 例: 1,500円/日
-DAILY_SOFT_CAP_JPY   = _env_float("NPE_DAILY_SOFT_CAP_JPY",   1000.0)  # ソフト警告ライン
-PER_CALL_CAP_JPY     = _env_float("NPE_PER_CALL_CAP_JPY",       80.0)  # 1回上限
+
+DAILY_HARD_CAP_JPY = _env_float("NPE_DAILY_HARD_CAP_JPY", 1500.0)  # 例: 1,500円/日
+DAILY_SOFT_CAP_JPY = _env_float("NPE_DAILY_SOFT_CAP_JPY", 1000.0)  # ソフト警告ライン
+PER_CALL_CAP_JPY = _env_float("NPE_PER_CALL_CAP_JPY", 80.0)  # 1回上限
 ALLOW_WHEN_OVER_SOFT = os.getenv("NPE_ALLOW_OVER_SOFT", "true").lower() == "true"
 
 AUDIT_DIR = Path(os.getenv("NPE_AUDIT_DIR", "logs/npe"))
 AUDIT_DIR.mkdir(parents=True, exist_ok=True)
 USAGE_LEDGER = AUDIT_DIR / "usage_ledger.jsonl"
 _lock = threading.Lock()
+
 
 # -------- データクラス ---------------------------------------------------------
 @dataclasses.dataclass
@@ -70,18 +78,22 @@ class BudgetDecision:
     est_cost_jpy: float
     est_prompt_tokens: int
     est_completion_tokens: int
-    caps: Dict[str, Any]
+    caps: dict[str, Any]
+
 
 def _now_utc_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
-def _day_key(ts: Optional[float] = None) -> str:
+
+def _day_key(ts: float | None = None) -> str:
     return time.strftime("%Y-%m-%d", time.gmtime(ts or time.time()))
+
 
 def _estimate_cost_jpy(model: str, prompt_tokens: int, completion_tokens: int) -> float:
     jp = _cost(model, "prompt")
     jc = _cost(model, "completion")
     return (prompt_tokens / 1000.0) * jp + (completion_tokens / 1000.0) * jc
+
 
 def _read_today_total() -> float:
     total = 0.0
@@ -102,7 +114,10 @@ def _read_today_total() -> float:
             return total
     return total
 
-def record_usage(model: str, task: str, cost_jpy: float, prompt_tokens: int, completion_tokens: int) -> None:
+
+def record_usage(
+    model: str, task: str, cost_jpy: float, prompt_tokens: int, completion_tokens: int
+) -> None:
     entry = {
         "ts_utc": _now_utc_iso(),
         "day": _day_key(),
@@ -121,12 +136,9 @@ def record_usage(model: str, task: str, cost_jpy: float, prompt_tokens: int, com
             # 失敗時はコンソールに出すだけ（致命にしない）
             print("[NPE-Budget] WARN: failed to append usage_ledger")
 
+
 def preflight_check(
-    *,
-    model: str,
-    task: str,
-    est_prompt_tokens: int,
-    est_completion_tokens: int
+    *, model: str, task: str, est_prompt_tokens: int, est_completion_tokens: int
 ) -> BudgetDecision:
     """実行前の見積りで上限制御を行う。"""
     est_cost = _estimate_cost_jpy(model, est_prompt_tokens, est_completion_tokens)
@@ -194,6 +206,7 @@ def preflight_check(
             "today_total_jpy": today_total,
         },
     )
+
 
 def record_estimate(model: str, task: str, decision: BudgetDecision) -> None:
     """事前見積りを台帳に“仮記録”。後で実測で補正する。"""

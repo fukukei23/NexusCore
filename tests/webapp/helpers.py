@@ -6,10 +6,8 @@ HTML の 200 チェック＋キーワード検証を共通化。
 
 from __future__ import annotations
 
-from typing import List
 
-
-def assert_page_keywords(response, keywords: List[str]) -> None:
+def assert_page_keywords(response, keywords: list[str]) -> None:
     """
     レスポンスが 200 を返し、指定されたキーワードがすべて含まれていることを確認する。
 
@@ -39,4 +37,3 @@ def login_user(client, user) -> None:
     with client.session_transaction() as sess:
         sess["user_id"] = user.id
         sess["github_login"] = user.github_login
-

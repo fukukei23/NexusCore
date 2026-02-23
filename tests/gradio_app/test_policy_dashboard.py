@@ -33,11 +33,25 @@ def test_validate_policy_detects_errors():
 
 def test_assemble_policy_payload_builds_defaults():
     assembled, meta = policy_dashboard.assemble_policy_payload(
-        "Org", "Owner", "finance", "v2",
+        "Org",
+        "Owner",
+        "finance",
+        "v2",
         [["RL-1", "text", ""]],
-        True, False, "***", "ephemeral", 30,
-        "en", "friendly", True, False, "disc",
-        "openai", "gpt-4o", 0.5, 1024,
+        True,
+        False,
+        "***",
+        "ephemeral",
+        30,
+        "en",
+        "friendly",
+        True,
+        False,
+        "disc",
+        "openai",
+        "gpt-4o",
+        0.5,
+        1024,
     )
     assert meta["org_name"] == "Org"
     assert assembled["redlines"][0]["severity"] == "high"
@@ -68,10 +82,25 @@ def test_safe_int_and_float_defaults():
 
 def test_assemble_policy_payload_handles_empty(monkeypatch):
     assembled, meta = policy_dashboard.assemble_policy_payload(
-        "", "", "", "",
-        [], False, False, "", "", None,
-        "", "", False, False, "",
-        "", "", None, None,
+        "",
+        "",
+        "",
+        "",
+        [],
+        False,
+        False,
+        "",
+        "",
+        None,
+        "",
+        "",
+        False,
+        False,
+        "",
+        "",
+        "",
+        None,
+        None,
     )
     assert meta["org_name"] == ""
     assert assembled["pii_policy"]["retention_days"] == 0

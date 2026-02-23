@@ -4,8 +4,10 @@ Run API リクエスト・レスポンススキーマ
 FastAPI の Run エンドポイント用の Pydantic モデル定義。
 既存の Flask 実装 (`src/nexuscore/webapp/api_external.py`) の仕様に準拠。
 """
+
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -22,12 +24,15 @@ class RunSummary(BaseModel):
         finished_at: 終了日時
         created_at: 作成日時
     """
+
     id: int = Field(..., description="Run ID（データベースID）")
     run_id: str = Field(..., description="Run ID（UUID形式）")
     project_id: int = Field(..., description="プロジェクトID")
-    status: Literal["PENDING", "RUNNING", "SUCCESS", "FAILED"] = Field(..., description="ステータス")
-    started_at: Optional[datetime] = Field(None, description="開始日時")
-    finished_at: Optional[datetime] = Field(None, description="終了日時")
+    status: Literal["PENDING", "RUNNING", "SUCCESS", "FAILED"] = Field(
+        ..., description="ステータス"
+    )
+    started_at: datetime | None = Field(None, description="開始日時")
+    finished_at: datetime | None = Field(None, description="終了日時")
     created_at: datetime = Field(..., description="作成日時")
 
 
@@ -48,10 +53,11 @@ class RunResponse(RunSummary):
         requirement: ユーザー要件
         created_at: 作成日時
     """
-    triggered_by: Optional[int] = Field(None, description="トリガーしたユーザーID")
-    autonomy_level: Optional[int] = Field(None, description="自律レベル")
-    llm_model_summary: Optional[str] = Field(None, description="使用されたLLMモデルの概要")
-    requirement: Optional[str] = Field(None, description="ユーザー要件")
+
+    triggered_by: int | None = Field(None, description="トリガーしたユーザーID")
+    autonomy_level: int | None = Field(None, description="自律レベル")
+    llm_model_summary: str | None = Field(None, description="使用されたLLMモデルの概要")
+    requirement: str | None = Field(None, description="ユーザー要件")
 
 
 class RunListResponse(BaseModel):
@@ -61,6 +67,7 @@ class RunListResponse(BaseModel):
     Attributes:
         runs: Run一覧
     """
+
     runs: list[RunSummary] = Field(..., description="Run一覧")
 
     class Config:
@@ -74,9 +81,8 @@ class RunListResponse(BaseModel):
                         "status": "SUCCESS",
                         "started_at": "2025-01-01T00:00:00",
                         "finished_at": "2025-01-01T00:05:00",
-                        "created_at": "2025-01-01T00:00:00"
+                        "created_at": "2025-01-01T00:00:00",
                     }
                 ]
             }
         }
-

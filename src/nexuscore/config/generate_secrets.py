@@ -4,8 +4,8 @@
 # 保存場所: src/nexuscore/config/
 # ================================================================
 
-import os
 from pathlib import Path
+
 from dotenv import dotenv_values
 
 # ============================================

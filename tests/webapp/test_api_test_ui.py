@@ -5,6 +5,7 @@
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask legacy api_test_ui tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -46,9 +47,12 @@ def test_api_test_page_post_handles_missing_fields(client, app, test_user, test_
     """API Test ページの POST で必須フィールドが欠けている場合でも 500 にならないことを確認"""
     with app.app_context():
         login_user(client, test_user)
-        response = client.post("/api-test/", data={
-            "requirement": "Test requirement",
-        })
+        response = client.post(
+            "/api-test/",
+            data={
+                "requirement": "Test requirement",
+            },
+        )
         # 200 を確認（エラーメッセージが表示されるが、500 にはならない）
         assert response.status_code == 200
         html = response.data.decode("utf-8")

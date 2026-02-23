@@ -3,10 +3,9 @@ Comprehensive tests for json_sanitizer module.
 Covers all edge cases, fence removal, JSON extraction, and error handling.
 """
 
-import pytest
 import json
-from nexuscore.utils.json_sanitizer import sanitize_json_like
 
+from nexuscore.utils.json_sanitizer import sanitize_json_like
 
 # ==============================================================================
 # Dict/List Pass-Through Tests
@@ -34,13 +33,7 @@ class TestDictListPassThrough:
 
     def test_sanitize_nested_dict_unchanged(self):
         """Nested dict is returned unchanged"""
-        input_dict = {
-            "level1": {
-                "level2": {
-                    "level3": "deep"
-                }
-            }
-        }
+        input_dict = {"level1": {"level2": {"level3": "deep"}}}
         result = sanitize_json_like(input_dict)
 
         assert result == input_dict
@@ -102,7 +95,7 @@ class TestCodeFenceRemoval:
 
     def test_sanitize_removes_fence_from_array(self):
         """Removes fence from JSON array"""
-        input_str = '```json\\n[1, 2, 3]\\n```'
+        input_str = "```json\\n[1, 2, 3]\\n```"
         result = sanitize_json_like(input_str)
 
         assert result == [1, 2, 3]
@@ -146,7 +139,7 @@ class TestJSONExtraction:
 
     def test_sanitize_extracts_array_with_prefix(self):
         """Extracts JSON array with text before it"""
-        input_str = 'The items are: [1, 2, 3, 4, 5]'
+        input_str = "The items are: [1, 2, 3, 4, 5]"
         result = sanitize_json_like(input_str)
 
         assert result == [1, 2, 3, 4, 5]
@@ -183,7 +176,7 @@ class TestComplexCases:
 
     def test_sanitize_llm_response_with_explanation(self):
         """Sanitizes typical LLM response with explanation"""
-        input_str = '''Here's the JSON response you requested:
+        input_str = """Here's the JSON response you requested:
 
 ```json
 {
@@ -195,17 +188,11 @@ class TestComplexCases:
 }
 ```
 
-This contains the data you need.'''
+This contains the data you need."""
 
         result = sanitize_json_like(input_str)
 
-        assert result == {
-            "status": "success",
-            "data": {
-                "items": [1, 2, 3],
-                "count": 3
-            }
-        }
+        assert result == {"status": "success", "data": {"items": [1, 2, 3], "count": 3}}
 
     def test_sanitize_json_with_unicode(self):
         """Sanitizes JSON with Unicode characters"""
@@ -237,20 +224,16 @@ This contains the data you need.'''
 
     def test_sanitize_multiline_json(self):
         """Sanitizes multiline formatted JSON"""
-        input_str = '''{
+        input_str = """{
     "key1": "value1",
     "key2": "value2",
     "nested": {
         "inner": "data"
     }
-}'''
+}"""
         result = sanitize_json_like(input_str)
 
-        assert result == {
-            "key1": "value1",
-            "key2": "value2",
-            "nested": {"inner": "data"}
-        }
+        assert result == {"key1": "value1", "key2": "value2", "nested": {"inner": "data"}}
 
 
 # ==============================================================================
@@ -384,7 +367,7 @@ class TestRealWorldLLMOutputs:
 
     def test_sanitize_chatgpt_style_response(self):
         """Sanitizes ChatGPT-style response"""
-        input_str = '''Sure! Here's the JSON:
+        input_str = """Sure! Here's the JSON:
 
 ```json
 {
@@ -394,33 +377,26 @@ class TestRealWorldLLMOutputs:
 }
 ```
 
-Is there anything else you need?'''
+Is there anything else you need?"""
 
         result = sanitize_json_like(input_str)
 
-        assert result == {
-            "name": "John Doe",
-            "age": 30,
-            "email": "john@example.com"
-        }
+        assert result == {"name": "John Doe", "age": 30, "email": "john@example.com"}
 
     def test_sanitize_claude_style_response(self):
         """Sanitizes Claude-style response"""
-        input_str = '''I'll provide the data in JSON format:
+        input_str = """I'll provide the data in JSON format:
 
 ```json
 {
     "status": "complete",
     "results": ["item1", "item2", "item3"]
 }
-```'''
+```"""
 
         result = sanitize_json_like(input_str)
 
-        assert result == {
-            "status": "complete",
-            "results": ["item1", "item2", "item3"]
-        }
+        assert result == {"status": "complete", "results": ["item1", "item2", "item3"]}
 
     def test_sanitize_inline_json_response(self):
         """Sanitizes inline JSON without fences"""
@@ -431,7 +407,7 @@ Is there anything else you need?'''
 
     def test_sanitize_json_with_code_fence_and_prefix(self):
         """Sanitizes JSON with fence and explanatory text"""
-        input_str = '''Based on your request, here's the configuration:
+        input_str = """Based on your request, here's the configuration:
 
 ```json
 {
@@ -441,15 +417,11 @@ Is there anything else you need?'''
 }
 ```
 
-This should work for your use case.'''
+This should work for your use case."""
 
         result = sanitize_json_like(input_str)
 
-        assert result == {
-            "debug": False,
-            "timeout": 30,
-            "retries": 3
-        }
+        assert result == {"debug": False, "timeout": 30, "retries": 3}
 
 
 # ==============================================================================

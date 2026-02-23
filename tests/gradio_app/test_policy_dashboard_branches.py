@@ -11,10 +11,25 @@ def test_validation_summary_invalid_language():
 
 def test_assemble_policy_payload_bad_numbers():
     assembled, meta = policy_dashboard.assemble_policy_payload(
-        "Org", "Owner", "finance", "v1",
-        [], True, True, "", "", "not-int",
-        "ja", "professional", False, True, "",
-        "openai", "model", "bad-float", "bad-int",
+        "Org",
+        "Owner",
+        "finance",
+        "v1",
+        [],
+        True,
+        True,
+        "",
+        "",
+        "not-int",
+        "ja",
+        "professional",
+        False,
+        True,
+        "",
+        "openai",
+        "model",
+        "bad-float",
+        "bad-int",
     )
     assert assembled["pii_policy"]["retention_days"] == 0
     assert assembled["model_policy"]["max_tokens"] == 2000

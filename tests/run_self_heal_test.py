@@ -11,10 +11,9 @@
 # 改修内容:
 #   - GuardianAgentの初期化時に、他のエージェントと一貫性のあるダミー引数を追加。
 # ==============================================================================
-import os
-import sys
 import json
 import logging
+import sys
 from pathlib import Path
 
 # --- Python検索パスの設定 ---
@@ -26,24 +25,31 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 # --- 司令塔と、それに必要な全エージェントをインポート ---
-from nexuscore.core.orchestrator import Orchestrator
-from nexuscore.agents.requirement_agent import RequirementAgent
 from nexuscore.agents.architect_agent import ArchitectAgent
-from nexuscore.agents.planner_agent import PlannerAgent
 from nexuscore.agents.coder_agent import CoderAgent
-from nexuscore.agents.tester_agent import TesterAgent
 from nexuscore.agents.debugger_agent import DebuggerAgent
 from nexuscore.agents.guardian_agent import GuardianAgent
-from nexuscore.agents.postmortem_agent import PostmortemAgent
 from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
 from nexuscore.agents.patch_applier import PatchApplier
+from nexuscore.agents.planner_agent import PlannerAgent
+from nexuscore.agents.postmortem_agent import PostmortemAgent
+from nexuscore.agents.requirement_agent import RequirementAgent
+from nexuscore.agents.tester_agent import TesterAgent
+from nexuscore.core.orchestrator import Orchestrator
+
 try:
     from nexuscore.agents.policy_agent import PolicyAgent
 except ImportError:
-    class PolicyAgent: pass
+
+    class PolicyAgent:
+        pass
+
 
 # --- ロギング設定 ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - [%(levelname)s] - %(name)s - %(message)s"
+)
+
 
 def main():
     """自己修復ループを安全に実証するためのメイン関数。"""
@@ -52,8 +58,14 @@ def main():
     try:
         # --- 1. 憲法(プロジェクトルール)の読み込み ---
         constitution_path = PROJECT_ROOT / "constitution.json"
-        constitution = json.load(constitution_path.open("r", encoding="utf-8")) if constitution_path.exists() else {"automation_policy": {"max_llm_calls_per_task": 20}}
-        print(f"📜 [INFO] Constitution {'loaded' if constitution_path.exists() else 'created dummy'}.")
+        constitution = (
+            json.load(constitution_path.open("r", encoding="utf-8"))
+            if constitution_path.exists()
+            else {"automation_policy": {"max_llm_calls_per_task": 20}}
+        )
+        print(
+            f"📜 [INFO] Constitution {'loaded' if constitution_path.exists() else 'created dummy'}."
+        )
 
         # --- 2. 専門家チーム(エージェント群)の招集 ---
         print("👥 [INFO] Assembling agent team...")
@@ -74,13 +86,19 @@ def main():
 
         # --- 3. 司令塔(Orchestrator)の初期化 ---
         orchestrator = Orchestrator(
-            project_path=str(PROJECT_ROOT), constitution=constitution,
-            requirement_agent=requirement_agent, architect_agent=architect_agent,
-            planner_agent=planner_agent, coder_agent=coder_agent,
-            tester_agent=tester_agent, debugger_agent=debugger_agent,
-            guardian_agent=guardian_agent, policy_agent=policy_agent,
-            postmortem_agent=postmortem_agent, knowledge_curator_agent=knowledge_curator_agent,
-            patch_applier=patch_applier
+            project_path=str(PROJECT_ROOT),
+            constitution=constitution,
+            requirement_agent=requirement_agent,
+            architect_agent=architect_agent,
+            planner_agent=planner_agent,
+            coder_agent=coder_agent,
+            tester_agent=tester_agent,
+            debugger_agent=debugger_agent,
+            guardian_agent=guardian_agent,
+            policy_agent=policy_agent,
+            postmortem_agent=postmortem_agent,
+            knowledge_curator_agent=knowledge_curator_agent,
+            patch_applier=patch_applier,
         )
         print("🤖 [INFO] Orchestrator initialized successfully.")
 
@@ -104,19 +122,25 @@ def main():
         related_source_file = "tools/utils/math_utils.py"
         print("🕵️  [INFO] PostmortemAgent is analyzing the failure...")
         analysis_result = orchestrator.postmortem_agent.analyze(test_logs)
-        print(f"📝 [INFO] Postmortem analysis complete: {json.dumps(analysis_result, indent=2, ensure_ascii=False)}")
+        print(
+            f"📝 [INFO] Postmortem analysis complete: {json.dumps(analysis_result, indent=2, ensure_ascii=False)}"
+        )
 
         print("\n👨‍⚕️ [INFO] DebuggerAgent is generating a patch based on the analysis...")
         debug_result = orchestrator.debugger_agent.debug_and_patch(
             error_log=test_logs,
-            files_content={related_source_file: Path(related_source_file).read_text(encoding="utf-8")},
-            project_path=str(PROJECT_ROOT)
+            files_content={
+                related_source_file: Path(related_source_file).read_text(encoding="utf-8")
+            },
+            project_path=str(PROJECT_ROOT),
         )
         patch = debug_result.get("patch")
         if not patch:
             print("❌ [ERROR] DebuggerAgent failed to generate a patch. Aborting.")
             return
-        print(f"🩹 [INFO] Patch generated successfully.\n--- Generated Patch ---\n{patch}\n-----------------------\n")
+        print(
+            f"🩹 [INFO] Patch generated successfully.\n--- Generated Patch ---\n{patch}\n-----------------------\n"
+        )
 
         print("🩹 [INFO] PatchApplier is applying the patch...")
         was_applied = orchestrator.patch_applier.apply(patch, project_path=str(PROJECT_ROOT))
@@ -131,11 +155,14 @@ def main():
         if is_fixed:
             print("\n🎉 [SUCCESS] All tests passed! The bug has been successfully self-healed.")
         else:
-            print(f"\n❌ [FAILURE] Tests still fail after applying the patch.\n--- Final Test Log ---\n{final_test_logs}\n----------------------\n")
-            
+            print(
+                f"\n❌ [FAILURE] Tests still fail after applying the patch.\n--- Final Test Log ---\n{final_test_logs}\n----------------------\n"
+            )
+
     except Exception as e:
         logging.error("An error occurred during the self-healing cycle.", exc_info=True)
         print(f"🚨 [FATAL] A critical error occurred: {e}")
+
 
 if __name__ == "__main__":
     main()

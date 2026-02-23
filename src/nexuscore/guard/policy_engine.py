@@ -15,9 +15,8 @@ NexusGuard: 最小ポリシー判定器
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal, Optional
 from enum import Enum
-
+from typing import Literal
 
 # NexusEval の Verdict を参照（型のみ、実装依存なし）
 EvalVerdict = Literal["GO", "CONDITIONAL_GO", "NO"]
@@ -25,6 +24,7 @@ EvalVerdict = Literal["GO", "CONDITIONAL_GO", "NO"]
 
 class GuardDecision(str, Enum):
     """Guard判定結果"""
+
     ALLOW = "ALLOW"
     HOLD = "HOLD"
     BLOCK = "BLOCK"
@@ -33,24 +33,28 @@ class GuardDecision(str, Enum):
 @dataclass
 class EvalInput:
     """Eval入力（NexusEval の EvaluationReport から必要な情報のみ）"""
-    verdict: Optional[EvalVerdict] = None  # GO / CONDITIONAL_GO / NO
+
+    verdict: EvalVerdict | None = None  # GO / CONDITIONAL_GO / NO
 
 
 @dataclass
 class TestInput:
     """Test入力"""
-    status: Optional[Literal["PASS", "FAIL", "UNKNOWN"]] = None
+
+    status: Literal["PASS", "FAIL", "UNKNOWN"] | None = None
 
 
 @dataclass
 class DiffInput:
     """Diff入力"""
+
     high_risk: bool = False  # high_risk_diff
 
 
 @dataclass
 class SecurityInput:
     """Security入力"""
+
     check_status: Literal["PASS", "UNKNOWN", "NOT_RUN"]  # セキュリティチェックの状態（必須）
     secret_found: bool = False  # secret_found
 
@@ -58,17 +62,19 @@ class SecurityInput:
 @dataclass
 class GuardInput:
     """Guard判定への入力"""
+
     environment: Literal["production", "staging", "poc"]  # 環境（必須）
     security: SecurityInput  # セキュリティ入力（必須）
-    eval: Optional[EvalInput] = None
-    test: Optional[TestInput] = None
-    diff: Optional[DiffInput] = None
+    eval: EvalInput | None = None
+    test: TestInput | None = None
+    diff: DiffInput | None = None
     override: bool = False  # デフォルト無効、BLOCK解除は禁止
 
 
 @dataclass
 class GuardResult:
     """Guard判定結果"""
+
     decision: GuardDecision
     reasons: list[str] = field(default_factory=list)  # ルールIDに基づく理由
 

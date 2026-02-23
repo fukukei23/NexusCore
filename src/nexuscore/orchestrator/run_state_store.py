@@ -14,15 +14,15 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any
 
 from .run_state_integrity import sign_run_state
 
 
 def _now_iso8601() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _root_dir() -> Path:
@@ -36,7 +36,7 @@ def _state_path(run_id: str) -> Path:
     return _root_dir() / f"{run_id}.json"
 
 
-def save_state(state: Dict[str, Any]) -> None:
+def save_state(state: dict[str, Any]) -> None:
     """
     Save run state to JSON file. `state` must contain at least `run_id`.
 
@@ -59,7 +59,7 @@ def save_state(state: Dict[str, Any]) -> None:
     path.write_text(json.dumps(signed_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def load_state(run_id: str) -> Dict[str, Any]:
+def load_state(run_id: str) -> dict[str, Any]:
     """
     Load run state from JSON file.
     """
@@ -69,7 +69,7 @@ def load_state(run_id: str) -> Dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def update_state(run_id_or_state: Union[str, Dict[str, Any]], **patch: Any) -> Dict[str, Any]:
+def update_state(run_id_or_state: str | dict[str, Any], **patch: Any) -> dict[str, Any]:
     """
     Read-Modify-Write update (keeps unknown fields).
 
@@ -102,5 +102,3 @@ def update_state(run_id_or_state: Union[str, Dict[str, Any]], **patch: Any) -> D
     merged["updated_at"] = _now_iso8601()
     save_state(merged)
     return merged
-
-

@@ -8,18 +8,27 @@ WebApp HTML UI view.
 
 既存の Orchestrator / NPE とは独立して動作する。
 """
+
 from __future__ import annotations
 
 import os
 import uuid
-from datetime import datetime
-from typing import Sequence, Dict
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, session, flash, get_flashed_messages
+from collections.abc import Sequence
+
+from flask import (
+    Blueprint,
+    flash,
+    get_flashed_messages,
+    jsonify,
+    redirect,
+    request,
+    url_for,
+)
 from sqlalchemy import desc
 
 from nexuscore.webapp import db
-from nexuscore.webapp.models import Project, Run, User
-from nexuscore.webapp.auth import require_auth, get_current_user
+from nexuscore.webapp.auth import get_current_user, require_auth
+from nexuscore.webapp.models import Project, Run
 
 bp = Blueprint("views_projects", __name__, url_prefix="/projects")
 
@@ -27,6 +36,7 @@ bp = Blueprint("views_projects", __name__, url_prefix="/projects")
 # ============================================================================
 # ヘルパー関数: Run 一覧テーブル描画
 # ============================================================================
+
 
 def _format_duration(duration_sec: float | None) -> str:
     """
@@ -186,7 +196,8 @@ def list_projects():
     Data access: Direct DB access (no API call)
     FastAPI equivalent: GET /api/v1/projects (for external clients)
     """
-    from sqlalchemy import desc, func
+    from sqlalchemy import desc
+
     from nexuscore.integration.github_pr_comment import _compute_recent_success_rate
 
     user = get_current_user()
@@ -195,7 +206,9 @@ def list_projects():
     # 各プロジェクトの最新Run情報とメトリクスを取得
     projects_data = []
     for project in projects:
-        latest_run = Run.query.filter_by(project_id=project.id).order_by(desc(Run.created_at)).first()
+        latest_run = (
+            Run.query.filter_by(project_id=project.id).order_by(desc(Run.created_at)).first()
+        )
 
         # 4.5: 最近30件の成功率を計算
         success_rate = _compute_recent_success_rate(project.id, limit=30)
@@ -208,6 +221,7 @@ def list_projects():
 
             # 4.4: details から retry_count と last_error_class を取得
             from nexuscore.webapp.models import ExecutionLog
+
             logs = ExecutionLog.query.filter_by(run_id=latest_run.id).all()
             retry_count = 0
             last_error_class = None
@@ -229,19 +243,29 @@ def list_projects():
                 "last_error_class": last_error_class,
             }
 
-        projects_data.append({
-            "id": project.id,
-            "name": project.name,
-            "repo_url": project.repo_url,
-            "local_path": project.local_path,
-            "success_rate": success_rate,
-            "latest_run": {
-                "run_id": latest_run.run_id if latest_run else None,
-                "status": latest_run.status if latest_run else None,
-                "started_at": latest_run.started_at.isoformat() if latest_run and latest_run.started_at else None,
-                "metrics": latest_run_metrics,
-            } if latest_run else None,
-        })
+        projects_data.append(
+            {
+                "id": project.id,
+                "name": project.name,
+                "repo_url": project.repo_url,
+                "local_path": project.local_path,
+                "success_rate": success_rate,
+                "latest_run": (
+                    {
+                        "run_id": latest_run.run_id if latest_run else None,
+                        "status": latest_run.status if latest_run else None,
+                        "started_at": (
+                            latest_run.started_at.isoformat()
+                            if latest_run and latest_run.started_at
+                            else None
+                        ),
+                        "metrics": latest_run_metrics,
+                    }
+                    if latest_run
+                    else None
+                ),
+            }
+        )
 
     # JSON レスポンス
     if request.headers.get("Accept", "").startswith("application/json"):
@@ -338,20 +362,20 @@ def list_projects():
     """
     for p in projects_data:
         latest_status_badge = ""
-        if p['latest_run']:
-            latest_status_badge = _render_run_status_badge(p['latest_run']['status'])
+        if p["latest_run"]:
+            latest_status_badge = _render_run_status_badge(p["latest_run"]["status"])
 
-        success_rate_pct = p['success_rate'] * 100 if p['success_rate'] else 0.0
+        success_rate_pct = p["success_rate"] * 100 if p["success_rate"] else 0.0
 
         # 最新Runのメトリクス
         exec_time = "N/A"
         retry_count = "-"
         last_error = "-"
-        if p['latest_run'] and p['latest_run'].get('metrics'):
-            metrics = p['latest_run']['metrics']
-            exec_time = metrics.get('duration_str', 'N/A')
-            retry_count = str(metrics.get('retry_count', 0))
-            last_error = metrics.get('last_error_class', '-') or '-'
+        if p["latest_run"] and p["latest_run"].get("metrics"):
+            metrics = p["latest_run"]["metrics"]
+            exec_time = metrics.get("duration_str", "N/A")
+            retry_count = str(metrics.get("retry_count", 0))
+            last_error = metrics.get("last_error_class", "-") or "-"
 
         html += f"""
             <div class="project-card">
@@ -407,37 +431,40 @@ def project_detail(project_id: int):
     for run in runs:
         # 成功/失敗数の集計（簡易版）
         from nexuscore.webapp.models import ExecutionLog
+
         success_count = ExecutionLog.query.filter_by(
             run_id=run.id, level="INFO", source="ORCHESTRATOR"
         ).count()
-        failure_count = ExecutionLog.query.filter_by(
-            run_id=run.id, level="ERROR"
-        ).count()
+        failure_count = ExecutionLog.query.filter_by(run_id=run.id, level="ERROR").count()
 
         # 実行時間を計算
         duration_sec = _compute_run_duration(run)
 
-        runs_data.append({
-            "id": run.id,
-            "run_id": run.run_id,
-            "status": run.status,
-            "started_at": run.started_at.isoformat() if run.started_at else None,
-            "finished_at": run.finished_at.isoformat() if run.finished_at else None,
-            "duration_sec": duration_sec,
-            "success_count": success_count,
-            "failure_count": failure_count,
-        })
+        runs_data.append(
+            {
+                "id": run.id,
+                "run_id": run.run_id,
+                "status": run.status,
+                "started_at": run.started_at.isoformat() if run.started_at else None,
+                "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+                "duration_sec": duration_sec,
+                "success_count": success_count,
+                "failure_count": failure_count,
+            }
+        )
 
     if request.headers.get("Accept", "").startswith("application/json"):
-        return jsonify({
-            "project": {
-                "id": project.id,
-                "name": project.name,
-                "repo_url": project.repo_url,
-                "local_path": project.local_path,
-            },
-            "runs": runs_data,
-        })
+        return jsonify(
+            {
+                "project": {
+                    "id": project.id,
+                    "name": project.name,
+                    "repo_url": project.repo_url,
+                    "local_path": project.local_path,
+                },
+                "runs": runs_data,
+            }
+        )
 
     # フラッシュメッセージの取得
     flash_messages = get_flashed_messages(with_categories=True)
@@ -576,7 +603,6 @@ def trigger_run(project_id: int):
     フェーズ1: 同期実行（直接 Orchestrator を呼び出す）
     フェーズ2: Celery タスクとして Orchestrator を非同期実行する（コメントアウトで切り替え可能）
     """
-    from datetime import datetime
 
     user = get_current_user()
     project = Project.query.filter_by(id=project_id, owner_id=user.id).first_or_404()
@@ -622,14 +648,22 @@ def trigger_run(project_id: int):
 
         # ユーザーには「Run がキューに入った」ことを返す
         if request.accept_mimetypes.best == "application/json":
-            return jsonify({
-                "run_id": run.run_id,
-                "status": run.status,
-                "message": "Run queued. Execution will start shortly.",
-            }), 202
+            return (
+                jsonify(
+                    {
+                        "run_id": run.run_id,
+                        "status": run.status,
+                        "message": "Run queued. Execution will start shortly.",
+                    }
+                ),
+                202,
+            )
 
         # HTML レスポンスの場合はプロジェクト詳細ページへリダイレクト
-        flash(f"Run '{run.run_id[:8]}...' がキューに入りました。実行状態は上記の Run 一覧で確認できます。ログは Run ID をクリックしてください。", "info")
+        flash(
+            f"Run '{run.run_id[:8]}...' がキューに入りました。実行状態は上記の Run 一覧で確認できます。ログは Run ID をクリックしてください。",
+            "info",
+        )
         return redirect(url_for("views_projects.project_detail", project_id=project.id))
     else:
         # ========================================================================
@@ -648,25 +682,34 @@ def trigger_run(project_id: int):
 
             # ユーザーには実行結果を返す
             if request.accept_mimetypes.best == "application/json":
-                return jsonify({
-                    "run_id": run.run_id,
-                    "status": run.status,
-                    "message": "Run completed." if run.status == "SUCCESS" else "Run failed.",
-                }), 200 if run.status == "SUCCESS" else 500
+                return jsonify(
+                    {
+                        "run_id": run.run_id,
+                        "status": run.status,
+                        "message": "Run completed." if run.status == "SUCCESS" else "Run failed.",
+                    }
+                ), (200 if run.status == "SUCCESS" else 500)
 
             # HTML レスポンスの場合はプロジェクト詳細ページへリダイレクト
-            flash(f"Run '{run.run_id[:8]}...' が完了しました。ステータス: {run.status}", "success" if run.status == "SUCCESS" else "error")
+            flash(
+                f"Run '{run.run_id[:8]}...' が完了しました。ステータス: {run.status}",
+                "success" if run.status == "SUCCESS" else "error",
+            )
             return redirect(url_for("views_projects.project_detail", project_id=project.id))
 
         except Exception as exc:
             # エラーが発生した場合
             if request.accept_mimetypes.best == "application/json":
-                return jsonify({
-                    "run_id": run.run_id,
-                    "status": run.status,
-                    "message": f"Run failed: {str(exc)}",
-                }), 500
+                return (
+                    jsonify(
+                        {
+                            "run_id": run.run_id,
+                            "status": run.status,
+                            "message": f"Run failed: {str(exc)}",
+                        }
+                    ),
+                    500,
+                )
 
             flash(f"Run '{run.run_id[:8]}...' が失敗しました: {str(exc)}", "error")
             return redirect(url_for("views_projects.project_detail", project_id=project.id))
-

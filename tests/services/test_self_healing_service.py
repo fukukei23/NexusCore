@@ -1,21 +1,20 @@
 """self_healing_service.py のテスト"""
+
 import sys
 from unittest.mock import MagicMock, patch
 
 # patchモジュールをモック化（import前に実行）
-sys.modules['patch'] = MagicMock()
+sys.modules["patch"] = MagicMock()
 
 import os
-import tempfile
-import time
 from pathlib import Path
 
 import pytest
 
-from nexuscore.services.self_healing_service import SelfHealingService
-from nexuscore.core.session_control import SessionController
-from nexuscore.core.run_history import RunHistoryLogger
 from nexuscore.agents.patch_applier import PatchApplier
+from nexuscore.core.run_history import RunHistoryLogger
+from nexuscore.core.session_control import SessionController
+from nexuscore.services.self_healing_service import SelfHealingService
 
 
 def test_self_healing_service_initialization(tmp_path):
@@ -92,7 +91,7 @@ def test_maybe_stop_raises_on_stop_request(tmp_path):
         service._maybe_stop("test_phase", {"test": "data"})
 
 
-@patch('nexuscore.services.self_healing_service.subprocess')
+@patch("nexuscore.services.self_healing_service.subprocess")
 def test_clone_or_update_repo_with_base_dir(tmp_path, mock_subprocess):
     """_clone_or_update_repoがNEXUS_REPO_BASE_DIRからコピーするテスト"""
     base_dir = tmp_path / "base_repos"
@@ -119,7 +118,7 @@ def test_clone_or_update_repo_with_base_dir(tmp_path, mock_subprocess):
         assert mock_subprocess.run.called
 
 
-@patch('nexuscore.services.self_healing_service.subprocess')
+@patch("nexuscore.services.self_healing_service.subprocess")
 def test_clone_or_update_repo_with_git_clone(tmp_path, mock_subprocess):
     """_clone_or_update_repoがgit cloneを実行するテスト"""
     mock_subprocess.run.return_value = MagicMock(returncode=0, stdout="", stderr="")
@@ -198,7 +197,7 @@ def test_run_tests_with_custom_command(tmp_path, monkeypatch):
     assert "test output" in output
 
 
-@patch('nexuscore.services.self_healing_service.subprocess')
+@patch("nexuscore.services.self_healing_service.subprocess")
 def test_get_changed_files_with_git_diff(tmp_path, mock_subprocess):
     """_get_changed_filesがgit diffを実行するテスト"""
     mock_subprocess.run.return_value = MagicMock(
@@ -230,7 +229,7 @@ def test_get_changed_files_with_git_diff(tmp_path, mock_subprocess):
     assert "tests/test_module.py" in files
 
 
-@patch('nexuscore.services.self_healing_service.subprocess')
+@patch("nexuscore.services.self_healing_service.subprocess")
 def test_get_changed_files_with_base_and_head(tmp_path, mock_subprocess):
     """_get_changed_filesがbase_refとhead_refを使用するテスト"""
     mock_subprocess.run.return_value = MagicMock(
@@ -255,7 +254,7 @@ def test_get_changed_files_with_base_and_head(tmp_path, mock_subprocess):
     assert "main...feature-branch" in call_args
 
 
-@patch('nexuscore.services.self_healing_service.subprocess')
+@patch("nexuscore.services.self_healing_service.subprocess")
 def test_get_changed_files_handles_git_error(tmp_path, mock_subprocess):
     """_get_changed_filesがgitエラーを処理するテスト"""
     mock_subprocess.run.return_value = MagicMock(
@@ -365,7 +364,9 @@ def test_collect_relevant_files_fallback_to_py_files(tmp_path):
 def test_generate_patch_via_debugger_with_debug_and_patch(tmp_path):
     """_generate_patch_via_debuggerがdebug_and_patchメソッドを優先的に呼ぶテスト"""
     debugger_agent = MagicMock()
-    debugger_agent.debug_and_patch = MagicMock(return_value={"patch": "--- a/file.py\n+++ b/file.py\n@@ -1,1 +1,1 @@\n-old\n+new"})
+    debugger_agent.debug_and_patch = MagicMock(
+        return_value={"patch": "--- a/file.py\n+++ b/file.py\n@@ -1,1 +1,1 @@\n-old\n+new"}
+    )
 
     service = SelfHealingService(
         project_root=str(tmp_path),
@@ -395,7 +396,9 @@ def test_generate_patch_via_debugger_with_method(tmp_path):
     debugger_agent = MagicMock()
     # debug_and_patchがない場合、generate_patchにフォールバック
     delattr(debugger_agent, "debug_and_patch")
-    debugger_agent.generate_patch = MagicMock(return_value={"patch": "--- a/file.py\n+++ b/file.py\n@@ -1,1 +1,1 @@\n-old\n+new"})
+    debugger_agent.generate_patch = MagicMock(
+        return_value={"patch": "--- a/file.py\n+++ b/file.py\n@@ -1,1 +1,1 @@\n-old\n+new"}
+    )
 
     service = SelfHealingService(
         project_root=str(tmp_path),
@@ -631,7 +634,9 @@ def test_run_for_pull_request_successful_fix(tmp_path):
     test_py.write_text("def test_pass(): assert True\n", encoding="utf-8")
 
     with patch.object(service, "_clone_or_update_repo"):
-        with patch.object(service, "_run_tests", side_effect=[(False, "Test failed"), (True, "All tests passed")]):
+        with patch.object(
+            service, "_run_tests", side_effect=[(False, "Test failed"), (True, "All tests passed")]
+        ):
             result = service.run_for_pull_request(
                 repo_full_name="owner/repo",
                 pr_number=123,
@@ -735,4 +740,3 @@ def test_run_for_pull_request_includes_changed_files(tmp_path):
     # patch_changed_filesが含まれることを確認（パッチが適用された場合）
     if "patch_changed_files" in result.get("details", {}):
         assert isinstance(result["details"]["patch_changed_files"], list)
-

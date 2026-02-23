@@ -1,11 +1,13 @@
+
 import git
-from datetime import datetime
+
 
 class GitController:
     """
     Gitリポジトリの操作を管理するクラス。
     """
-    def __init__(self, repo_path='.'):
+
+    def __init__(self, repo_path="."):
         """
         指定されたパスのリポジトリを初期化します。
         リポジトリが存在しない場合はエラーを送出します。

@@ -4,9 +4,13 @@ def test_log_monitor_import_safe(monkeypatch):
 
     # simulate missing dependency by inserting dummy module
     sys.modules["auto_cycle_manager"] = type("M", (), {"auto_repair_cycle": lambda *a, **k: None})
+
     class DummyThread:
-        def __init__(self, *a, **k): pass
-        def start(self): return None
+        def __init__(self, *a, **k):
+            pass
+
+        def start(self):
+            return None
 
     monkeypatch.setattr("threading.Thread", lambda *a, **k: DummyThread())
     monkeypatch.setattr("os.listdir", lambda path: [])
@@ -27,8 +31,11 @@ def test_log_watcher_processes_file(monkeypatch, tmp_path, capsys):
     sys.modules["auto_cycle_manager"] = type("M", (), {"auto_repair_cycle": fake_cycle})
 
     class DummyThread:
-        def __init__(self, *a, **k): pass
-        def start(self): return None
+        def __init__(self, *a, **k):
+            pass
+
+        def start(self):
+            return None
 
     monkeypatch.setattr("threading.Thread", lambda *a, **k: DummyThread())
     log_monitor = importlib.import_module("nexuscore.utils.log_monitor")

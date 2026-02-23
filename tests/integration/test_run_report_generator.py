@@ -1,15 +1,14 @@
 """
 Run レポート生成のテスト
 """
-import pytest
-from pathlib import Path
+
 from unittest.mock import Mock, patch
 
+import pytest
+
 from nexuscore.integration.run_report_generator import (
-    generate_run_report_markdown,
-    write_run_report_file,
     _format_duration,
-    _collect_run_metrics,
+    generate_run_report_markdown,
 )
 
 
@@ -22,7 +21,8 @@ def test_format_duration():
     result = _format_duration(run)
     assert result == "N/A"
 
-    from datetime import datetime, timedelta
+    from datetime import datetime
+
     run.started_at = datetime(2025, 1, 1, 10, 0, 0)
     run.finished_at = datetime(2025, 1, 1, 10, 0, 30)
     result = _format_duration(run)
@@ -52,4 +52,3 @@ def test_generate_run_report_markdown_without_webapp():
         result = generate_run_report_markdown(1)
         assert "# Run Report" in result
         assert "Webapp models not available" in result
-

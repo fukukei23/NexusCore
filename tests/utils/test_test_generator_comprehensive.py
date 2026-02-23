@@ -3,27 +3,23 @@ Comprehensive tests for test_generator module.
 Tests pytest test code generation engine with LLM and template modes.
 """
 
-import pytest
 import os
-import ast
-import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock, mock_open
-from dataclasses import dataclass
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from nexuscore.utils.test_generator import (
+    DEFAULT_CONFIG,
     TestGenConfig,
     _env_flag,
     _get_client,
-    generate_template_tests,
     _try_generate_tests_with_llm,
-    generate_unit_tests,
     generate_and_validate_test_code,
+    generate_template_tests,
     generate_tests_for_module,
-    DEFAULT_CONFIG,
-    HAS_OPENAI,
+    generate_unit_tests,
 )
-
 
 # ==============================================================================
 # TestGenConfig Tests
@@ -49,7 +45,7 @@ class TestTestGenConfig:
 
     def test_config_is_dataclass(self):
         """TestGenConfig is a dataclass"""
-        assert hasattr(TestGenConfig, '__dataclass_fields__')
+        assert hasattr(TestGenConfig, "__dataclass_fields__")
 
 
 # ==============================================================================
@@ -132,12 +128,13 @@ class TestGetClient:
     def reset_client(self):
         """Reset global _client before each test"""
         import nexuscore.utils.test_generator as tg
+
         tg._client = None
         yield
         tg._client = None
 
-    @patch('nexuscore.utils.test_generator.HAS_OPENAI', True)
-    @patch('nexuscore.utils.test_generator.OpenAI')
+    @patch("nexuscore.utils.test_generator.HAS_OPENAI", True)
+    @patch("nexuscore.utils.test_generator.OpenAI")
     def test_get_client_creates_client(self, mock_openai_class):
         """Creates OpenAI client with API key"""
         mock_client = MagicMock()
@@ -149,8 +146,8 @@ class TestGetClient:
         assert client == mock_client
         mock_openai_class.assert_called_once_with(api_key="test-key")
 
-    @patch('nexuscore.utils.test_generator.HAS_OPENAI', True)
-    @patch('nexuscore.utils.test_generator.OpenAI')
+    @patch("nexuscore.utils.test_generator.HAS_OPENAI", True)
+    @patch("nexuscore.utils.test_generator.OpenAI")
     def test_get_client_lazy_initialization(self, mock_openai_class):
         """Client is only created once (lazy initialization)"""
         mock_client = MagicMock()
@@ -164,13 +161,13 @@ class TestGetClient:
         # OpenAI should only be called once
         assert mock_openai_class.call_count == 1
 
-    @patch('nexuscore.utils.test_generator.HAS_OPENAI', False)
+    @patch("nexuscore.utils.test_generator.HAS_OPENAI", False)
     def test_get_client_no_openai_package(self):
         """Raises ImportError when openai package not installed"""
         with pytest.raises(ImportError, match="openai package is not installed"):
             _get_client()
 
-    @patch('nexuscore.utils.test_generator.HAS_OPENAI', True)
+    @patch("nexuscore.utils.test_generator.HAS_OPENAI", True)
     def test_get_client_no_api_key(self):
         """Raises ValueError when API key not set"""
         with patch.dict(os.environ, {}, clear=True):
@@ -189,10 +186,12 @@ class TestGenerateTemplateTests:
     def test_generate_template_simple_function(self, tmp_path):
         """Generate template for simple function"""
         module_file = tmp_path / "simple.py"
-        module_file.write_text("""
+        module_file.write_text(
+            """
 def add(a, b):
     return a + b
-""")
+"""
+        )
 
         result = generate_template_tests(module_file)
 
@@ -203,7 +202,8 @@ def add(a, b):
     def test_generate_template_multiple_functions(self, tmp_path):
         """Generate template for multiple functions"""
         module_file = tmp_path / "multi.py"
-        module_file.write_text("""
+        module_file.write_text(
+            """
 def func1():
     pass
 
@@ -212,7 +212,8 @@ def func2():
 
 def func3():
     pass
-""")
+"""
+        )
 
         result = generate_template_tests(module_file)
 
@@ -223,14 +224,16 @@ def func3():
     def test_generate_template_with_class(self, tmp_path):
         """Generate template for class methods"""
         module_file = tmp_path / "with_class.py"
-        module_file.write_text("""
+        module_file.write_text(
+            """
 class Calculator:
     def add(self, a, b):
         return a + b
 
     def subtract(self, a, b):
         return a - b
-""")
+"""
+        )
 
         result = generate_template_tests(module_file)
 
@@ -283,17 +286,15 @@ class Calculator:
         module_file.parent.mkdir(parents=True)
         module_file.write_text("def test_func(): pass")
 
-        result = generate_template_tests(
-            module_file,
-            project_root=project_root
-        )
+        result = generate_template_tests(module_file, project_root=project_root)
 
         assert "from src.mymodule import" in result
 
     def test_generate_template_excludes_private_methods(self, tmp_path):
         """Excludes private methods starting with _"""
         module_file = tmp_path / "private.py"
-        module_file.write_text("""
+        module_file.write_text(
+            """
 class MyClass:
     def public_method(self):
         pass
@@ -303,7 +304,8 @@ class MyClass:
 
     def __dunder_method__(self):
         pass
-""")
+"""
+        )
 
         result = generate_template_tests(module_file)
 
@@ -324,6 +326,7 @@ class TestTryGenerateTestsWithLLM:
     def reset_client(self):
         """Reset global _client"""
         import nexuscore.utils.test_generator as tg
+
         tg._client = None
         yield
         tg._client = None
@@ -338,8 +341,8 @@ class TestTryGenerateTestsWithLLM:
 
         assert result == template
 
-    @patch('nexuscore.utils.test_generator.HAS_OPENAI', True)
-    @patch('nexuscore.utils.test_generator.OpenAI')
+    @patch("nexuscore.utils.test_generator.HAS_OPENAI", True)
+    @patch("nexuscore.utils.test_generator.OpenAI")
     def test_llm_success(self, mock_openai_class):
         """Successfully generates tests with LLM"""
         mock_client = MagicMock()
@@ -358,8 +361,8 @@ class TestTryGenerateTestsWithLLM:
 
         assert result == "# generated test code"
 
-    @patch('nexuscore.utils.test_generator.HAS_OPENAI', True)
-    @patch('nexuscore.utils.test_generator.OpenAI')
+    @patch("nexuscore.utils.test_generator.HAS_OPENAI", True)
+    @patch("nexuscore.utils.test_generator.OpenAI")
     def test_llm_empty_response_returns_template(self, mock_openai_class):
         """Returns template when LLM returns empty response"""
         mock_client = MagicMock()
@@ -378,7 +381,7 @@ class TestTryGenerateTestsWithLLM:
 
         assert result == template
 
-    @patch('nexuscore.utils.test_generator.HAS_OPENAI', False)
+    @patch("nexuscore.utils.test_generator.HAS_OPENAI", False)
     def test_llm_import_error_returns_template(self):
         """Returns template when openai not available"""
         config = TestGenConfig(use_llm=True)
@@ -389,7 +392,7 @@ class TestTryGenerateTestsWithLLM:
 
         assert result == template
 
-    @patch('nexuscore.utils.test_generator.HAS_OPENAI', True)
+    @patch("nexuscore.utils.test_generator.HAS_OPENAI", True)
     def test_llm_no_api_key_returns_template(self):
         """Returns template when API key not set"""
         config = TestGenConfig(use_llm=True)
@@ -401,8 +404,8 @@ class TestTryGenerateTestsWithLLM:
 
         assert result == template
 
-    @patch('nexuscore.utils.test_generator.HAS_OPENAI', True)
-    @patch('nexuscore.utils.test_generator.OpenAI')
+    @patch("nexuscore.utils.test_generator.HAS_OPENAI", True)
+    @patch("nexuscore.utils.test_generator.OpenAI")
     def test_llm_exception_returns_template(self, mock_openai_class):
         """Returns template when LLM raises exception"""
         mock_client = MagicMock()
@@ -431,6 +434,7 @@ class TestGenerateUnitTests:
     def reset_client(self):
         """Reset global _client"""
         import nexuscore.utils.test_generator as tg
+
         tg._client = None
         yield
         tg._client = None
@@ -441,11 +445,7 @@ class TestGenerateUnitTests:
         module_file.write_text("def add(a, b): return a + b")
 
         config = TestGenConfig(use_llm=False)
-        result = generate_unit_tests(
-            "",
-            file_path=module_file,
-            config=config
-        )
+        result = generate_unit_tests("", file_path=module_file, config=config)
 
         assert "import pytest" in result
         assert "test_add" in result
@@ -493,6 +493,7 @@ class TestGenerateAndValidateTestCode:
     def reset_client(self):
         """Reset global _client"""
         import nexuscore.utils.test_generator as tg
+
         tg._client = None
         yield
         tg._client = None
@@ -502,10 +503,9 @@ class TestGenerateAndValidateTestCode:
         module_file = tmp_path / "module.py"
         module_file.write_text("def add(a, b): return a + b")
 
-        with patch('nexuscore.utils.test_generator.DEFAULT_CONFIG.use_llm', False):
+        with patch("nexuscore.utils.test_generator.DEFAULT_CONFIG.use_llm", False):
             test_code, is_valid, error, warnings = generate_and_validate_test_code(
-                "def add(a, b): return a + b",
-                file_path=module_file
+                "def add(a, b): return a + b", file_path=module_file
             )
 
         assert is_valid is True
@@ -521,8 +521,12 @@ def test_example():
     assert True
 ```
 """
-        with patch('nexuscore.utils.test_generator.generate_unit_tests', return_value=code_with_fence):
-            test_code, is_valid, error, warnings = generate_and_validate_test_code("def func(): pass")
+        with patch(
+            "nexuscore.utils.test_generator.generate_unit_tests", return_value=code_with_fence
+        ):
+            test_code, is_valid, error, warnings = generate_and_validate_test_code(
+                "def func(): pass"
+            )
 
         assert "```" not in test_code
         assert "import pytest" in test_code
@@ -535,10 +539,9 @@ def test_example():
         # Mock to return invalid code
         invalid_code = "def invalid syntax"
 
-        with patch('nexuscore.utils.test_generator.generate_unit_tests', return_value=invalid_code):
+        with patch("nexuscore.utils.test_generator.generate_unit_tests", return_value=invalid_code):
             test_code, is_valid, error, warnings = generate_and_validate_test_code(
-                "def func(): pass",
-                file_path=module_file
+                "def func(): pass", file_path=module_file
             )
 
         # Should use fallback, making it valid
@@ -558,6 +561,7 @@ class TestGenerateTestsForModule:
     def reset_client(self):
         """Reset global _client"""
         import nexuscore.utils.test_generator as tg
+
         tg._client = None
         yield
         tg._client = None
@@ -568,10 +572,7 @@ class TestGenerateTestsForModule:
         module_file.write_text("def add(a, b): return a + b")
 
         config = TestGenConfig(use_llm=False)
-        output_path = generate_tests_for_module(
-            module_file,
-            config=config
-        )
+        output_path = generate_tests_for_module(module_file, config=config)
 
         assert output_path.exists()
         assert output_path.name == "test_mymodule.py"
@@ -585,9 +586,7 @@ class TestGenerateTestsForModule:
 
         config = TestGenConfig(use_llm=False)
         output_path = generate_tests_for_module(
-            module_file,
-            output_path=custom_output,
-            config=config
+            module_file, output_path=custom_output, config=config
         )
 
         assert output_path == custom_output
@@ -598,10 +597,7 @@ class TestGenerateTestsForModule:
         nonexistent_file = tmp_path / "nonexistent.py"
 
         config = TestGenConfig(use_llm=False)
-        output_path = generate_tests_for_module(
-            nonexistent_file,
-            config=config
-        )
+        output_path = generate_tests_for_module(nonexistent_file, config=config)
 
         # Should still create a fallback test file
         assert output_path.exists()
@@ -614,10 +610,7 @@ class TestGenerateTestsForModule:
         module_file.write_text("def func(): pass")
 
         config = TestGenConfig(use_llm=False)
-        output_path = generate_tests_for_module(
-            module_file,
-            config=config
-        )
+        output_path = generate_tests_for_module(module_file, config=config)
 
         content = output_path.read_text()
         # Should not contain markdown fences
@@ -636,6 +629,7 @@ class TestTestGeneratorIntegration:
     def reset_client(self):
         """Reset global _client"""
         import nexuscore.utils.test_generator as tg
+
         tg._client = None
         yield
         tg._client = None
@@ -644,7 +638,8 @@ class TestTestGeneratorIntegration:
         """End-to-end test in template mode"""
         # Create module
         module_file = tmp_path / "calculator.py"
-        module_file.write_text("""
+        module_file.write_text(
+            """
 class Calculator:
     def add(self, a, b):
         return a + b
@@ -654,15 +649,12 @@ class Calculator:
 
 def standalone_function():
     return 42
-""")
+"""
+        )
 
         # Generate tests
         config = TestGenConfig(use_llm=False)
-        output_path = generate_tests_for_module(
-            module_file,
-            project_root=tmp_path,
-            config=config
-        )
+        output_path = generate_tests_for_module(module_file, project_root=tmp_path, config=config)
 
         # Verify output
         assert output_path.exists()
@@ -681,10 +673,7 @@ def standalone_function():
         module_file.write_text(funcs)
 
         config = TestGenConfig(use_llm=False, max_functions=5)
-        output_path = generate_tests_for_module(
-            module_file,
-            config=config
-        )
+        output_path = generate_tests_for_module(module_file, config=config)
 
         content = output_path.read_text()
         test_count = content.count("def test_func")
@@ -695,8 +684,8 @@ def standalone_function():
         """DEFAULT_CONFIG is properly initialized"""
         assert DEFAULT_CONFIG is not None
         assert isinstance(DEFAULT_CONFIG, TestGenConfig)
-        assert hasattr(DEFAULT_CONFIG, 'use_llm')
-        assert hasattr(DEFAULT_CONFIG, 'max_functions')
+        assert hasattr(DEFAULT_CONFIG, "use_llm")
+        assert hasattr(DEFAULT_CONFIG, "max_functions")
 
     def test_fallback_chain(self, tmp_path):
         """Fallback chain works: LLM -> template"""
@@ -724,13 +713,10 @@ def standalone_function():
         config = TestGenConfig(use_llm=False)
 
         # Should use project_path_to_module_path
-        with patch('nexuscore.utils.test_generator._try_generate_tests_with_llm') as mock_llm:
+        with patch("nexuscore.utils.test_generator._try_generate_tests_with_llm") as mock_llm:
             mock_llm.return_value = "# test code"
             result = generate_unit_tests(
-                "def func(): pass",
-                file_path=module_file,
-                project_root=project_root,
-                config=config
+                "def func(): pass", file_path=module_file, project_root=project_root, config=config
             )
 
         assert isinstance(result, str)
@@ -738,13 +724,16 @@ def standalone_function():
     def test_warning_logging_on_validation(self, tmp_path, caplog):
         """Logs warnings during validation"""
         import logging
+
         caplog.set_level(logging.WARNING)
 
         # Generate code that will have warnings
         code = "def test_example():\n    import os\n    os.system('ls')"
 
-        with patch('nexuscore.utils.test_generator.generate_unit_tests', return_value=code):
-            test_code, is_valid, error, warnings = generate_and_validate_test_code("def func(): pass")
+        with patch("nexuscore.utils.test_generator.generate_unit_tests", return_value=code):
+            test_code, is_valid, error, warnings = generate_and_validate_test_code(
+                "def func(): pass"
+            )
 
         # Should log warnings
         assert len(warnings) > 0
@@ -752,6 +741,7 @@ def standalone_function():
     def test_error_logging_on_invalid_code(self, tmp_path, caplog):
         """Logs error when generated code is invalid"""
         import logging
+
         caplog.set_level(logging.ERROR)
 
         module_file = tmp_path / "module.py"
@@ -760,10 +750,9 @@ def standalone_function():
         # Generate invalid code
         invalid_code = "def invalid syntax"
 
-        with patch('nexuscore.utils.test_generator.generate_unit_tests', return_value=invalid_code):
+        with patch("nexuscore.utils.test_generator.generate_unit_tests", return_value=invalid_code):
             test_code, is_valid, error, warnings = generate_and_validate_test_code(
-                "def func(): pass",
-                file_path=module_file
+                "def func(): pass", file_path=module_file
             )
 
         # Should use fallback
@@ -782,6 +771,7 @@ class TestTestGeneratorEdgeCases:
     def reset_client(self):
         """Reset global _client"""
         import nexuscore.utils.test_generator as tg
+
         tg._client = None
         yield
         tg._client = None
@@ -799,11 +789,14 @@ class TestTestGeneratorEdgeCases:
     def test_unicode_in_code(self, tmp_path):
         """Handle Unicode characters in code"""
         module_file = tmp_path / "unicode.py"
-        module_file.write_text("""
+        module_file.write_text(
+            """
 def 日本語関数():
     '''日本語のコメント'''
     return "こんにちは"
-""", encoding="utf-8")
+""",
+            encoding="utf-8",
+        )
 
         config = TestGenConfig(use_llm=False)
         result = generate_template_tests(module_file)
@@ -824,12 +817,14 @@ def 日本語関数():
     def test_nested_classes(self, tmp_path):
         """Handle nested classes"""
         module_file = tmp_path / "nested.py"
-        module_file.write_text("""
+        module_file.write_text(
+            """
 class Outer:
     class Inner:
         def method(self):
             pass
-""")
+"""
+        )
 
         config = TestGenConfig(use_llm=False)
         result = generate_template_tests(module_file)

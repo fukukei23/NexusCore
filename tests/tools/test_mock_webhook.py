@@ -1,10 +1,8 @@
 """mock_github_pr_webhook.py のテスト"""
-import json
+
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 # tools/ はプロジェクトルートから直接インポート可能
 project_root = Path(__file__).resolve().parent.parent.parent
@@ -43,10 +41,10 @@ def test_build_sample_payload_with_slash_in_repo():
     assert payload["repository"]["owner"]["login"] == "owner"
 
 
-@patch('tools.mock_github_pr_webhook.requests')
+@patch("tools.mock_github_pr_webhook.requests")
 def test_mock_webhook_imports_requests(mock_requests):
     """requests ライブラリがインポートできることを確認"""
     # インポート時に requests がチェックされる
     import tools.mock_github_pr_webhook
-    assert hasattr(tools.mock_github_pr_webhook, 'requests')
 
+    assert hasattr(tools.mock_github_pr_webhook, "requests")

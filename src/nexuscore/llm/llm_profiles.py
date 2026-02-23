@@ -5,7 +5,6 @@ Central registry for LLM profiles referenced by the router.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 
 @dataclass(frozen=True)
@@ -22,7 +21,7 @@ class LLMProfile:
     default_temperature: float = 0.2
 
 
-PROFILE_REGISTRY: Dict[str, LLMProfile] = {
+PROFILE_REGISTRY: dict[str, LLMProfile] = {
     "gpt5_default": LLMProfile(
         name="gpt5_default",
         provider="openai",
@@ -75,12 +74,12 @@ PROFILE_REGISTRY: Dict[str, LLMProfile] = {
 }
 
 
-def get_profile(name: str) -> Optional[LLMProfile]:
+def get_profile(name: str) -> LLMProfile | None:
     """Return a registered LLM profile by id."""
     return PROFILE_REGISTRY.get(name)
 
 
-def profile_ids() -> List[str]:
+def profile_ids() -> list[str]:
     """Return all known profile identifiers."""
     return list(PROFILE_REGISTRY.keys())
 
@@ -103,4 +102,3 @@ __all__ = [
     "profile_ids",
     "profile_to_model_name",
 ]
-

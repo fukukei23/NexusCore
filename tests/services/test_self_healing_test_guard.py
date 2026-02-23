@@ -1,9 +1,7 @@
 """self_healing_service.py のテストガード（tests/ ブロック）のテスト"""
-from pathlib import Path
+
 from unittest import mock
 from unittest.mock import MagicMock
-
-import pytest
 
 from nexuscore.services.self_healing_service import SelfHealingService
 
@@ -105,7 +103,9 @@ def test_patch_allowed_when_no_test_files(tmp_path):
     (project_path / "src" / "module.py").write_text("old\n")
 
     with mock.patch.object(service, "_clone_or_update_repo"):
-        with mock.patch.object(service, "_run_tests", side_effect=[(False, "Test failed"), (True, "All tests passed")]):
+        with mock.patch.object(
+            service, "_run_tests", side_effect=[(False, "Test failed"), (True, "All tests passed")]
+        ):
             result = service.run_for_pull_request(
                 repo_full_name="owner/repo",
                 pr_number=123,
@@ -156,4 +156,3 @@ def test_patch_blocked_with_multiple_test_files(tmp_path):
     assert len(blocked_paths) == 2
     assert "tests/test_a.py" in blocked_paths
     assert "tests/test_b.py" in blocked_paths
-

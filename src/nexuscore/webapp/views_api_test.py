@@ -14,12 +14,11 @@ Web UI 上から簡易的に試せるフォームを提供する。
 from __future__ import annotations
 
 import json
-from flask import Blueprint, request, jsonify, url_for
-from typing import Optional
 
-from nexuscore.webapp.models import Project, ApiKey
-from nexuscore.webapp.auth import require_auth, get_current_user
-from nexuscore.webapp import db
+from flask import Blueprint, request
+
+from nexuscore.webapp.auth import get_current_user, require_auth
+from nexuscore.webapp.models import ApiKey, Project
 
 bp = Blueprint("views_api_test", __name__, url_prefix="/api-test")
 
@@ -201,4 +200,3 @@ def api_test():
     </html>
     """
     return html
-

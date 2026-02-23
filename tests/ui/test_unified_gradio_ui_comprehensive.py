@@ -3,20 +3,18 @@ Comprehensive tests for ui/unified_gradio_ui.py
 
 Unified Gradio UI の完全な包括的テスト（全ハンドラー・UI構築関数含む）
 """
+
 import sys
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, mock_open
-import subprocess
-
-import pytest
+from unittest.mock import MagicMock, Mock, patch
 
 # GradioとWhisperのモック化
-sys.modules['gradio'] = MagicMock()
-sys.modules['nexuscore.modules.whisper_handler'] = MagicMock()
-sys.modules['nexuscore.services.self_healing_service'] = MagicMock()
-sys.modules['nexuscore.agents.debugger_agent'] = MagicMock()
-sys.modules['nexuscore.integration.github_pr_comment'] = MagicMock()
-sys.modules['nexuscore.integration.run_report_generator'] = MagicMock()
+sys.modules["gradio"] = MagicMock()
+sys.modules["nexuscore.modules.whisper_handler"] = MagicMock()
+sys.modules["nexuscore.services.self_healing_service"] = MagicMock()
+sys.modules["nexuscore.agents.debugger_agent"] = MagicMock()
+sys.modules["nexuscore.integration.github_pr_comment"] = MagicMock()
+sys.modules["nexuscore.integration.run_report_generator"] = MagicMock()
 
 from nexuscore.ui.unified_gradio_ui import (
     AppState,
@@ -47,7 +45,7 @@ class TestAppState:
             current_file_path="/test/file.py",
             generated_code="print('hello')",
             latest_test_result="All tests passed",
-            latest_run_id="run_123"
+            latest_run_id="run_123",
         )
 
         assert state.current_file_path == "/test/file.py"
@@ -312,12 +310,8 @@ class TestRunTestHandler:
         """テスト実行成功"""
         state = AppState()
 
-        with patch('subprocess.run') as mock_run:
-            mock_run.return_value = Mock(
-                returncode=0,
-                stdout="All tests passed",
-                stderr=""
-            )
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout="All tests passed", stderr="")
 
             output, status, new_state = run_test_handler("pytest", "", state)
 
@@ -329,12 +323,8 @@ class TestRunTestHandler:
         """テスト実行失敗"""
         state = AppState()
 
-        with patch('subprocess.run') as mock_run:
-            mock_run.return_value = Mock(
-                returncode=1,
-                stdout="",
-                stderr="Test failed"
-            )
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=1, stdout="", stderr="Test failed")
 
             output, status, new_state = run_test_handler("pytest", "", state)
 
@@ -345,12 +335,8 @@ class TestRunTestHandler:
         """特定のテストファイルを実行"""
         state = AppState()
 
-        with patch('subprocess.run') as mock_run:
-            mock_run.return_value = Mock(
-                returncode=0,
-                stdout="Tests passed",
-                stderr=""
-            )
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout="Tests passed", stderr="")
 
             run_test_handler("pytest", "tests/test_sample.py", state)
 
@@ -363,19 +349,19 @@ class TestRunTestHandler:
         """shell=Falseでセキュアに実行"""
         state = AppState()
 
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
 
             run_test_handler("pytest", "", state)
 
             # shell=False を確認
-            assert mock_run.call_args[1]['shell'] is False
+            assert mock_run.call_args[1]["shell"] is False
 
     def test_run_test_handler_command_injection_protection(self):
         """コマンドインジェクション対策"""
         state = AppState()
 
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
 
             # 悪意のあるコマンドを試みる
@@ -384,13 +370,13 @@ class TestRunTestHandler:
             # リスト形式で渡されることを確認
             call_args = mock_run.call_args[0][0]
             assert isinstance(call_args, list)
-            assert mock_run.call_args[1]['shell'] is False
+            assert mock_run.call_args[1]["shell"] is False
 
     def test_run_test_handler_exception(self):
         """例外処理"""
         state = AppState()
 
-        with patch('subprocess.run', side_effect=Exception("Test error")):
+        with patch("subprocess.run", side_effect=Exception("Test error")):
             output, status, new_state = run_test_handler("pytest", "", state)
 
             assert "❌ エラー" in output
@@ -400,7 +386,7 @@ class TestRunTestHandler:
         """空のコマンド"""
         state = AppState()
 
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
 
             run_test_handler("", "", state)
@@ -412,11 +398,9 @@ class TestRunTestHandler:
         """stdoutとstderrの結合"""
         state = AppState()
 
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value = Mock(
-                returncode=0,
-                stdout="stdout content",
-                stderr="stderr content"
+                returncode=0, stdout="stdout content", stderr="stderr content"
             )
 
             output, _, _ = run_test_handler("pytest", "", state)
@@ -429,12 +413,8 @@ class TestRunTestHandler:
         state = AppState()
         test_output = "Test output"
 
-        with patch('subprocess.run') as mock_run:
-            mock_run.return_value = Mock(
-                returncode=0,
-                stdout=test_output,
-                stderr=""
-            )
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout=test_output, stderr="")
 
             _, _, new_state = run_test_handler("pytest", "", state)
 
@@ -444,7 +424,7 @@ class TestRunTestHandler:
         """複数のテストファイル指定"""
         state = AppState()
 
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
 
             run_test_handler("pytest -v", "tests/test_a.py tests/test_b.py", state)
@@ -456,12 +436,8 @@ class TestRunTestHandler:
         state = AppState()
 
         for return_code in [0, 1, 2, 127]:
-            with patch('subprocess.run') as mock_run:
-                mock_run.return_value = Mock(
-                    returncode=return_code,
-                    stdout="",
-                    stderr=""
-                )
+            with patch("subprocess.run") as mock_run:
+                mock_run.return_value = Mock(returncode=return_code, stdout="", stderr="")
 
                 _, status, _ = run_test_handler("pytest", "", state)
 
@@ -472,7 +448,7 @@ class TestRunTestHandler:
 # Tab 1: Code/Prompt ハンドラーテスト
 # ============================================================================
 class TestCodePromptHandlers:
-    @patch('nexuscore.ui.unified_gradio_ui.transcribe_audio')
+    @patch("nexuscore.ui.unified_gradio_ui.transcribe_audio")
     def test_transcribe_handler_success(self, mock_transcribe):
         """音声文字起こし成功"""
         from nexuscore.ui import unified_gradio_ui
@@ -841,10 +817,10 @@ class TestHistoryDiffHandlers:
 
         # モック結果
         result_dict = {
-            'status': 'success',
-            'summary': 'Fixed 3 issues',
-            'run_id': 'sh-test-run',
-            'duration_seconds': 45.5
+            "status": "success",
+            "summary": "Fixed 3 issues",
+            "run_id": "sh-test-run",
+            "duration_seconds": 45.5,
         }
 
         result_text = f"""Status: {result_dict.get('status', 'unknown')}
@@ -870,14 +846,11 @@ Duration: {result_dict.get('duration_seconds', 0):.2f}s
     def test_trigger_self_healing_handler_with_retry_details(self):
         """リトライ詳細を含むSelf-Healing結果"""
         result_dict = {
-            'status': 'success',
-            'summary': 'Fixed',
-            'run_id': 'sh-retry',
-            'duration_seconds': 100.0,
-            'details': {
-                'retry_count': 3,
-                'last_error_class': 'TimeoutError'
-            }
+            "status": "success",
+            "summary": "Fixed",
+            "run_id": "sh-retry",
+            "duration_seconds": 100.0,
+            "details": {"retry_count": 3, "last_error_class": "TimeoutError"},
         }
 
         result_text = f"""Status: {result_dict.get('status', 'unknown')}
@@ -885,11 +858,11 @@ Summary: {result_dict.get('summary', 'N/A')}
 Run ID: {result_dict.get('run_id', 'N/A')}
 Duration: {result_dict.get('duration_seconds', 0):.2f}s
 """
-        if result_dict.get('details'):
-            details = result_dict['details']
-            if details.get('retry_count'):
+        if result_dict.get("details"):
+            details = result_dict["details"]
+            if details.get("retry_count"):
                 result_text += f"Retry Count: {details.get('retry_count')}\n"
-            if details.get('last_error_class'):
+            if details.get("last_error_class"):
                 result_text += f"Last Error: {details.get('last_error_class')}\n"
 
         assert "Retry Count: 3" in result_text
@@ -900,7 +873,7 @@ Duration: {result_dict.get('duration_seconds', 0):.2f}s
 # UI構築関数テスト
 # ============================================================================
 class TestUIBuilders:
-    @patch('nexuscore.ui.unified_gradio_ui.gr')
+    @patch("nexuscore.ui.unified_gradio_ui.gr")
     def test_build_unified_ui_creates_blocks(self, mock_gr):
         """build_unified_uiがBlocksを作成"""
         mock_blocks = MagicMock()
@@ -913,7 +886,7 @@ class TestUIBuilders:
         # Blocksが呼ばれたことを確認
         mock_gr.Blocks.assert_called_once()
 
-    @patch('nexuscore.ui.unified_gradio_ui.gr')
+    @patch("nexuscore.ui.unified_gradio_ui.gr")
     def test_build_unified_ui_sets_title(self, mock_gr):
         """build_unified_uiがタイトルを設定"""
         mock_gr.Blocks.return_value.__enter__.return_value = MagicMock()
@@ -924,9 +897,9 @@ class TestUIBuilders:
 
         # Blocksのtitleパラメータを確認
         call_kwargs = mock_gr.Blocks.call_args[1]
-        assert call_kwargs['title'] == "NexusCore Unified UI"
+        assert call_kwargs["title"] == "NexusCore Unified UI"
 
-    @patch('nexuscore.ui.unified_gradio_ui.gr')
+    @patch("nexuscore.ui.unified_gradio_ui.gr")
     def test_build_unified_ui_initializes_state(self, mock_gr):
         """build_unified_uiがStateを初期化"""
         mock_gr.Blocks.return_value.__enter__.return_value = MagicMock()
@@ -939,7 +912,7 @@ class TestUIBuilders:
         # Stateが呼ばれたことを確認
         mock_gr.State.assert_called_once()
 
-    @patch('nexuscore.ui.unified_gradio_ui.build_unified_ui')
+    @patch("nexuscore.ui.unified_gradio_ui.build_unified_ui")
     def test_launch_unified_ui_builds_demo(self, mock_build):
         """launch_unified_uiがdemoを構築"""
         mock_demo = MagicMock()
@@ -950,7 +923,7 @@ class TestUIBuilders:
 
         mock_build.assert_called_once()
 
-    @patch('nexuscore.ui.unified_gradio_ui.build_unified_ui')
+    @patch("nexuscore.ui.unified_gradio_ui.build_unified_ui")
     def test_launch_unified_ui_calls_queue(self, mock_build):
         """launch_unified_uiがqueue()を呼ぶ"""
         mock_demo = MagicMock()
@@ -961,7 +934,7 @@ class TestUIBuilders:
 
         mock_demo.queue.assert_called_once()
 
-    @patch('nexuscore.ui.unified_gradio_ui.build_unified_ui')
+    @patch("nexuscore.ui.unified_gradio_ui.build_unified_ui")
     def test_launch_unified_ui_default_params(self, mock_build):
         """launch_unified_uiのデフォルトパラメータ"""
         mock_demo = MagicMock()
@@ -971,32 +944,27 @@ class TestUIBuilders:
         launch_unified_ui()
 
         launch_call = mock_demo.launch.call_args
-        assert launch_call[1]['server_name'] == "127.0.0.1"
-        assert launch_call[1]['server_port'] == 7860
-        assert launch_call[1]['inbrowser'] is False
-        assert launch_call[1]['share'] is False
+        assert launch_call[1]["server_name"] == "127.0.0.1"
+        assert launch_call[1]["server_port"] == 7860
+        assert launch_call[1]["inbrowser"] is False
+        assert launch_call[1]["share"] is False
 
-    @patch('nexuscore.ui.unified_gradio_ui.build_unified_ui')
+    @patch("nexuscore.ui.unified_gradio_ui.build_unified_ui")
     def test_launch_unified_ui_custom_params(self, mock_build):
         """launch_unified_uiのカスタムパラメータ"""
         mock_demo = MagicMock()
         mock_build.return_value = mock_demo
         mock_demo.queue.return_value = mock_demo
 
-        launch_unified_ui(
-            server_name="0.0.0.0",
-            server_port=8080,
-            inbrowser=True,
-            share=True
-        )
+        launch_unified_ui(server_name="0.0.0.0", server_port=8080, inbrowser=True, share=True)
 
         launch_call = mock_demo.launch.call_args
-        assert launch_call[1]['server_name'] == "0.0.0.0"
-        assert launch_call[1]['server_port'] == 8080
-        assert launch_call[1]['inbrowser'] is True
-        assert launch_call[1]['share'] is True
+        assert launch_call[1]["server_name"] == "0.0.0.0"
+        assert launch_call[1]["server_port"] == 8080
+        assert launch_call[1]["inbrowser"] is True
+        assert launch_call[1]["share"] is True
 
-    @patch('nexuscore.ui.unified_gradio_ui.gr')
+    @patch("nexuscore.ui.unified_gradio_ui.gr")
     def test_build_unified_ui_uses_soft_theme(self, mock_gr):
         """build_unified_uiがSoftテーマを使用"""
         mock_gr.Blocks.return_value.__enter__.return_value = MagicMock()
@@ -1008,7 +976,7 @@ class TestUIBuilders:
 
         mock_gr.themes.Soft.assert_called_once()
 
-    @patch('nexuscore.ui.unified_gradio_ui.build_unified_ui')
+    @patch("nexuscore.ui.unified_gradio_ui.build_unified_ui")
     def test_launch_unified_ui_show_error_true(self, mock_build):
         """launch_unified_uiがshow_error=Trueで起動"""
         mock_demo = MagicMock()
@@ -1018,7 +986,7 @@ class TestUIBuilders:
         launch_unified_ui()
 
         launch_call = mock_demo.launch.call_args
-        assert launch_call[1]['show_error'] is True
+        assert launch_call[1]["show_error"] is True
 
 
 # ============================================================================
@@ -1028,38 +996,42 @@ class TestModuleImports:
     def test_has_whisper_flag(self):
         """HAS_WHISPER フラグの存在確認"""
         from nexuscore.ui import unified_gradio_ui
-        assert hasattr(unified_gradio_ui, 'HAS_WHISPER')
+
+        assert hasattr(unified_gradio_ui, "HAS_WHISPER")
 
     def test_has_self_healing_flag(self):
         """HAS_SELF_HEALING フラグの存在確認"""
         from nexuscore.ui import unified_gradio_ui
-        assert hasattr(unified_gradio_ui, 'HAS_SELF_HEALING')
+
+        assert hasattr(unified_gradio_ui, "HAS_SELF_HEALING")
 
     def test_appstate_class_exists(self):
         """AppStateクラスの存在確認"""
         from nexuscore.ui import unified_gradio_ui
-        assert hasattr(unified_gradio_ui, 'AppState')
+
+        assert hasattr(unified_gradio_ui, "AppState")
 
     def test_tab_builder_functions_exist(self):
         """タブビルダー関数の存在確認"""
         from nexuscore.ui import unified_gradio_ui
 
-        assert hasattr(unified_gradio_ui, 'build_code_prompt_tab')
-        assert hasattr(unified_gradio_ui, 'build_ai_revision_tab')
-        assert hasattr(unified_gradio_ui, 'build_test_runner_tab')
-        assert hasattr(unified_gradio_ui, 'build_history_diff_tab')
+        assert hasattr(unified_gradio_ui, "build_code_prompt_tab")
+        assert hasattr(unified_gradio_ui, "build_ai_revision_tab")
+        assert hasattr(unified_gradio_ui, "build_test_runner_tab")
+        assert hasattr(unified_gradio_ui, "build_history_diff_tab")
 
     def test_main_ui_functions_exist(self):
         """メインUI関数の存在確認"""
         from nexuscore.ui import unified_gradio_ui
 
-        assert hasattr(unified_gradio_ui, 'build_unified_ui')
-        assert hasattr(unified_gradio_ui, 'launch_unified_ui')
+        assert hasattr(unified_gradio_ui, "build_unified_ui")
+        assert hasattr(unified_gradio_ui, "launch_unified_ui")
 
     def test_run_test_handler_exists(self):
         """run_test_handler関数の存在確認"""
         from nexuscore.ui import unified_gradio_ui
-        assert hasattr(unified_gradio_ui, 'run_test_handler')
+
+        assert hasattr(unified_gradio_ui, "run_test_handler")
 
 
 # ============================================================================
@@ -1112,13 +1084,13 @@ class TestIntegration:
         state.before_code[str(save_path)] = state.generated_code
 
         # Step 3: パッチ生成
-        diff_patch = f"--- a/test.py\n+++ b/test.py\n@@ -1,1 +1,2 @@\n+# improved"
+        diff_patch = "--- a/test.py\n+++ b/test.py\n@@ -1,1 +1,2 @@\n+# improved"
 
         # Step 4: パッチ適用
         state.after_code[str(save_path)] = "improved code"
 
         # Step 5: テスト実行
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value = Mock(returncode=0, stdout="OK", stderr="")
             output, status, state = run_test_handler("pytest", "", state)
             state.latest_test_result = output

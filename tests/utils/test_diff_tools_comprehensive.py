@@ -12,7 +12,6 @@ diff_tools.py の包括的テスト
 - Unicode文字、特殊文字
 """
 
-import pytest
 from nexuscore.utils.diff_tools import (
     generate_diff_report,
     score_code_improvement,
@@ -124,7 +123,7 @@ class TestGenerateDiffReport:
     def test_generate_diff_report_special_characters(self):
         """特殊文字を含むdiff"""
         original = "def foo():\n    return 'hello'"
-        modified = "def foo():\n    return \"world\""
+        modified = 'def foo():\n    return "world"'
 
         result = generate_diff_report(original, modified)
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Comprehensive tests for nexuscore.gradio_app.revision_tab module.
 
@@ -10,20 +9,17 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict
-from unittest.mock import MagicMock, Mock, patch, mock_open, call
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-import sys
 
 # Mock gradio before importing revision_tab
-sys.modules['gradio'] = MagicMock()
+sys.modules["gradio"] = MagicMock()
 
 from nexuscore.gradio_app import revision_tab
-
 
 # ============================================================================
 # Fixtures
@@ -71,7 +67,11 @@ def mock_openai_client():
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
         mock_response = Mock()
         mock_response.choices = [
-            Mock(message=Mock(content='{"code": "def is_prime(n):\\n    return n >= 2", "reason": "Fixed edge case"}'))
+            Mock(
+                message=Mock(
+                    content='{"code": "def is_prime(n):\\n    return n >= 2", "reason": "Fixed edge case"}'
+                )
+            )
         ]
 
         with patch("nexuscore.gradio_app.revision_tab.OpenAI") as mock_client:
@@ -93,7 +93,7 @@ def sample_patch_data():
         "code": "def is_prime(n):\n    return n >= 2",
         "full_code_after": "def is_prime(n):\n    return n >= 2",
         "code_diff": "-    return n > 1\n+    return n >= 2",
-        "test_log": "5 passed in 0.2s"
+        "test_log": "5 passed in 0.2s",
     }
 
 
@@ -371,7 +371,9 @@ class TestSavePatchHistoryJson:
         monkeypatch.setattr(revision_tab, "PATCH_HISTORY_DIR", patch_dir)
         monkeypatch.setattr(revision_tab, "RESULT_LOG", str(result_log))
 
-        output_path = revision_tab.save_patch_history_json("test_code", "test_reason", "test_prompt")
+        output_path = revision_tab.save_patch_history_json(
+            "test_code", "test_reason", "test_prompt"
+        )
 
         data = json.loads(Path(output_path).read_text(encoding="utf-8"))
 
@@ -434,9 +436,7 @@ class TestSavePatchHistoryJson:
         monkeypatch.setattr(revision_tab, "RESULT_LOG", str(result_log))
 
         output_path = revision_tab.save_patch_history_json(
-            "# 日本語コード",
-            "日本語の理由",
-            "日本語プロンプト"
+            "# 日本語コード", "日本語の理由", "日本語プロンプト"
         )
 
         data = json.loads(Path(output_path).read_text(encoding="utf-8"))
@@ -481,7 +481,9 @@ class TestRunPytest:
         result_log = tmp_path / "result.log"
         monkeypatch.setattr(revision_tab, "RESULT_LOG", str(result_log))
 
-        with patch.object(revision_tab.subprocess, "run", side_effect=FileNotFoundError("pytest not found")):
+        with patch.object(
+            revision_tab.subprocess, "run", side_effect=FileNotFoundError("pytest not found")
+        ):
             ok, output = revision_tab.run_pytest()
 
         assert ok is False
@@ -550,7 +552,7 @@ class TestGeneratePrompt:
             "v1.0",
             "Previous attempt failed",
             "AssertionError at line 5",
-            "Fix the edge case"
+            "Fix the edge case",
         )
 
         assert "sample.py" in prompt
@@ -569,9 +571,7 @@ class TestGeneratePrompt:
         sample_file.write_text("", encoding="utf-8")
         test_file.write_text("", encoding="utf-8")
 
-        prompt = revision_tab.generate_prompt(
-            str(sample_file), str(test_file), "", "", "", ""
-        )
+        prompt = revision_tab.generate_prompt(str(sample_file), str(test_file), "", "", "", "")
 
         assert "sample.py" in prompt
         assert "test_sample.py" in prompt
@@ -579,12 +579,7 @@ class TestGeneratePrompt:
     def test_generate_prompt_with_nonexistent_files(self):
         """Test prompt generation with nonexistent files."""
         prompt = revision_tab.generate_prompt(
-            "/nonexistent/sample.py",
-            "/nonexistent/test.py",
-            "summary",
-            "history",
-            "errors",
-            "note"
+            "/nonexistent/sample.py", "/nonexistent/test.py", "summary", "history", "errors", "note"
         )
 
         assert "sample.py" in prompt
@@ -598,9 +593,7 @@ class TestGeneratePrompt:
         sample_file.write_text("code", encoding="utf-8")
         test_file.write_text("test", encoding="utf-8")
 
-        prompt = revision_tab.generate_prompt(
-            str(sample_file), str(test_file), "s", "h", "e", "n"
-        )
+        prompt = revision_tab.generate_prompt(str(sample_file), str(test_file), "s", "h", "e", "n")
 
         assert "# Context" in prompt
         assert "# ユーザーの目的" in prompt
@@ -620,10 +613,7 @@ class TestExtractCodeAndReason:
 
     def test_extract_code_and_reason_json_format(self):
         """Test extraction from JSON format."""
-        response = json.dumps({
-            "code": "def test():\n    pass",
-            "reason": "Fixed the issue"
-        })
+        response = json.dumps({"code": "def test():\n    pass", "reason": "Fixed the issue"})
 
         code, reason = revision_tab.extract_code_and_reason(response)
 
@@ -701,12 +691,15 @@ code2
         assert code == ""
         assert "抽出できませんでした" in reason
 
-    @pytest.mark.parametrize("response,expected_code,reason_contains", [
-        ('{"code": "x=1", "reason": "simple"}', "x=1", "simple"),
-        ('{"code": "", "reason": "empty"}', "", "empty"),
-        ('{"code": "a", "reason": ""}', "a", ""),
-        ("```\ncode\n```\nreason", "code", "reason"),
-    ])
+    @pytest.mark.parametrize(
+        "response,expected_code,reason_contains",
+        [
+            ('{"code": "x=1", "reason": "simple"}', "x=1", "simple"),
+            ('{"code": "", "reason": "empty"}', "", "empty"),
+            ('{"code": "a", "reason": ""}', "a", ""),
+            ("```\ncode\n```\nreason", "code", "reason"),
+        ],
+    )
     def test_extract_code_and_reason_parametrized(self, response, expected_code, reason_contains):
         """Parametrized tests for various response formats."""
         code, reason = revision_tab.extract_code_and_reason(response)

@@ -3,6 +3,7 @@ Comprehensive tests for llm/provider_factory.py
 
 プロバイダーファクトリーとクラスマッピングのテスト
 """
+
 import pytest
 
 from nexuscore.llm.provider_factory import (
@@ -71,9 +72,7 @@ class TestProviderClasses:
     def test_all_provider_classes_inherit_base_llm(self):
         """全プロバイダークラスがBaseLLMを継承"""
         for family, provider_cls in PROVIDER_CLASSES.items():
-            assert issubclass(
-                provider_cls, BaseLLM
-            ), f"{family} doesn't inherit from BaseLLM"
+            assert issubclass(provider_cls, BaseLLM), f"{family} doesn't inherit from BaseLLM"
 
     def test_provider_classes_keys_are_lowercase(self):
         """全キーが小文字"""

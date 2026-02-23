@@ -3,9 +3,7 @@ Comprehensive tests for pr_comments module.
 Tests GitHub PR comment generation and patch summarization.
 """
 
-import pytest
-from nexuscore.utils.pr_comments import summarize_patch, build_self_healing_pr_comment
-
+from nexuscore.utils.pr_comments import build_self_healing_pr_comment, summarize_patch
 
 # ==============================================================================
 # summarize_patch Tests
@@ -147,7 +145,7 @@ class TestBuildSelfHealingPRComment:
             duration_seconds=60.0,
             model_name="gpt-4",
         )
-        
+
         assert "test-123" in comment
         assert "✅" in comment  # fixed emoji
         assert "60.00s" in comment
@@ -163,7 +161,7 @@ class TestBuildSelfHealingPRComment:
             duration_seconds=1.0,
             model_name="test-model",
         )
-        
+
         assert "NexusCore Self-Healing Report" in comment
 
     def test_build_pr_comment_status_fixed(self):
@@ -176,7 +174,7 @@ class TestBuildSelfHealingPRComment:
             duration_seconds=1.0,
             model_name="test-model",
         )
-        
+
         assert "✅" in comment
         assert "FIXED" in comment
 
@@ -190,7 +188,7 @@ class TestBuildSelfHealingPRComment:
             duration_seconds=1.0,
             model_name="test-model",
         )
-        
+
         assert "⚠️" in comment
         assert "NOT FIXED" in comment
 
@@ -204,7 +202,7 @@ class TestBuildSelfHealingPRComment:
             duration_seconds=1.0,
             model_name="test-model",
         )
-        
+
         assert "ℹ️" in comment
         assert "NO ISSUES" in comment
 
@@ -218,7 +216,7 @@ class TestBuildSelfHealingPRComment:
             duration_seconds=1.0,
             model_name="test-model",
         )
-        
+
         assert "🚫" in comment
         assert "BLOCKED" in comment
 
@@ -232,7 +230,7 @@ class TestBuildSelfHealingPRComment:
             duration_seconds=1.0,
             model_name="test-model",
         )
-        
+
         assert "❌" in comment
         assert "ERROR" in comment
 
@@ -246,7 +244,7 @@ class TestBuildSelfHealingPRComment:
             duration_seconds=1.0,
             model_name="test-model",
         )
-        
+
         assert "❓" in comment
 
     def test_build_pr_comment_with_patch(self):
@@ -254,7 +252,7 @@ class TestBuildSelfHealingPRComment:
         patch = """+++ b/file.py
 +line1
 +line2"""
-        
+
         comment = build_self_healing_pr_comment(
             run_id="test",
             result_status="fixed",
@@ -264,7 +262,7 @@ class TestBuildSelfHealingPRComment:
             model_name="test-model",
             patch_str=patch,
         )
-        
+
         assert "2 lines / 1 files" in comment
         assert "Patch Preview" in comment
         assert "+line1" in comment
@@ -280,7 +278,7 @@ class TestBuildSelfHealingPRComment:
             model_name="test-model",
             patch_str="",
         )
-        
+
         assert "N/A" in comment
 
     def test_build_pr_comment_with_success_rate(self):
@@ -296,7 +294,7 @@ class TestBuildSelfHealingPRComment:
             success_count_30=25,
             total_count_30=30,
         )
-        
+
         assert "85.5%" in comment
         assert "25 / 30" in comment
 
@@ -311,7 +309,7 @@ class TestBuildSelfHealingPRComment:
             model_name="test-model",
             total_count_30=0,
         )
-        
+
         assert "N/A (insufficient data)" in comment
 
     def test_build_pr_comment_with_summary(self):
@@ -325,7 +323,7 @@ class TestBuildSelfHealingPRComment:
             model_name="test-model",
             summary="Fixed 3 test failures by updating assertions",
         )
-        
+
         assert "Summary" in comment
         assert "Fixed 3 test failures" in comment
 
@@ -341,7 +339,7 @@ class TestBuildSelfHealingPRComment:
             guardian_status="APPROVED",
             guardian_comment="Changes look good",
         )
-        
+
         assert "Guardian Review" in comment
         assert "APPROVED" in comment
         assert "Changes look good" in comment
@@ -349,7 +347,7 @@ class TestBuildSelfHealingPRComment:
     def test_build_pr_comment_with_blocked_tests(self):
         """Include blocked test paths when provided"""
         blocked = ["tests/test_critical.py", "tests/test_security.py"]
-        
+
         comment = build_self_healing_pr_comment(
             run_id="test",
             result_status="blocked",
@@ -359,7 +357,7 @@ class TestBuildSelfHealingPRComment:
             model_name="test-model",
             blocked_test_paths=blocked,
         )
-        
+
         assert "Blocked Test Files" in comment
         assert "test_critical.py" in comment
         assert "test_security.py" in comment
@@ -368,7 +366,7 @@ class TestBuildSelfHealingPRComment:
         """Truncate very long patches"""
         long_patch = "\n".join([f"+line{i}" for i in range(1500)])
         long_patch = "+++ b/file.py\n" + long_patch
-        
+
         comment = build_self_healing_pr_comment(
             run_id="test",
             result_status="fixed",
@@ -378,7 +376,7 @@ class TestBuildSelfHealingPRComment:
             model_name="test-model",
             patch_str=long_patch,
         )
-        
+
         assert "truncated" in comment.lower()
         assert "1501 total lines" in comment
 
@@ -392,7 +390,7 @@ class TestBuildSelfHealingPRComment:
             duration_seconds=83.456,
             model_name="test-model",
         )
-        
+
         assert "83.46s" in comment
 
     def test_build_pr_comment_is_markdown(self):
@@ -405,7 +403,7 @@ class TestBuildSelfHealingPRComment:
             duration_seconds=1.0,
             model_name="test-model",
         )
-        
+
         # Check for Markdown table syntax
         assert "|" in comment
         assert "---|" in comment
@@ -429,7 +427,7 @@ class TestPRCommentsIntegration:
 -    print("old")
 +    print("new")
 +    return 0"""
-        
+
         comment = build_self_healing_pr_comment(
             run_id="run-abc123",
             result_status="fixed",
@@ -446,7 +444,7 @@ class TestPRCommentsIntegration:
             guardian_comment="All changes are safe",
             blocked_test_paths=["tests/test_blocked.py"],
         )
-        
+
         # Verify all sections are present
         assert "run-abc123" in comment
         assert "✅" in comment
@@ -466,9 +464,9 @@ class TestPRCommentsIntegration:
 +line2
 +++ b/file2.py
 -removed"""
-        
+
         patch_line_count, affected_files = summarize_patch(patch)
-        
+
         comment = build_self_healing_pr_comment(
             run_id="test",
             result_status="fixed",
@@ -478,7 +476,7 @@ class TestPRCommentsIntegration:
             model_name="test-model",
             patch_str=patch,
         )
-        
+
         # Verify summarize_patch results appear in comment
         assert f"{patch_line_count} lines" in comment
         assert f"{affected_files} files" in comment

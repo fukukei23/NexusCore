@@ -15,7 +15,7 @@ import difflib
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Literal, Optional
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +28,10 @@ class FunctionChange:
 
     name: str
     kind: ChangeKind  # added / removed / modified
-    signature_before: Optional[str] = None
-    signature_after: Optional[str] = None
-    doc_before: Optional[str] = None
-    doc_after: Optional[str] = None
+    signature_before: str | None = None
+    signature_after: str | None = None
+    doc_before: str | None = None
+    doc_after: str | None = None
 
 
 @dataclass
@@ -47,11 +47,11 @@ class SemanticDiffResult:
     """意味的差分の結果"""
 
     file_path: Path
-    functions: List[FunctionChange] = field(default_factory=list)
-    behavior_hints: List[BehaviorChangeHint] = field(default_factory=list)
-    raw_line_diff_summary: Optional[str] = None  # 数行に要約した line diff
+    functions: list[FunctionChange] = field(default_factory=list)
+    behavior_hints: list[BehaviorChangeHint] = field(default_factory=list)
+    raw_line_diff_summary: str | None = None  # 数行に要約した line diff
 
-    def to_dict(self) -> Dict[str, object]:
+    def to_dict(self) -> dict[str, object]:
         """Run.details に突っ込みやすいように dict 化"""
         return {
             "file_path": str(self.file_path),
@@ -77,14 +77,14 @@ class SemanticDiffResult:
         }
 
 
-def _extract_functions_from_ast(tree: ast.AST) -> Dict[str, Dict[str, Optional[str]]]:
+def _extract_functions_from_ast(tree: ast.AST) -> dict[str, dict[str, str | None]]:
     """
     AST から関数情報を抽出する。
 
     Returns:
         {関数名: {"signature": "...", "doc": "..."}} の辞書
     """
-    functions: Dict[str, Dict[str, Optional[str]]] = {}
+    functions: dict[str, dict[str, str | None]] = {}
 
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef):
@@ -113,8 +113,8 @@ def _extract_functions_from_ast(tree: ast.AST) -> Dict[str, Dict[str, Optional[s
 
 
 def _build_behavior_hints_from_diff(
-    lines_before: List[str], lines_after: List[str]
-) -> List[BehaviorChangeHint]:
+    lines_before: list[str], lines_after: list[str]
+) -> list[BehaviorChangeHint]:
     """
     行レベル diff から振る舞いの変化ヒントを構築する。
 
@@ -125,7 +125,7 @@ def _build_behavior_hints_from_diff(
     Returns:
         BehaviorChangeHint のリスト
     """
-    hints: List[BehaviorChangeHint] = []
+    hints: list[BehaviorChangeHint] = []
 
     # unified_diff を取得
     diff_lines = list(
@@ -164,8 +164,12 @@ def _build_behavior_hints_from_diff(
         )
 
     # if 行が増えたかチェック
-    added_ifs = sum(1 for line in diff_lines if line.startswith("+") and line.strip().startswith("if "))
-    removed_ifs = sum(1 for line in diff_lines if line.startswith("-") and line.strip().startswith("if "))
+    added_ifs = sum(
+        1 for line in diff_lines if line.startswith("+") and line.strip().startswith("if ")
+    )
+    removed_ifs = sum(
+        1 for line in diff_lines if line.startswith("-") and line.strip().startswith("if ")
+    )
 
     if added_ifs > 0:
         hints.append(
@@ -183,8 +187,12 @@ def _build_behavior_hints_from_diff(
         )
 
     # return 行の変化をチェック（簡易版）
-    added_returns = sum(1 for line in diff_lines if line.startswith("+") and "return" in line.lower())
-    removed_returns = sum(1 for line in diff_lines if line.startswith("-") and "return" in line.lower())
+    added_returns = sum(
+        1 for line in diff_lines if line.startswith("+") and "return" in line.lower()
+    )
+    removed_returns = sum(
+        1 for line in diff_lines if line.startswith("-") and "return" in line.lower()
+    )
 
     if added_returns > removed_returns:
         hints.append(
@@ -202,7 +210,9 @@ def _build_behavior_hints_from_diff(
         )
 
     # assert 行が増えたかチェック（バリデーション追加の可能性）
-    added_asserts = sum(1 for line in diff_lines if line.startswith("+") and "assert" in line.lower())
+    added_asserts = sum(
+        1 for line in diff_lines if line.startswith("+") and "assert" in line.lower()
+    )
     if added_asserts > 0:
         hints.append(
             BehaviorChangeHint(
@@ -250,15 +260,17 @@ def compute_semantic_diff(
                 lineterm="",
                 n=3,
             )
-        )[:20]  # 最初の20行だけ
+        )[
+            :20
+        ]  # 最初の20行だけ
         result.raw_line_diff_summary = "\n".join(diff_lines)
         return result
 
     # Python コードの解析
     try:
         # Before の AST 解析
-        tree_before: Optional[ast.AST] = None
-        functions_before: Dict[str, Dict[str, Optional[str]]] = {}
+        tree_before: ast.AST | None = None
+        functions_before: dict[str, dict[str, str | None]] = {}
         try:
             tree_before = ast.parse(before_code, filename=str(file_path))
             functions_before = _extract_functions_from_ast(tree_before)
@@ -266,8 +278,8 @@ def compute_semantic_diff(
             logger.warning(f"Failed to parse before code for {file_path}: {e}")
 
         # After の AST 解析
-        tree_after: Optional[ast.AST] = None
-        functions_after: Dict[str, Dict[str, Optional[str]]] = {}
+        tree_after: ast.AST | None = None
+        functions_after: dict[str, dict[str, str | None]] = {}
         try:
             tree_after = ast.parse(after_code, filename=str(file_path))
             functions_after = _extract_functions_from_ast(tree_after)
@@ -360,4 +372,3 @@ def compute_semantic_diff(
             pass  # 最後の手段も失敗した場合は空のまま返す
 
     return result
-

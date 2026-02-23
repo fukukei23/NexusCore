@@ -13,8 +13,9 @@ http_client.py の包括的テスト
 - session マウントの確認
 """
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 
 # NOTE: requests がインストールされていない環境でもテストが動作するよう、
 # モック可能な状態でインポート
@@ -23,6 +24,7 @@ try:
         HttpClientFactory,
         RequestsHTTPError,
     )
+
     HAS_HTTP_CLIENT = True
 except ImportError:
     HAS_HTTP_CLIENT = False
@@ -58,6 +60,7 @@ class TestHttpClientFactory:
         # requests が利用可能な環境でテスト
         try:
             import requests
+
             HAS_REQUESTS = True
         except ImportError:
             HAS_REQUESTS = False
@@ -95,6 +98,7 @@ class TestHttpClientFactory:
             import requests
             from requests.adapters import HTTPAdapter
             from urllib3.util.retry import Retry
+
             HAS_DEPS = True
         except ImportError:
             HAS_DEPS = False
@@ -123,6 +127,7 @@ class TestHttpClientFactory:
             import requests
             from requests.adapters import HTTPAdapter
             from urllib3.util.retry import Retry
+
             HAS_DEPS = True
         except ImportError:
             HAS_DEPS = False
@@ -157,6 +162,7 @@ class TestHttpClientFactory:
         try:
             import requests
             from requests.adapters import HTTPAdapter
+
             HAS_DEPS = True
         except ImportError:
             HAS_DEPS = False
@@ -182,6 +188,7 @@ class TestHttpClientFactory:
         try:
             import requests
             from requests.adapters import HTTPAdapter
+
             HAS_DEPS = True
         except ImportError:
             HAS_DEPS = False
@@ -207,6 +214,7 @@ class TestHttpClientFactory:
         try:
             import requests
             from requests.adapters import HTTPAdapter
+
             HAS_DEPS = True
         except ImportError:
             HAS_DEPS = False
@@ -232,6 +240,7 @@ class TestHttpClientFactory:
         """複数回の session 作成が独立している"""
         try:
             import requests
+
             HAS_REQUESTS = True
         except ImportError:
             HAS_REQUESTS = False
@@ -288,6 +297,7 @@ class TestEdgeCases:
             with patch("nexuscore.llm.http_client.HTTPAdapter", None):
                 try:
                     import requests
+
                     HAS_REQUESTS = True
                 except ImportError:
                     HAS_REQUESTS = False
@@ -332,6 +342,7 @@ class TestEdgeCases:
         """Session が適切にクローズされる（リソース管理）"""
         try:
             import requests
+
             HAS_REQUESTS = True
         except ImportError:
             HAS_REQUESTS = False

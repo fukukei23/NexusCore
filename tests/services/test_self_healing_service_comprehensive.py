@@ -3,20 +3,17 @@ Comprehensive tests for self_healing_service.py
 
 包括的なエッジケース、エラーハンドリング、統合シナリオのテスト
 """
+
 import sys
-from unittest.mock import MagicMock, Mock, patch, call
+from unittest.mock import MagicMock, Mock, patch
 
 # patchモジュールをモック化（import前に実行）
-sys.modules['patch'] = MagicMock()
+sys.modules["patch"] = MagicMock()
 
-import json
-import pytest
-from pathlib import Path
 
-from nexuscore.services.self_healing_service import SelfHealingService
 from nexuscore.config.self_healing_config import SelfHealingConfig
-from nexuscore.core.session_control import SessionController
 from nexuscore.core.run_history import RunHistoryLogger
+from nexuscore.services.self_healing_service import SelfHealingService
 
 
 # ============================================================================
@@ -26,15 +23,10 @@ class TestInitializationAndConfig:
     def test_initialization_with_custom_config(self, tmp_path):
         """カスタム設定での初期化"""
         config = SelfHealingConfig(
-            test_command="pytest --maxfail=1",
-            allow_test_modification=True,
-            allow_deletions=True
+            test_command="pytest --maxfail=1", allow_test_modification=True, allow_deletions=True
         )
 
-        service = SelfHealingService(
-            project_root=str(tmp_path),
-            config=config
-        )
+        service = SelfHealingService(project_root=str(tmp_path), config=config)
 
         assert service.config.test_command == "pytest --maxfail=1"
         assert service.config.allow_test_modification is True
@@ -57,7 +49,7 @@ class TestInitializationAndConfig:
             debugger_agent=None,
             patch_applier=None,
             history_logger=None,
-            config=None
+            config=None,
         )
 
         # すべてデフォルト生成される
@@ -72,10 +64,7 @@ class TestInitializationAndConfig:
 class TestMaybeStop:
     def test_maybe_stop_no_session_controller(self, tmp_path):
         """SessionControllerがない場合はスキップ"""
-        service = SelfHealingService(
-            project_root=str(tmp_path),
-            session_controller=None
-        )
+        service = SelfHealingService(project_root=str(tmp_path), session_controller=None)
 
         # エラーなく完了
         service._maybe_stop("test_phase")
@@ -85,10 +74,7 @@ class TestMaybeStop:
         mock_controller = Mock()
         mock_controller.should_stop.return_value = False
 
-        service = SelfHealingService(
-            project_root=str(tmp_path),
-            session_controller=mock_controller
-        )
+        service = SelfHealingService(project_root=str(tmp_path), session_controller=mock_controller)
 
         meta = {"key": "value", "count": 42}
         service._maybe_stop("phase1", meta)
@@ -101,8 +87,8 @@ class TestMaybeStop:
 # _clone_or_update_repo テスト
 # ============================================================================
 class TestCloneOrUpdateRepo:
-    @patch('subprocess.run')
-    @patch('shutil.rmtree')
+    @patch("subprocess.run")
+    @patch("shutil.rmtree")
     def test_clone_new_repo_success(self, mock_rmtree, mock_run, tmp_path):
         """新規リポジトリのクローン成功"""
         mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
@@ -112,19 +98,16 @@ class TestCloneOrUpdateRepo:
 
         # Noneを返すことを確認（副作用でディレクトリ作成）
         result = service._clone_or_update_repo(
-            repo_full_name="user/repo",
-            pr_number=123,
-            head_sha="abc123",
-            target_dir=target_dir
+            repo_full_name="user/repo", pr_number=123, head_sha="abc123", target_dir=target_dir
         )
 
         assert result is None
         # git clone と checkout が呼ばれる
         assert mock_run.call_count >= 2
 
-    @patch('subprocess.run')
-    @patch('os.getenv')
-    @patch('shutil.copytree')
+    @patch("subprocess.run")
+    @patch("os.getenv")
+    @patch("shutil.copytree")
     def test_clone_from_local_base_dir(self, mock_copytree, mock_getenv, mock_run, tmp_path):
         """ローカルベースディレクトリからのコピー"""
         base_dir = tmp_path / "repos"
@@ -141,20 +124,19 @@ class TestCloneOrUpdateRepo:
         target_dir = tmp_path / "sandbox" / "repo"
 
         service._clone_or_update_repo(
-            repo_full_name="user/repo",
-            pr_number=123,
-            head_sha="abc123",
-            target_dir=target_dir
+            repo_full_name="user/repo", pr_number=123, head_sha="abc123", target_dir=target_dir
         )
 
         # copytree が呼ばれる
         mock_copytree.assert_called_once()
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_clone_with_authentication_url(self, mock_run, tmp_path, monkeypatch):
         """認証URL経由でのクローン"""
-        monkeypatch.setenv("NEXUS_GITHUB_CLONE_URL_TEMPLATE",
-                          "https://token:SECRET@github.com/{repo_full_name}.git")
+        monkeypatch.setenv(
+            "NEXUS_GITHUB_CLONE_URL_TEMPLATE",
+            "https://token:SECRET@github.com/{repo_full_name}.git",
+        )
 
         mock_run.return_value = Mock(returncode=0)
 
@@ -162,10 +144,7 @@ class TestCloneOrUpdateRepo:
         target_dir = tmp_path / "sandbox" / "repo"
 
         service._clone_or_update_repo(
-            repo_full_name="user/repo",
-            pr_number=123,
-            head_sha="abc123",
-            target_dir=target_dir
+            repo_full_name="user/repo", pr_number=123, head_sha="abc123", target_dir=target_dir
         )
 
         # git clone が認証URLで呼ばれる
@@ -176,14 +155,10 @@ class TestCloneOrUpdateRepo:
 # _run_tests テスト
 # ============================================================================
 class TestRunTests:
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_tests_success(self, mock_run, tmp_path):
         """テスト実行成功"""
-        mock_run.return_value = Mock(
-            returncode=0,
-            stdout="5 passed",
-            stderr=""
-        )
+        mock_run.return_value = Mock(returncode=0, stdout="5 passed", stderr="")
 
         service = SelfHealingService(project_root=str(tmp_path))
         success, output = service._run_tests(tmp_path)
@@ -191,21 +166,17 @@ class TestRunTests:
         assert success is True
         assert "passed" in output or output == ""
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_tests_failure(self, mock_run, tmp_path):
         """テスト実行失敗"""
-        mock_run.return_value = Mock(
-            returncode=1,
-            stdout="",
-            stderr="3 failed"
-        )
+        mock_run.return_value = Mock(returncode=1, stdout="", stderr="3 failed")
 
         service = SelfHealingService(project_root=str(tmp_path))
         success, output = service._run_tests(tmp_path)
 
         assert success is False
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_tests_with_custom_command(self, mock_run, tmp_path, monkeypatch):
         """カスタムテストコマンドでの実行"""
         monkeypatch.setenv("NEXUS_SELF_HEALING_TEST_CMD", "npm test")
@@ -218,10 +189,11 @@ class TestRunTests:
         # npm test が呼ばれる
         assert any("npm" in str(call) for call in mock_run.call_args_list)
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_run_tests_timeout_handling(self, mock_run, tmp_path):
         """タイムアウト処理"""
         from subprocess import TimeoutExpired
+
         mock_run.side_effect = TimeoutExpired("pytest", 60)
 
         service = SelfHealingService(project_root=str(tmp_path))
@@ -239,14 +211,10 @@ class TestRunTests:
 # _get_changed_files テスト
 # ============================================================================
 class TestGetChangedFiles:
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_get_changed_files_with_refs(self, mock_run, tmp_path):
         """base_ref/head_ref指定での変更ファイル取得"""
-        mock_run.return_value = Mock(
-            returncode=0,
-            stdout="src/foo.py\nsrc/bar.py\n",
-            stderr=""
-        )
+        mock_run.return_value = Mock(returncode=0, stdout="src/foo.py\nsrc/bar.py\n", stderr="")
 
         service = SelfHealingService(project_root=str(tmp_path))
         files = service._get_changed_files(tmp_path, "main", "feature-branch")
@@ -254,21 +222,17 @@ class TestGetChangedFiles:
         assert isinstance(files, list)
         assert len(files) >= 0
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_get_changed_files_without_refs(self, mock_run, tmp_path):
         """refs未指定でのフォールバック"""
-        mock_run.return_value = Mock(
-            returncode=0,
-            stdout="test.py\n",
-            stderr=""
-        )
+        mock_run.return_value = Mock(returncode=0, stdout="test.py\n", stderr="")
 
         service = SelfHealingService(project_root=str(tmp_path))
         files = service._get_changed_files(tmp_path, None, None)
 
         assert isinstance(files, list)
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_get_changed_files_git_error(self, mock_run, tmp_path):
         """gitコマンドエラー時の処理"""
         mock_run.side_effect = Exception("git not found")
@@ -301,7 +265,7 @@ class TestCollectRelevantFiles:
             project_path=tmp_path,
             error_log="Error in foo.py",
             changed_files=["src/foo.py"],
-            stacktrace_files=["src/bar.py"]
+            stacktrace_files=["src/bar.py"],
         )
 
         assert isinstance(files_dict, dict)
@@ -318,7 +282,7 @@ class TestCollectRelevantFiles:
             project_path=tmp_path,
             error_log="",
             changed_files=["test.py", "test.py"],
-            stacktrace_files=["test.py"]
+            stacktrace_files=["test.py"],
         )
 
         # 重複が除去される
@@ -332,7 +296,7 @@ class TestCollectRelevantFiles:
             project_path=tmp_path,
             error_log="",
             changed_files=["nonexistent.py"],
-            stacktrace_files=[]
+            stacktrace_files=[],
         )
 
         # 存在しないファイルはスキップされる
@@ -343,10 +307,7 @@ class TestCollectRelevantFiles:
         service = SelfHealingService(project_root=str(tmp_path))
 
         files_dict = service._collect_relevant_files(
-            project_path=tmp_path,
-            error_log="",
-            changed_files=[],
-            stacktrace_files=[]
+            project_path=tmp_path, error_log="", changed_files=[], stacktrace_files=[]
         )
 
         assert files_dict == {}
@@ -360,17 +321,14 @@ class TestGeneratePatchViaDebugger:
         """DebuggerAgent経由でのパッチ生成"""
         mock_agent = Mock()
         # debug_and_patchが優先的に呼ばれる
-        mock_agent.debug_and_patch.return_value = {"patch": "--- a/file.py\n+++ b/file.py\n@@ -1 +1 @@\n-old\n+new"}
+        mock_agent.debug_and_patch.return_value = {
+            "patch": "--- a/file.py\n+++ b/file.py\n@@ -1 +1 @@\n-old\n+new"
+        }
 
-        service = SelfHealingService(
-            project_root=str(tmp_path),
-            debugger_agent=mock_agent
-        )
+        service = SelfHealingService(project_root=str(tmp_path), debugger_agent=mock_agent)
 
         result = service._generate_patch_via_debugger(
-            error_log="Error",
-            files={"file.py": "old"},
-            project_path=tmp_path
+            error_log="Error", files={"file.py": "old"}, project_path=tmp_path
         )
 
         assert isinstance(result, dict)
@@ -378,15 +336,10 @@ class TestGeneratePatchViaDebugger:
 
     def test_generate_patch_without_debugger_agent(self, tmp_path):
         """DebuggerAgentなしでの処理"""
-        service = SelfHealingService(
-            project_root=str(tmp_path),
-            debugger_agent=None
-        )
+        service = SelfHealingService(project_root=str(tmp_path), debugger_agent=None)
 
         result = service._generate_patch_via_debugger(
-            error_log="Error",
-            files={"file.py": "code"},
-            project_path=tmp_path
+            error_log="Error", files={"file.py": "code"}, project_path=tmp_path
         )
 
         # debugger_agentがNoneの場合は空辞書を返す
@@ -397,17 +350,12 @@ class TestGeneratePatchViaDebugger:
         mock_agent = Mock()
         mock_agent.generate_patch.side_effect = Exception("Agent failed")
 
-        service = SelfHealingService(
-            project_root=str(tmp_path),
-            debugger_agent=mock_agent
-        )
+        service = SelfHealingService(project_root=str(tmp_path), debugger_agent=mock_agent)
 
         # 例外をキャッチして空辞書か例外を返す
         try:
             result = service._generate_patch_via_debugger(
-                error_log="Error",
-                files={},
-                project_path=tmp_path
+                error_log="Error", files={}, project_path=tmp_path
             )
             assert isinstance(result, dict)
         except Exception:
@@ -430,9 +378,7 @@ class TestRunForPullRequestIntegration:
         service = SelfHealingService(project_root=str(tmp_path))
 
         result = service.run_for_pull_request(
-            repo_full_name="user/repo",
-            pr_number=123,
-            head_sha="abc123"
+            repo_full_name="user/repo", pr_number=123, head_sha="abc123"
         )
 
         assert isinstance(result, dict)
@@ -441,25 +387,22 @@ class TestRunForPullRequestIntegration:
     @patch.object(SelfHealingService, "_clone_or_update_repo")
     @patch.object(SelfHealingService, "_run_tests")
     @patch.object(SelfHealingService, "_generate_patch_via_debugger")
-    def test_run_with_test_failures_and_patch(self, mock_gen_patch, mock_run_tests, mock_clone, tmp_path):
+    def test_run_with_test_failures_and_patch(
+        self, mock_gen_patch, mock_run_tests, mock_clone, tmp_path
+    ):
         """テスト失敗→パッチ生成のシナリオ"""
         mock_clone.return_value = None
         mock_run_tests.side_effect = [
             (False, "1 failed"),  # 初回失敗
-            (True, "5 passed")    # パッチ後成功
+            (True, "5 passed"),  # パッチ後成功
         ]
         mock_gen_patch.return_value = "--- patch content ---"
 
         mock_agent = Mock()
-        service = SelfHealingService(
-            project_root=str(tmp_path),
-            debugger_agent=mock_agent
-        )
+        service = SelfHealingService(project_root=str(tmp_path), debugger_agent=mock_agent)
 
         result = service.run_for_pull_request(
-            repo_full_name="user/repo",
-            pr_number=456,
-            head_sha="def456"
+            repo_full_name="user/repo", pr_number=456, head_sha="def456"
         )
 
         assert isinstance(result, dict)
@@ -474,9 +417,7 @@ class TestRunForPullRequestIntegration:
         # 例外をキャッチして失敗結果を返すかraise
         try:
             result = service.run_for_pull_request(
-                repo_full_name="user/repo",
-                pr_number=789,
-                head_sha="ghi789"
+                repo_full_name="user/repo", pr_number=789, head_sha="ghi789"
             )
             assert isinstance(result, dict)
             # エラー情報が含まれる
@@ -493,18 +434,13 @@ class TestErrorHandlingAndEdgeCases:
         """実行履歴が記録される"""
         mock_logger = Mock(spec=RunHistoryLogger)
 
-        service = SelfHealingService(
-            project_root=str(tmp_path),
-            history_logger=mock_logger
-        )
+        service = SelfHealingService(project_root=str(tmp_path), history_logger=mock_logger)
 
         # 何らかの操作を実行
         with patch.object(service, "_clone_or_update_repo", side_effect=Exception("test")):
             try:
                 service.run_for_pull_request(
-                    repo_full_name="user/repo",
-                    pr_number=1,
-                    head_sha="test"
+                    repo_full_name="user/repo", pr_number=1, head_sha="test"
                 )
             except Exception:
                 pass
@@ -521,11 +457,8 @@ class TestErrorHandlingAndEdgeCases:
     def test_config_load_fallback(self, tmp_path):
         """設定ファイルが存在しない場合のフォールバック"""
         # configがNoneの場合、SelfHealingConfig.load()が呼ばれる
-        service = SelfHealingService(
-            project_root=str(tmp_path),
-            config=None
-        )
+        service = SelfHealingService(project_root=str(tmp_path), config=None)
 
         # デフォルト設定が使われる
         assert service.config is not None
-        assert hasattr(service.config, 'test_command')
+        assert hasattr(service.config, "test_command")

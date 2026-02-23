@@ -1,5 +1,3 @@
-import json
-from pathlib import Path
 
 import pytest
 
@@ -26,6 +24,7 @@ def test_cli_main_parser_failure(monkeypatch, capsys, tmp_path):
     class DummyAnalyzer(tsc.SemanticAnalyzer):
         def setup_parsers(self, languages=None):
             return False
+
     monkeypatch.setattr(tsc, "SemanticAnalyzer", DummyAnalyzer)
     monkeypatch.setattr(tsc, "Fore", type("F", (), {"RED": ""}))
     argv = ["prog", str(tmp_path)]

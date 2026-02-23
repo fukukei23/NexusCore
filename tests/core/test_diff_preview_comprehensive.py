@@ -4,11 +4,10 @@ Comprehensive tests for diff_preview module.
 Tests diff formatting utilities for PR comments and review UI.
 """
 
-import pytest
 from nexuscore.core.diff_preview import (
+    summarize_diff_files,
     truncate_diff,
     wrap_diff_as_markdown,
-    summarize_diff_files,
 )
 
 
@@ -105,7 +104,9 @@ index 1234567..abcdefg 100644
      line 2
 +    new line
      line 3
-""" + "\n".join([f"     line {i}" for i in range(4, 100)])
+""" + "\n".join(
+            [f"     line {i}" for i in range(4, 100)]
+        )
 
         result = truncate_diff(diff, max_lines=10)
 

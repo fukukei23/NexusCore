@@ -3,17 +3,15 @@ Comprehensive tests for ui/self_healing_dashboard.py
 
 Self-Healing Dashboard の関数とロジックのテスト
 """
+
 import json
 import sys
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, mock_open
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 # Streamlitのモック化
-sys.modules['streamlit'] = MagicMock()
+sys.modules["streamlit"] = MagicMock()
 
-from nexuscore.ui.self_healing_dashboard import load_history, main, _parse_args
+from nexuscore.ui.self_healing_dashboard import _parse_args, load_history, main
 
 
 # ============================================================================
@@ -85,7 +83,9 @@ class TestLoadHistory:
         history_dir.mkdir(parents=True)
         log_file = history_dir / "self_healing.log.jsonl"
 
-        content = json.dumps({"status": "success"}) + "\n\n\n" + json.dumps({"status": "failed"}) + "\n"
+        content = (
+            json.dumps({"status": "success"}) + "\n\n\n" + json.dumps({"status": "failed"}) + "\n"
+        )
         log_file.write_text(content)
 
         result = load_history(str(project_root))
@@ -100,9 +100,11 @@ class TestLoadHistory:
         log_file = history_dir / "self_healing.log.jsonl"
 
         content = (
-            json.dumps({"status": "success"}) + "\n"
+            json.dumps({"status": "success"})
+            + "\n"
             + "invalid json line\n"
-            + json.dumps({"status": "failed"}) + "\n"
+            + json.dumps({"status": "failed"})
+            + "\n"
         )
         log_file.write_text(content)
 
@@ -122,10 +124,7 @@ class TestLoadHistory:
 
         record = {
             "status": "success",
-            "details": {
-                "patch_preview": "diff content",
-                "files_changed": ["file1.py", "file2.py"]
-            }
+            "details": {"patch_preview": "diff content", "files_changed": ["file1.py", "file2.py"]},
         }
         log_file.write_text(json.dumps(record) + "\n")
 
@@ -156,8 +155,8 @@ class TestLoadHistory:
 # main 関数テスト（Streamlit モック）
 # ============================================================================
 class TestMain:
-    @patch('nexuscore.ui.self_healing_dashboard.st')
-    @patch('nexuscore.ui.self_healing_dashboard.load_history')
+    @patch("nexuscore.ui.self_healing_dashboard.st")
+    @patch("nexuscore.ui.self_healing_dashboard.load_history")
     def test_main_no_records(self, mock_load_history, mock_st, tmp_path):
         """レコードがない場合"""
         mock_load_history.return_value = []
@@ -167,8 +166,8 @@ class TestMain:
         # 情報メッセージが表示される
         mock_st.info.assert_called_once()
 
-    @patch('nexuscore.ui.self_healing_dashboard.st')
-    @patch('nexuscore.ui.self_healing_dashboard.load_history')
+    @patch("nexuscore.ui.self_healing_dashboard.st")
+    @patch("nexuscore.ui.self_healing_dashboard.load_history")
     def test_main_with_records(self, mock_load_history, mock_st, tmp_path):
         """レコードがある場合"""
         mock_load_history.return_value = [
@@ -179,7 +178,7 @@ class TestMain:
         # サイドバーのモック設定
         mock_st.sidebar.multiselect.side_effect = [
             ["success", "failed"],  # selected_statuses
-            []  # selected_repos（空リスト）
+            [],  # selected_repos（空リスト）
         ]
 
         # columnsのモック設定
@@ -195,8 +194,8 @@ class TestMain:
         # タイトルが設定される
         mock_st.title.assert_called_once()
 
-    @patch('nexuscore.ui.self_healing_dashboard.st')
-    @patch('nexuscore.ui.self_healing_dashboard.load_history')
+    @patch("nexuscore.ui.self_healing_dashboard.st")
+    @patch("nexuscore.ui.self_healing_dashboard.load_history")
     def test_main_displays_total_count(self, mock_load_history, mock_st, tmp_path):
         """総レコード数を表示"""
         records = [{"status": "success", "run_id": str(i)} for i in range(10)]
@@ -210,8 +209,8 @@ class TestMain:
         # writeメソッドが呼ばれる（総数表示）
         assert mock_st.write.called
 
-    @patch('nexuscore.ui.self_healing_dashboard.st')
-    @patch('nexuscore.ui.self_healing_dashboard.load_history')
+    @patch("nexuscore.ui.self_healing_dashboard.st")
+    @patch("nexuscore.ui.self_healing_dashboard.load_history")
     def test_main_filters_by_status(self, mock_load_history, mock_st, tmp_path):
         """ステータスでフィルタリング"""
         records = [
@@ -230,8 +229,8 @@ class TestMain:
         # フィルタリング結果が表示される
         assert mock_st.write.called
 
-    @patch('nexuscore.ui.self_healing_dashboard.st')
-    @patch('nexuscore.ui.self_healing_dashboard.load_history')
+    @patch("nexuscore.ui.self_healing_dashboard.st")
+    @patch("nexuscore.ui.self_healing_dashboard.load_history")
     def test_main_displays_status_summary(self, mock_load_history, mock_st, tmp_path):
         """ステータスサマリーを表示"""
         records = [
@@ -249,8 +248,8 @@ class TestMain:
         # サブヘッダーが設定される
         assert mock_st.subheader.called
 
-    @patch('nexuscore.ui.self_healing_dashboard.st')
-    @patch('nexuscore.ui.self_healing_dashboard.load_history')
+    @patch("nexuscore.ui.self_healing_dashboard.st")
+    @patch("nexuscore.ui.self_healing_dashboard.load_history")
     def test_main_displays_recent_runs(self, mock_load_history, mock_st, tmp_path):
         """最近の実行を表示"""
         records = [
@@ -259,7 +258,7 @@ class TestMain:
                 "run_id": "1",
                 "repo_full_name": "user/repo",
                 "pr_number": 123,
-                "summary": "Test summary"
+                "summary": "Test summary",
             }
         ]
         mock_load_history.return_value = records
@@ -277,26 +276,26 @@ class TestMain:
 # _parse_args テスト
 # ============================================================================
 class TestParseArgs:
-    @patch('sys.argv', ['script.py', '--project-root', '/custom/path'])
+    @patch("sys.argv", ["script.py", "--project-root", "/custom/path"])
     def test_parse_args_with_project_root(self):
         """--project-root 引数のパース"""
         args = _parse_args()
 
-        assert args.project_root == '/custom/path'
+        assert args.project_root == "/custom/path"
 
-    @patch('sys.argv', ['script.py'])
+    @patch("sys.argv", ["script.py"])
     def test_parse_args_default_project_root(self):
         """デフォルトのproject_root"""
         args = _parse_args()
 
-        assert args.project_root == '.'
+        assert args.project_root == "."
 
-    @patch('sys.argv', ['script.py', '--project-root', '.'])
+    @patch("sys.argv", ["script.py", "--project-root", "."])
     def test_parse_args_current_directory(self):
         """カレントディレクトリ指定"""
         args = _parse_args()
 
-        assert args.project_root == '.'
+        assert args.project_root == "."
 
 
 # ============================================================================
@@ -329,15 +328,14 @@ class TestSelfHealingDashboardIntegration:
         filtered = [
             r
             for r in loaded
-            if r.get("status") in selected_statuses
-            and r.get("repo_full_name") in selected_repos
+            if r.get("status") in selected_statuses and r.get("repo_full_name") in selected_repos
         ]
 
         assert len(filtered) == 2
         assert all(r["status"] == "success" for r in filtered)
         assert all(r["repo_full_name"] == "repo1" for r in filtered)
 
-    @patch('nexuscore.ui.self_healing_dashboard.st')
+    @patch("nexuscore.ui.self_healing_dashboard.st")
     def test_main_full_workflow(self, mock_st, tmp_path):
         """main関数の完全ワークフロー"""
         # ヒストリーファイルを作成
@@ -357,19 +355,14 @@ class TestSelfHealingDashboardIntegration:
                 "head_sha": "abc123",
                 "started_at": "2024-01-01T00:00:00",
                 "finished_at": "2024-01-01T01:00:00",
-                "details": {
-                    "patch_preview": "diff content"
-                }
+                "details": {"patch_preview": "diff content"},
             }
         ]
         content = "\n".join(json.dumps(r) for r in records) + "\n"
         log_file.write_text(content)
 
         # サイドバーのモック
-        mock_st.sidebar.multiselect.side_effect = [
-            ["success"],
-            ["test/repo"]
-        ]
+        mock_st.sidebar.multiselect.side_effect = [["success"], ["test/repo"]]
         mock_st.columns.return_value = [MagicMock(), MagicMock()]
 
         # 実行
@@ -453,10 +446,7 @@ class TestEdgeCases:
         history_dir.mkdir(parents=True)
         log_file = history_dir / "self_healing.log.jsonl"
 
-        record = {
-            "status": "success",
-            "summary": "Fixed: 'quotes' and \"double\" and \n newline"
-        }
+        record = {"status": "success", "summary": "Fixed: 'quotes' and \"double\" and \n newline"}
         log_file.write_text(json.dumps(record) + "\n")
 
         result = load_history(str(project_root))

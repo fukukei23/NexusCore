@@ -1,22 +1,23 @@
 # src/utils/code_analyzer.py
 
-import subprocess
-import re
 import json
+import re
+import subprocess
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
 from pathlib import Path
-
+from typing import Any
 
 # ==============================================================================
 # Data Classes
 # ==============================================================================
 
+
 @dataclass
 class SecurityIssue:
     """Banditで検出されたセキュリティ問題"""
-    severity: str        # "HIGH", "MEDIUM", "LOW"
-    confidence: str      # "HIGH", "MEDIUM", "LOW"
+
+    severity: str  # "HIGH", "MEDIUM", "LOW"
+    confidence: str  # "HIGH", "MEDIUM", "LOW"
     issue_text: str
     filename: str
     line_number: int
@@ -25,6 +26,7 @@ class SecurityIssue:
 @dataclass
 class QualityReport:
     """Tier 1 品質ゲートの結果レポート"""
+
     # 総合結果
     passed: bool
 
@@ -42,33 +44,21 @@ class QualityReport:
 
     # Bandit
     bandit_passed: bool
-    security_issues: List[SecurityIssue] = field(default_factory=list)
+    security_issues: list[SecurityIssue] = field(default_factory=list)
 
     # フィードバック
     feedback: str = ""
-    violations: List[str] = field(default_factory=list)
+    violations: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """辞書形式に変換（ログ出力用）"""
         return {
             "passed": self.passed,
-            "coverage": {
-                "percentage": self.coverage_percentage,
-                "passed": self.coverage_passed
-            },
-            "pylint": {
-                "score": self.pylint_score,
-                "passed": self.pylint_passed
-            },
-            "mypy": {
-                "passed": self.mypy_passed,
-                "output": self.mypy_output
-            },
-            "bandit": {
-                "passed": self.bandit_passed,
-                "issues_count": len(self.security_issues)
-            },
-            "violations_count": len(self.violations)
+            "coverage": {"percentage": self.coverage_percentage, "passed": self.coverage_passed},
+            "pylint": {"score": self.pylint_score, "passed": self.pylint_passed},
+            "mypy": {"passed": self.mypy_passed, "output": self.mypy_output},
+            "bandit": {"passed": self.bandit_passed, "issues_count": len(self.security_issues)},
+            "violations_count": len(self.violations),
         }
 
 
@@ -82,38 +72,40 @@ def run_pylint(file_path: str) -> float:
     print(f"🔬 Running Pylint on {file_path}...")
     command = ["pylint", file_path]
     try:
-        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8')
+        result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
         output = result.stdout
         match = re.search(r"Your code has been rated at (\d+\.\d+)/10", output)
         if match:
             score = float(match.group(1))
             print(f"✅ Pylint score: {score}/10")
             return score
-        print(f"⚠️ Pylint score not found in output.")
+        print("⚠️ Pylint score not found in output.")
         return 0.0
     except Exception as e:
         print(f"🚨 An error occurred while running Pylint: {e}")
         return 0.0
+
 
 def run_mypy(file_path: str) -> tuple[bool, str]:
     """指定されたファイルに対してMyPyを実行し、(成功フラグ, 結果メッセージ)を返す"""
     print(f"🔬 Running MyPy on {file_path}...")
     command = ["mypy", file_path]
     try:
-        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8')
+        result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
         output = result.stdout + result.stderr
         if "Success: no issues found" in output:
             print("✅ MyPy found no issues.")
             return True, "Passed"
         else:
             error_summary = "\n".join(line for line in output.splitlines() if "error:" in line)
-            print(f"❌ MyPy found issues.")
+            print("❌ MyPy found issues.")
             return False, error_summary
     except Exception as e:
         print(f"🚨 An error occurred while running MyPy: {e}")
         return False, str(e)
 
-def run_bandit(target_path: str) -> tuple[bool, List[Dict[str, Any]]]:
+
+def run_bandit(target_path: str) -> tuple[bool, list[dict[str, Any]]]:
     """
     指定されたパスに対してBanditを実行し、(成功フラグ, 問題リスト)を返す
 
@@ -123,13 +115,12 @@ def run_bandit(target_path: str) -> tuple[bool, List[Dict[str, Any]]]:
     print(f"🔬 Running Bandit security scan on {target_path}...")
     command = ["bandit", "-r", target_path, "-f", "json"]
     try:
-        result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8')
+        result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
         report = json.loads(result.stdout)
         issues = report.get("results", [])
 
         high_medium_issues = [
-            issue for issue in issues
-            if issue["issue_severity"] in ["HIGH", "MEDIUM"]
+            issue for issue in issues if issue["issue_severity"] in ["HIGH", "MEDIUM"]
         ]
 
         if not high_medium_issues:
@@ -146,6 +137,7 @@ def run_bandit(target_path: str) -> tuple[bool, List[Dict[str, Any]]]:
         print(f"🚨 An error occurred while running Bandit: {e}")
         return False, []
 
+
 def run_pytest_cov(project_path: str) -> float:
     """
     指定されたプロジェクトパスを基準にテストとカバレッジ計測を実行する。
@@ -161,7 +153,7 @@ def run_pytest_cov(project_path: str) -> float:
             cwd=project_path,  # これが重要！
             capture_output=True,
             text=True,
-            encoding='utf-8'
+            encoding="utf-8",
         )
         output = result.stdout
         match = re.search(r"TOTAL\s+\d+\s+\d+\s+(\d+)%", output)
@@ -180,11 +172,12 @@ def run_pytest_cov(project_path: str) -> float:
 # Integrated Quality Analysis
 # ==============================================================================
 
+
 def analyze_code_quality(
     source_path: str,
     test_path: str,
-    constitution: Dict[str, Any],
-    project_root: Optional[str] = None
+    constitution: dict[str, Any],
+    project_root: str | None = None,
 ) -> QualityReport:
     """
     Tier 1 品質ゲートを実行し、憲法に基づいて合否判定。
@@ -199,6 +192,7 @@ def analyze_code_quality(
         QualityReport: 詳細な検査結果
     """
     import logging
+
     logger = logging.getLogger(__name__)
 
     # Step 1: 憲法から基準値を抽出
@@ -218,17 +212,13 @@ def analyze_code_quality(
     coverage = run_pytest_cov(project_root)
     coverage_passed = coverage >= min_coverage
     if not coverage_passed:
-        violations.append(
-            f"テストカバレッジ不足: {coverage:.1f}% < {min_coverage}% (最低基準)"
-        )
+        violations.append(f"テストカバレッジ不足: {coverage:.1f}% < {min_coverage}% (最低基準)")
 
     # Step 3: Pylint実行
     pylint_score = run_pylint(source_path)
     pylint_passed = pylint_score >= min_pylint
     if not pylint_passed:
-        violations.append(
-            f"Pylintスコア不足: {pylint_score:.1f}/10 < {min_pylint}/10 (最低基準)"
-        )
+        violations.append(f"Pylintスコア不足: {pylint_score:.1f}/10 < {min_pylint}/10 (最低基準)")
 
     # Step 4: MyPy実行
     mypy_passed, mypy_output = run_mypy(source_path)
@@ -260,14 +250,13 @@ def analyze_code_quality(
         bandit_passed=bandit_passed,
         security_issues=security_issues,
         feedback=feedback,
-        violations=violations
+        violations=violations,
     )
 
 
 def _parse_bandit_issues(
-    bandit_issues: List[Dict[str, Any]],
-    max_severity: str
-) -> List[SecurityIssue]:
+    bandit_issues: list[dict[str, Any]], max_severity: str
+) -> list[SecurityIssue]:
     """Bandit問題リストをSecurityIssueオブジェクトに変換"""
     severity_levels = {"HIGH": 3, "MEDIUM": 2, "LOW": 1}
     max_level = severity_levels.get(max_severity, 2)
@@ -276,18 +265,20 @@ def _parse_bandit_issues(
     for issue in bandit_issues:
         severity = issue.get("issue_severity", "UNKNOWN")
         if severity_levels.get(severity, 0) >= max_level:
-            issues.append(SecurityIssue(
-                severity=severity,
-                confidence=issue.get("issue_confidence", "UNKNOWN"),
-                issue_text=issue.get("issue_text", ""),
-                filename=issue.get("filename", ""),
-                line_number=issue.get("line_number", 0)
-            ))
+            issues.append(
+                SecurityIssue(
+                    severity=severity,
+                    confidence=issue.get("issue_confidence", "UNKNOWN"),
+                    issue_text=issue.get("issue_text", ""),
+                    filename=issue.get("filename", ""),
+                    line_number=issue.get("line_number", 0),
+                )
+            )
 
     return issues
 
 
-def _generate_feedback(violations: List[str], source_path: str) -> str:
+def _generate_feedback(violations: list[str], source_path: str) -> str:
     """
     CoderAgentへの具体的なフィードバックを生成
 
@@ -302,9 +293,7 @@ def _generate_feedback(violations: List[str], source_path: str) -> str:
     if not violations:
         return "✅ 全ての品質チェックに合格しました。"
 
-    feedback_lines = [
-        f"❌ 品質ゲート不合格: {len(violations)}件の問題が見つかりました。\n"
-    ]
+    feedback_lines = [f"❌ 品質ゲート不合格: {len(violations)}件の問題が見つかりました。\n"]
 
     for i, violation in enumerate(violations, 1):
         feedback_lines.append(f"{i}. {violation}")
@@ -320,9 +309,7 @@ def _generate_feedback(violations: List[str], source_path: str) -> str:
                 "   💡 提案: コードの複雑度を下げるか、命名規則を見直してください。"
             )
         elif "MyPy" in violation:
-            feedback_lines.append(
-                "   💡 提案: 型アノテーションを追加または修正してください。"
-            )
+            feedback_lines.append("   💡 提案: 型アノテーションを追加または修正してください。")
         elif "セキュリティ" in violation:
             feedback_lines.append(
                 "   💡 提案: 安全でない関数（eval, exec等）の使用を避けてください。"

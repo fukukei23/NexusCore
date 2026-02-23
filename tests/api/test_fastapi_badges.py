@@ -5,10 +5,11 @@ CR-FASTAPI-009 で作成された以下のエンドポイントのテスト:
 - GET /api/v1/projects/{project_id}/badge/success_rate
 - GET /api/v1/projects/{project_id}/badge/last_run
 """
+
+from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
-from sqlalchemy import desc
 
 from nexuscore.api.fastapi_app import app
 
@@ -50,9 +51,11 @@ def test_project_success_rate_badge_success(mock_project, mock_runs):
     """
     GET /api/v1/projects/{project_id}/badge/success_rate が正常に動作することを確認
     """
-    with patch("nexuscore.webapp.models.Project") as MockProject, \
-         patch("nexuscore.webapp.models.Run") as MockRun, \
-         patch("nexuscore.api.routes.badges.desc") as mock_desc:
+    with (
+        patch("nexuscore.webapp.models.Project") as MockProject,
+        patch("nexuscore.webapp.models.Run") as MockRun,
+        patch("nexuscore.api.routes.badges.desc") as mock_desc,
+    ):
 
         # プロジェクトのクエリをモック
         MockProject.query.filter_by.return_value.first.return_value = mock_project
@@ -79,9 +82,11 @@ def test_project_success_rate_badge_no_runs(mock_project):
     """
     GET /api/v1/projects/{project_id}/badge/success_rate がRunが存在しない場合に0%を返すことを確認
     """
-    with patch("nexuscore.webapp.models.Project") as MockProject, \
-         patch("nexuscore.webapp.models.Run") as MockRun, \
-         patch("nexuscore.api.routes.badges.desc") as mock_desc:
+    with (
+        patch("nexuscore.webapp.models.Project") as MockProject,
+        patch("nexuscore.webapp.models.Run") as MockRun,
+        patch("nexuscore.api.routes.badges.desc") as mock_desc,
+    ):
 
         # プロジェクトのクエリをモック
         MockProject.query.filter_by.return_value.first.return_value = mock_project
@@ -126,9 +131,11 @@ def test_project_last_run_badge_success(mock_project, mock_latest_run):
     """
     GET /api/v1/projects/{project_id}/badge/last_run が正常に動作することを確認
     """
-    with patch("nexuscore.webapp.models.Project") as MockProject, \
-         patch("nexuscore.webapp.models.Run") as MockRun, \
-         patch("nexuscore.api.routes.badges.desc") as mock_desc:
+    with (
+        patch("nexuscore.webapp.models.Project") as MockProject,
+        patch("nexuscore.webapp.models.Run") as MockRun,
+        patch("nexuscore.api.routes.badges.desc") as mock_desc,
+    ):
 
         # プロジェクトのクエリをモック
         MockProject.query.filter_by.return_value.first.return_value = mock_project
@@ -155,9 +162,11 @@ def test_project_last_run_badge_no_runs(mock_project):
     """
     GET /api/v1/projects/{project_id}/badge/last_run がRunが存在しない場合に適切なメッセージを返すことを確認
     """
-    with patch("nexuscore.webapp.models.Project") as MockProject, \
-         patch("nexuscore.webapp.models.Run") as MockRun, \
-         patch("nexuscore.api.routes.badges.desc") as mock_desc:
+    with (
+        patch("nexuscore.webapp.models.Project") as MockProject,
+        patch("nexuscore.webapp.models.Run") as MockRun,
+        patch("nexuscore.api.routes.badges.desc") as mock_desc,
+    ):
 
         # プロジェクトのクエリをモック
         MockProject.query.filter_by.return_value.first.return_value = mock_project
@@ -197,9 +206,11 @@ def test_project_last_run_badge_different_statuses(mock_project):
         mock_run.started_at = None
         mock_run.finished_at = None
 
-        with patch("nexuscore.webapp.models.Project") as MockProject, \
-             patch("nexuscore.webapp.models.Run") as MockRun, \
-             patch("nexuscore.api.routes.badges.desc") as mock_desc:
+        with (
+            patch("nexuscore.webapp.models.Project") as MockProject,
+            patch("nexuscore.webapp.models.Run") as MockRun,
+            patch("nexuscore.api.routes.badges.desc") as mock_desc,
+        ):
 
             MockProject.query.filter_by.return_value.first.return_value = mock_project
             mock_desc.return_value = MagicMock()
@@ -238,9 +249,11 @@ def test_badge_endpoints_no_authentication_required(mock_project, mock_runs):
     """
     Badge エンドポイントが認証不要であることを確認
     """
-    with patch("nexuscore.webapp.models.Project") as MockProject, \
-         patch("nexuscore.webapp.models.Run") as MockRun, \
-         patch("nexuscore.api.routes.badges.desc") as mock_desc:
+    with (
+        patch("nexuscore.webapp.models.Project") as MockProject,
+        patch("nexuscore.webapp.models.Run") as MockRun,
+        patch("nexuscore.api.routes.badges.desc") as mock_desc,
+    ):
 
         MockProject.query.filter_by.return_value.first.return_value = mock_project
         mock_desc.return_value = MagicMock()
@@ -255,4 +268,3 @@ def test_badge_endpoints_no_authentication_required(mock_project, mock_runs):
         assert response.status_code == 200
         data = response.json()
         assert "schemaVersion" in data
-

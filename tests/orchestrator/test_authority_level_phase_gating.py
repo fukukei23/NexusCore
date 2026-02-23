@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
-
-import pytest
+from typing import Any
 
 from nexuscore.orchestrator.authority_runner import run_with_authority
 
@@ -16,13 +14,13 @@ class DummyContext:
 class SpySessionController:
     def __init__(self) -> None:
         self.session_id = "run-123"
-        self.stop_before_phases: List[str] = []
-        self.last_checkpoint: Optional[str] = None
+        self.stop_before_phases: list[str] = []
+        self.last_checkpoint: str | None = None
 
     def set_stop_before_phases(self, phases: list[str]) -> None:
         self.stop_before_phases = list(phases)
 
-    def checkpoint(self, phase: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def checkpoint(self, phase: str, metadata: dict[str, Any] | None = None) -> None:
         self.last_checkpoint = phase
 
     def should_stop(self) -> bool:
@@ -34,9 +32,9 @@ class SpySessionController:
 class FakeOrchestrator:
     def __init__(self) -> None:
         self.project_path = "/tmp/nxcore"
-        self.constitution: Dict[str, Any] = {}
+        self.constitution: dict[str, Any] = {}
         self.session_controller = SpySessionController()
-        self.calls: List[str] = []
+        self.calls: list[str] = []
 
     def run_full_project(self, *args: Any, **kwargs: Any) -> None:
         self.calls.append("run_full_project")
@@ -92,7 +90,9 @@ def test_human_sets_stop_policy_and_pauses_with_next_phase(monkeypatch: Any, tmp
     assert orch.calls == []  # stopped before executing any phase
 
 
-def test_partial_sets_stop_policy_and_pauses_before_implementation(monkeypatch: Any, tmp_path: Any) -> None:
+def test_partial_sets_stop_policy_and_pauses_before_implementation(
+    monkeypatch: Any, tmp_path: Any
+) -> None:
     monkeypatch.setenv("NEXUSCORE_RUN_STATE_DIR", str(tmp_path / "run_state"))
     monkeypatch.setenv("NEXUSCORE_RUNSTATE_HMAC_SECRET", "test-secret-key")
     orch = FakeOrchestrator()
@@ -125,5 +125,3 @@ def test_full_sets_empty_stop_policy_and_completes(monkeypatch: Any, tmp_path: A
     assert result["next_phase"] is None
     # For full, we preserve existing behavior (call run_full_project)
     assert orch.calls == ["run_full_project"]
-
-

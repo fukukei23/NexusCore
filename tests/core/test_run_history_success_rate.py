@@ -6,11 +6,7 @@ RunHistoryLogger の成功率計算機能のテスト。
 
 from __future__ import annotations
 
-import json
 import tempfile
-from pathlib import Path
-
-import pytest
 
 from nexuscore.core.run_history import RunHistoryLogger, RunRecord
 
@@ -122,4 +118,3 @@ class TestRunHistorySuccessRate:
             assert runs[0]["run_id"] == "test-4"
             assert runs[1]["run_id"] == "test-3"
             assert runs[2]["run_id"] == "test-2"
-

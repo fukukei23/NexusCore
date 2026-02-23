@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 from nexuscore.llm.runtime import CONFIG
 
-DEFAULT_STUB_CONTENT: Dict[str, Any] = {
+DEFAULT_STUB_CONTENT: dict[str, Any] = {
     "summary": "Stubbed response: real LLM call was skipped or unavailable.",
     "plan": [
         {"step": "analyze_requirement", "owner": "PlannerAgent", "status": "pending"},
@@ -57,7 +57,7 @@ def _env_flag(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _real_call_enabled(api_key: Optional[str]) -> bool:
+def _real_call_enabled(api_key: str | None) -> bool:
     """Determine if real LLM calls should execute."""
     dry_run = _env_flag("LLM_DRY_RUN", CONFIG.dry_run)
     real_calls = _env_flag("NEXUS_REAL_CALLS", CONFIG.real_calls_enabled)

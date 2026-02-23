@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 from nexuscore.orchestrator import authority_runner
 from nexuscore.orchestrator.run_state_store import load_state, save_state
@@ -11,7 +11,7 @@ def test_resume_status_transition_and_orchestrator_rebuild(monkeypatch: Any, tmp
     monkeypatch.setenv("NEXUSCORE_RUNSTATE_HMAC_SECRET", "test-secret-key")
 
     # Arrange: a valid PAUSED RunState (with an unknown field to verify RMW preservation)
-    state: Dict[str, Any] = {
+    state: dict[str, Any] = {
         "schema_version": "1.0",
         "run_id": "run-1",
         "status": "PAUSED",
@@ -23,7 +23,7 @@ def test_resume_status_transition_and_orchestrator_rebuild(monkeypatch: Any, tmp
     save_state(state)
 
     # Spy on update_state calls to confirm RESUMING -> RUNNING transitions.
-    seen_statuses: List[str] = []
+    seen_statuses: list[str] = []
     real_update_state = authority_runner.update_state  # type: ignore[attr-defined]
 
     def _spy_update_state(arg: Any, **kwargs: Any) -> Any:
@@ -40,7 +40,7 @@ def test_resume_status_transition_and_orchestrator_rebuild(monkeypatch: Any, tmp
     monkeypatch.setattr(authority_runner, "update_state", _spy_update_state)
 
     # Orchestrator factory must be used (new instance per resume).
-    factory_calls: List[str] = []
+    factory_calls: list[str] = []
 
     class DummyOrchestrator:
         def __init__(self, marker: str) -> None:
@@ -65,5 +65,3 @@ def test_resume_status_transition_and_orchestrator_rebuild(monkeypatch: Any, tmp
     stored = load_state("run-1")
     assert stored["status"] == "RUNNING"
     assert stored["unknown_field"] == {"k": "v"}
-
-

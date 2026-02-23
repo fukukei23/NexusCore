@@ -6,10 +6,12 @@ Core/NPE層はこのインターフェースのみに依存し、Webapp層の具
 実行時に依存性注入される。これにより循環インポートを回避し、CLI実行時に
 Webappが不要になる。
 """
+
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
 from pathlib import Path
+from typing import Any
 
 
 class LoggingProvider(ABC):
@@ -21,11 +23,7 @@ class LoggingProvider(ABC):
     """
 
     @abstractmethod
-    def enhance_transaction(
-        self,
-        log_data: Dict[str, Any],
-        log_file: Path
-    ) -> None:
+    def enhance_transaction(self, log_data: dict[str, Any], log_file: Path) -> None:
         """
         ログトランザクションの拡張処理
 
@@ -49,11 +47,7 @@ class NoOpLoggingProvider(LoggingProvider):
     このプロバイダーが使用され、ファイルログのみが記録される。
     """
 
-    def enhance_transaction(
-        self,
-        log_data: Dict[str, Any],
-        log_file: Path
-    ) -> None:
+    def enhance_transaction(self, log_data: dict[str, Any], log_file: Path) -> None:
         # 何もしない（ファイルログのみで十分）
         pass
 
@@ -62,7 +56,7 @@ class NoOpLoggingProvider(LoggingProvider):
 
 
 # グローバルプロバイダーレジストリ
-_logging_provider: Optional[LoggingProvider] = None
+_logging_provider: LoggingProvider | None = None
 
 
 def register_logging_provider(provider: LoggingProvider) -> None:

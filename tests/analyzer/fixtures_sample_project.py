@@ -49,4 +49,3 @@ def sample_project_dir(tmp_path: Path) -> Path:
     )
 
     return root
-

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Comprehensive tests for nexuscore.gradio_app.repair_timeline module.
 
@@ -9,20 +8,17 @@ policy badge rendering, timeline filtering, and JST timezone handling.
 from __future__ import annotations
 
 import json
-import os
-from datetime import datetime, date, timedelta, timezone
+import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import List, Dict, Any
-from unittest.mock import Mock, patch, MagicMock, call
+from unittest.mock import MagicMock, patch
 
 import pytest
-import sys
 
 # Mock gradio before importing repair_timeline
-sys.modules['gradio'] = MagicMock()
+sys.modules["gradio"] = MagicMock()
 
 from nexuscore.gradio_app import repair_timeline
-
 
 # ============================================================================
 # Fixtures
@@ -163,14 +159,7 @@ class TestReadJson:
     def test_read_json_nested_structure(self, tmp_path):
         """Test reading JSON with nested structure."""
         json_file = tmp_path / "nested.json"
-        data = {
-            "meta": {
-                "policy": {
-                    "profile": "Strict",
-                    "version": "v2"
-                }
-            }
-        }
+        data = {"meta": {"policy": {"profile": "Strict", "version": "v2"}}}
         json_file.write_text(json.dumps(data), encoding="utf-8")
 
         result = repair_timeline._read_json(json_file)
@@ -199,10 +188,15 @@ class TestCollectItems:
     def test_collect_items_basic(self, temp_patch_dir, monkeypatch):
         """Test basic item collection."""
         patch_file = temp_patch_dir / "patch_20250615_120000.json"
-        patch_file.write_text(json.dumps({
-            "timestamp": "20250615_120000",
-            "status": "success",
-        }), encoding="utf-8")
+        patch_file.write_text(
+            json.dumps(
+                {
+                    "timestamp": "20250615_120000",
+                    "status": "success",
+                }
+            ),
+            encoding="utf-8",
+        )
 
         monkeypatch.setattr(repair_timeline, "PATCH_HISTORY_DIRS", [temp_patch_dir])
 
@@ -217,7 +211,9 @@ class TestCollectItems:
         for i in range(5):
             ts = f"2025061{i}_120000"
             patch_file = temp_patch_dir / f"patch_{ts}.json"
-            patch_file.write_text(json.dumps({"timestamp": ts, "status": "success"}), encoding="utf-8")
+            patch_file.write_text(
+                json.dumps({"timestamp": ts, "status": "success"}), encoding="utf-8"
+            )
 
         monkeypatch.setattr(repair_timeline, "PATCH_HISTORY_DIRS", [temp_patch_dir])
 
@@ -232,12 +228,10 @@ class TestCollectItems:
         yesterday_ts = (now - timedelta(days=1)).strftime("%Y%m%d_120000")
 
         (temp_patch_dir / f"patch_{today_ts}.json").write_text(
-            json.dumps({"timestamp": today_ts, "status": "success"}),
-            encoding="utf-8"
+            json.dumps({"timestamp": today_ts, "status": "success"}), encoding="utf-8"
         )
         (temp_patch_dir / f"patch_{yesterday_ts}.json").write_text(
-            json.dumps({"timestamp": yesterday_ts, "status": "success"}),
-            encoding="utf-8"
+            json.dumps({"timestamp": yesterday_ts, "status": "success"}), encoding="utf-8"
         )
 
         monkeypatch.setattr(repair_timeline, "PATCH_HISTORY_DIRS", [temp_patch_dir])
@@ -246,7 +240,9 @@ class TestCollectItems:
 
         # Should only include today's items
         assert all(
-            datetime.strptime(item["timestamp"], "%Y%m%d_%H%M%S").replace(tzinfo=repair_timeline.JST).date()
+            datetime.strptime(item["timestamp"], "%Y%m%d_%H%M%S")
+            .replace(tzinfo=repair_timeline.JST)
+            .date()
             == now.date()
             for item in items
         )
@@ -258,12 +254,10 @@ class TestCollectItems:
         old_ts = (now - timedelta(days=10)).strftime("%Y%m%d_120000")
 
         (temp_patch_dir / f"patch_{recent_ts}.json").write_text(
-            json.dumps({"timestamp": recent_ts, "status": "success"}),
-            encoding="utf-8"
+            json.dumps({"timestamp": recent_ts, "status": "success"}), encoding="utf-8"
         )
         (temp_patch_dir / f"patch_{old_ts}.json").write_text(
-            json.dumps({"timestamp": old_ts, "status": "success"}),
-            encoding="utf-8"
+            json.dumps({"timestamp": old_ts, "status": "success"}), encoding="utf-8"
         )
 
         monkeypatch.setattr(repair_timeline, "PATCH_HISTORY_DIRS", [temp_patch_dir])
@@ -279,7 +273,9 @@ class TestCollectItems:
         timestamps = ["20250615_100000", "20250615_120000", "20250615_110000"]
         for ts in timestamps:
             patch_file = temp_patch_dir / f"patch_{ts}.json"
-            patch_file.write_text(json.dumps({"timestamp": ts, "status": "success"}), encoding="utf-8")
+            patch_file.write_text(
+                json.dumps({"timestamp": ts, "status": "success"}), encoding="utf-8"
+            )
 
         monkeypatch.setattr(repair_timeline, "PATCH_HISTORY_DIRS", [temp_patch_dir])
 
@@ -297,12 +293,10 @@ class TestCollectItems:
         dir2.mkdir()
 
         (dir1 / "patch_20250615_120000.json").write_text(
-            json.dumps({"timestamp": "20250615_120000", "status": "success"}),
-            encoding="utf-8"
+            json.dumps({"timestamp": "20250615_120000", "status": "success"}), encoding="utf-8"
         )
         (dir2 / "patch_20250615_130000.json").write_text(
-            json.dumps({"timestamp": "20250615_130000", "status": "success"}),
-            encoding="utf-8"
+            json.dumps({"timestamp": "20250615_130000", "status": "success"}), encoding="utf-8"
         )
 
         monkeypatch.setattr(repair_timeline, "PATCH_HISTORY_DIRS", [dir1, dir2])
@@ -323,7 +317,9 @@ class TestCollectItems:
     def test_collect_items_adds_file_path(self, temp_patch_dir, monkeypatch):
         """Test that _file path is added to items."""
         patch_file = temp_patch_dir / "patch_20250615_120000.json"
-        patch_file.write_text(json.dumps({"timestamp": "20250615_120000", "status": "success"}), encoding="utf-8")
+        patch_file.write_text(
+            json.dumps({"timestamp": "20250615_120000", "status": "success"}), encoding="utf-8"
+        )
 
         monkeypatch.setattr(repair_timeline, "PATCH_HISTORY_DIRS", [temp_patch_dir])
 
@@ -361,9 +357,14 @@ class TestCategorizeReason:
 
     def test_categorize_algorithm(self):
         """Test categorization of algorithm improvements."""
-        assert repair_timeline._categorize_reason("Improved O(n) complexity") == "アルゴリズム/計算量"
+        assert (
+            repair_timeline._categorize_reason("Improved O(n) complexity") == "アルゴリズム/計算量"
+        )
         assert repair_timeline._categorize_reason("Two pointers approach") == "アルゴリズム/計算量"
-        assert repair_timeline._categorize_reason("Binary search optimization") == "アルゴリズム/計算量"
+        assert (
+            repair_timeline._categorize_reason("Binary search optimization")
+            == "アルゴリズム/計算量"
+        )
         assert repair_timeline._categorize_reason("while i * i <= n loop") == "アルゴリズム/計算量"
 
     def test_categorize_io_path(self):
@@ -405,15 +406,18 @@ class TestCategorizeReason:
         result = repair_timeline._categorize_reason(None)
         assert result == "不明"
 
-    @pytest.mark.parametrize("text,expected_category", [
-        ("Edge case n=0", "境界値/特例"),
-        ("Binary search O(log n)", "アルゴリズム/計算量"),
-        ("Path separator fix", "I/O・パス・環境"),
-        ("pytest fixture", "テスト修正/品質"),
-        ("Spec update", "設計/仕様"),
-        ("Unknown issue", "不明"),
-        ("", "不明"),
-    ])
+    @pytest.mark.parametrize(
+        "text,expected_category",
+        [
+            ("Edge case n=0", "境界値/特例"),
+            ("Binary search O(log n)", "アルゴリズム/計算量"),
+            ("Path separator fix", "I/O・パス・環境"),
+            ("pytest fixture", "テスト修正/品質"),
+            ("Spec update", "設計/仕様"),
+            ("Unknown issue", "不明"),
+            ("", "不明"),
+        ],
+    )
     def test_categorize_parametrized(self, text, expected_category):
         """Parametrized tests for categorization."""
         assert repair_timeline._categorize_reason(text) == expected_category
@@ -630,13 +634,16 @@ class TestMakePolicyBadge:
 
         assert badge == ""
 
-    @pytest.mark.parametrize("data,expected", [
-        ({"policy_profile": "A", "policy_version": "v1", "policy_icon": "🔒"}, "[🔒 A v1]"),
-        ({"policy_profile": "B", "policy_icon": "📌"}, "[📌 B]"),
-        ({"policy_profile": "C", "policy_version": "v2"}, "[C v2]"),
-        ({"policy_profile": "D"}, "[D]"),
-        ({}, ""),
-    ])
+    @pytest.mark.parametrize(
+        "data,expected",
+        [
+            ({"policy_profile": "A", "policy_version": "v1", "policy_icon": "🔒"}, "[🔒 A v1]"),
+            ({"policy_profile": "B", "policy_icon": "📌"}, "[📌 B]"),
+            ({"policy_profile": "C", "policy_version": "v2"}, "[C v2]"),
+            ({"policy_profile": "D"}, "[D]"),
+            ({}, ""),
+        ],
+    )
     def test_make_policy_badge_parametrized(self, data, expected):
         """Parametrized tests for badge generation."""
         assert repair_timeline._make_policy_badge(data) == expected
@@ -653,11 +660,7 @@ class TestBuildTimelineRows:
     def test_build_timeline_rows_basic(self, sample_items):
         """Test basic timeline row building."""
         rows = repair_timeline.build_timeline_rows(
-            sample_items,
-            pair_mode=False,
-            show_attempt=True,
-            show_success=True,
-            show_initial=True
+            sample_items, pair_mode=False, show_attempt=True, show_success=True, show_initial=True
         )
 
         assert len(rows) == 3
@@ -666,11 +669,7 @@ class TestBuildTimelineRows:
     def test_build_timeline_rows_filter_attempts(self, sample_items):
         """Test filtering out attempts."""
         rows = repair_timeline.build_timeline_rows(
-            sample_items,
-            pair_mode=False,
-            show_attempt=False,
-            show_success=True,
-            show_initial=True
+            sample_items, pair_mode=False, show_attempt=False, show_success=True, show_initial=True
         )
 
         # Should exclude attempt_fail items
@@ -679,11 +678,7 @@ class TestBuildTimelineRows:
     def test_build_timeline_rows_filter_success(self, sample_items):
         """Test filtering out success."""
         rows = repair_timeline.build_timeline_rows(
-            sample_items,
-            pair_mode=False,
-            show_attempt=True,
-            show_success=False,
-            show_initial=True
+            sample_items, pair_mode=False, show_attempt=True, show_success=False, show_initial=True
         )
 
         # Should exclude success items
@@ -692,11 +687,7 @@ class TestBuildTimelineRows:
     def test_build_timeline_rows_filter_initial(self, sample_items):
         """Test filtering out initial pass."""
         rows = repair_timeline.build_timeline_rows(
-            sample_items,
-            pair_mode=False,
-            show_attempt=True,
-            show_success=True,
-            show_initial=False
+            sample_items, pair_mode=False, show_attempt=True, show_success=True, show_initial=False
         )
 
         # Should exclude initial_pass items
@@ -705,11 +696,7 @@ class TestBuildTimelineRows:
     def test_build_timeline_rows_includes_badge(self, sample_items):
         """Test that policy badges are included in labels."""
         rows = repair_timeline.build_timeline_rows(
-            sample_items,
-            pair_mode=False,
-            show_attempt=True,
-            show_success=True,
-            show_initial=True
+            sample_items, pair_mode=False, show_attempt=True, show_success=True, show_initial=True
         )
 
         # Check that rows with policy info include badges
@@ -719,11 +706,7 @@ class TestBuildTimelineRows:
     def test_build_timeline_rows_status_icons(self, sample_items):
         """Test that status icons are included."""
         rows = repair_timeline.build_timeline_rows(
-            sample_items,
-            pair_mode=False,
-            show_attempt=True,
-            show_success=True,
-            show_initial=True
+            sample_items, pair_mode=False, show_attempt=True, show_success=True, show_initial=True
         )
 
         # Success should have ✅
@@ -746,11 +729,7 @@ class TestBuildTimelineRows:
         ]
 
         rows = repair_timeline.build_timeline_rows(
-            items,
-            pair_mode=True,
-            show_attempt=True,
-            show_success=True,
-            show_initial=True
+            items, pair_mode=True, show_attempt=True, show_success=True, show_initial=True
         )
 
         # In pair mode, items should be sorted to group attempts with successes
@@ -759,11 +738,7 @@ class TestBuildTimelineRows:
     def test_build_timeline_rows_empty_items(self):
         """Test with empty items list."""
         rows = repair_timeline.build_timeline_rows(
-            [],
-            pair_mode=False,
-            show_attempt=True,
-            show_success=True,
-            show_initial=True
+            [], pair_mode=False, show_attempt=True, show_success=True, show_initial=True
         )
 
         assert len(rows) == 0
@@ -775,7 +750,7 @@ class TestBuildTimelineRows:
             pair_mode=False,
             show_attempt=False,
             show_success=False,
-            show_initial=False
+            show_initial=False,
         )
 
         assert len(rows) == 0
@@ -825,12 +800,15 @@ class TestRenderDiffMarkdown:
         assert "old line 1" in result
         assert "new line 3" in result
 
-    @pytest.mark.parametrize("diff_str,expected_contains", [
-        ("-a\n+b", ["```diff", "a", "b"]),
-        ("", ["差分はありません"]),
-        (None, ["差分はありません"]),
-        ("unified diff", ["```diff", "unified diff"]),
-    ])
+    @pytest.mark.parametrize(
+        "diff_str,expected_contains",
+        [
+            ("-a\n+b", ["```diff", "a", "b"]),
+            ("", ["差分はありません"]),
+            (None, ["差分はありません"]),
+            ("unified diff", ["```diff", "unified diff"]),
+        ],
+    )
     def test_render_diff_md_parametrized(self, diff_str, expected_contains):
         """Parametrized tests for diff rendering."""
         result = repair_timeline._render_diff_md(diff_str)
@@ -903,11 +881,13 @@ class TestPickDetail:
 
     def test_pick_detail_truncates_prompt(self):
         """Test that prompt excerpt is truncated."""
-        items = [{
-            "timestamp": "20250615_120000",
-            "status": "success",
-            "llm_prompt": "a" * 200,
-        }]
+        items = [
+            {
+                "timestamp": "20250615_120000",
+                "status": "success",
+                "llm_prompt": "a" * 200,
+            }
+        ]
         ts_key = "20250615_120000"
 
         code, reason, test_log, meta, fkb, diff_md = repair_timeline.pick_detail(ts_key, items)
@@ -917,12 +897,14 @@ class TestPickDetail:
 
     def test_pick_detail_prefers_full_code_after(self):
         """Test that full_code_after is preferred over code."""
-        items = [{
-            "timestamp": "20250615_120000",
-            "status": "success",
-            "code": "short code",
-            "full_code_after": "full version of code",
-        }]
+        items = [
+            {
+                "timestamp": "20250615_120000",
+                "status": "success",
+                "code": "short code",
+                "full_code_after": "full version of code",
+            }
+        ]
         ts_key = "20250615_120000"
 
         code, reason, test_log, meta, fkb, diff_md = repair_timeline.pick_detail(ts_key, items)
@@ -1004,7 +986,12 @@ class TestIntegration:
         """Test end-to-end with multiple items spanning different statuses."""
         items_data = [
             {"timestamp": "20250615_120000", "status": "attempt_fail", "reason": "edge case"},
-            {"timestamp": "20250615_130000", "status": "success", "reason": "fixed edge", "policy_profile": "Strict"},
+            {
+                "timestamp": "20250615_130000",
+                "status": "success",
+                "reason": "fixed edge",
+                "policy_profile": "Strict",
+            },
             {"timestamp": "20250615_140000", "status": "initial_pass", "reason": "spec complete"},
         ]
 
@@ -1032,17 +1019,17 @@ class TestIntegration:
             {
                 "timestamp": now.strftime("%Y%m%d_120000"),
                 "status": "success",
-                "reason": "Edge case n=2 fix"
+                "reason": "Edge case n=2 fix",
             },
             {
                 "timestamp": now.strftime("%Y%m%d_130000"),
                 "status": "success",
-                "reason": "Binary search O(log n)"
+                "reason": "Binary search O(log n)",
             },
             {
                 "timestamp": (now - timedelta(days=10)).strftime("%Y%m%d_120000"),
                 "status": "success",
-                "reason": "Path handling"
+                "reason": "Path handling",
             },
         ]
 
@@ -1106,10 +1093,15 @@ class TestEdgeCases:
     def test_collect_items_with_invalid_timestamps(self, temp_patch_dir, monkeypatch):
         """Test collection with invalid timestamp formats."""
         patch_file = temp_patch_dir / "patch_invalid.json"
-        patch_file.write_text(json.dumps({
-            "timestamp": "invalid_format",
-            "status": "success",
-        }), encoding="utf-8")
+        patch_file.write_text(
+            json.dumps(
+                {
+                    "timestamp": "invalid_format",
+                    "status": "success",
+                }
+            ),
+            encoding="utf-8",
+        )
 
         monkeypatch.setattr(repair_timeline, "PATCH_HISTORY_DIRS", [temp_patch_dir])
 
@@ -1121,7 +1113,9 @@ class TestEdgeCases:
 
     def test_pick_detail_with_empty_items_list(self):
         """Test picking detail from empty items list."""
-        code, reason, test_log, meta, fkb, diff_md = repair_timeline.pick_detail("20250615_120000", [])
+        code, reason, test_log, meta, fkb, diff_md = repair_timeline.pick_detail(
+            "20250615_120000", []
+        )
 
         assert code == ""
         assert reason == ""

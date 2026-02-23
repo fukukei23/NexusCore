@@ -1,8 +1,7 @@
 """notifier.py のテスト"""
+
 import os
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from nexuscore.core.notifier import SlackNotifier, get_notifier
 
@@ -12,7 +11,7 @@ def test_slack_notifier_initialization_with_webhook():
     notifier = SlackNotifier(webhook_url="https://hooks.slack.com/services/test/webhook")
 
     assert notifier.webhook_url == "https://hooks.slack.com/services/test/webhook"
-    assert notifier.enabled == (hasattr(notifier, '_has_requests') or True)  # requestsの有無に依存
+    assert notifier.enabled == (hasattr(notifier, "_has_requests") or True)  # requestsの有無に依存
 
 
 def test_slack_notifier_initialization_from_env(monkeypatch):
@@ -33,7 +32,7 @@ def test_slack_notifier_initialization_no_webhook():
         assert notifier.enabled is False
 
 
-@patch('nexuscore.core.notifier.requests')
+@patch("nexuscore.core.notifier.requests")
 def test_slack_notifier_send_success(mock_requests):
     """通知送信が成功する場合のテスト"""
     mock_response = MagicMock()
@@ -62,7 +61,7 @@ def test_slack_notifier_send_success(mock_requests):
     assert status_field["value"] == "成功"
 
 
-@patch('nexuscore.core.notifier.requests')
+@patch("nexuscore.core.notifier.requests")
 def test_slack_notifier_send_failure(mock_requests):
     """通知送信が失敗する場合のテスト"""
     mock_requests.post.side_effect = Exception("Network error")
@@ -90,7 +89,7 @@ def test_slack_notifier_send_disabled():
     assert result is False
 
 
-@patch('nexuscore.core.notifier.requests')
+@patch("nexuscore.core.notifier.requests")
 def test_slack_notifier_send_with_details(mock_requests):
     """詳細情報を含む通知のテスト"""
     mock_response = MagicMock()
@@ -116,7 +115,7 @@ def test_slack_notifier_send_with_details(mock_requests):
     assert detail_field is not None
 
 
-@patch('nexuscore.core.notifier.requests')
+@patch("nexuscore.core.notifier.requests")
 def test_slack_notifier_notify_self_healing_complete_fixed(mock_requests):
     """Self-Healing完了通知（fixed）のテスト"""
     mock_response = MagicMock()
@@ -147,7 +146,7 @@ def test_slack_notifier_notify_self_healing_complete_fixed(mock_requests):
         assert "リポジトリ" in detail_field["value"] or "修復成功" in detail_field["value"]
 
 
-@patch('nexuscore.core.notifier.requests')
+@patch("nexuscore.core.notifier.requests")
 def test_slack_notifier_notify_self_healing_complete_error(mock_requests):
     """Self-Healing完了通知（error）のテスト"""
     mock_response = MagicMock()
@@ -170,7 +169,7 @@ def test_slack_notifier_notify_self_healing_complete_error(mock_requests):
     assert "❌" in payload["text"]
 
 
-@patch('nexuscore.core.notifier.requests')
+@patch("nexuscore.core.notifier.requests")
 def test_slack_notifier_notify_orchestrator_complete(mock_requests):
     """Orchestrator完了通知のテスト"""
     mock_response = MagicMock()
@@ -212,7 +211,7 @@ def test_get_notifier_without_webhook(monkeypatch):
     assert notifier is None
 
 
-@patch('nexuscore.core.notifier.requests')
+@patch("nexuscore.core.notifier.requests")
 def test_slack_notifier_color_mapping(mock_requests):
     """ステータスに応じたカラーマッピングのテスト"""
     mock_response = MagicMock()
@@ -237,7 +236,7 @@ def test_slack_notifier_color_mapping(mock_requests):
     assert call_args[1]["json"]["attachments"][0]["color"] == "#ffaa00"
 
 
-@patch('nexuscore.core.notifier.requests')
+@patch("nexuscore.core.notifier.requests")
 def test_slack_notifier_custom_color(mock_requests):
     """カスタムカラーの指定テスト"""
     mock_response = MagicMock()
@@ -256,5 +255,3 @@ def test_slack_notifier_custom_color(mock_requests):
     assert result is True
     call_args = mock_requests.post.call_args
     assert call_args[1]["json"]["attachments"][0]["color"] == "#123456"
-
-

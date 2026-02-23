@@ -4,8 +4,9 @@ Project API リクエスト・レスポンススキーマ
 FastAPI の Project エンドポイント用の Pydantic モデル定義。
 既存の Flask 実装 (`src/nexuscore/webapp/api_external.py`) の仕様に準拠。
 """
+
 from datetime import datetime
-from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -19,10 +20,11 @@ class ProjectBase(BaseModel):
         local_path: ローカルパス（必須）
         context_bundle_path: コンテキストバンドルパス（任意）
     """
+
     name: str = Field(..., description="プロジェクト名", min_length=1)
-    repo_url: Optional[str] = Field(None, description="リポジトリURL")
+    repo_url: str | None = Field(None, description="リポジトリURL")
     local_path: str = Field(..., description="ローカルパス", min_length=1)
-    context_bundle_path: Optional[str] = Field(None, description="コンテキストバンドルパス")
+    context_bundle_path: str | None = Field(None, description="コンテキストバンドルパス")
 
 
 class ProjectCreateRequest(ProjectBase):
@@ -35,6 +37,7 @@ class ProjectCreateRequest(ProjectBase):
         local_path: ローカルパス（必須）
         context_bundle_path: コンテキストバンドルパス（任意）
     """
+
     pass
 
 
@@ -50,9 +53,10 @@ class ProjectSummary(BaseModel):
         created_at: 作成日時
         updated_at: 更新日時
     """
+
     id: int = Field(..., description="プロジェクトID")
     name: str = Field(..., description="プロジェクト名")
-    repo_url: Optional[str] = Field(None, description="リポジトリURL")
+    repo_url: str | None = Field(None, description="リポジトリURL")
     local_path: str = Field(..., description="ローカルパス")
     created_at: datetime = Field(..., description="作成日時")
     updated_at: datetime = Field(..., description="更新日時")
@@ -71,7 +75,8 @@ class ProjectResponse(ProjectSummary):
         created_at: 作成日時
         updated_at: 更新日時
     """
-    context_bundle_path: Optional[str] = Field(None, description="コンテキストバンドルパス")
+
+    context_bundle_path: str | None = Field(None, description="コンテキストバンドルパス")
 
 
 class ProjectListResponse(BaseModel):
@@ -81,6 +86,7 @@ class ProjectListResponse(BaseModel):
     Attributes:
         projects: プロジェクト一覧
     """
+
     projects: list[ProjectSummary] = Field(..., description="プロジェクト一覧")
 
     class Config:
@@ -93,9 +99,8 @@ class ProjectListResponse(BaseModel):
                         "repo_url": "https://github.com/owner/repo",
                         "local_path": "/path/to/project",
                         "created_at": "2025-01-01T00:00:00",
-                        "updated_at": "2025-01-01T00:00:00"
+                        "updated_at": "2025-01-01T00:00:00",
                     }
                 ]
             }
         }
-

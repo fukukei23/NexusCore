@@ -14,7 +14,6 @@ from nexuscore.npe import budget, engine
 from nexuscore.npe.budget import BudgetDecision
 from nexuscore.npe.engine import _estimate_tokens, guarded_llm_call
 
-
 # =============================================================================
 # Test _estimate_tokens
 # =============================================================================
@@ -430,7 +429,12 @@ class TestEdgeCases:
     def test_empty_prompts(self):
         """空のプロンプト"""
         decision = BudgetDecision(
-            allow=True, reason="ok", est_cost_jpy=0.0, est_prompt_tokens=0, est_completion_tokens=0, caps={}
+            allow=True,
+            reason="ok",
+            est_cost_jpy=0.0,
+            est_prompt_tokens=0,
+            est_completion_tokens=0,
+            caps={},
         )
 
         with patch.object(budget, "preflight_check", return_value=decision):
@@ -454,7 +458,12 @@ class TestEdgeCases:
         long_prompt = "x" * 100000
 
         decision = BudgetDecision(
-            allow=True, reason="ok", est_cost_jpy=50.0, est_prompt_tokens=26316, est_completion_tokens=512, caps={}
+            allow=True,
+            reason="ok",
+            est_cost_jpy=50.0,
+            est_prompt_tokens=26316,
+            est_completion_tokens=512,
+            caps={},
         )
 
         with patch.object(budget, "preflight_check", return_value=decision):
@@ -476,7 +485,12 @@ class TestEdgeCases:
     def test_unicode_prompts(self):
         """Unicode 文字を含むプロンプト"""
         decision = BudgetDecision(
-            allow=True, reason="ok", est_cost_jpy=1.0, est_prompt_tokens=10, est_completion_tokens=10, caps={}
+            allow=True,
+            reason="ok",
+            est_cost_jpy=1.0,
+            est_prompt_tokens=10,
+            est_completion_tokens=10,
+            caps={},
         )
 
         with patch.object(budget, "preflight_check", return_value=decision):
@@ -499,7 +513,12 @@ class TestEdgeCases:
     def test_llm_fn_raises_exception(self):
         """LLM関数が例外を投げる"""
         decision = BudgetDecision(
-            allow=True, reason="ok", est_cost_jpy=1.0, est_prompt_tokens=10, est_completion_tokens=10, caps={}
+            allow=True,
+            reason="ok",
+            est_cost_jpy=1.0,
+            est_prompt_tokens=10,
+            est_completion_tokens=10,
+            caps={},
         )
 
         with patch.object(budget, "preflight_check", return_value=decision):
@@ -521,7 +540,12 @@ class TestEdgeCases:
     def test_llm_returns_ok_false(self):
         """LLMがok=Falseを返す"""
         decision = BudgetDecision(
-            allow=True, reason="ok", est_cost_jpy=1.0, est_prompt_tokens=10, est_completion_tokens=10, caps={}
+            allow=True,
+            reason="ok",
+            est_cost_jpy=1.0,
+            est_prompt_tokens=10,
+            est_completion_tokens=10,
+            caps={},
         )
 
         with patch.object(budget, "preflight_check", return_value=decision):
@@ -555,7 +579,12 @@ class TestEdgeCases:
     def test_missing_usage_fields_in_llm_response(self):
         """LLMレスポンスにusageフィールドがない"""
         decision = BudgetDecision(
-            allow=True, reason="ok", est_cost_jpy=1.0, est_prompt_tokens=10, est_completion_tokens=10, caps={}
+            allow=True,
+            reason="ok",
+            est_cost_jpy=1.0,
+            est_prompt_tokens=10,
+            est_completion_tokens=10,
+            caps={},
         )
 
         with patch.object(budget, "preflight_check", return_value=decision):
@@ -584,7 +613,12 @@ class TestEdgeCases:
     def test_partial_usage_fields_in_llm_response(self):
         """LLMレスポンスに一部のusageフィールドのみ"""
         decision = BudgetDecision(
-            allow=True, reason="ok", est_cost_jpy=1.0, est_prompt_tokens=10, est_completion_tokens=10, caps={}
+            allow=True,
+            reason="ok",
+            est_cost_jpy=1.0,
+            est_prompt_tokens=10,
+            est_completion_tokens=10,
+            caps={},
         )
 
         with patch.object(budget, "preflight_check", return_value=decision):
@@ -616,7 +650,12 @@ class TestEdgeCases:
     def test_result_without_usage_field_gets_initialized(self):
         """usageフィールドがない結果に初期化"""
         decision = BudgetDecision(
-            allow=True, reason="ok", est_cost_jpy=1.0, est_prompt_tokens=10, est_completion_tokens=10, caps={}
+            allow=True,
+            reason="ok",
+            est_cost_jpy=1.0,
+            est_prompt_tokens=10,
+            est_completion_tokens=10,
+            caps={},
         )
 
         with patch.object(budget, "preflight_check", return_value=decision):
@@ -642,7 +681,12 @@ class TestEdgeCases:
     def test_zero_length_content_in_response(self):
         """レスポンスに空のコンテンツ"""
         decision = BudgetDecision(
-            allow=True, reason="ok", est_cost_jpy=1.0, est_prompt_tokens=10, est_completion_tokens=10, caps={}
+            allow=True,
+            reason="ok",
+            est_cost_jpy=1.0,
+            est_prompt_tokens=10,
+            est_completion_tokens=10,
+            caps={},
         )
 
         with patch.object(budget, "preflight_check", return_value=decision):
@@ -669,7 +713,12 @@ class TestEdgeCases:
 
         for model in models:
             decision = BudgetDecision(
-                allow=True, reason="ok", est_cost_jpy=1.0, est_prompt_tokens=10, est_completion_tokens=10, caps={}
+                allow=True,
+                reason="ok",
+                est_cost_jpy=1.0,
+                est_prompt_tokens=10,
+                est_completion_tokens=10,
+                caps={},
             )
 
             with patch.object(budget, "preflight_check", return_value=decision):
