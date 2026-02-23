@@ -3,15 +3,17 @@
 
 from difflib import unified_diff
 
+
 def generate_diff_report(original: str, modified: str) -> str:
     diff = unified_diff(
         original.splitlines(),
         modified.splitlines(),
         fromfile="Original",
         tofile="Modified",
-        lineterm=""
+        lineterm="",
     )
     return "\n".join(diff)
+
 
 def score_code_improvement(original: str, modified: str) -> float:
     orig_lines = len(original.strip().splitlines())

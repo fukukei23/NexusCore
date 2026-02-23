@@ -5,6 +5,7 @@ webapp/models.py の高品質なテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask legacy models tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -46,6 +47,7 @@ def app():
 def db_session(app):
     """Database session for tests"""
     from nexuscore.webapp import db
+
     with app.app_context():
         yield db.session
 
@@ -55,10 +57,7 @@ class TestUserModel:
 
     def test_user_creation_with_required_fields(self, db_session):
         """必須フィールドのみでユーザー作成"""
-        user = User(
-            github_id="123456",
-            github_login="testuser"
-        )
+        user = User(github_id="123456", github_login="testuser")
         db_session.add(user)
         db_session.commit()
 
@@ -76,7 +75,7 @@ class TestUserModel:
             github_login="testuser",
             name="Test User",
             avatar_url="https://example.com/avatar.png",
-            email="test@example.com"
+            email="test@example.com",
         )
         db_session.add(user)
         db_session.commit()
@@ -151,9 +150,7 @@ class TestUserModel:
 
         # ApiKey を作成
         api_key = ApiKey(
-            user_id=user.id,
-            token_hash=ApiKey.hash_token("test_token"),
-            name="test_key"
+            user_id=user.id, token_hash=ApiKey.hash_token("test_token"), name="test_key"
         )
         db_session.add(api_key)
         db_session.commit()
@@ -178,11 +175,7 @@ class TestProjectModel:
         db_session.add(user)
         db_session.commit()
 
-        project = Project(
-            owner_id=user.id,
-            name="test_project",
-            local_path="/path/to/project"
-        )
+        project = Project(owner_id=user.id, name="test_project", local_path="/path/to/project")
         db_session.add(project)
         db_session.commit()
 
@@ -203,7 +196,7 @@ class TestProjectModel:
             name="test_project",
             repo_url="https://github.com/user/repo",
             local_path="/path/to/project",
-            context_bundle_path="/context_bundles/latest.json"
+            context_bundle_path="/context_bundles/latest.json",
         )
         db_session.add(project)
         db_session.commit()
@@ -314,7 +307,7 @@ class TestRunModel:
             finished_at=now,
             autonomy_level=2,
             llm_model_summary="gpt-4",
-            requirement="Fix bug in module X"
+            requirement="Fix bug in module X",
         )
         db_session.add(run)
         db_session.commit()
@@ -413,10 +406,7 @@ class TestRunModel:
 
         # PatchRecord を作成
         patch = PatchRecord(
-            run_id=run.id,
-            file_path="/src/main.py",
-            diff_text="--- a\n+++ b\n",
-            applied=True
+            run_id=run.id, file_path="/src/main.py", diff_text="--- a\n+++ b\n", applied=True
         )
         db_session.add(patch)
         db_session.commit()
@@ -439,10 +429,7 @@ class TestRunModel:
 
         # ExecutionLog を作成
         log = ExecutionLog(
-            run_id=run.id,
-            source="ORCHESTRATOR",
-            level="INFO",
-            message="Test message"
+            run_id=run.id, source="ORCHESTRATOR", level="INFO", message="Test message"
         )
         db_session.add(log)
         db_session.commit()
@@ -471,7 +458,7 @@ class TestPatchRecordModel:
             run_id=run.id,
             file_path="/src/module.py",
             diff_text="--- a/src/module.py\n+++ b/src/module.py\n@@ -1 +1 @@\n-old\n+new",
-            applied=True
+            applied=True,
         )
         db_session.add(patch)
         db_session.commit()
@@ -490,11 +477,7 @@ class TestPatchRecordModel:
         db_session.add_all([project, run])
         db_session.commit()
 
-        patch = PatchRecord(
-            run_id=run.id,
-            file_path="/src/module.py",
-            diff_text="--- a\n+++ b\n"
-        )
+        patch = PatchRecord(run_id=run.id, file_path="/src/module.py", diff_text="--- a\n+++ b\n")
         db_session.add(patch)
         db_session.commit()
 
@@ -507,11 +490,7 @@ class TestPatchRecordModel:
         db_session.add_all([project, run])
         db_session.commit()
 
-        patch = PatchRecord(
-            run_id=run.id,
-            file_path="/src/module.py",
-            diff_text="--- a\n+++ b\n"
-        )
+        patch = PatchRecord(run_id=run.id, file_path="/src/module.py", diff_text="--- a\n+++ b\n")
         db_session.add(patch)
         db_session.commit()
 
@@ -527,10 +506,7 @@ class TestPatchRecordModel:
         db_session.commit()
 
         patch = PatchRecord(
-            run_id=run.id,
-            file_path="/src/module.py",
-            diff_text="--- a\n+++ b\n",
-            applied=True
+            run_id=run.id, file_path="/src/module.py", diff_text="--- a\n+++ b\n", applied=True
         )
         db_session.add(patch)
         db_session.commit()
@@ -552,10 +528,7 @@ class TestExecutionLogModel:
         db_session.commit()
 
         log = ExecutionLog(
-            run_id=run.id,
-            source="ORCHESTRATOR",
-            level="INFO",
-            message="Orchestration started"
+            run_id=run.id, source="ORCHESTRATOR", level="INFO", message="Orchestration started"
         )
         db_session.add(log)
         db_session.commit()
@@ -580,7 +553,7 @@ class TestExecutionLogModel:
             source="AGENT",
             level="INFO",
             message="Agent completed task",
-            payload_json=payload
+            payload_json=payload,
         )
         db_session.add(log)
         db_session.commit()
@@ -591,12 +564,7 @@ class TestExecutionLogModel:
 
     def test_execution_log_without_run_id(self, db_session):
         """run_id が NULL でも作成できる（紐付かないログ）"""
-        log = ExecutionLog(
-            run_id=None,
-            source="NPE",
-            level="WARNING",
-            message="Generic warning"
-        )
+        log = ExecutionLog(run_id=None, source="NPE", level="WARNING", message="Generic warning")
         db_session.add(log)
         db_session.commit()
 
@@ -611,10 +579,7 @@ class TestExecutionLogModel:
         db_session.commit()
 
         log = ExecutionLog(
-            run_id=run.id,
-            source="ORCHESTRATOR",
-            level="INFO",
-            message="Test message"
+            run_id=run.id, source="ORCHESTRATOR", level="INFO", message="Test message"
         )
         db_session.add(log)
         db_session.commit()
@@ -625,11 +590,7 @@ class TestExecutionLogModel:
 
     def test_execution_log_repr(self, db_session):
         """__repr__ メソッドのテスト"""
-        log = ExecutionLog(
-            source="NPE",
-            level="ERROR",
-            message="Test error"
-        )
+        log = ExecutionLog(source="NPE", level="ERROR", message="Test error")
         db_session.add(log)
         db_session.commit()
 
@@ -650,9 +611,7 @@ class TestApiKeyModel:
 
         token = ApiKey.generate_token()
         api_key = ApiKey(
-            user_id=user.id,
-            token_hash=ApiKey.hash_token(token),
-            name="Production Key"
+            user_id=user.id, token_hash=ApiKey.hash_token(token), name="Production Key"
         )
         db_session.add(api_key)
         db_session.commit()
@@ -703,11 +662,7 @@ class TestApiKeyModel:
         db_session.commit()
 
         token = "nexus_test_token_123"
-        api_key = ApiKey(
-            user_id=user.id,
-            token_hash=ApiKey.hash_token(token),
-            name="Test Key"
-        )
+        api_key = ApiKey(user_id=user.id, token_hash=ApiKey.hash_token(token), name="Test Key")
         db_session.add(api_key)
         db_session.commit()
 
@@ -721,11 +676,7 @@ class TestApiKeyModel:
         db_session.commit()
 
         token = "nexus_test_token_123"
-        api_key = ApiKey(
-            user_id=user.id,
-            token_hash=ApiKey.hash_token(token),
-            name="Test Key"
-        )
+        api_key = ApiKey(user_id=user.id, token_hash=ApiKey.hash_token(token), name="Test Key")
         db_session.add(api_key)
         db_session.commit()
 
@@ -759,9 +710,7 @@ class TestApiKeyModel:
         db_session.commit()
 
         api_key = ApiKey(
-            user_id=user.id,
-            token_hash=ApiKey.hash_token("test_token"),
-            name="Test Key"
+            user_id=user.id, token_hash=ApiKey.hash_token("test_token"), name="Test Key"
         )
         db_session.add(api_key)
         db_session.commit()
@@ -777,9 +726,7 @@ class TestApiKeyModel:
         db_session.commit()
 
         api_key = ApiKey(
-            user_id=user.id,
-            token_hash=ApiKey.hash_token("test_token"),
-            name="Production Key"
+            user_id=user.id, token_hash=ApiKey.hash_token("test_token"), name="Production Key"
         )
         db_session.add(api_key)
         db_session.commit()
@@ -801,36 +748,23 @@ class TestModelIntegration:
         db_session.commit()
 
         # Project 作成
-        project = Project(
-            owner_id=user.id,
-            name="test_project",
-            local_path="/path/to/project"
-        )
+        project = Project(owner_id=user.id, name="test_project", local_path="/path/to/project")
         db_session.add(project)
         db_session.commit()
 
         # Run 作成
         run = Run(
-            project_id=project.id,
-            run_id="run-abc123",
-            triggered_by=user.id,
-            status="RUNNING"
+            project_id=project.id, run_id="run-abc123", triggered_by=user.id, status="RUNNING"
         )
         db_session.add(run)
         db_session.commit()
 
         # ExecutionLog 作成
         log1 = ExecutionLog(
-            run_id=run.id,
-            source="ORCHESTRATOR",
-            level="INFO",
-            message="Started orchestration"
+            run_id=run.id, source="ORCHESTRATOR", level="INFO", message="Started orchestration"
         )
         log2 = ExecutionLog(
-            run_id=run.id,
-            source="AGENT",
-            level="INFO",
-            message="Agent completed task"
+            run_id=run.id, source="AGENT", level="INFO", message="Agent completed task"
         )
         db_session.add_all([log1, log2])
         db_session.commit()
@@ -852,9 +786,7 @@ class TestModelIntegration:
 
         # ApiKey を作成
         api_key = ApiKey(
-            user_id=user.id,
-            token_hash=ApiKey.hash_token("test_token"),
-            name="Test Key"
+            user_id=user.id, token_hash=ApiKey.hash_token("test_token"), name="Test Key"
         )
         db_session.add(api_key)
         db_session.commit()
@@ -885,6 +817,7 @@ class TestModelIntegration:
 
         # Project.owner_id は NOT NULL なのでエラーになる
         from sqlalchemy.exc import IntegrityError
+
         with pytest.raises(IntegrityError):
             db_session.commit()
 

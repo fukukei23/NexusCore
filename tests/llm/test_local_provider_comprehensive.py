@@ -8,9 +8,10 @@ Tests cover:
 - Model name handling
 - Safety fallback behavior
 """
+
 import json
-from unittest.mock import Mock, MagicMock, patch
-import pytest
+from unittest.mock import patch
+
 from nexuscore.llm.providers.local_provider import LocalLLM
 
 
@@ -31,7 +32,7 @@ class TestLocalProviderInit:
         """Should always be in stub mode (no API calls)"""
         provider = LocalLLM("local-test")
         # Local provider doesn't have real_calls attribute, it's always stub
-        assert hasattr(provider, 'execute')
+        assert hasattr(provider, "execute")
 
 
 class TestLocalProviderExecute:
@@ -156,14 +157,14 @@ class TestLocalProviderSafety:
         provider = LocalLLM("local-test")
 
         # No session should be created
-        assert not hasattr(provider, 'session') or provider.session is None
+        assert not hasattr(provider, "session") or provider.session is None
 
         # No API key should be used
-        assert not hasattr(provider, 'api_key') or provider.api_key is None
+        assert not hasattr(provider, "api_key") or provider.api_key is None
 
     def test_works_without_environment_variables(self):
         """Should work without any environment variables"""
-        with patch.dict('os.environ', {}, clear=True):
+        with patch.dict("os.environ", {}, clear=True):
             provider = LocalLLM("local-test")
             result = provider.execute("prompt", "system")
 

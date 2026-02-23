@@ -1,5 +1,4 @@
 import asyncio
-import sys
 
 from nexuscore.gradio_app import streamlit_migrated_tab as smt
 

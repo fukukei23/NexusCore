@@ -3,20 +3,18 @@ Comprehensive tests for cli/bootstrap_apikey.py
 
 API Key ブートストラップ CLI の完全な包括的テスト
 """
+
 import io
 import sys
-import os
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
 
 import pytest
 
-from nexuscore.webapp import create_app, db
-from nexuscore.webapp.models import User, ApiKey
 from nexuscore.cli.bootstrap_apikey import (
     bootstrap_apikey_for_app,
     bootstrap_apikey_main,
 )
+from nexuscore.webapp import create_app, db
+from nexuscore.webapp.models import ApiKey, User
 
 
 # ============================================================================
@@ -438,9 +436,12 @@ class TestBootstrapApikeyMainBasic:
         code, out, err = _capture_stdout_stderr(
             bootstrap_apikey_main,
             [
-                "--user-login", "dev",
-                "--user-name", "Developer User",
-                "--key-name", "Dev Key",
+                "--user-login",
+                "dev",
+                "--user-name",
+                "Developer User",
+                "--key-name",
+                "Dev Key",
             ],
         )
 
@@ -511,6 +512,7 @@ class TestBootstrapApikeyMainErrors:
 
     def test_exception_in_app_creation_returns_one(self, monkeypatch):
         """アプリ作成中の例外で終了コード 1 を返すこと"""
+
         def _failing_create_app():
             raise RuntimeError("Failed to create app")
 
@@ -626,9 +628,12 @@ class TestBootstrapApikeyMainArgumentParsing:
         code, out, err = _capture_stdout_stderr(
             bootstrap_apikey_main,
             [
-                "--user-login", "fulluser",
-                "--user-name", "Full User Name",
-                "--key-name", "Full Key Name",
+                "--user-login",
+                "fulluser",
+                "--user-name",
+                "Full User Name",
+                "--key-name",
+                "Full Key Name",
             ],
         )
 
@@ -663,9 +668,12 @@ class TestIntegration:
         code, out, err = _capture_stdout_stderr(
             bootstrap_apikey_main,
             [
-                "--user-login", "newuser",
-                "--user-name", "New User",
-                "--key-name", "First Key",
+                "--user-login",
+                "newuser",
+                "--user-name",
+                "New User",
+                "--key-name",
+                "First Key",
             ],
         )
 
@@ -737,9 +745,12 @@ class TestIntegration:
             code, out, err = _capture_stdout_stderr(
                 bootstrap_apikey_main,
                 [
-                    "--user-login", login,
-                    "--user-name", name,
-                    "--key-name", key_name,
+                    "--user-login",
+                    login,
+                    "--user-name",
+                    name,
+                    "--key-name",
+                    key_name,
                 ],
             )
             assert code == 0
@@ -793,9 +804,12 @@ class TestEdgeCases:
         code, out, err = _capture_stdout_stderr(
             bootstrap_apikey_main,
             [
-                "--user-login", "",
-                "--user-name", "",
-                "--key-name", "",
+                "--user-login",
+                "",
+                "--user-name",
+                "",
+                "--key-name",
+                "",
             ],
         )
 
@@ -818,9 +832,12 @@ class TestEdgeCases:
         code, out, err = _capture_stdout_stderr(
             bootstrap_apikey_main,
             [
-                "--user-login", "   ",
-                "--user-name", "  \t  ",
-                "--key-name", "  \n  ",
+                "--user-login",
+                "   ",
+                "--user-name",
+                "  \t  ",
+                "--key-name",
+                "  \n  ",
             ],
         )
 
@@ -836,8 +853,10 @@ class TestEdgeCases:
         code, out, err = _capture_stdout_stderr(
             bootstrap_apikey_main,
             [
-                "--user-login", "user$with&special",
-                "--key-name", "key;with|pipes",
+                "--user-login",
+                "user$with&special",
+                "--key-name",
+                "key;with|pipes",
             ],
         )
 
@@ -861,9 +880,12 @@ class TestEdgeCases:
         code, out, err = _capture_stdout_stderr(
             bootstrap_apikey_main,
             [
-                "--user-login", long_login,
-                "--user-name", long_name,
-                "--key-name", long_key,
+                "--user-login",
+                long_login,
+                "--user-name",
+                long_name,
+                "--key-name",
+                long_key,
             ],
         )
 

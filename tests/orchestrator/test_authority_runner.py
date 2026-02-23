@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import Any
 
 import pytest
 
@@ -14,12 +14,12 @@ class FakeContext:
     user_requirement: str
     language: str = "ja"
     fast_lane: bool = False
-    run_db_id: Optional[int] = None
+    run_db_id: int | None = None
 
 
 class FakeOrchestrator:
     def __init__(self) -> None:
-        self.calls: List[str] = []
+        self.calls: list[str] = []
 
     def run_requirements_phase(self, context: Any) -> Any:
         self.calls.append("requirements")
@@ -111,5 +111,3 @@ def test_invalid_authority_level_raises_value_error() -> None:
             authority_level=999,
             context_factory=_ctx_factory,
         )
-
-

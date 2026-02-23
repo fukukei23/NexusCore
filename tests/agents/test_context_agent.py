@@ -1,6 +1,4 @@
 import json
-import os
-from pathlib import Path
 
 import pytest
 
@@ -9,8 +7,8 @@ from nexuscore.agents.context_agent import ContextAgent
 
 @pytest.fixture(autouse=True)
 def disable_heavy_dependencies(monkeypatch):
-    from nexuscore.agents import policy_interface as policy_module
     from nexuscore.agents import context_agent as context_module
+    from nexuscore.agents import policy_interface as policy_module
 
     class DummyPolicy:
         def launch_and_wait_for_input(self, timeout=180):

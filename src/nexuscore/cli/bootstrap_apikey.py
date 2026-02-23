@@ -13,10 +13,9 @@
 from __future__ import annotations
 
 import argparse
-import sys
 import os
+import sys
 from pathlib import Path
-from typing import Tuple
 
 # プロジェクトルートをパスに追加
 # bootstrap_apikey.py は src/nexuscore/cli/ にあるため、
@@ -35,7 +34,7 @@ elif str(src_path) not in os.environ["PYTHONPATH"].split(os.pathsep):
     os.environ["PYTHONPATH"] = f"{src_path}{os.pathsep}{os.environ['PYTHONPATH']}"
 
 from nexuscore.webapp import create_app, db
-from nexuscore.webapp.models import User, ApiKey
+from nexuscore.webapp.models import ApiKey, User
 
 
 def bootstrap_apikey_for_app(
@@ -43,7 +42,7 @@ def bootstrap_apikey_for_app(
     user_login: str,
     user_name: str | None = None,
     key_name: str = "Bootstrap Dev Key",
-) -> Tuple[User, ApiKey, str]:
+) -> tuple[User, ApiKey, str]:
     """与えられた app コンテキストで User + ApiKey を作成し、生 token を返す純粋ロジック関数。
 
     テストではこの関数を直接呼び出すことで、テスト用 DB / app を利用できる。

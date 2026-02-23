@@ -4,24 +4,24 @@ API Keys エンドポイント
 API Key の発行・一覧取得・削除を提供する FastAPI エンドポイント。
 認証済みユーザーが自身の API Key を管理できます。
 """
+
 import logging
-from typing import List
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.exc import SQLAlchemyError
 
+from ..dependencies.auth import AuthenticatedUser, get_current_user
 from ..schemas.api_keys import (
     ApiKeyIssueRequest,
     ApiKeyIssueResponse,
-    ApiKeyMeta,
     ApiKeyListResponse,
+    ApiKeyMeta,
 )
 from ..schemas.error import ErrorResponse
-from ..dependencies.auth import get_current_user, AuthenticatedUser
 from ..utils.errors import (
-    make_not_found_error,
-    make_internal_error,
     make_forbidden_error,
+    make_internal_error,
+    make_not_found_error,
 )
 
 router = APIRouter(tags=["api-keys"])
@@ -100,8 +100,8 @@ async def issue_api_key(
         HTTPException: 認証失敗（401）、上限超過（403）、内部エラー（500）
     """
     try:
-        from nexuscore.webapp.models import ApiKey, User
         from nexuscore.webapp import db
+        from nexuscore.webapp.models import ApiKey
 
         user_id = _get_user_id_from_auth(current_user)
 
@@ -261,8 +261,8 @@ async def revoke_api_key(
         HTTPException: 認証失敗（401）、権限なし（403）、見つからない（404）、内部エラー（500）
     """
     try:
-        from nexuscore.webapp.models import ApiKey
         from nexuscore.webapp import db
+        from nexuscore.webapp.models import ApiKey
 
         user_id = _get_user_id_from_auth(current_user)
 
@@ -299,4 +299,3 @@ async def revoke_api_key(
             raise
         logger.error(f"Unexpected error during API key revocation: {e}", exc_info=True)
         raise make_internal_error("Unexpected error during API key revocation")
-

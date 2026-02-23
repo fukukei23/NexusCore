@@ -4,8 +4,8 @@ Tests basic mathematical operations.
 """
 
 import pytest
-from nexuscore.utils.math_ops import add
 
+from nexuscore.utils.math_ops import add
 
 # ==============================================================================
 # add Function Tests

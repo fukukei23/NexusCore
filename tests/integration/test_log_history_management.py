@@ -4,6 +4,7 @@
 RunHistoryLogger と SessionController の連携を確認し、
 ジョブの履歴やログが正しく保存されることを検証する。
 """
+
 from __future__ import annotations
 
 import json
@@ -11,11 +12,9 @@ import tempfile
 import time
 from pathlib import Path
 
-import pytest
-
+from nexuscore.core.job_state_machine import JobStateMachine
 from nexuscore.core.run_history import RunHistoryLogger, RunRecord
 from nexuscore.core.session_control import SessionController
-from nexuscore.core.job_state_machine import JobStateMachine
 
 
 class TestLogHistoryManagement:
@@ -290,9 +289,10 @@ class TestRunHistoryLoggerSessionControllerIntegration:
                 history_logger.log_run(record)
 
             # 成功率を計算
-            success_rate, success_count, total_count = history_logger.calculate_success_rate(limit=10)
+            success_rate, success_count, total_count = history_logger.calculate_success_rate(
+                limit=10
+            )
 
             assert total_count == 10
             assert success_count == 6
             assert success_rate == 60.0
-

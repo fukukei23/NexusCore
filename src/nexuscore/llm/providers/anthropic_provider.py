@@ -24,13 +24,17 @@ class AnthropicLLM(BaseLLM):
         if self.real_calls:
             session = HTTP_CLIENT_FACTORY.create_session()
             if not session:
-                self.logger.warning("AnthropicLLM could not obtain an HTTP session. Falling back to stub mode.")
+                self.logger.warning(
+                    "AnthropicLLM could not obtain an HTTP session. Falling back to stub mode."
+                )
                 self.real_calls = False
             else:
                 self.session = session
                 self.logger.info("AnthropicLLM initialized in REAL-CALL mode (Retry: On).")
         else:
-            self.logger.info("AnthropicLLM initialized in STUB mode (reason: missing key or dry-run).")
+            self.logger.info(
+                "AnthropicLLM initialized in STUB mode (reason: missing key or dry-run)."
+            )
 
     def execute(self, prompt: str, system_prompt: str, **kwargs) -> str:
         temperature = kwargs.get("temperature", 0.3)
@@ -65,7 +69,11 @@ class AnthropicLLM(BaseLLM):
                 content_blocks = data.get("content") or []
                 text_parts = []
                 for block in content_blocks:
-                    if isinstance(block, dict) and block.get("type") == "text" and block.get("text"):
+                    if (
+                        isinstance(block, dict)
+                        and block.get("type") == "text"
+                        and block.get("text")
+                    ):
                         text_parts.append(str(block["text"]))
                 text = "\n".join(text_parts).strip()
 

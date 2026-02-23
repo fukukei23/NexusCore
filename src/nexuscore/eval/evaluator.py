@@ -12,13 +12,13 @@ NexusEval: JSON構造出力評価器
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, Literal
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 try:
     import jsonschema
-    from jsonschema import validate, ValidationError
+    from jsonschema import ValidationError, validate
 except ImportError:
     jsonschema = None
     validate = None
@@ -27,6 +27,7 @@ except ImportError:
 
 class Verdict(str, Enum):
     """評価結果の判定"""
+
     GO = "GO"
     CONDITIONAL_GO = "CONDITIONAL_GO"
     NO = "NO"
@@ -35,6 +36,7 @@ class Verdict(str, Enum):
 @dataclass
 class EvaluationConfig:
     """評価設定（閾値はここから注入）"""
+
     # Schema 検証の閾値（必須通過）
     schema_required: bool = True
 
@@ -53,53 +55,59 @@ class EvaluationConfig:
 @dataclass
 class ParseResult:
     """JSONパース結果"""
+
     success: bool
-    data: Optional[Dict[str, Any]] = None
-    errors: List[str] = field(default_factory=list)
+    data: dict[str, Any] | None = None
+    errors: list[str] = field(default_factory=list)
 
 
 @dataclass
 class SchemaValidationResult:
     """Schema検証結果"""
+
     pass_: bool
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 @dataclass
 class RulesValidationResult:
     """Rules検証結果"""
+
     pass_: bool
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
     not_applicable: bool = False  # rules未指定の場合
 
 
 @dataclass
 class StabilityResult:
     """Stability測定結果"""
+
     measured: bool
-    value: Optional[float] = None  # 0.0-1.0 (1.0 = 完全一致)
-    errors: List[str] = field(default_factory=list)
+    value: float | None = None  # 0.0-1.0 (1.0 = 完全一致)
+    errors: list[str] = field(default_factory=list)
 
 
 @dataclass
 class EvaluationCase:
     """評価ケース（1回の実行）"""
+
     case_id: str
     input_data: str  # JSON文字列（パース前）
-    schema: Optional[Dict[str, Any]] = None  # JSON Schema
-    rules: Optional[Dict[str, Any]] = None  # Rules定義（禁止値/禁止組合せ/if-then）
-    parse_result: Optional[ParseResult] = None
-    schema_result: Optional[SchemaValidationResult] = None
-    rules_result: Optional[RulesValidationResult] = None
+    schema: dict[str, Any] | None = None  # JSON Schema
+    rules: dict[str, Any] | None = None  # Rules定義（禁止値/禁止組合せ/if-then）
+    parse_result: ParseResult | None = None
+    schema_result: SchemaValidationResult | None = None
+    rules_result: RulesValidationResult | None = None
 
 
 @dataclass
 class EvaluationReport:
     """評価レポート（全ケースの集計結果）"""
+
     run_id: str
     task_type: str = "json_structured_output"  # 固定
     repeats: int = 1
-    cases: List[EvaluationCase] = field(default_factory=list)
+    cases: list[EvaluationCase] = field(default_factory=list)
 
     # Metrics
     schema_pass_rate: float = 0.0
@@ -111,16 +119,17 @@ class EvaluationReport:
     verdict_reason: str = ""
 
     # 必須: 閾値の記録（後追い再現のため）
-    thresholds_used: Dict[str, Any] = field(default_factory=dict)
+    thresholds_used: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class EvaluationRun:
     """評価実行（複数ケースの実行単位）"""
+
     run_id: str
     config: EvaluationConfig
-    cases: List[EvaluationCase] = field(default_factory=list)
-    report: Optional[EvaluationReport] = None
+    cases: list[EvaluationCase] = field(default_factory=list)
+    report: EvaluationReport | None = None
 
 
 def parse_json(input_data: str) -> ParseResult:
@@ -133,8 +142,8 @@ def parse_json(input_data: str) -> ParseResult:
     Returns:
         ParseResult: パース結果（失敗時はerrorsにエラー情報を収集）
     """
-    errors: List[str] = []
-    data: Optional[Dict[str, Any]] = None
+    errors: list[str] = []
+    data: dict[str, Any] | None = None
 
     try:
         data = json.loads(input_data)
@@ -150,7 +159,7 @@ def parse_json(input_data: str) -> ParseResult:
         return ParseResult(success=False, errors=errors)
 
 
-def normalize_json(data: Dict[str, Any]) -> str:
+def normalize_json(data: dict[str, Any]) -> str:
     """
     JSONを正規化する（キー順固定等）。
 
@@ -165,6 +174,7 @@ def normalize_json(data: Dict[str, Any]) -> str:
     Returns:
         正規化されたJSON文字列
     """
+
     def _sort_keys(obj: Any) -> Any:
         if isinstance(obj, dict):
             return {k: _sort_keys(v) for k, v in sorted(obj.items())}
@@ -177,7 +187,9 @@ def normalize_json(data: Dict[str, Any]) -> str:
     return json.dumps(normalized, ensure_ascii=False, sort_keys=True)
 
 
-def validate_schema(data: Dict[str, Any], schema: Optional[Dict[str, Any]]) -> SchemaValidationResult:
+def validate_schema(
+    data: dict[str, Any], schema: dict[str, Any] | None
+) -> SchemaValidationResult:
     """
     JSON Schema検証を実行する。
 
@@ -192,12 +204,9 @@ def validate_schema(data: Dict[str, Any], schema: Optional[Dict[str, Any]]) -> S
         return SchemaValidationResult(pass_=True)
 
     if jsonschema is None:
-        return SchemaValidationResult(
-            pass_=False,
-            errors=["jsonschema library is not installed"]
-        )
+        return SchemaValidationResult(pass_=False, errors=["jsonschema library is not installed"])
 
-    errors: List[str] = []
+    errors: list[str] = []
     try:
         validate(instance=data, schema=schema)
         return SchemaValidationResult(pass_=True)
@@ -211,7 +220,7 @@ def validate_schema(data: Dict[str, Any], schema: Optional[Dict[str, Any]]) -> S
         return SchemaValidationResult(pass_=False, errors=errors)
 
 
-def validate_rules(data: Dict[str, Any], rules: Optional[Dict[str, Any]]) -> RulesValidationResult:
+def validate_rules(data: dict[str, Any], rules: dict[str, Any] | None) -> RulesValidationResult:
     """
     Rules検証を実行する（最小：禁止値/禁止組合せ/if-then）。
 
@@ -225,7 +234,7 @@ def validate_rules(data: Dict[str, Any], rules: Optional[Dict[str, Any]]) -> Rul
     if rules is None:
         return RulesValidationResult(pass_=True, not_applicable=True)
 
-    errors: List[str] = []
+    errors: list[str] = []
 
     # 禁止値チェック
     if "forbidden_values" in rules:
@@ -273,7 +282,7 @@ def validate_rules(data: Dict[str, Any], rules: Optional[Dict[str, Any]]) -> Rul
     return RulesValidationResult(pass_=len(errors) == 0, errors=errors, not_applicable=False)
 
 
-def measure_stability(cases: List[EvaluationCase]) -> StabilityResult:
+def measure_stability(cases: list[EvaluationCase]) -> StabilityResult:
     """
     Stabilityを測定する（repeats>=2 の場合のみ）。
 
@@ -287,13 +296,13 @@ def measure_stability(cases: List[EvaluationCase]) -> StabilityResult:
         return StabilityResult(measured=False)
 
     # パース成功したケースのみを対象
-    parsed_cases = [c for c in cases if c.parse_result and c.parse_result.success and c.parse_result.data]
+    parsed_cases = [
+        c for c in cases if c.parse_result and c.parse_result.success and c.parse_result.data
+    ]
 
     if len(parsed_cases) < 2:
         return StabilityResult(
-            measured=True,
-            value=0.0,
-            errors=["Less than 2 cases with successful JSON parse"]
+            measured=True, value=0.0, errors=["Less than 2 cases with successful JSON parse"]
         )
 
     # 正規化されたJSON文字列を比較
@@ -306,7 +315,7 @@ def measure_stability(cases: List[EvaluationCase]) -> StabilityResult:
             return StabilityResult(
                 measured=True,
                 value=0.0,
-                errors=[f"Failed to normalize JSON in case {case.case_id}: {str(e)}"]
+                errors=[f"Failed to normalize JSON in case {case.case_id}: {str(e)}"],
             )
 
     # すべての正規化JSONが同一かチェック
@@ -318,10 +327,7 @@ def measure_stability(cases: List[EvaluationCase]) -> StabilityResult:
     return StabilityResult(measured=True, value=stability_value)
 
 
-def determine_verdict(
-    report: EvaluationReport,
-    config: EvaluationConfig
-) -> tuple[Verdict, str]:
+def determine_verdict(report: EvaluationReport, config: EvaluationConfig) -> tuple[Verdict, str]:
     """
     Verdictを判定する。
 
@@ -347,15 +353,24 @@ def determine_verdict(
 
     # repeats=1 の場合は stability を条件にしない
     if report.repeats == 1:
-        return Verdict.CONDITIONAL_GO, "Schema and rules passed (stability not measured for repeats=1)"
+        return (
+            Verdict.CONDITIONAL_GO,
+            "Schema and rules passed (stability not measured for repeats=1)",
+        )
 
     # repeats>=2 の場合は stability を条件にする
     if report.stability.measured:
-        if report.stability.value is not None and report.stability.value >= config.stability_threshold:
+        if (
+            report.stability.value is not None
+            and report.stability.value >= config.stability_threshold
+        ):
             return Verdict.GO, f"All validations passed (stability={report.stability.value:.2f})"
         else:
             stability_val = report.stability.value if report.stability.value is not None else 0.0
-            return Verdict.CONDITIONAL_GO, f"Schema and rules passed but stability below threshold (stability={stability_val:.2f}, threshold={config.stability_threshold:.2f})"
+            return (
+                Verdict.CONDITIONAL_GO,
+                f"Schema and rules passed but stability below threshold (stability={stability_val:.2f}, threshold={config.stability_threshold:.2f})",
+            )
 
     # stability測定に失敗した場合
     return Verdict.CONDITIONAL_GO, "Schema and rules passed but stability measurement failed"
@@ -363,10 +378,10 @@ def determine_verdict(
 
 def evaluate_json_structured_output(
     run_id: str,
-    inputs: List[str],  # JSON文字列のリスト（repeats回分）
-    schema: Optional[Dict[str, Any]] = None,
-    rules: Optional[Dict[str, Any]] = None,
-    config: Optional[EvaluationConfig] = None,
+    inputs: list[str],  # JSON文字列のリスト（repeats回分）
+    schema: dict[str, Any] | None = None,
+    rules: dict[str, Any] | None = None,
+    config: EvaluationConfig | None = None,
 ) -> EvaluationReport:
     """
     JSON構造出力を評価する（メイン関数）。
@@ -385,7 +400,7 @@ def evaluate_json_structured_output(
         config = EvaluationConfig()
 
     repeats = len(inputs)
-    cases: List[EvaluationCase] = []
+    cases: list[EvaluationCase] = []
 
     # 各入力に対して評価ケースを実行
     for i, input_data in enumerate(inputs):
@@ -439,7 +454,7 @@ def evaluate_json_structured_output(
             "schema_required": config.schema_required,
             "rules_required": config.rules_required,
             "stability_threshold": config.stability_threshold,
-        }
+        },
     )
 
     # Verdict判定
@@ -448,4 +463,3 @@ def evaluate_json_structured_output(
     report.verdict_reason = reason
 
     return report
-

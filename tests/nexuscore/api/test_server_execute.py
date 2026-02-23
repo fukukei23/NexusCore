@@ -4,9 +4,7 @@ CR-002: /api/v1/execute エンドポイントの認証テスト
 認証なし API の保護をテストする。
 """
 
-import os
 import pytest
-from flask import Flask
 
 from nexuscore.api.server import app
 
@@ -22,17 +20,13 @@ def test_execute_unauthorized_no_header(client, monkeypatch):
     monkeypatch.setenv("NEXUSCORE_API_TOKEN", "secret-token")
 
     response = client.post(
-        '/api/v1/execute',
-        json={
-            'requirement': 'test requirement',
-            'project_path': '/tmp/test'
-        }
+        "/api/v1/execute", json={"requirement": "test requirement", "project_path": "/tmp/test"}
     )
 
     assert response.status_code == 401
     data = response.get_json()
-    assert 'error' in data
-    assert 'Authorization' in data['error'].lower() or 'required' in data['error'].lower()
+    assert "error" in data
+    assert "Authorization" in data["error"].lower() or "required" in data["error"].lower()
 
 
 def test_execute_unauthorized_invalid_token(client, monkeypatch):
@@ -40,20 +34,15 @@ def test_execute_unauthorized_invalid_token(client, monkeypatch):
     monkeypatch.setenv("NEXUSCORE_API_TOKEN", "secret-token")
 
     response = client.post(
-        '/api/v1/execute',
-        json={
-            'requirement': 'test requirement',
-            'project_path': '/tmp/test'
-        },
-        headers={
-            'Authorization': 'Bearer wrong-token'
-        }
+        "/api/v1/execute",
+        json={"requirement": "test requirement", "project_path": "/tmp/test"},
+        headers={"Authorization": "Bearer wrong-token"},
     )
 
     assert response.status_code == 401
     data = response.get_json()
-    assert 'error' in data
-    assert 'Authorization' in data['error'].lower() or 'required' in data['error'].lower()
+    assert "error" in data
+    assert "Authorization" in data["error"].lower() or "required" in data["error"].lower()
 
 
 def test_execute_authorized_success(client, monkeypatch):
@@ -61,22 +50,17 @@ def test_execute_authorized_success(client, monkeypatch):
     monkeypatch.setenv("NEXUSCORE_API_TOKEN", "secret-token")
 
     response = client.post(
-        '/api/v1/execute',
-        json={
-            'requirement': 'test requirement',
-            'project_path': '/tmp/test'
-        },
-        headers={
-            'Authorization': 'Bearer secret-token'
-        }
+        "/api/v1/execute",
+        json={"requirement": "test requirement", "project_path": "/tmp/test"},
+        headers={"Authorization": "Bearer secret-token"},
     )
 
     assert response.status_code == 202  # 既存の正常系レスポンスコード
     data = response.get_json()
-    assert 'message' in data
-    assert 'task_id' in data
-    assert 'status_url' in data
-    assert 'Task accepted' in data['message']
+    assert "message" in data
+    assert "task_id" in data
+    assert "status_url" in data
+    assert "Task accepted" in data["message"]
 
 
 def test_execute_server_misconfigured_when_env_missing(client, monkeypatch):
@@ -85,18 +69,12 @@ def test_execute_server_misconfigured_when_env_missing(client, monkeypatch):
     monkeypatch.delenv("NEXUSCORE_API_TOKEN", raising=False)
 
     response = client.post(
-        '/api/v1/execute',
-        json={
-            'requirement': 'test requirement',
-            'project_path': '/tmp/test'
-        },
-        headers={
-            'Authorization': 'Bearer any-token'
-        }
+        "/api/v1/execute",
+        json={"requirement": "test requirement", "project_path": "/tmp/test"},
+        headers={"Authorization": "Bearer any-token"},
     )
 
     assert response.status_code == 500
     data = response.get_json()
-    assert 'error' in data
-    assert 'NEXUSCORE_API_TOKEN' in data['error'] or 'misconfigured' in data['error'].lower()
-
+    assert "error" in data
+    assert "NEXUSCORE_API_TOKEN" in data["error"] or "misconfigured" in data["error"].lower()

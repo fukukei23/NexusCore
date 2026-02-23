@@ -3,10 +3,8 @@ Error Code Catalog の整合性チェックテスト
 
 CR-FASTAPI-015 で作成された Error Code Catalog と OpenAPI スキーマの整合性を確認する。
 """
-import json
-import re
+
 from pathlib import Path
-from typing import Dict, Set, Tuple
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,7 +16,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 ERROR_CODE_CATALOG_PATH = PROJECT_ROOT / "docs" / "api" / "ERROR_CODE_CATALOG.md"
 
 
-def parse_error_code_catalog() -> Dict[str, Tuple[int, str]]:
+def parse_error_code_catalog() -> dict[str, tuple[int, str]]:
     """
     ERROR_CODE_CATALOG.md からエラーコードと HTTP ステータスの対応をパースする
 
@@ -71,7 +69,7 @@ def parse_error_code_catalog() -> Dict[str, Tuple[int, str]]:
     return error_codes
 
 
-def get_openapi_error_responses(openapi_schema: dict) -> Dict[str, Set[int]]:
+def get_openapi_error_responses(openapi_schema: dict) -> dict[str, set[int]]:
     """
     OpenAPI スキーマから ErrorResponse を返すレスポンス定義を抽出する
 
@@ -133,10 +131,12 @@ def test_error_code_catalog_exists():
     """
     ERROR_CODE_CATALOG.md が存在することを確認
     """
-    assert ERROR_CODE_CATALOG_PATH.exists(), f"ERROR_CODE_CATALOG.md not found at {ERROR_CODE_CATALOG_PATH}"
+    assert (
+        ERROR_CODE_CATALOG_PATH.exists()
+    ), f"ERROR_CODE_CATALOG.md not found at {ERROR_CODE_CATALOG_PATH}"
 
 
-def test_error_code_catalog_parsable(error_code_catalog: Dict[str, Tuple[int, str]]):
+def test_error_code_catalog_parsable(error_code_catalog: dict[str, tuple[int, str]]):
     """
     ERROR_CODE_CATALOG.md が正しくパースできることを確認
     """
@@ -145,23 +145,27 @@ def test_error_code_catalog_parsable(error_code_catalog: Dict[str, Tuple[int, st
     # 最低限のエラーコードが含まれていることを確認
     expected_codes = {"UNAUTHORIZED", "NOT_FOUND", "VALIDATION_ERROR", "INTERNAL_ERROR"}
     catalog_codes = set(error_code_catalog.keys())
-    assert expected_codes.issubset(catalog_codes), f"Expected error codes not found in catalog. Found: {catalog_codes}"
+    assert expected_codes.issubset(
+        catalog_codes
+    ), f"Expected error codes not found in catalog. Found: {catalog_codes}"
 
 
-def test_error_code_catalog_has_required_fields(error_code_catalog: Dict[str, Tuple[int, str]]):
+def test_error_code_catalog_has_required_fields(error_code_catalog: dict[str, tuple[int, str]]):
     """
     ERROR_CODE_CATALOG.md の各エラーコードに必要な情報が含まれていることを確認
     """
     for error_code, (http_status, category) in error_code_catalog.items():
-        assert error_code, f"Error code is empty"
+        assert error_code, "Error code is empty"
         assert isinstance(http_status, int), f"HTTP status for {error_code} is not an integer"
-        assert 400 <= http_status <= 599, f"HTTP status {http_status} for {error_code} is out of range"
+        assert (
+            400 <= http_status <= 599
+        ), f"HTTP status {http_status} for {error_code} is out of range"
         assert category, f"Category for {error_code} is empty"
 
 
 def test_openapi_error_responses_match_catalog(
     client: TestClient,
-    error_code_catalog: Dict[str, Tuple[int, str]],
+    error_code_catalog: dict[str, tuple[int, str]],
     openapi_schema: dict,
 ):
     """
@@ -188,7 +192,7 @@ def test_openapi_error_responses_match_catalog(
     )
 
 
-def test_error_code_catalog_completeness(error_code_catalog: Dict[str, Tuple[int, str]]):
+def test_error_code_catalog_completeness(error_code_catalog: dict[str, tuple[int, str]]):
     """
     カタログに最低限必要なエラーコードが含まれていることを確認
     """
@@ -202,15 +206,15 @@ def test_error_code_catalog_completeness(error_code_catalog: Dict[str, Tuple[int
     for code, (expected_status, expected_category) in required_codes.items():
         assert code in error_code_catalog, f"Required error code {code} not found in catalog"
         actual_status, actual_category = error_code_catalog[code]
-        assert actual_status == expected_status, (
-            f"Error code {code} has wrong HTTP status: expected {expected_status}, got {actual_status}"
-        )
-        assert actual_category == expected_category, (
-            f"Error code {code} has wrong category: expected {expected_category}, got {actual_category}"
-        )
+        assert (
+            actual_status == expected_status
+        ), f"Error code {code} has wrong HTTP status: expected {expected_status}, got {actual_status}"
+        assert (
+            actual_category == expected_category
+        ), f"Error code {code} has wrong category: expected {expected_category}, got {actual_category}"
 
 
-def test_error_code_catalog_no_duplicates(error_code_catalog: Dict[str, Tuple[int, str]]):
+def test_error_code_catalog_no_duplicates(error_code_catalog: dict[str, tuple[int, str]]):
     """
     カタログに重複するエラーコードがないことを確認
     """
@@ -219,7 +223,7 @@ def test_error_code_catalog_no_duplicates(error_code_catalog: Dict[str, Tuple[in
     assert len(error_codes) == len(unique_codes), f"Duplicate error codes found: {error_codes}"
 
 
-def test_error_code_catalog_status_code_consistency(error_code_catalog: Dict[str, Tuple[int, str]]):
+def test_error_code_catalog_status_code_consistency(error_code_catalog: dict[str, tuple[int, str]]):
     """
     カタログのエラーコードと HTTP ステータスの対応が一貫していることを確認
     """
@@ -235,22 +239,21 @@ def test_error_code_catalog_status_code_consistency(error_code_catalog: Dict[str
     for status, codes in status_to_codes.items():
         if status == 401:
             # 401 は認証エラーなので、Auth カテゴリである必要がある
-            assert all(category == "Auth" for _, category in codes), (
-                f"Status 401 error codes should be in Auth category: {codes}"
-            )
+            assert all(
+                category == "Auth" for _, category in codes
+            ), f"Status 401 error codes should be in Auth category: {codes}"
         elif status == 404:
             # 404 は NotFound カテゴリである必要がある
-            assert all(category == "NotFound" for _, category in codes), (
-                f"Status 404 error codes should be in NotFound category: {codes}"
-            )
+            assert all(
+                category == "NotFound" for _, category in codes
+            ), f"Status 404 error codes should be in NotFound category: {codes}"
         elif status == 422:
             # 422 は Validation カテゴリである必要がある
-            assert all(category == "Validation" for _, category in codes), (
-                f"Status 422 error codes should be in Validation category: {codes}"
-            )
+            assert all(
+                category == "Validation" for _, category in codes
+            ), f"Status 422 error codes should be in Validation category: {codes}"
         elif status == 500:
             # 500 は Internal カテゴリである必要がある
-            assert all(category == "Internal" for _, category in codes), (
-                f"Status 500 error codes should be in Internal category: {codes}"
-            )
-
+            assert all(
+                category == "Internal" for _, category in codes
+            ), f"Status 500 error codes should be in Internal category: {codes}"

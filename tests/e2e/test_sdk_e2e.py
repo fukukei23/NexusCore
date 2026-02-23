@@ -10,6 +10,7 @@ SDK / FastAPI E2E テスト
 注意: SDK が存在しない／import に失敗する環境では、適切に pytest.skip でスキップされます。
 これは「テスト環境の問題」であり、SDK / API 実装のバグではありません。
 """
+
 from __future__ import annotations
 
 import sys
@@ -33,9 +34,14 @@ SDK_IMPORT_ERROR: str | None = None
 try:
     from tests.e2e.helpers.sdk_client import (
         SDK_AVAILABLE as _SDK_AVAILABLE,
+    )
+    from tests.e2e.helpers.sdk_client import (
         SDK_IMPORT_ERROR as _SDK_IMPORT_ERROR,
+    )
+    from tests.e2e.helpers.sdk_client import (
         create_sdk_client,
     )
+
     SDK_AVAILABLE = _SDK_AVAILABLE
     SDK_IMPORT_ERROR = _SDK_IMPORT_ERROR
 except ImportError:
@@ -51,7 +57,7 @@ if SDK_AVAILABLE:
     except ImportError:
         # DefaultApi が存在しない場合は、タグごとの API クラスを試みる
         try:
-            from nexuscore_sdk.api import HealthApi, ProjectsApi, ExecuteApi
+            from nexuscore_sdk.api import ExecuteApi, HealthApi, ProjectsApi
         except ImportError:
             pass
 
@@ -172,6 +178,7 @@ def test_health_e2e(fastapi_server, sdk_client):
         # ApiClient から HealthApi を取得
         try:
             from nexuscore_sdk.api import HealthApi
+
             health_api = HealthApi(sdk_client)
             # 実際のメソッド名を試す（OpenAPI Generator の命名規則に従う）
             if hasattr(health_api, "health_check_api_v1_health_get"):
@@ -259,6 +266,7 @@ def test_projects_list_e2e(sdk_client, api_key):
     elif isinstance(sdk_client, ApiClient):
         try:
             from nexuscore_sdk.api import ProjectsApi
+
             projects_api = ProjectsApi(sdk_client)
             # 実際のメソッド名を試す（OpenAPI Generator の命名規則に従う）
             # x_api_key は必須引数なので、テスト用のダミーキーを使用
@@ -352,9 +360,9 @@ def test_execute_e2e(sdk_client, api_key):
     # ExecuteRequest オブジェクトを作成
     try:
         from nexuscore_sdk.models.execute_request import ExecuteRequest
+
         execute_request = ExecuteRequest(
-            requirement="Test requirement",
-            project_path="/tmp/test_project"
+            requirement="Test requirement", project_path="/tmp/test_project"
         )
     except ImportError:
         # ExecuteRequest が import できない場合はスキップ
@@ -383,13 +391,13 @@ def test_execute_e2e(sdk_client, api_key):
     elif isinstance(sdk_client, ApiClient):
         try:
             from nexuscore_sdk.api import ExecuteApi
+
             execute_api = ExecuteApi(sdk_client)
             # 実際のメソッド名を試す（OpenAPI Generator の命名規則に従う）
             # x_api_key と execute_request は必須引数
             if hasattr(execute_api, "execute_endpoint_api_v1_execute_post"):
                 execute_response = execute_api.execute_endpoint_api_v1_execute_post(
-                    x_api_key=test_api_key,
-                    execute_request=execute_request
+                    x_api_key=test_api_key, execute_request=execute_request
                 )
             elif hasattr(execute_api, "execute_post"):
                 execute_response = execute_api.execute_post(execute_request)

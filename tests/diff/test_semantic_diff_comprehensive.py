@@ -8,9 +8,6 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
-from typing import Dict, List, Optional
-
-import pytest
 
 from nexuscore.diff.semantic_diff import (
     BehaviorChangeHint,
@@ -20,7 +17,6 @@ from nexuscore.diff.semantic_diff import (
     _extract_functions_from_ast,
     compute_semantic_diff,
 )
-
 
 # =============================================================================
 # Test _extract_functions_from_ast
@@ -145,7 +141,12 @@ class TestBuildBehaviorHintsFromDiff:
     def test_added_raise_statement(self):
         """raise 文が追加された場合"""
         before = ["def foo(x):", "    return x"]
-        after = ["def foo(x):", "    if x < 0:", "        raise ValueError('negative')", "    return x"]
+        after = [
+            "def foo(x):",
+            "    if x < 0:",
+            "        raise ValueError('negative')",
+            "    return x",
+        ]
 
         hints = _build_behavior_hints_from_diff(before, after)
 
@@ -154,7 +155,12 @@ class TestBuildBehaviorHintsFromDiff:
 
     def test_removed_raise_statement(self):
         """raise 文が削除された場合"""
-        before = ["def foo(x):", "    if x < 0:", "        raise ValueError('negative')", "    return x"]
+        before = [
+            "def foo(x):",
+            "    if x < 0:",
+            "        raise ValueError('negative')",
+            "    return x",
+        ]
         after = ["def foo(x):", "    return x"]
 
         hints = _build_behavior_hints_from_diff(before, after)
@@ -420,7 +426,9 @@ class TestSemanticDiffResultToDict:
                 )
             ],
             behavior_hints=[
-                BehaviorChangeHint(description="例外パスが追加されました（1箇所）", risk_level="medium")
+                BehaviorChangeHint(
+                    description="例外パスが追加されました（1箇所）", risk_level="medium"
+                )
             ],
             raw_line_diff_summary="--- before\n+++ after\n@@ -1 +1,2 @@\n+def foo(x): pass",
         )

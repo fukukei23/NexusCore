@@ -5,7 +5,6 @@ Task to model configuration map built on top of LLM profiles.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List
 
 from .llm_profiles import profile_to_model_name
 
@@ -15,12 +14,12 @@ class TaskModelConfig:
     """Structured mapping from a task to LLM profile candidates."""
 
     primary: str
-    secondary: List[str]
+    secondary: list[str]
     fallback: str
     temperature: float | None = None
 
 
-TASK_MODEL_CONFIGS: Dict[str, TaskModelConfig] = {
+TASK_MODEL_CONFIGS: dict[str, TaskModelConfig] = {
     # --- Core coding tasks ---
     "code_generate": TaskModelConfig(
         primary="gpt5_codex",
@@ -194,18 +193,18 @@ LEGACY_TO_TASK = {
 }
 
 
-def build_task_model_map_dict() -> Dict[str, Dict[str, object]]:
+def build_task_model_map_dict() -> dict[str, dict[str, object]]:
     """
     Build a dict matching the legacy TASK_MODEL_MAP_DEFAULT structure.
     """
-    result: Dict[str, Dict[str, object]] = {}
+    result: dict[str, dict[str, object]] = {}
     for task, cfg in TASK_MODEL_CONFIGS.items():
         primary_model = profile_to_model_name(cfg.primary)
         fallbacks = [profile_to_model_name(profile_id) for profile_id in cfg.secondary]
         fallback_model = profile_to_model_name(cfg.fallback)
         if fallback_model not in fallbacks:
             fallbacks.append(fallback_model)
-        result_entry: Dict[str, object] = {
+        result_entry: dict[str, object] = {
             "primary": primary_model,
             "fallbacks": fallbacks,
         }
@@ -221,4 +220,3 @@ __all__ = [
     "LEGACY_TO_TASK",
     "build_task_model_map_dict",
 ]
-

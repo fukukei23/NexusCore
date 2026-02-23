@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import asdict, dataclass
-from typing import Dict, Optional
 
 from nexuscore.llm.config import LLMRouterConfig
 from nexuscore.llm.http_client import HttpClientFactory
@@ -27,16 +26,16 @@ HTTP_AVAILABLE = HTTP_CLIENT_FACTORY.available
 class LLMRuntimeDiagnostics:
     """ランタイム状態を可視化するためのデータコンテナ。"""
 
-    env_file: Optional[str]
+    env_file: str | None
     request_timeout: float
     http_available: bool
     dry_run: bool
     real_calls_enabled: bool
 
-    def to_dict(self) -> Dict[str, object]:
+    def to_dict(self) -> dict[str, object]:
         return asdict(self)
 
-    def log(self, logger: Optional[logging.Logger] = None) -> None:
+    def log(self, logger: logging.Logger | None = None) -> None:
         target = logger or LOGGER
         summary = ", ".join(f"{k}={v}" for k, v in self.to_dict().items())
         target.info("[Runtime] %s", summary)
@@ -65,7 +64,7 @@ def current_diagnostics() -> LLMRuntimeDiagnostics:
     )
 
 
-def log_runtime_status(logger: Optional[logging.Logger] = None) -> LLMRuntimeDiagnostics:
+def log_runtime_status(logger: logging.Logger | None = None) -> LLMRuntimeDiagnostics:
     """
     ランタイム状況をログ出力しつつ Diagnostics を返す。
     Router 初期化時などに呼び出す想定。

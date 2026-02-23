@@ -105,6 +105,9 @@ nexus_core_run.log
 project_chronicle.jsonl
 *.log
 
+# Sandbox logs（repair logs等の一時ファイル）
+src/sandbox_logs/
+
 # --- Archives / Backups ---
 *.zip
 *.tar.gz

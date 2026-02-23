@@ -6,21 +6,20 @@ with SessionController and RunHistoryLogger integration.
 """
 
 import tempfile
-import time
-from unittest.mock import Mock, patch, MagicMock, call
+from unittest.mock import Mock, patch
+
 import pytest
 
 from nexuscore.core.job_state_machine import (
-    State,
-    PendingState,
-    RunningState,
     CompletedState,
     FailedState,
     JobMetadata,
     JobStateMachine,
+    PendingState,
+    RunningState,
 )
-from nexuscore.core.session_control import SessionController
 from nexuscore.core.run_history import RunHistoryLogger
+from nexuscore.core.session_control import SessionController
 
 
 class TestStateClasses:
@@ -33,10 +32,9 @@ class TestStateClasses:
 
         state.handle()
 
-        machine._update_state_metadata.assert_called_once_with({
-            "status": "pending",
-            "message": "Job is waiting to start"
-        })
+        machine._update_state_metadata.assert_called_once_with(
+            {"status": "pending", "message": "Job is waiting to start"}
+        )
 
     def test_pending_state_name(self):
         """Test PendingState.get_state_name() returns 'pending'."""
@@ -66,10 +64,9 @@ class TestStateClasses:
 
         state.handle()
 
-        machine._update_state_metadata.assert_called_once_with({
-            "status": "running",
-            "message": "Job is executing"
-        })
+        machine._update_state_metadata.assert_called_once_with(
+            {"status": "running", "message": "Job is executing"}
+        )
 
     def test_running_state_name(self):
         """Test RunningState.get_state_name() returns 'running'."""
@@ -106,10 +103,9 @@ class TestStateClasses:
 
         state.handle()
 
-        machine._update_state_metadata.assert_called_once_with({
-            "status": "completed",
-            "message": "Job completed successfully"
-        })
+        machine._update_state_metadata.assert_called_once_with(
+            {"status": "completed", "message": "Job completed successfully"}
+        )
         machine._record_completion.assert_called_once()
 
     def test_completed_state_name(self):
@@ -135,11 +131,9 @@ class TestStateClasses:
 
         state.handle()
 
-        machine._update_state_metadata.assert_called_once_with({
-            "status": "failed",
-            "message": "Job execution failed",
-            "error": "Test error"
-        })
+        machine._update_state_metadata.assert_called_once_with(
+            {"status": "failed", "message": "Job execution failed", "error": "Test error"}
+        )
         machine._record_failure.assert_called_once_with("Test error")
 
     def test_failed_state_default_error_message(self):
@@ -192,7 +186,7 @@ class TestJobMetadata:
             status="running",
             message="Test message",
             error="Test error",
-            details={"key": "value"}
+            details={"key": "value"},
         )
 
         assert metadata.job_id == "job-2"
@@ -244,7 +238,7 @@ class TestJobStateMachineInit:
 
     def test_init_calls_initial_state_handle(self):
         """Test initialization calls handle() on initial state."""
-        with patch.object(PendingState, 'handle') as mock_handle:
+        with patch.object(PendingState, "handle") as mock_handle:
             machine = JobStateMachine("job-1")
 
             mock_handle.assert_called_once()
@@ -273,7 +267,7 @@ class TestJobStateMachineTransitions:
         """Test transition_to() calls handle() on new state."""
         machine = JobStateMachine("job-1")
 
-        with patch.object(RunningState, 'handle') as mock_handle:
+        with patch.object(RunningState, "handle") as mock_handle:
             machine.transition_to(RunningState)
 
             mock_handle.assert_called_once()
@@ -328,7 +322,7 @@ class TestJobStateMachineConvenienceMethods:
         """Test start() transitions from Pending to Running."""
         machine = JobStateMachine("job-1")
 
-        with patch('time.time', return_value=1000.0):
+        with patch("time.time", return_value=1000.0):
             machine.start()
 
         assert machine.get_current_state() == "running"
@@ -347,7 +341,7 @@ class TestJobStateMachineConvenienceMethods:
         machine = JobStateMachine("job-1")
         machine.start()
 
-        with patch('time.time', return_value=2000.0):
+        with patch("time.time", return_value=2000.0):
             machine.complete()
 
         assert machine.get_current_state() == "completed"
@@ -375,7 +369,7 @@ class TestJobStateMachineConvenienceMethods:
         machine = JobStateMachine("job-1")
         machine.start()
 
-        with patch('time.time', return_value=2000.0):
+        with patch("time.time", return_value=2000.0):
             machine.fail("Test error occurred")
 
         assert machine.get_current_state() == "failed"
@@ -474,6 +468,7 @@ class TestSessionControllerIntegration:
             machine.start()
 
             import json
+
             with controller.state_file.open("r") as f:
                 data = json.load(f)
 
@@ -502,6 +497,7 @@ class TestHistoryLoggerIntegration:
             # Verify log content
             with log_file.open("r") as f:
                 import json
+
                 data = json.loads(f.read())
 
             assert data["run_id"] == "job-1"
@@ -521,6 +517,7 @@ class TestHistoryLoggerIntegration:
             log_file = logger.history_dir / "test_job.log.jsonl"
             with log_file.open("r") as f:
                 import json
+
                 data = json.loads(f.read())
 
             assert data["run_id"] == "job-1"
@@ -558,18 +555,18 @@ class TestJobStateMachineIntegration:
                 "job-1",
                 session_controller=controller,
                 history_logger=logger,
-                job_type="integration_test"
+                job_type="integration_test",
             )
 
             # Start job
-            with patch('time.time', return_value=1000.0):
+            with patch("time.time", return_value=1000.0):
                 machine.start()
 
             assert machine.get_current_state() == "running"
             assert machine.metadata.started_at == 1000.0
 
             # Complete job
-            with patch('time.time', return_value=2000.0):
+            with patch("time.time", return_value=2000.0):
                 machine.complete(details={"result": "success"})
 
             assert machine.get_current_state() == "completed"
@@ -590,7 +587,7 @@ class TestJobStateMachineIntegration:
                 "job-1",
                 session_controller=controller,
                 history_logger=logger,
-                job_type="integration_test"
+                job_type="integration_test",
             )
 
             machine.start()

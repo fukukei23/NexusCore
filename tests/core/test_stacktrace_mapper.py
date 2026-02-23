@@ -1,5 +1,5 @@
 """stacktrace_mapper.py のテスト"""
-import pytest
+
 
 from nexuscore.core.stacktrace_mapper import extract_candidate_files
 
@@ -331,4 +331,3 @@ ________________________ test_example ________________________
     assert len(files) >= 0  # この例では2件抽出されるはず
     if len(files) > 0:
         assert "/app/src/calculator.py" in files or "/app/src/validator.py" in files
-

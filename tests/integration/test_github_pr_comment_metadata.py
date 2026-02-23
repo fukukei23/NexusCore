@@ -1,18 +1,18 @@
 """
 CR-E3: Self-Healing PR コメント メタ情報ブロックのテスト
 """
+
 from __future__ import annotations
 
-import pytest
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 from nexuscore.integration.github_pr_comment import (
-    format_metadata_block,
+    PRCommentContext,
     _collect_run_metrics,
     _estimate_diff_lines_separated,
-    PRCommentContext,
     build_pr_comment,
+    format_metadata_block,
 )
 
 
@@ -206,9 +206,11 @@ class TestCollectRunMetrics:
 """
 
         # webapp モデルをモック
-        with patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", True), \
-             patch("nexuscore.integration.github_pr_comment.PatchRecord") as MockPatchRecord, \
-             patch("nexuscore.integration.github_pr_comment.ExecutionLog") as MockExecutionLog:
+        with (
+            patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", True),
+            patch("nexuscore.integration.github_pr_comment.PatchRecord") as MockPatchRecord,
+            patch("nexuscore.integration.github_pr_comment.ExecutionLog") as MockExecutionLog,
+        ):
 
             MockPatchRecord.query.filter_by.return_value.all.return_value = [mock_patch]
             MockExecutionLog.query.filter_by.return_value.all.return_value = []
@@ -252,14 +254,18 @@ class TestBuildPrCommentWithMetadata:
         )
 
         # webapp モデルをモック
-        with patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", True), \
-             patch("nexuscore.integration.github_pr_comment.PatchRecord") as MockPatchRecord, \
-             patch("nexuscore.integration.github_pr_comment.ExecutionLog") as MockExecutionLog, \
-             patch("nexuscore.integration.github_pr_comment.Run") as MockRun:
+        with (
+            patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", True),
+            patch("nexuscore.integration.github_pr_comment.PatchRecord") as MockPatchRecord,
+            patch("nexuscore.integration.github_pr_comment.ExecutionLog") as MockExecutionLog,
+            patch("nexuscore.integration.github_pr_comment.Run") as MockRun,
+        ):
 
             MockPatchRecord.query.filter_by.return_value.all.return_value = []
             MockExecutionLog.query.filter_by.return_value.all.return_value = []
-            MockRun.query.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [mock_run]
+            MockRun.query.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [
+                mock_run
+            ]
 
             comment = build_pr_comment(ctx)
 
@@ -270,4 +276,3 @@ class TestBuildPrCommentWithMetadata:
             assert "abc1234" in comment  # 短縮形式
             # 既存のコンテンツも含まれていることを確認
             assert "Guardian Review" in comment
-

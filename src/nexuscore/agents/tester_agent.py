@@ -19,20 +19,19 @@
 # -----------------------------------------------------------------------------
 
 import json
+import logging
 import os
 import re
-import logging
 import subprocess
 from pathlib import Path
-from typing import Optional, Tuple
 
 # (ご提案 #2) 相対インポートから絶対インポートへ修正
 # これにより、異なるディレクトリ階層からの呼び出し時も安定します。
 from nexuscore.agents.base_agent import BaseAgent
 
 try:
-    from nexuscore.agents.test_strategy import TestStrategyManager
     from nexuscore.agents.test_generator_prompt import build_test_generation_prompt
+    from nexuscore.agents.test_strategy import TestStrategyManager
     from nexuscore.core.test_metrics import TestMetricsCollector
 except ImportError:
     TestStrategyManager = None  # type: ignore
@@ -40,6 +39,7 @@ except ImportError:
     TestMetricsCollector = None  # type: ignore
 
 logger = logging.getLogger(__name__)
+
 
 class TesterAgent(BaseAgent):
     """
@@ -57,7 +57,7 @@ class TesterAgent(BaseAgent):
 高品質なテストコードと、そのテスト設計に関する「証言」を生成することです。
 """
 
-    def __init__(self, project_root: Optional[str] = None) -> None:
+    def __init__(self, project_root: str | None = None) -> None:
         """
         TesterAgent を初期化する。
 
@@ -75,13 +75,17 @@ class TesterAgent(BaseAgent):
             self.strategy_manager = TestStrategyManager()
         else:
             self.strategy_manager = None
-            logger.warning("TestStrategyManager is not available. Test strategy features will be disabled.")
+            logger.warning(
+                "TestStrategyManager is not available. Test strategy features will be disabled."
+            )
 
         if TestMetricsCollector is not None:
             self.test_metrics = TestMetricsCollector(project_root=str(self.project_root))
         else:
             self.test_metrics = None
-            logger.warning("TestMetricsCollector is not available. Test metrics will not be recorded.")
+            logger.warning(
+                "TestMetricsCollector is not available. Test metrics will not be recorded."
+            )
 
     def generate_tests_and_testimony(self, code_to_test: str) -> str:
         """
@@ -130,7 +134,7 @@ class TesterAgent(BaseAgent):
             plan_str = json.dumps(plan, indent=2, ensure_ascii=False)
         except Exception as e:
             logger.error(f"[TesterAgent] Failed to serialize plan: {e}")
-            plan_str = str(plan) # シリアライズ失敗時はそのまま文字列化
+            plan_str = str(plan)  # シリアライズ失敗時はそのまま文字列化
 
         prompt = f"""
 # 実装計画 (Implementation Plan)
@@ -184,9 +188,9 @@ class TesterAgent(BaseAgent):
         module_name: str,
         target_file_path: str,
         target_code: str,
-        test_level: Optional[str] = None,
-        existing_tests: Optional[str] = None,
-    ) -> Optional[dict]:
+        test_level: str | None = None,
+        existing_tests: str | None = None,
+    ) -> dict | None:
         """
         指定モジュールに対して、テスト戦略に基づき AI によるテスト生成を行う。
 
@@ -287,7 +291,7 @@ class TesterAgent(BaseAgent):
             "coverage_after": coverage_after,
         }
 
-    def handle_changed_files(self, changed_files: list[str]) -> dict[str, Optional[dict]]:
+    def handle_changed_files(self, changed_files: list[str]) -> dict[str, dict | None]:
         """
         Git の差分などから渡された変更ファイルリストに対して、
         戦略に基づくテスト生成をまとめて実行する高レベルメソッド。
@@ -295,7 +299,7 @@ class TesterAgent(BaseAgent):
         :param changed_files: 変更されたファイルパスのリスト
         :return: モジュール名をキーとした生成結果の辞書
         """
-        results: dict[str, Optional[dict]] = {}
+        results: dict[str, dict | None] = {}
 
         for file_path in changed_files:
             try:
@@ -397,7 +401,7 @@ class TesterAgent(BaseAgent):
         parts = list(path.parts)
         if "src" in parts:
             idx = parts.index("src")
-            parts = parts[idx + 1:]
+            parts = parts[idx + 1 :]
         elif "nexuscore" in parts:
             idx = parts.index("nexuscore")
             parts = parts[idx:]
@@ -539,7 +543,7 @@ class TesterAgent(BaseAgent):
         module_name: str,
         test_code: str,
         target_file_path: str,
-    ) -> Tuple[str, int, float, float]:
+    ) -> tuple[str, int, float, float]:
         """
         生成されたテストコードをファイルとして保存し、必要に応じて pytest とカバレッジを実行する。
 
@@ -578,7 +582,7 @@ class TesterAgent(BaseAgent):
         # 簡易実装: ファイル名をそのまま使用
         return module_name
 
+
 # -----------------------------------------------------------------------------
 # END OF FILE: src/nexuscore/agents/tester_agent.py
 # -----------------------------------------------------------------------------
-

@@ -3,20 +3,24 @@ API認証ユーティリティ
 
 JWTトークンベースの認証を提供する。
 """
-from functools import wraps
-from flask import request, jsonify
+
+import logging
 import os
 from datetime import datetime, timedelta
-from typing import Optional
-import logging
+from functools import wraps
+
+from flask import jsonify, request
 
 try:
     import jwt
+
     HAS_JWT = True
 except Exception as e:
     HAS_JWT = False
     jwt = None  # type: ignore
-    logging.warning(f"PyJWT not available ({type(e).__name__}). JWT authentication will be disabled.")
+    logging.warning(
+        f"PyJWT not available ({type(e).__name__}). JWT authentication will be disabled."
+    )
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-in-production-INSECURE-DEFAULT")
 ALGORITHM = "HS256"
@@ -39,21 +43,25 @@ def require_auth(f):
         401: トークンがない、または無効
         403: トークンの権限不足
     """
+
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not HAS_JWT:
             return jsonify({"error": "JWT authentication not available. Install PyJWT."}), 503
 
         # Authorization ヘッダーからトークンを取得
-        auth_header = request.headers.get('Authorization')
+        auth_header = request.headers.get("Authorization")
 
         if not auth_header:
             return jsonify({"error": "Authorization header missing"}), 401
 
         # "Bearer <token>" 形式を想定
         parts = auth_header.split()
-        if len(parts) != 2 or parts[0].lower() != 'bearer':
-            return jsonify({"error": "Invalid authorization header format. Use: Bearer <token>"}), 401
+        if len(parts) != 2 or parts[0].lower() != "bearer":
+            return (
+                jsonify({"error": "Invalid authorization header format. Use: Bearer <token>"}),
+                401,
+            )
 
         token = parts[1]
 
@@ -94,14 +102,14 @@ def generate_token(user_id: str, expires_in_hours: int = 24) -> str:
         raise ImportError("PyJWT not available. Install with: pip install pyjwt")
 
     payload = {
-        'user_id': user_id,
-        'exp': datetime.utcnow() + timedelta(hours=expires_in_hours),
-        'iat': datetime.utcnow()
+        "user_id": user_id,
+        "exp": datetime.utcnow() + timedelta(hours=expires_in_hours),
+        "iat": datetime.utcnow(),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)  # type: ignore
 
 
-def verify_token(token: str) -> Optional[dict]:
+def verify_token(token: str) -> dict | None:
     """
     トークンを検証してペイロードを返す
 

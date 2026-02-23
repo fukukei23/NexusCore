@@ -3,9 +3,8 @@ Comprehensive tests for llm/runtime.py
 
 LLMランタイムシングルトンと診断ユーティリティのテスト
 """
+
 import logging
-import os
-from unittest.mock import Mock, patch
 
 import pytest
 

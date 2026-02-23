@@ -29,13 +29,17 @@ class DeepSeekLLM(BaseLLM):
         if self.real_calls:
             session = HTTP_CLIENT_FACTORY.create_session()
             if not session:
-                self.logger.warning("DeepSeekLLM could not obtain an HTTP session. Falling back to stub mode.")
+                self.logger.warning(
+                    "DeepSeekLLM could not obtain an HTTP session. Falling back to stub mode."
+                )
                 self.real_calls = False
             else:
                 self.session = session
                 self.logger.info("DeepSeekLLM initialized in REAL-CALL mode (Retry: On).")
         else:
-            self.logger.info("DeepSeekLLM initialized in STUB mode (reason: missing key or dry-run).")
+            self.logger.info(
+                "DeepSeekLLM initialized in STUB mode (reason: missing key or dry-run)."
+            )
 
     def execute(self, prompt: str, system_prompt: str, **kwargs) -> str:
         temperature = kwargs.get("temperature", 0.2)
@@ -44,7 +48,10 @@ class DeepSeekLLM(BaseLLM):
         if self.real_calls and self.session:
             try:
                 url = f"{self.base_url}/v1/chat/completions"
-                headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                }
 
                 messages = [
                     {"role": "system", "content": system_prompt},
@@ -68,8 +75,8 @@ class DeepSeekLLM(BaseLLM):
 
                 data = resp.json()
                 text = ""
-                for ch in (data.get("choices") or []):
-                    msg = (ch.get("message") or {})
+                for ch in data.get("choices") or []:
+                    msg = ch.get("message") or {}
                     if msg.get("content"):
                         text += str(msg["content"])
 
@@ -108,7 +115,11 @@ class DeepSeekLLM(BaseLLM):
                 "summary": "Stubbed DeepSeek response",
                 "plan": [
                     {"step": "analyze_requirement", "owner": "PlannerAgent", "status": "pending"},
-                    {"step": "implement_core_logic", "owner": "CoderAgent", "status": "blocked_stub"},
+                    {
+                        "step": "implement_core_logic",
+                        "owner": "CoderAgent",
+                        "status": "blocked_stub",
+                    },
                     {"step": "write_tests", "owner": "TesterAgent", "status": "blocked_stub"},
                 ],
             },

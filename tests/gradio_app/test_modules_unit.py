@@ -3,8 +3,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from nexuscore.modules import chat_handler, code_generator, diff_viewer, history_viewer, tester, whisper_handler
-
+from nexuscore.modules import (
+    chat_handler,
+    code_generator,
+    diff_viewer,
+    history_viewer,
+    tester,
+    whisper_handler,
+)
 
 # whisper がインストールされていない環境では、
 # このモジュール全体をスキップする

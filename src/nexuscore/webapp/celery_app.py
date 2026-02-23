@@ -3,17 +3,18 @@ NexusCore SaaS基盤 - Celery アプリ初期化
 
 Flask アプリと連携した Celery インスタンスを作成する。
 """
+
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
+
 from celery import Celery
-from typing import Optional, Callable
 
 from nexuscore.config.config import AppConfig
 
-
-celery: Optional[Celery] = None
-run_orchestrator_task: Optional[Callable] = None
+celery: Celery | None = None
+run_orchestrator_task: Callable | None = None
 
 
 def make_celery(flask_app) -> Celery:
@@ -33,8 +34,10 @@ def make_celery(flask_app) -> Celery:
 
     celery_app = Celery(
         flask_app.import_name,
-        broker=AppConfig.CELERY_BROKER_URL or os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0"),
-        backend=AppConfig.CELERY_RESULT_BACKEND or os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1"),
+        broker=AppConfig.CELERY_BROKER_URL
+        or os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0"),
+        backend=AppConfig.CELERY_RESULT_BACKEND
+        or os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1"),
     )
     celery_app.conf.update(flask_app.config)
 
@@ -79,14 +82,13 @@ def init_celery() -> Celery:
 # ==============================================================================
 
 from datetime import datetime
-from typing import Optional
 
-from nexuscore.webapp.models import Run, Project
-from nexuscore.webapp import db
-from nexuscore.webapp.orchestrator_helper import run_orchestrator_sync
 from nexuscore.core.job_state_machine import JobStateMachine
-from nexuscore.core.session_control import SessionController
 from nexuscore.core.run_history import RunHistoryLogger
+from nexuscore.core.session_control import SessionController
+from nexuscore.webapp import db
+from nexuscore.webapp.models import Project, Run
+from nexuscore.webapp.orchestrator_helper import run_orchestrator_sync
 
 
 def _register_tasks(celery_instance: Celery) -> None:
@@ -107,9 +109,10 @@ def _register_tasks(celery_instance: Celery) -> None:
         - run_full_project(..., run_db_id=run.id) を呼び出す
         """
         import logging
+
         logger = logging.getLogger(__name__)
 
-        run: Optional[Run] = Run.query.get(run_db_id)
+        run: Run | None = Run.query.get(run_db_id)
         if run is None:
             logger.error(f"Run not found: run_db_id={run_db_id}")
             return
@@ -127,7 +130,7 @@ def _register_tasks(celery_instance: Celery) -> None:
 
         # SessionController と RunHistoryLogger を初期化
         import os
-        from pathlib import Path
+
         session_dir = os.path.join(project.local_path, ".nexus", "sessions")
         session_controller = SessionController(
             session_id=job_id,
@@ -163,10 +166,12 @@ def _register_tasks(celery_instance: Celery) -> None:
             )
 
             # ジョブを完了（Running → Completed）
-            state_machine.complete(details={
-                "run_db_id": run.id,
-                "project_name": project.name,
-            })
+            state_machine.complete(
+                details={
+                    "run_db_id": run.id,
+                    "project_name": project.name,
+                }
+            )
             run.status = "SUCCESS"
             status = "success"
 
@@ -182,7 +187,7 @@ def _register_tasks(celery_instance: Celery) -> None:
                     "run_db_id": run.id,
                     "project_name": project.name,
                     "exception_type": type(exc).__name__,
-                }
+                },
             )
             run.status = "FAILED"
             status = "error"
@@ -198,12 +203,14 @@ def _register_tasks(celery_instance: Celery) -> None:
             # Run レポートを生成
             try:
                 from nexuscore.integration.run_report_generator import write_run_report_file
+
                 report_path = write_run_report_file(run.id)
                 logger.info(f"Run report generated: {report_path}")
 
                 # ExecutionLog に記録
                 try:
                     from nexuscore.webapp.models import ExecutionLog
+
                     log_entry = ExecutionLog(
                         run_id=run.id,
                         source="SYSTEM",
@@ -253,7 +260,7 @@ def _register_tasks(celery_instance: Celery) -> None:
 if celery is None and os.getenv("SKIP_CELERY_AUTO_INIT") != "1":
     try:
         celery = init_celery()
-    except (ImportError, ModuleNotFoundError) as e:
+    except (ImportError, ModuleNotFoundError):
         # テスト時や依存関係が不足している場合は初期化をスキップ
         # Celery worker 起動時には依存関係が揃っている前提
         pass

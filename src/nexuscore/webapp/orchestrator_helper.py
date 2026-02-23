@@ -3,16 +3,17 @@ NexusCore Webapp - Orchestrator ヘルパー関数
 
 Orchestrator のインスタンス化と実行を簡易化するヘルパー関数。
 """
+
 from __future__ import annotations
 
 import logging
 import os
 import uuid
-from typing import Dict, Any, Optional
+from typing import Any
 
+from nexuscore.config.config import AppConfig
 from nexuscore.core.orchestrator import Orchestrator, assemble_agent_team
 from nexuscore.core.session_control import SessionController
-from nexuscore.config.config import AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 def create_orchestrator_instance(
     project_path: str,
     autonomy_level: int = 1,
-    session_id: Optional[str] = None,
+    session_id: str | None = None,
 ) -> Orchestrator:
     """
     Orchestrator インスタンスを作成する。
@@ -34,7 +35,7 @@ def create_orchestrator_instance(
         Orchestrator インスタンス
     """
     # constitution の作成
-    constitution: Dict[str, Any] = {
+    constitution: dict[str, Any] = {
         "automation_policy": {
             "autonomy_level": autonomy_level,
         }
@@ -77,7 +78,7 @@ def create_orchestrator_instance(
 def run_orchestrator_sync(
     project_path: str,
     user_requirement: str,
-    run_db_id: Optional[int] = None,
+    run_db_id: int | None = None,
     autonomy_level: int = 1,
     language: str = "ja",
     fast_lane: bool = False,
@@ -107,4 +108,3 @@ def run_orchestrator_sync(
         fast_lane=fast_lane,
         run_db_id=run_db_id,
     )
-

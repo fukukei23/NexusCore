@@ -7,54 +7,50 @@ Tests for CR-NEXUS-051-B: Retry Policy
 import pytest
 
 from nexuscore.core.errors import (
+    InvalidModelOutputError,
+    ModelConnectionError,
     ModelRateLimitError,
     ModelTimeoutError,
-    ModelConnectionError,
-    InvalidModelOutputError,
+    PatchApplyError,
     SandboxExecutionError,
     SandboxSecurityError,
-    PatchApplyError,
     UnexpectedSystemError,
 )
-from nexuscore.core.retry_policy import RetryDecision, decide_retry
-
+from nexuscore.core.retry_policy import decide_retry
 
 # ===== Decision Table 検証 =====
 
-@pytest.mark.parametrize("error_class,attempt,expected_action,expected_max_attempts", [
-    # ModelRateLimitError: 5 回まで Retry
-    (ModelRateLimitError("Rate limit"), 1, "retry", 5),
-    (ModelRateLimitError("Rate limit"), 3, "retry", 5),
-    (ModelRateLimitError("Rate limit"), 5, "retry", 5),
-    (ModelRateLimitError("Rate limit"), 6, "abort", 5),
 
-    # ModelTimeoutError: 3 回まで Retry
-    (ModelTimeoutError("Timeout"), 1, "retry", 3),
-    (ModelTimeoutError("Timeout"), 3, "retry", 3),
-    (ModelTimeoutError("Timeout"), 4, "abort", 3),
-
-    # ModelConnectionError: 3 回まで Retry
-    (ModelConnectionError("Connection"), 1, "retry", 3),
-    (ModelConnectionError("Connection"), 3, "retry", 3),
-    (ModelConnectionError("Connection"), 4, "abort", 3),
-
-    # InvalidModelOutputError: 3 回まで Retry
-    (InvalidModelOutputError("Invalid output"), 1, "retry", 3),
-    (InvalidModelOutputError("Invalid output"), 3, "retry", 3),
-    (InvalidModelOutputError("Invalid output"), 4, "abort", 3),
-
-    # SandboxExecutionError: 即座に Abort
-    (SandboxExecutionError("Sandbox error"), 1, "abort", 0),
-
-    # SandboxSecurityError: 即座に Abort
-    (SandboxSecurityError("Security error"), 1, "abort", 0),
-
-    # PatchApplyError: 即座に Abort
-    (PatchApplyError("Patch error"), 1, "abort", 0),
-
-    # UnexpectedSystemError: 即座に Abort
-    (UnexpectedSystemError("Unexpected error"), 1, "abort", 0),
-])
+@pytest.mark.parametrize(
+    "error_class,attempt,expected_action,expected_max_attempts",
+    [
+        # ModelRateLimitError: 5 回まで Retry
+        (ModelRateLimitError("Rate limit"), 1, "retry", 5),
+        (ModelRateLimitError("Rate limit"), 3, "retry", 5),
+        (ModelRateLimitError("Rate limit"), 5, "retry", 5),
+        (ModelRateLimitError("Rate limit"), 6, "abort", 5),
+        # ModelTimeoutError: 3 回まで Retry
+        (ModelTimeoutError("Timeout"), 1, "retry", 3),
+        (ModelTimeoutError("Timeout"), 3, "retry", 3),
+        (ModelTimeoutError("Timeout"), 4, "abort", 3),
+        # ModelConnectionError: 3 回まで Retry
+        (ModelConnectionError("Connection"), 1, "retry", 3),
+        (ModelConnectionError("Connection"), 3, "retry", 3),
+        (ModelConnectionError("Connection"), 4, "abort", 3),
+        # InvalidModelOutputError: 3 回まで Retry
+        (InvalidModelOutputError("Invalid output"), 1, "retry", 3),
+        (InvalidModelOutputError("Invalid output"), 3, "retry", 3),
+        (InvalidModelOutputError("Invalid output"), 4, "abort", 3),
+        # SandboxExecutionError: 即座に Abort
+        (SandboxExecutionError("Sandbox error"), 1, "abort", 0),
+        # SandboxSecurityError: 即座に Abort
+        (SandboxSecurityError("Security error"), 1, "abort", 0),
+        # PatchApplyError: 即座に Abort
+        (PatchApplyError("Patch error"), 1, "abort", 0),
+        # UnexpectedSystemError: 即座に Abort
+        (UnexpectedSystemError("Unexpected error"), 1, "abort", 0),
+    ],
+)
 def test_decision_table(error_class, attempt, expected_action, expected_max_attempts):
     """Decision Table を機械的に検証する"""
     error = error_class
@@ -62,11 +58,15 @@ def test_decision_table(error_class, attempt, expected_action, expected_max_atte
 
     # Max Attempts を超えている場合は Abort
     if attempt > expected_max_attempts:
-        assert decision.action == "abort", f"{error_class.__name__}: attempt {attempt} should abort (max: {expected_max_attempts})"
+        assert (
+            decision.action == "abort"
+        ), f"{error_class.__name__}: attempt {attempt} should abort (max: {expected_max_attempts})"
         assert not decision.should_retry
     else:
         # Max Attempts 以内の場合は期待されるアクション
-        assert decision.action == expected_action, f"{error_class.__name__}: attempt {attempt} should {expected_action}"
+        assert (
+            decision.action == expected_action
+        ), f"{error_class.__name__}: attempt {attempt} should {expected_action}"
         if expected_action == "retry":
             assert decision.should_retry
         else:
@@ -74,6 +74,7 @@ def test_decision_table(error_class, attempt, expected_action, expected_max_atte
 
 
 # ===== 有限性検証 =====
+
 
 def test_finite_retries_rate_limit():
     """ModelRateLimitError は 5 回で停止する"""
@@ -137,6 +138,7 @@ def test_finite_retries_invalid_output():
 
 # ===== Unexpected 処理検証 =====
 
+
 def test_unexpected_no_retry():
     """UnexpectedSystemError は即座に Abort（Retry しない）"""
     error = UnexpectedSystemError("Unexpected error")
@@ -168,6 +170,7 @@ def test_sandbox_security_no_retry():
 
 
 # ===== Backoff 検証 =====
+
 
 def test_exponential_backoff_rate_limit():
     """ModelRateLimitError の Exponential Backoff を検証"""
@@ -221,14 +224,11 @@ def test_linear_backoff_invalid_output():
 
 # ===== Context 引数の検証 =====
 
+
 def test_decide_retry_with_context():
     """Context 引数が正しく処理されることを検証"""
     error = ModelRateLimitError("Rate limit")
-    context = {
-        "task_type": "code_generate",
-        "model_id": "gpt-5.1-codex",
-        "task_id": "test-123"
-    }
+    context = {"task_type": "code_generate", "model_id": "gpt-5.1-codex", "task_id": "test-123"}
 
     decision = decide_retry(error, 1, context)
     assert decision.action == "retry"

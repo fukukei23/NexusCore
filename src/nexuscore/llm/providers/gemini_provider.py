@@ -88,7 +88,9 @@ class GeminiLLM(BaseLLM):
                 if not text:
                     finish_reason = None
                     try:
-                        finish_reason = getattr(getattr(resp, "candidates", [None])[0], "finish_reason", None)
+                        finish_reason = getattr(
+                            getattr(resp, "candidates", [None])[0], "finish_reason", None
+                        )
                     except Exception:
                         pass
                     self.logger.warning(

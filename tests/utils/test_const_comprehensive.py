@@ -3,16 +3,14 @@ Comprehensive tests for const module.
 Tests security guard code constants and system prompts.
 """
 
-import pytest
 from nexuscore.utils.const import (
-    TOOLS_CODE,
-    write_denial_function,
-    read_denial_function,
-    class_denial,
-    GUARD_CODE,
     CODE_INTERPRETER_SYSTEM_PROMPT,
+    GUARD_CODE,
+    TOOLS_CODE,
+    class_denial,
+    read_denial_function,
+    write_denial_function,
 )
-
 
 # ==============================================================================
 # TOOLS_CODE Tests

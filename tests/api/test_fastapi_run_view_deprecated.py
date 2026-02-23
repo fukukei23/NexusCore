@@ -5,10 +5,10 @@ Minimal test to verify deprecated /api/v1/run-view/runs endpoints still work.
 """
 
 import json
+from unittest.mock import MagicMock, patch
+
 import pytest
-from pathlib import Path
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
 from nexuscore.api.fastapi_app import app
 
@@ -31,9 +31,11 @@ def mock_api_key(monkeypatch):
 @pytest.fixture
 def mock_db_models():
     """データベースモデルをモック（認証用）"""
-    with patch("nexuscore.webapp.models.User") as mock_user, \
-         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.webapp.db") as mock_db:
+    with (
+        patch("nexuscore.webapp.models.User") as mock_user,
+        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.webapp.db") as mock_db,
+    ):
         # API Key認証のモック
         mock_user_obj = MagicMock()
         mock_user_obj.id = 1
@@ -93,4 +95,3 @@ def test_deprecated_get_run_view_still_works(
     # RunState raw JSON を返さない
     assert "schema_version" not in data
     assert "integrity" not in data
-

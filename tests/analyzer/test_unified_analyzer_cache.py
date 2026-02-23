@@ -11,13 +11,14 @@ unified_analyzer キャッシュ機能の詳細テスト
 from __future__ import annotations
 
 import os
-import pytest
 import time
-from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 try:
     from nexuscore.analyzer.unified_analyzer import UnifiedAnalyzer
+
     HAS_ANALYZER = True
 except ImportError:
     HAS_ANALYZER = False
@@ -37,6 +38,7 @@ def test_cache_miss_then_hit(sample_project_dir, tmp_path):
     cache_dir = sample_project_dir / ".nexuscache"
     if cache_dir.exists():
         import shutil
+
         shutil.rmtree(cache_dir)
 
     cache_file = cache_dir / "unified_analyzer.json"
@@ -90,7 +92,9 @@ def test_cache_miss_then_hit(sample_project_dir, tmp_path):
     # 2回目の解析回数が1回目より少ないことを確認（キャッシュヒットにより）
     # 注意: ファイル数が少ない場合は差が小さい可能性がある
     if result2["stats"]["total_files"] > 1:
-        assert analyze_count_2 < analyze_count_1, "Second run should analyze fewer files due to cache hits"
+        assert (
+            analyze_count_2 < analyze_count_1
+        ), "Second run should analyze fewer files due to cache hits"
 
 
 @pytest.mark.skipif(not HAS_ANALYZER, reason="Analyzer modules not available")
@@ -156,13 +160,17 @@ def test_cache_disabled_by_env(sample_project_dir):
 
         # キャッシュが無効なので、毎回解析される
         # （ただし、同じインスタンスを使用している場合は、内部状態により異なる可能性がある）
-        assert result2["cache_info"] is None or not result2["cache_info"].get("enabled", False), "Cache should be disabled"
+        assert result2["cache_info"] is None or not result2["cache_info"].get(
+            "enabled", False
+        ), "Cache should be disabled"
 
         # 新しいインスタンスでも同じことを確認
         analyzer2 = UnifiedAnalyzer(sample_project_dir, use_cache=False)
         if analyzer2.setup(["python"]):
             result3 = analyzer2.run()
-            assert result3["cache_info"] is None or not result3["cache_info"].get("enabled", False), "Cache should be disabled"
+            assert result3["cache_info"] is None or not result3["cache_info"].get(
+                "enabled", False
+            ), "Cache should be disabled"
 
 
 @pytest.mark.skipif(not HAS_ANALYZER, reason="Analyzer modules not available")
@@ -176,6 +184,7 @@ def test_cache_reset_env_flag(sample_project_dir):
     cache_dir = sample_project_dir / ".nexuscache"
     if cache_dir.exists():
         import shutil
+
         shutil.rmtree(cache_dir)
 
     cache_file = cache_dir / "unified_analyzer.json"
@@ -192,9 +201,10 @@ def test_cache_reset_env_flag(sample_project_dir):
 
     # キャッシュファイルの内容を確認（created_at を記録）
     import json
-    with open(cache_file, 'r', encoding='utf-8') as f:
+
+    with open(cache_file, encoding="utf-8") as f:
         cache_data_1 = json.load(f)
-    created_at_1 = cache_data_1.get('created_at')
+    created_at_1 = cache_data_1.get("created_at")
 
     # 少し待ってから RESET_CACHE を設定して再実行
     time.sleep(0.1)
@@ -222,10 +232,11 @@ def test_cache_reset_env_flag(sample_project_dir):
         assert cache_file.exists(), "Cache file should be recreated"
 
         # キャッシュファイルの内容を確認（created_at が更新されている）
-        with open(cache_file, 'r', encoding='utf-8') as f:
+        with open(cache_file, encoding="utf-8") as f:
             cache_data_2 = json.load(f)
-        created_at_2 = cache_data_2.get('created_at')
+        created_at_2 = cache_data_2.get("created_at")
 
         # created_at が更新されていることを確認（または、クリア後に再生成されている）
-        assert result2["stats"]["analyzed_files"] > 0, "Files should be re-analyzed after cache reset"
-
+        assert (
+            result2["stats"]["analyzed_files"] > 0
+        ), "Files should be re-analyzed after cache reset"

@@ -8,10 +8,7 @@ from __future__ import annotations
 
 import json
 import time
-from pathlib import Path
 from typing import Any
-
-import pytest
 
 from nexuscore.orchestrator.run_lock import _lock_file_path, release_run_lock, try_acquire_run_lock
 
@@ -49,7 +46,7 @@ def test_stale_lock_reclaim(monkeypatch: Any, tmp_path: Any) -> None:
     assert lock_path.exists(), "New lock file should exist after re-acquisition"
 
     # Verify the new lock file has correct content (run_id preserved, valid expires_at)
-    with open(lock_path, "r") as f:
+    with open(lock_path) as f:
         new_lock_data = json.load(f)
     assert new_lock_data["run_id"] == run_id, "Original run_id must be preserved in lock file"
     assert new_lock_data["expires_at"] > time.time(), "New lock expires_at must be in the future"
@@ -80,7 +77,9 @@ def test_stale_lock_reclaim_with_missing_expires_at(monkeypatch: Any, tmp_path: 
 
     # Try to acquire lock - should succeed after reclaiming
     ok, reason = try_acquire_run_lock(run_id)
-    assert ok is True, "Lock acquisition should succeed when expires_at is missing (treated as stale)"
+    assert (
+        ok is True
+    ), "Lock acquisition should succeed when expires_at is missing (treated as stale)"
     assert reason is None
 
     # Cleanup
@@ -131,12 +130,12 @@ def test_safe_run_id_filesystem_injection_prevention() -> None:
         safe_id = _safe_run_id(run_id)
         # safe_id should be a hex string (sha256 produces 64 hex chars)
         assert len(safe_id) == 64, f"safe_run_id should be 64 hex chars (got {len(safe_id)})"
-        assert all(c in "0123456789abcdef" for c in safe_id), f"safe_run_id should be hex (got {safe_id})"
+        assert all(
+            c in "0123456789abcdef" for c in safe_id
+        ), f"safe_run_id should be hex (got {safe_id})"
         # Should not contain problematic chars
         assert "/" not in safe_id
         assert ":" not in safe_id
         assert "\\" not in safe_id
         assert ".." not in safe_id
         assert " " not in safe_id
-
-

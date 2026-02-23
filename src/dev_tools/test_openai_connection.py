@@ -1,7 +1,8 @@
 # test_openai_connection.py
 import os
-from openai import OpenAI
+
 from dotenv import load_dotenv
+from openai import OpenAI
 
 # .env から APIキーを読み込み
 load_dotenv()
@@ -17,9 +18,7 @@ client = OpenAI(api_key=api_key)
 try:
     response = client.chat.completions.create(
         model="gpt-4",
-        messages=[
-            {"role": "user", "content": "こんにちは！APIは正常に動いていますか？"}
-        ]
+        messages=[{"role": "user", "content": "こんにちは！APIは正常に動いていますか？"}],
     )
     print("✅ 接続成功！レスポンス：\n")
     print(response.choices[0].message.content)

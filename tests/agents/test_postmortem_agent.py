@@ -4,8 +4,8 @@ import pytest
 
 from nexuscore.agents.postmortem_agent import (
     PostmortemAgent,
-    _truncate,
     _redact,
+    _truncate,
     _validate_and_normalize,
 )
 

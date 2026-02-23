@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from nexuscore.orchestrator import authority_runner
 from nexuscore.orchestrator.run_state_store import load_state, save_state
@@ -13,7 +13,7 @@ def test_resume_schema_invalid_marks_failed_and_returns_explainability(
     monkeypatch.setenv("NEXUSCORE_RUNSTATE_HMAC_SECRET", "test-secret-key")
 
     # status=PAUSED but next_phase is null -> schema invalid per CR-020 MVP checks
-    state: Dict[str, Any] = {
+    state: dict[str, Any] = {
         "schema_version": "1.0",
         "run_id": "run-bad",
         "status": "PAUSED",
@@ -36,5 +36,3 @@ def test_resume_schema_invalid_marks_failed_and_returns_explainability(
     assert "last_error" in stored
     assert stored["last_error"]["code"]
     assert stored["last_error"]["message"]
-
-

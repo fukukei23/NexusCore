@@ -15,6 +15,7 @@ try:
         build_pr_comment,
         format_semantic_diff_block,
     )
+
     HAS_GITHUB_PR_COMMENT = True
 except ImportError:
     HAS_GITHUB_PR_COMMENT = False
@@ -96,4 +97,3 @@ def test_build_pr_comment_includes_semantic_diff() -> None:
     assert "sample.py" in comment
     assert "bar" in comment
     assert "modified" in comment
-

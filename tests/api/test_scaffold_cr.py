@@ -16,14 +16,6 @@ from nexuscore.governance.cr_spec import (
     COMPLETION_REPORT_SECTIONS,
     README_CR_REQUIRED_FIELDS,
 )
-from tools.scaffold_cr import (
-    extract_existing_cr_entries,
-    find_insert_position,
-    generate_completion_report,
-    generate_readme_entry,
-    parse_cr_id,
-)
-
 from tests.api._completion_report_helpers import (
     contains_evidence,
     contains_file_paths,
@@ -32,6 +24,13 @@ from tests.api._completion_report_helpers import (
     is_effectively_empty_text,
 )
 from tests.api._readme_cr_helpers import extract_cr_field, is_effectively_empty
+from tools.scaffold_cr import (
+    extract_existing_cr_entries,
+    find_insert_position,
+    generate_completion_report,
+    generate_readme_entry,
+    parse_cr_id,
+)
 
 
 def test_scaffold_generated_readme_entry_passes_quality_gate(tmp_path):
@@ -95,12 +94,16 @@ def test_scaffold_generated_completion_report_passes_quality_gate(tmp_path):
     # 変更ファイル一覧にファイルパスが含まれることをチェック（044 の要件）
     files_content = extract_section_content(report_content, "変更ファイル一覧")
     assert files_content is not None, "変更ファイル一覧セクションが見つかりません"
-    assert contains_file_paths(files_content), "変更ファイル一覧にファイルパス表記が含まれていません"
+    assert contains_file_paths(
+        files_content
+    ), "変更ファイル一覧にファイルパス表記が含まれていません"
 
     # 動作確認結果に証跡が含まれることをチェック（044 の要件）
     validation_content = extract_section_content(report_content, "動作確認結果")
     assert validation_content is not None, "動作確認結果セクションが見つかりません"
-    assert contains_evidence(validation_content), "動作確認結果に実行コマンドまたは結果の記述が含まれていません"
+    assert contains_evidence(
+        validation_content
+    ), "動作確認結果に実行コマンドまたは結果の記述が含まれていません"
 
     # 各セクションが実質的に空でないことをチェック（044 の要件）
     for section_name in required_sections:
@@ -200,4 +203,3 @@ def test_scaffold_completion_report_has_all_required_sections():
     for section_name in required_sections:
         section_content = extract_section_content(report_content, section_name)
         assert section_content is not None, f"必須セクション '{section_name}' が見つかりません"
-

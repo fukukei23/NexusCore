@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Gradio v4/5 対応：
 - UI 構築とイベント結線は必ず Blocks 文脈内で行う
@@ -23,6 +22,7 @@ except Exception:  # pragma: no cover - openai missing
 load_dotenv()
 _client = None
 
+
 def get_client():
     """
     Lazy-load OpenAI client so import時にAPIキーが無くても落ちない。
@@ -38,12 +38,14 @@ def get_client():
     _client = OpenAI(api_key=api_key)
     return _client
 
+
 ROOT = Path(__file__).resolve().parents[2]  # リポジトリルート（src/ の2つ上）
 SANDBOX_DIR = ROOT / "sandbox_output"
 SAMPLE_FILE = SANDBOX_DIR / "sample.py"
 TEST_FILE = SANDBOX_DIR / "test_sample.py"
 
 # ====== 生成ロジック ============================================================
+
 
 def save_sample_code(code: str) -> None:
     SANDBOX_DIR.mkdir(parents=True, exist_ok=True)
@@ -122,7 +124,9 @@ def process_code(code: str):
     except Exception as e:
         return "", f"❌ エラー: {e}"
 
+
 # ====== UI 構築（Blocks 内でコンポーネントとイベントを定義） =====================
+
 
 def build_ui() -> gr.Blocks:
     with gr.Blocks(theme=gr.themes.Soft(), fill_height=True) as demo:

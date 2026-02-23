@@ -3,10 +3,9 @@ Comprehensive tests for llm/config.py
 
 環境変数ロード、同期、設定クラスのテスト
 """
+
 import os
-import sys
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
 

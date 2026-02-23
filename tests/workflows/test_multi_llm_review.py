@@ -1,8 +1,5 @@
 import asyncio
-import json
-from unittest.mock import Mock, patch, MagicMock
-
-import pytest
+from unittest.mock import Mock, patch
 
 from nexuscore.workflows import multi_llm_review as workflow
 
@@ -13,11 +10,7 @@ from nexuscore.workflows import multi_llm_review as workflow
 class TestDataClasses:
     def test_review_item_creation(self):
         """ReviewItemの作成と属性"""
-        item = workflow.ReviewItem(
-            path="test.py",
-            content="def test(): pass",
-            error="SyntaxError"
-        )
+        item = workflow.ReviewItem(path="test.py", content="def test(): pass", error="SyntaxError")
         assert item.path == "test.py"
         assert item.content == "def test(): pass"
         assert item.error == "SyntaxError"
@@ -34,7 +27,7 @@ class TestDataClasses:
             summary={"issues": [{"title": "bug"}], "confidence": 0.8},
             raw='{"issues":[]}',
             ok=True,
-            error=""
+            error="",
         )
         assert review.model == "gpt-4"
         assert review.summary["confidence"] == 0.8
@@ -42,10 +35,7 @@ class TestDataClasses:
 
     def test_model_review_default_values(self):
         """ModelReviewのデフォルト値"""
-        review = workflow.ModelReview(
-            model="test-model",
-            summary={}
-        )
+        review = workflow.ModelReview(model="test-model", summary={})
         assert review.raw == ""
         assert review.ok is True
         assert review.error == ""
@@ -56,7 +46,7 @@ class TestDataClasses:
             issues=["issue1", "issue2"],
             file_fixes={"file.py": "fix"},
             confidence=0.95,
-            contributing_models=["model1", "model2"]
+            contributing_models=["model1", "model2"],
         )
         assert len(result.issues) == 2
         assert result.confidence == 0.95
@@ -89,7 +79,7 @@ class TestPrompts:
     def test_review_agent_has_system_prompt(self):
         """ReviewAgentがSYSTEM_PROMPTを持つ"""
         agent = workflow.ReviewAgent()
-        assert hasattr(agent, 'SYSTEM_PROMPT')
+        assert hasattr(agent, "SYSTEM_PROMPT")
         assert "JSON" in agent.SYSTEM_PROMPT
 
 
@@ -98,8 +88,14 @@ class TestPrompts:
 # ============================================================================
 def test_merge_consensus_aggregates_issues():
     reviews = [
-        workflow.ModelReview(model="m1", summary={"issues": [{"title": "A"}], "confidence": 0.6}, raw=""),
-        workflow.ModelReview(model="m2", summary={"issues": [{"title": "B"}, {"title": "A"}], "confidence": 0.8}, raw=""),
+        workflow.ModelReview(
+            model="m1", summary={"issues": [{"title": "A"}], "confidence": 0.6}, raw=""
+        ),
+        workflow.ModelReview(
+            model="m2",
+            summary={"issues": [{"title": "B"}, {"title": "A"}], "confidence": 0.8},
+            raw="",
+        ),
     ]
     consensus = workflow._merge_consensus(reviews)
     assert consensus.issues == ["A", "B"]
@@ -150,8 +146,16 @@ class TestMergeConsensus:
     def test_merge_consensus_deduplicates_issues(self):
         """重複するissueを除去"""
         reviews = [
-            workflow.ModelReview(model="m1", summary={"issues": [{"title": "A"}, {"title": "B"}], "confidence": 0.5}, raw=""),
-            workflow.ModelReview(model="m2", summary={"issues": [{"title": "A"}, {"title": "C"}], "confidence": 0.7}, raw=""),
+            workflow.ModelReview(
+                model="m1",
+                summary={"issues": [{"title": "A"}, {"title": "B"}], "confidence": 0.5},
+                raw="",
+            ),
+            workflow.ModelReview(
+                model="m2",
+                summary={"issues": [{"title": "A"}, {"title": "C"}], "confidence": 0.7},
+                raw="",
+            ),
         ]
         consensus = workflow._merge_consensus(reviews)
         assert len(consensus.issues) == 3  # A, B, C
@@ -163,7 +167,9 @@ class TestMergeConsensus:
         """issueを最大5つに制限"""
         issues_list = [{"title": f"Issue{i}"} for i in range(10)]
         reviews = [
-            workflow.ModelReview(model="m1", summary={"issues": issues_list, "confidence": 0.8}, raw="")
+            workflow.ModelReview(
+                model="m1", summary={"issues": issues_list, "confidence": 0.8}, raw=""
+            )
         ]
         consensus = workflow._merge_consensus(reviews)
         assert len(consensus.issues) <= 5
@@ -192,7 +198,9 @@ class TestMergeConsensus:
     def test_merge_consensus_handles_malformed_issues(self):
         """不正なissue形式を処理"""
         reviews = [
-            workflow.ModelReview(model="m1", summary={"issues": [{"title": "Valid"}], "confidence": 0.5}, raw=""),
+            workflow.ModelReview(
+                model="m1", summary={"issues": [{"title": "Valid"}], "confidence": 0.5}, raw=""
+            ),
         ]
         consensus = workflow._merge_consensus(reviews)
         # Validなissueが含まれる
@@ -203,11 +211,13 @@ class TestMergeConsensus:
 # _run_one_model テスト
 # ============================================================================
 class TestRunOneModel:
-    @patch('nexuscore.workflows.multi_llm_review._make_client_forced')
+    @patch("nexuscore.workflows.multi_llm_review._make_client_forced")
     def test_run_one_model_success(self, mock_make_client):
         """正常なモデル実行"""
         mock_client = Mock()
-        mock_client.execute.return_value = '{"issues":[{"title":"Bug"}],"severity":"high","confidence":0.9}'
+        mock_client.execute.return_value = (
+            '{"issues":[{"title":"Bug"}],"severity":"high","confidence":0.9}'
+        )
         mock_make_client.return_value = mock_client
 
         result = asyncio.run(workflow._run_one_model("gpt-4", "test prompt", 100))
@@ -217,7 +227,7 @@ class TestRunOneModel:
         assert result.summary["confidence"] == 0.9
         assert result.summary["severity"] == "high"
 
-    @patch('nexuscore.workflows.multi_llm_review._make_client_forced')
+    @patch("nexuscore.workflows.multi_llm_review._make_client_forced")
     def test_run_one_model_json_parse_error(self, mock_make_client):
         """JSON解析エラー時のフォールバック"""
         mock_client = Mock()
@@ -230,7 +240,7 @@ class TestRunOneModel:
         assert result.summary["issues"] == []
         assert result.summary["confidence"] == 0.0
 
-    @patch('nexuscore.workflows.multi_llm_review._make_client_forced')
+    @patch("nexuscore.workflows.multi_llm_review._make_client_forced")
     def test_run_one_model_client_error(self, mock_make_client):
         """クライアントエラー時の処理"""
         mock_make_client.side_effect = Exception("API Error")
@@ -241,7 +251,7 @@ class TestRunOneModel:
         assert "API Error" in result.error
         assert result.summary["confidence"] == 0.0
 
-    @patch('nexuscore.workflows.multi_llm_review._make_client_forced')
+    @patch("nexuscore.workflows.multi_llm_review._make_client_forced")
     def test_run_one_model_empty_response(self, mock_make_client):
         """空のレスポンス処理"""
         mock_client = Mock()
@@ -352,6 +362,7 @@ class TestRunConsensusReview:
 
     def test_run_consensus_review_single_model(self, monkeypatch):
         """単一モデルでの実行"""
+
         async def fake_run_one(model_name, prompt, max_tokens):
             return workflow.ModelReview(
                 model=model_name,

@@ -5,6 +5,7 @@ views_projects.py の包括的なテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側のテストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask legacy views_projects comprehensive tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -254,7 +255,9 @@ class TestListProjects:
         db.session.add(other_user)
         db.session.commit()
 
-        other_project = Project(owner_id=other_user.id, name="other_project", local_path="/tmp/other")
+        other_project = Project(
+            owner_id=other_user.id, name="other_project", local_path="/tmp/other"
+        )
         db.session.add(other_project)
         db.session.commit()
 
@@ -263,7 +266,9 @@ class TestListProjects:
         assert response.status_code == 200
         assert b"other_project" not in response.data
 
-    def test_list_projects_displays_success_rate(self, authenticated_client, test_project, test_user):
+    def test_list_projects_displays_success_rate(
+        self, authenticated_client, test_project, test_user
+    ):
         """成功率が表示される"""
         # Runを作成
         for _ in range(10):
@@ -282,7 +287,9 @@ class TestListProjects:
         assert response.status_code == 200
         assert b"Success Rate" in response.data
 
-    def test_list_projects_displays_latest_run_status(self, authenticated_client, test_project, test_run):
+    def test_list_projects_displays_latest_run_status(
+        self, authenticated_client, test_project, test_run
+    ):
         """最新Runステータスが表示される"""
         response = authenticated_client.get("/projects/")
 
@@ -338,7 +345,9 @@ class TestProjectDetail:
         db.session.add(other_user)
         db.session.commit()
 
-        other_project = Project(owner_id=other_user.id, name="other_project", local_path="/tmp/other")
+        other_project = Project(
+            owner_id=other_user.id, name="other_project", local_path="/tmp/other"
+        )
         db.session.add(other_project)
         db.session.commit()
 
@@ -373,8 +382,7 @@ class TestProjectDetail:
     def test_project_detail_json_response(self, authenticated_client, test_project, test_run):
         """Accept: application/jsonヘッダーでJSON形式を返す"""
         response = authenticated_client.get(
-            f"/projects/{test_project.id}",
-            headers={"Accept": "application/json"}
+            f"/projects/{test_project.id}", headers={"Accept": "application/json"}
         )
 
         assert response.status_code == 200
@@ -416,11 +424,14 @@ class TestCreateProject:
 
     def test_create_project_post_creates_project(self, authenticated_client, test_user):
         """POSTでプロジェクトを作成できる"""
-        response = authenticated_client.post("/projects/new", data={
-            "name": "New Project",
-            "local_path": "/tmp/new",
-            "repo_url": "https://github.com/test/new",
-        })
+        response = authenticated_client.post(
+            "/projects/new",
+            data={
+                "name": "New Project",
+                "local_path": "/tmp/new",
+                "repo_url": "https://github.com/test/new",
+            },
+        )
 
         assert response.status_code == 302  # リダイレクト
 
@@ -432,27 +443,36 @@ class TestCreateProject:
 
     def test_create_project_post_without_name_returns_error(self, authenticated_client):
         """nameなしはエラー"""
-        response = authenticated_client.post("/projects/new", data={
-            "local_path": "/tmp/new",
-        })
+        response = authenticated_client.post(
+            "/projects/new",
+            data={
+                "local_path": "/tmp/new",
+            },
+        )
 
         assert response.status_code == 400
         assert b"error" in response.data.lower() or b"required" in response.data.lower()
 
     def test_create_project_post_without_local_path_returns_error(self, authenticated_client):
         """local_pathなしはエラー"""
-        response = authenticated_client.post("/projects/new", data={
-            "name": "New Project",
-        })
+        response = authenticated_client.post(
+            "/projects/new",
+            data={
+                "name": "New Project",
+            },
+        )
 
         assert response.status_code == 400
 
     def test_create_project_post_without_repo_url_is_ok(self, authenticated_client, test_user):
         """repo_urlなしでも作成できる"""
-        response = authenticated_client.post("/projects/new", data={
-            "name": "New Project",
-            "local_path": "/tmp/new",
-        })
+        response = authenticated_client.post(
+            "/projects/new",
+            data={
+                "name": "New Project",
+                "local_path": "/tmp/new",
+            },
+        )
 
         assert response.status_code == 302
 
@@ -474,12 +494,11 @@ class TestTriggerRun:
         response = client.post(f"/projects/{test_project.id}/run")
         assert response.status_code in [302, 401]
 
-    def test_trigger_run_without_requirement_returns_error(self, authenticated_client, test_project):
+    def test_trigger_run_without_requirement_returns_error(
+        self, authenticated_client, test_project
+    ):
         """requirementなしはエラー"""
-        response = authenticated_client.post(
-            f"/projects/{test_project.id}/run",
-            json={}
-        )
+        response = authenticated_client.post(f"/projects/{test_project.id}/run", json={})
 
         assert response.status_code == 400
 
@@ -490,8 +509,7 @@ class TestTriggerRun:
         mock_task.delay.return_value = Mock(id="task-123")
 
         response = authenticated_client.post(
-            f"/projects/{test_project.id}/run",
-            json={"requirement": "Fix bugs"}
+            f"/projects/{test_project.id}/run", json={"requirement": "Fix bugs"}
         )
 
         # Runが作成されている
@@ -508,8 +526,7 @@ class TestTriggerRun:
     def test_trigger_run_without_celery(self, mock_inline, authenticated_client, test_project):
         """Celery未使用時は同期実行"""
         response = authenticated_client.post(
-            f"/projects/{test_project.id}/run",
-            json={"requirement": "Run tests"}
+            f"/projects/{test_project.id}/run", json={"requirement": "Run tests"}
         )
 
         # Runが作成されている
@@ -527,7 +544,7 @@ class TestTriggerRun:
 
                 response = authenticated_client.post(
                     f"/projects/{test_project.id}/run",
-                    json={"requirement": "Test", "autonomy_level": 2}
+                    json={"requirement": "Test", "autonomy_level": 2},
                 )
 
                 run = Run.query.filter_by(project_id=test_project.id).first()
@@ -541,7 +558,7 @@ class TestTriggerRun:
 
                 response = authenticated_client.post(
                     f"/projects/{test_project.id}/run",
-                    json={"requirement": "Test", "fast_lane": True}
+                    json={"requirement": "Test", "fast_lane": True},
                 )
 
                 # Runが作成されている
@@ -554,13 +571,14 @@ class TestTriggerRun:
         db.session.add(other_user)
         db.session.commit()
 
-        other_project = Project(owner_id=other_user.id, name="other_project", local_path="/tmp/other")
+        other_project = Project(
+            owner_id=other_user.id, name="other_project", local_path="/tmp/other"
+        )
         db.session.add(other_project)
         db.session.commit()
 
         response = authenticated_client.post(
-            f"/projects/{other_project.id}/run",
-            json={"requirement": "Test"}
+            f"/projects/{other_project.id}/run", json={"requirement": "Test"}
         )
 
         assert response.status_code == 404
@@ -574,7 +592,7 @@ class TestTriggerRun:
                 response = authenticated_client.post(
                     f"/projects/{test_project.id}/run",
                     json={"requirement": "Test"},
-                    headers={"Accept": "application/json"}
+                    headers={"Accept": "application/json"},
                 )
 
                 assert response.status_code == 202

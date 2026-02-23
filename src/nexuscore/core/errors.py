@@ -8,53 +8,61 @@ Retry 戦略を決定するために使用する。
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 class NexusCoreError(Exception):
     """Base class for NexusCore-specific errors."""
+
     pass
 
 
 class ModelRateLimitError(NexusCoreError):
     """LLM API のレートリミット（429）"""
+
     pass
 
 
 class ModelTimeoutError(NexusCoreError):
     """LLM 応答タイムアウト"""
+
     pass
 
 
 class ModelConnectionError(NexusCoreError):
     """ネットワーク系の一時的なエラー"""
+
     pass
 
 
 class InvalidModelOutputError(NexusCoreError):
     """LLM 出力が期待する JSON/構造になっていない"""
+
     pass
 
 
 class SandboxExecutionError(NexusCoreError):
     """テスト実行・コード実行系のエラー"""
+
     pass
 
 
 class SandboxSecurityError(NexusCoreError):
     """サンドボックスセキュリティ違反（禁止モジュールの利用など）"""
+
     pass
 
 
 class PatchApplyError(NexusCoreError):
     """patch_applier の適用失敗"""
+
     pass
 
 
 class UnexpectedSystemError(NexusCoreError):
     """想定外の例外ラッパ"""
+
     pass
 
 
@@ -82,8 +90,7 @@ def classify_error(exc: Exception) -> str:
     # Step 1: 入力検証（3.4.3）
     if exc is None:
         logger.warning(
-            "classify_error received None. Treating as unclassifiable error.",
-            exc_info=False
+            "classify_error received None. Treating as unclassifiable error.", exc_info=False
         )
         return "unexpected"
 
@@ -113,7 +120,7 @@ def classify_error(exc: Exception) -> str:
                 logger.warning(
                     f"Failed to stringify error object (type: {type(exc).__name__}). "
                     f"Reason: {e}. Treating as unclassifiable error.",
-                    exc_info=False
+                    exc_info=False,
                 )
                 return "unexpected"
 
@@ -124,17 +131,23 @@ def classify_error(exc: Exception) -> str:
             elif "timeout" in error_str or "timeout" in error_type or "timed out" in error_str:
                 result = "timeout"
             # 接続エラー
-            elif any(keyword in error_str for keyword in ["connection", "connect", "network", "dns", "resolve"]):
+            elif any(
+                keyword in error_str
+                for keyword in ["connection", "connect", "network", "dns", "resolve"]
+            ):
                 result = "connection"
             elif any(keyword in error_type for keyword in ["connection", "connect", "network"]):
                 result = "connection"
             # JSON パースエラー（LLM 出力が不正）
             # メッセージまたは型名にJSON/parseキーワードが含まれる場合（OR論理）
-            elif any(keyword in error_str for keyword in ["json", "parse", "decode", "invalid format"]) or \
-                 any(keyword in error_type for keyword in ["json", "parse", "decode"]):
+            elif any(
+                keyword in error_str for keyword in ["json", "parse", "decode", "invalid format"]
+            ) or any(keyword in error_type for keyword in ["json", "parse", "decode"]):
                 result = "invalid_output"
             # サンドボックス関連
-            elif any(keyword in error_str for keyword in ["sandbox", "subprocess", "execution failed"]):
+            elif any(
+                keyword in error_str for keyword in ["sandbox", "subprocess", "execution failed"]
+            ):
                 result = "sandbox"
             # パッチ適用関連
             elif any(keyword in error_str for keyword in ["patch", "apply", "diff"]):
@@ -147,7 +160,15 @@ def classify_error(exc: Exception) -> str:
         logger.info(f"Error classified as '{result}': {type(exc).__name__} - {str(exc)[:200]}")
 
         # 分類結果が定義済みカテゴリに含まれているか検証（3.4.1）
-        valid_categories = {"rate_limit", "timeout", "connection", "invalid_output", "sandbox", "patch_apply", "unexpected"}
+        valid_categories = {
+            "rate_limit",
+            "timeout",
+            "connection",
+            "invalid_output",
+            "sandbox",
+            "patch_apply",
+            "unexpected",
+        }
         if result not in valid_categories:
             # Step 2: 分類不能エラーのログ記録（3.4.2 Step 2）
             logger.warning(
@@ -166,7 +187,7 @@ def classify_error(exc: Exception) -> str:
             f"Original error: {type(exc).__name__} - {str(exc)[:200]}. "
             f"Classification error: {type(classification_error).__name__} - {str(classification_error)}. "
             f"Treating as unclassifiable error.",
-            exc_info=True
+            exc_info=True,
         )
         # Step 1: 安全な分類結果の返却（3.4.2 Step 1）
         return "unexpected"
@@ -221,7 +242,7 @@ def convert_http_error_to_nexus_error(exc: Exception) -> NexusCoreError:
             f"Original error: {type(exc).__name__ if exc is not None else 'None'}. "
             f"Conversion error: {type(conversion_error).__name__} - {str(conversion_error)}. "
             f"Falling back to UnexpectedSystemError.",
-            exc_info=True
+            exc_info=True,
         )
         # Step 3: 安全な例外として伝播（3.4.2 Step 3）
         try:

@@ -8,18 +8,17 @@ Comprehensive Tests for sandbox_executor.py
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
-import pytest
+
 import subprocess
-import time
-import tempfile
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock, mock_open, call
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from nexuscore.core.sandbox_executor import (
-    load_sandbox_policy,
     SandboxExceptionType,
-    SandboxResult,
     SandboxExecutor,
+    SandboxResult,
+    load_sandbox_policy,
     run_in_sandbox,
 )
 
@@ -37,7 +36,7 @@ except ImportError:
 class TestLoadSandboxPolicy:
     def test_load_policy_default_when_yaml_not_available(self):
         """YAMLがない場合のデフォルトポリシー"""
-        with patch('nexuscore.core.sandbox_executor.yaml', None):
+        with patch("nexuscore.core.sandbox_executor.yaml", None):
             policy = load_sandbox_policy()
 
             assert "resource_limits" in policy
@@ -53,10 +52,10 @@ class TestLoadSandboxPolicy:
         assert policy["resource_limits"]["wall_time_seconds"] == 60
         assert policy["retry_policy"]["max_retries"] == 1
 
-    @patch.dict('os.environ', {'NEXUSCORE_SANDBOX_POLICY': '/custom/policy.yml'})
+    @patch.dict("os.environ", {"NEXUSCORE_SANDBOX_POLICY": "/custom/policy.yml"})
     def test_load_policy_from_env_var(self):
         """環境変数からポリシーパスを取得"""
-        with patch('pathlib.Path.exists', return_value=False):
+        with patch("pathlib.Path.exists", return_value=False):
             policy = load_sandbox_policy()
 
             # ファイルが見つからないのでデフォルトが返される
@@ -196,7 +195,7 @@ class TestSandboxExecutorInit:
 
 
 class TestRunInSandbox:
-    @patch('nexuscore.core.sandbox_executor.subprocess.run')
+    @patch("nexuscore.core.sandbox_executor.subprocess.run")
     def test_run_in_sandbox_success(self, mock_run):
         """正常実行"""
         mock_result = Mock()
@@ -212,7 +211,7 @@ class TestRunInSandbox:
         assert result.stdout == "success output"
         assert result.timed_out is False
 
-    @patch('nexuscore.core.sandbox_executor.subprocess.run')
+    @patch("nexuscore.core.sandbox_executor.subprocess.run")
     def test_run_in_sandbox_with_timeout(self, mock_run):
         """カスタムタイムアウト"""
         mock_run.side_effect = subprocess.TimeoutExpired(["sleep", "10"], 5)
@@ -223,7 +222,7 @@ class TestRunInSandbox:
         assert result.timed_out is True
         assert result.exception_type == SandboxExceptionType.TIMEOUT
 
-    @patch('nexuscore.core.sandbox_executor.subprocess.run')
+    @patch("nexuscore.core.sandbox_executor.subprocess.run")
     def test_run_in_sandbox_with_cwd(self, mock_run):
         """作業ディレクトリ指定"""
         mock_result = Mock(stdout="", stderr="", returncode=0)
@@ -235,7 +234,7 @@ class TestRunInSandbox:
         mock_run.assert_called_once()
         assert mock_run.call_args[1]["cwd"] == "/tmp"
 
-    @patch('nexuscore.core.sandbox_executor.subprocess.run')
+    @patch("nexuscore.core.sandbox_executor.subprocess.run")
     def test_run_in_sandbox_with_env(self, mock_run):
         """環境変数指定"""
         mock_result = Mock(stdout="", stderr="", returncode=0)
@@ -248,8 +247,8 @@ class TestRunInSandbox:
         mock_run.assert_called_once()
         assert mock_run.call_args[1]["env"] == custom_env
 
-    @patch('nexuscore.core.sandbox_executor.subprocess.run')
-    @patch('nexuscore.core.sandbox_executor.time.sleep')
+    @patch("nexuscore.core.sandbox_executor.subprocess.run")
+    @patch("nexuscore.core.sandbox_executor.time.sleep")
     def test_run_in_sandbox_with_retry(self, mock_sleep, mock_run):
         """リトライ機能"""
         # 最初の2回は失敗、3回目で成功
@@ -267,7 +266,7 @@ class TestRunInSandbox:
         assert mock_run.call_count == 3
         assert mock_sleep.call_count == 2  # 2回リトライ
 
-    @patch('nexuscore.core.sandbox_executor.subprocess.run')
+    @patch("nexuscore.core.sandbox_executor.subprocess.run")
     def test_run_in_sandbox_no_retry_on_execution_error(self, mock_run):
         """実行エラーの場合はリトライしない"""
         mock_run.side_effect = Exception("syntax error")
@@ -278,7 +277,7 @@ class TestRunInSandbox:
         assert result.exception_type == SandboxExceptionType.EXECUTION_ERROR
         assert mock_run.call_count == 1  # リトライしない
 
-    @patch('nexuscore.core.sandbox_executor.subprocess.run')
+    @patch("nexuscore.core.sandbox_executor.subprocess.run")
     def test_run_in_sandbox_no_retry_when_disabled(self, mock_run):
         """retry_on_errors=Falseの場合"""
         mock_run.side_effect = Exception("error")
@@ -296,7 +295,7 @@ class TestRunInSandbox:
 
 
 class TestExecuteOnce:
-    @patch('nexuscore.core.sandbox_executor.subprocess.run')
+    @patch("nexuscore.core.sandbox_executor.subprocess.run")
     def test_execute_once_success(self, mock_run):
         """1回の実行成功"""
         mock_result = Mock(stdout="output", stderr="", returncode=0)
@@ -310,7 +309,7 @@ class TestExecuteOnce:
         # execution_time_sec is real time, just check it's >= 0
         assert result.execution_time_sec >= 0
 
-    @patch('nexuscore.core.sandbox_executor.subprocess.run')
+    @patch("nexuscore.core.sandbox_executor.subprocess.run")
     def test_execute_once_timeout(self, mock_run):
         """タイムアウト発生"""
         mock_run.side_effect = subprocess.TimeoutExpired(["sleep"], 5)
@@ -375,14 +374,13 @@ class TestLogSandboxError:
         """webappがある場合のログ記録"""
         # webapp モジュールをモック
         import sys
-        from unittest.mock import MagicMock
 
         mock_webapp = MagicMock()
         mock_log_func = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules['nexuscore.webapp'] = mock_webapp
-        sys.modules['nexuscore.webapp.logging_service'] = mock_webapp.logging_service
+        sys.modules["nexuscore.webapp"] = mock_webapp
+        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
 
         try:
             executor = SandboxExecutor()
@@ -401,16 +399,17 @@ class TestLogSandboxError:
             assert call_kwargs["message"] == "Test timeout"
         finally:
             # クリーンアップ
-            sys.modules.pop('nexuscore.webapp', None)
-            sys.modules.pop('nexuscore.webapp.logging_service', None)
+            sys.modules.pop("nexuscore.webapp", None)
+            sys.modules.pop("nexuscore.webapp.logging_service", None)
 
     def test_log_sandbox_error_without_webapp(self):
         """webappがない場合（ImportErrorが発生してもスキップされる）"""
         # ImportErrorをシミュレート
         import sys
-        webapp_module = sys.modules.get('nexuscore.webapp.logging_service')
-        if 'nexuscore.webapp.logging_service' in sys.modules:
-            del sys.modules['nexuscore.webapp.logging_service']
+
+        webapp_module = sys.modules.get("nexuscore.webapp.logging_service")
+        if "nexuscore.webapp.logging_service" in sys.modules:
+            del sys.modules["nexuscore.webapp.logging_service"]
 
         try:
             executor = SandboxExecutor()
@@ -424,7 +423,7 @@ class TestLogSandboxError:
         finally:
             # モジュールを復元
             if webapp_module is not None:
-                sys.modules['nexuscore.webapp.logging_service'] = webapp_module
+                sys.modules["nexuscore.webapp.logging_service"] = webapp_module
 
 
 # ============================================================================
@@ -433,7 +432,7 @@ class TestLogSandboxError:
 
 
 class TestGlobalRunInSandbox:
-    @patch('nexuscore.core.sandbox_executor.subprocess.run')
+    @patch("nexuscore.core.sandbox_executor.subprocess.run")
     def test_global_run_in_sandbox(self, mock_run):
         """グローバル関数でのサンドボックス実行"""
         mock_result = Mock(stdout="output", stderr="", returncode=0)
@@ -451,8 +450,8 @@ class TestGlobalRunInSandbox:
 
 
 class TestIntegrationScenarios:
-    @patch('nexuscore.core.sandbox_executor.subprocess.run')
-    @patch('nexuscore.core.sandbox_executor.time.sleep')
+    @patch("nexuscore.core.sandbox_executor.subprocess.run")
+    @patch("nexuscore.core.sandbox_executor.time.sleep")
     def test_full_retry_workflow(self, mock_sleep, mock_run):
         """完全なリトライワークフロー"""
         # 最初2回失敗、3回目成功
@@ -476,7 +475,7 @@ class TestIntegrationScenarios:
         assert sleep_calls[0] == 1.0  # 1回目のリトライ
         assert sleep_calls[1] == 2.0  # 2回目のリトライ（2倍）
 
-    @patch('nexuscore.core.sandbox_executor.subprocess.run')
+    @patch("nexuscore.core.sandbox_executor.subprocess.run")
     def test_timeout_no_retry(self, mock_run):
         """タイムアウトはリトライしない"""
         mock_run.side_effect = subprocess.TimeoutExpired(["sleep"], 5)
@@ -487,7 +486,7 @@ class TestIntegrationScenarios:
         assert result.timed_out is True
         assert mock_run.call_count == 1  # リトライしない
 
-    @patch('nexuscore.core.sandbox_executor.subprocess.run')
+    @patch("nexuscore.core.sandbox_executor.subprocess.run")
     def test_execution_error_no_retry(self, mock_run):
         """実行エラーはリトライしない"""
         mock_run.side_effect = Exception("SyntaxError: invalid syntax")
@@ -498,7 +497,7 @@ class TestIntegrationScenarios:
         assert result.exception_type == SandboxExceptionType.EXECUTION_ERROR
         assert mock_run.call_count == 1
 
-    @patch('nexuscore.core.sandbox_executor.subprocess.run')
+    @patch("nexuscore.core.sandbox_executor.subprocess.run")
     def test_measure_execution_time(self, mock_run):
         """実行時間の測定"""
         mock_result = Mock(stdout="", stderr="", returncode=0)

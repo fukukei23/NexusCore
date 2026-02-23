@@ -8,25 +8,24 @@ unified_gradio_ui.py ベースの Gradio UI について、
 
 from __future__ import annotations
 
-import subprocess
 from unittest.mock import Mock, patch
 
-import pytest
 import gradio as gr
+import pytest
 
-from nexuscore.ui.unified_gradio_ui import build_unified_ui, run_test_handler
-from nexuscore.ui.unified_gradio_ui import AppState
+from nexuscore.ui.unified_gradio_ui import AppState, build_unified_ui, run_test_handler
+from tests.gradio.helpers_gradio import assert_buttons_exist, assert_tabs_exist
 from tests.gradio.ui_keywords_gradio import (
+    GRADIO_BUTTON_LABELS,
     GRADIO_MAIN_TITLE,
     GRADIO_TABS,
-    GRADIO_BUTTON_LABELS,
 )
-from tests.gradio.helpers_gradio import assert_tabs_exist, assert_buttons_exist
 
 
 def test_unified_gradio_ui_imports():
     """unified_gradio_ui モジュールがインポートできることを確認"""
     from nexuscore.ui import unified_gradio_ui
+
     assert hasattr(unified_gradio_ui, "build_unified_ui")
     assert hasattr(unified_gradio_ui, "launch_unified_ui")
 
@@ -160,4 +159,3 @@ def test_run_test_handler_whitespace_only_test_file():
         call_args = mock_run.call_args
         assert call_args[0][0] == [command]  # コマンドリストが1要素のみ
         assert call_args[1]["shell"] is False
-

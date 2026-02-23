@@ -5,21 +5,20 @@ Tests retry logic with exponential backoff, RetryContext tracking,
 and error classification integration.
 """
 
-import time
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
+
 import pytest
 
-from nexuscore.core.retry_utils import (
-    RetryContext,
-    retry_with_context,
-    retry,
-)
 from nexuscore.core.errors import (
+    InvalidModelOutputError,
+    ModelConnectionError,
     ModelRateLimitError,
     ModelTimeoutError,
-    ModelConnectionError,
-    NexusCoreError,
-    InvalidModelOutputError,
+)
+from nexuscore.core.retry_utils import (
+    RetryContext,
+    retry,
+    retry_with_context,
 )
 
 
@@ -117,12 +116,11 @@ class TestRetryWithContext:
 
     def test_retries_on_rate_limit_error(self):
         """Test retries on ModelRateLimitError."""
-        mock_func = Mock(__name__="test_func", side_effect=[
-            ModelRateLimitError("Rate limit"),
-            "success"
-        ])
+        mock_func = Mock(
+            __name__="test_func", side_effect=[ModelRateLimitError("Rate limit"), "success"]
+        )
 
-        with patch('time.sleep'):  # Skip actual sleep
+        with patch("time.sleep"):  # Skip actual sleep
             wrapped = retry_with_context(mock_func, max_retries=2, base_delay=0.1)
             result = wrapped()
 
@@ -131,13 +129,16 @@ class TestRetryWithContext:
 
     def test_retries_on_timeout_error(self):
         """Test retries on ModelTimeoutError."""
-        mock_func = Mock(__name__="test_func", side_effect=[
-            ModelTimeoutError("Timeout"),
-            ModelTimeoutError("Timeout again"),
-            "success"
-        ])
+        mock_func = Mock(
+            __name__="test_func",
+            side_effect=[
+                ModelTimeoutError("Timeout"),
+                ModelTimeoutError("Timeout again"),
+                "success",
+            ],
+        )
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             wrapped = retry_with_context(mock_func, max_retries=3, base_delay=0.1)
             result = wrapped()
 
@@ -146,12 +147,11 @@ class TestRetryWithContext:
 
     def test_retries_on_connection_error(self):
         """Test retries on ModelConnectionError."""
-        mock_func = Mock(__name__="test_func", side_effect=[
-            ModelConnectionError("Connection failed"),
-            "success"
-        ])
+        mock_func = Mock(
+            __name__="test_func", side_effect=[ModelConnectionError("Connection failed"), "success"]
+        )
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             wrapped = retry_with_context(mock_func, max_retries=2, base_delay=0.1)
             result = wrapped()
 
@@ -160,7 +160,9 @@ class TestRetryWithContext:
 
     def test_does_not_retry_on_non_retryable_error(self):
         """Test does not retry on non-retryable errors."""
-        mock_func = Mock(__name__="test_func", side_effect=InvalidModelOutputError("Invalid output"))
+        mock_func = Mock(
+            __name__="test_func", side_effect=InvalidModelOutputError("Invalid output")
+        )
 
         wrapped = retry_with_context(mock_func, max_retries=2)
 
@@ -173,7 +175,7 @@ class TestRetryWithContext:
         """Test raises after exhausting max retries."""
         mock_func = Mock(__name__="test_func", side_effect=ModelRateLimitError("Rate limit"))
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             wrapped = retry_with_context(mock_func, max_retries=2)
 
             with pytest.raises(ModelRateLimitError):
@@ -183,13 +185,16 @@ class TestRetryWithContext:
 
     def test_exponential_backoff_delays(self):
         """Test exponential backoff increases delay correctly."""
-        mock_func = Mock(__name__="test_func", side_effect=[
-            ModelRateLimitError("Error 1"),
-            ModelRateLimitError("Error 2"),
-            ModelRateLimitError("Error 3"),
-        ])
+        mock_func = Mock(
+            __name__="test_func",
+            side_effect=[
+                ModelRateLimitError("Error 1"),
+                ModelRateLimitError("Error 2"),
+                ModelRateLimitError("Error 3"),
+            ],
+        )
 
-        with patch('time.sleep') as mock_sleep:
+        with patch("time.sleep") as mock_sleep:
             wrapped = retry_with_context(mock_func, max_retries=2, base_delay=1.0)
 
             with pytest.raises(ModelRateLimitError):
@@ -202,13 +207,12 @@ class TestRetryWithContext:
 
     def test_context_records_retry_count(self):
         """Test RetryContext records retry count correctly."""
-        mock_func = Mock(__name__="test_func", side_effect=[
-            ModelRateLimitError("Error"),
-            "success"
-        ])
+        mock_func = Mock(
+            __name__="test_func", side_effect=[ModelRateLimitError("Error"), "success"]
+        )
         ctx = RetryContext()
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             wrapped = retry_with_context(mock_func, max_retries=2, context=ctx)
             result = wrapped()
 
@@ -218,14 +222,17 @@ class TestRetryWithContext:
 
     def test_context_records_all_errors(self):
         """Test RetryContext records all error attempts."""
-        mock_func = Mock(__name__="test_func", side_effect=[
-            ModelTimeoutError("Timeout 1"),
-            ModelRateLimitError("Rate limit"),
-            "success"
-        ])
+        mock_func = Mock(
+            __name__="test_func",
+            side_effect=[
+                ModelTimeoutError("Timeout 1"),
+                ModelRateLimitError("Rate limit"),
+                "success",
+            ],
+        )
         ctx = RetryContext()
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             wrapped = retry_with_context(mock_func, max_retries=3, context=ctx)
             result = wrapped()
 
@@ -236,17 +243,10 @@ class TestRetryWithContext:
 
     def test_custom_retry_on_exceptions(self):
         """Test custom retry_on exception list."""
-        mock_func = Mock(__name__="test_func", side_effect=[
-            ValueError("Custom error"),
-            "success"
-        ])
+        mock_func = Mock(__name__="test_func", side_effect=[ValueError("Custom error"), "success"])
 
-        with patch('time.sleep'):
-            wrapped = retry_with_context(
-                mock_func,
-                max_retries=2,
-                retry_on=(ValueError,)
-            )
+        with patch("time.sleep"):
+            wrapped = retry_with_context(mock_func, max_retries=2, retry_on=(ValueError,))
             result = wrapped()
 
         assert result == "success"
@@ -254,18 +254,13 @@ class TestRetryWithContext:
 
     def test_custom_logger(self):
         """Test uses custom logger when provided."""
-        mock_func = Mock(__name__="test_func", side_effect=[
-            ModelRateLimitError("Error"),
-            "success"
-        ])
+        mock_func = Mock(
+            __name__="test_func", side_effect=[ModelRateLimitError("Error"), "success"]
+        )
         mock_logger = Mock()
 
-        with patch('time.sleep'):
-            wrapped = retry_with_context(
-                mock_func,
-                max_retries=2,
-                logger_instance=mock_logger
-            )
+        with patch("time.sleep"):
+            wrapped = retry_with_context(mock_func, max_retries=2, logger_instance=mock_logger)
             result = wrapped()
 
         # Should have logged warning for retry
@@ -277,12 +272,8 @@ class TestRetryWithContext:
         mock_func = Mock(__name__="test_func", side_effect=ModelRateLimitError("Rate limit"))
         mock_logger = Mock()
 
-        with patch('time.sleep'):
-            wrapped = retry_with_context(
-                mock_func,
-                max_retries=1,
-                logger_instance=mock_logger
-            )
+        with patch("time.sleep"):
+            wrapped = retry_with_context(mock_func, max_retries=1, logger_instance=mock_logger)
 
             with pytest.raises(ModelRateLimitError):
                 wrapped()
@@ -293,6 +284,7 @@ class TestRetryWithContext:
 
     def test_preserves_function_name_and_attributes(self):
         """Test decorator preserves function metadata."""
+
         def my_test_function():
             """Test docstring."""
             return "result"
@@ -317,7 +309,7 @@ class TestRetryDecorator:
                 raise ModelRateLimitError("Error")
             return "success"
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             result = failing_function()
 
         assert result == "success"
@@ -325,12 +317,11 @@ class TestRetryDecorator:
 
     def test_retry_as_direct_wrapper(self):
         """Test retry()(func) direct wrapper syntax."""
-        mock_func = Mock(__name__="test_func", side_effect=[
-            ModelTimeoutError("Timeout"),
-            "success"
-        ])
+        mock_func = Mock(
+            __name__="test_func", side_effect=[ModelTimeoutError("Timeout"), "success"]
+        )
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             wrapped = retry(max_retries=2)(mock_func)
             result = wrapped()
 
@@ -339,12 +330,11 @@ class TestRetryDecorator:
 
     def test_retry_without_parentheses_when_func_provided(self):
         """Test retry(func) syntax when function is directly provided."""
-        mock_func = Mock(__name__="test_func", side_effect=[
-            ModelRateLimitError("Error"),
-            "success"
-        ])
+        mock_func = Mock(
+            __name__="test_func", side_effect=[ModelRateLimitError("Error"), "success"]
+        )
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             wrapped = retry(mock_func, max_retries=1)
             result = wrapped()
 
@@ -360,7 +350,7 @@ class TestRetryDecorator:
             max_retries=3,
             base_delay=0.5,
             retry_on=(ValueError, KeyError),
-            logger_instance=mock_logger
+            logger_instance=mock_logger,
         )
         def custom_function():
             call_count["count"] += 1
@@ -368,7 +358,7 @@ class TestRetryDecorator:
                 raise ValueError("Test error")
             return "done"
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             result = custom_function()
 
         assert result == "done"
@@ -388,7 +378,7 @@ class TestRetryIntegration:
         ]
         mock_func = Mock(__name__="test_func", side_effect=errors + ["success"])
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             wrapped = retry_with_context(mock_func, max_retries=5)
             result = wrapped()
 
@@ -397,14 +387,13 @@ class TestRetryIntegration:
 
     def test_context_to_dict_integration(self):
         """Test full flow from retry to context.to_dict()."""
-        mock_func = Mock(__name__="test_func", side_effect=[
-            ModelRateLimitError("Error 1"),
-            ModelTimeoutError("Error 2"),
-            "success"
-        ])
+        mock_func = Mock(
+            __name__="test_func",
+            side_effect=[ModelRateLimitError("Error 1"), ModelTimeoutError("Error 2"), "success"],
+        )
         ctx = RetryContext()
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             wrapped = retry_with_context(mock_func, max_retries=3, context=ctx)
             result = wrapped()
 
@@ -435,7 +424,7 @@ class TestRetryIntegration:
                 raise ModelTimeoutError("Error")
             return f"{a}-{b}-{c}"
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             wrapped = retry_with_context(func_with_args, max_retries=2)
             result = wrapped("x", "y", c="z")
 
@@ -444,12 +433,11 @@ class TestRetryIntegration:
 
     def test_retry_respects_base_delay_parameter(self):
         """Test base_delay parameter affects sleep duration."""
-        mock_func = Mock(__name__="test_func", side_effect=[
-            ModelRateLimitError("Error"),
-            "success"
-        ])
+        mock_func = Mock(
+            __name__="test_func", side_effect=[ModelRateLimitError("Error"), "success"]
+        )
 
-        with patch('time.sleep') as mock_sleep:
+        with patch("time.sleep") as mock_sleep:
             wrapped = retry_with_context(mock_func, max_retries=2, base_delay=5.0)
             result = wrapped()
 

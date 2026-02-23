@@ -4,10 +4,11 @@ FastAPI Execute エンドポイントのテスト
 CR-FASTAPI-002 で作成された /api/v1/execute と /api/v1/status/{task_id} エンドポイントのテスト。
 既存の Flask テスト (`tests/test_api_server.py`) の期待値に準拠。
 """
-import os
+
+from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
 from nexuscore.api.fastapi_app import app
 
@@ -25,8 +26,10 @@ def mock_auth_token(monkeypatch):
     monkeypatch.setenv("NEXUSCORE_API_KEY", api_key)
     # 認証のモックを設定（データベースアクセスを回避）
     # get_current_user 内で使用される webapp.models をモック
-    with patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.webapp.models.User") as mock_user_model:
+    with (
+        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.webapp.models.User") as mock_user_model,
+    ):
         mock_user = MagicMock()
         mock_user.id = 1
         mock_api_key_obj = MagicMock()
@@ -53,11 +56,8 @@ def test_execute_endpoint_accepts_valid_request(client: TestClient, auth_headers
     with patch("nexuscore.api.routes.execute.run_orchestrator_task"):
         response = client.post(
             "/api/v1/execute",
-            json={
-                "requirement": "Test requirement",
-                "project_path": "/tmp/test"
-            },
-            headers=auth_headers
+            json={"requirement": "Test requirement", "project_path": "/tmp/test"},
+            headers=auth_headers,
         )
 
         assert response.status_code == 202
@@ -69,24 +69,22 @@ def test_execute_endpoint_accepts_valid_request(client: TestClient, auth_headers
         assert data["status_url"].startswith("/api/v1/status/")
 
 
-def test_execute_endpoint_rejects_invalid_request_missing_fields(client: TestClient, auth_headers: dict):
+def test_execute_endpoint_rejects_invalid_request_missing_fields(
+    client: TestClient, auth_headers: dict
+):
     """
     Execute エンドポイントが必須フィールド欠如で 400 を返すことを確認
     既存の Flask テスト (`test_execute_task_endpoint_missing_fields`) に準拠
     """
     # requirement がない場合
     response = client.post(
-        "/api/v1/execute",
-        json={"project_path": "/tmp/test"},
-        headers=auth_headers
+        "/api/v1/execute", json={"project_path": "/tmp/test"}, headers=auth_headers
     )
     assert response.status_code == 422  # FastAPI のバリデーションエラー
 
     # project_path がない場合
     response = client.post(
-        "/api/v1/execute",
-        json={"requirement": "Test requirement"},
-        headers=auth_headers
+        "/api/v1/execute", json={"requirement": "Test requirement"}, headers=auth_headers
     )
     assert response.status_code == 422  # FastAPI のバリデーションエラー
 
@@ -98,10 +96,7 @@ def test_execute_endpoint_requires_authentication(client: TestClient):
     """
     response = client.post(
         "/api/v1/execute",
-        json={
-            "requirement": "Test requirement",
-            "project_path": "/tmp/test"
-        }
+        json={"requirement": "Test requirement", "project_path": "/tmp/test"},
         # 認証ヘッダーを付けない
     )
     # FastAPI では必須ヘッダー（X-API-Key）が欠如している場合、422 Unprocessable Entity を返す
@@ -119,9 +114,9 @@ def test_execute_endpoint_with_constitution_text(client: TestClient, auth_header
             json={
                 "requirement": "Test requirement",
                 "project_path": "/tmp/test",
-                "constitution_text": "Custom constitution"
+                "constitution_text": "Custom constitution",
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
 
         assert response.status_code == 202
@@ -135,13 +130,13 @@ def test_status_endpoint_returns_task_state(client: TestClient, mock_auth_token)
     """
     # テスト用のタスクを追加
     from nexuscore.api import server
+
     test_task_id = "test-task-123"
     server.tasks[test_task_id] = {"status": "running", "message": "Test message"}
 
     try:
         response = client.get(
-            f"/api/v1/status/{test_task_id}",
-            headers={"X-API-Key": mock_auth_token}
+            f"/api/v1/status/{test_task_id}", headers={"X-API-Key": mock_auth_token}
         )
         assert response.status_code == 200
         data = response.json()
@@ -159,8 +154,7 @@ def test_status_endpoint_returns_404_for_nonexistent_task(client: TestClient, mo
     既存の Flask テスト (`test_get_task_status_not_found`) に準拠
     """
     response = client.get(
-        "/api/v1/status/nonexistent-task-id",
-        headers={"X-API-Key": mock_auth_token}
+        "/api/v1/status/nonexistent-task-id", headers={"X-API-Key": mock_auth_token}
     )
     assert response.status_code == 404
     data = response.json()
@@ -208,11 +202,8 @@ def test_execute_response_structure(client: TestClient, auth_headers: dict):
     with patch("nexuscore.api.routes.execute.run_orchestrator_task"):
         response = client.post(
             "/api/v1/execute",
-            json={
-                "requirement": "Test",
-                "project_path": "/tmp/test"
-            },
-            headers=auth_headers
+            json={"requirement": "Test", "project_path": "/tmp/test"},
+            headers=auth_headers,
         )
 
         assert response.status_code == 202
@@ -241,17 +232,17 @@ def test_status_response_structure(client: TestClient, mock_auth_token):
     既存の Flask テスト (`test_get_task_status_response_structure`) に準拠
     """
     from nexuscore.api import server
+
     test_task_id = "test-structure-123"
     server.tasks[test_task_id] = {
         "status": "running",
         "message": "Test message",
-        "extra_field": "extra_value"
+        "extra_field": "extra_value",
     }
 
     try:
         response = client.get(
-            f"/api/v1/status/{test_task_id}",
-            headers={"X-API-Key": mock_auth_token}
+            f"/api/v1/status/{test_task_id}", headers={"X-API-Key": mock_auth_token}
         )
         assert response.status_code == 200
         data = response.json()
@@ -278,11 +269,8 @@ def test_execute_task_id_uniqueness(client: TestClient, auth_headers: dict):
         for i in range(10):
             response = client.post(
                 "/api/v1/execute",
-                json={
-                    "requirement": f"Test {i}",
-                    "project_path": f"/tmp/test{i}"
-                },
-                headers=auth_headers
+                json={"requirement": f"Test {i}", "project_path": f"/tmp/test{i}"},
+                headers=auth_headers,
             )
             assert response.status_code == 202
             data = response.json()
@@ -290,4 +278,3 @@ def test_execute_task_id_uniqueness(client: TestClient, auth_headers: dict):
 
         # すべてのタスクIDが異なることを確認
         assert len(set(task_ids)) == len(task_ids)
-

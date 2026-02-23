@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from nexuscore.gradio_app import repair_timeline
 
@@ -39,18 +39,29 @@ def test_compute_metrics_summary():
 
 
 def test_make_policy_badge():
-    assert repair_timeline._make_policy_badge(
-        {"policy_profile": "alpha", "policy_version": "v1", "policy_icon": "🏷️"}
-    ) == "[🏷️ alpha v1]"
+    assert (
+        repair_timeline._make_policy_badge(
+            {"policy_profile": "alpha", "policy_version": "v1", "policy_icon": "🏷️"}
+        )
+        == "[🏷️ alpha v1]"
+    )
     assert repair_timeline._make_policy_badge({}) == ""
 
 
 def test_build_timeline_rows_filters(monkeypatch):
     items = [
-        {"status": "success", "timestamp": "2025", "policy_profile": "p", "policy_version": "1", "policy_icon": "⭐"},
+        {
+            "status": "success",
+            "timestamp": "2025",
+            "policy_profile": "p",
+            "policy_version": "1",
+            "policy_icon": "⭐",
+        },
         {"status": "attempt_fail", "timestamp": "2024"},
     ]
-    rows = repair_timeline.build_timeline_rows(items, pair_mode=False, show_attempt=False, show_success=True, show_initial=True)
+    rows = repair_timeline.build_timeline_rows(
+        items, pair_mode=False, show_attempt=False, show_success=True, show_initial=True
+    )
     assert len(rows) == 1
     assert "success" in rows[0][0]
 
@@ -60,7 +71,9 @@ def test_build_timeline_rows_pair_mode_orders_success_first():
         {"status": "attempt_fail", "timestamp": "20250101_120001"},
         {"status": "success", "timestamp": "20250101_120002"},
     ]
-    rows = repair_timeline.build_timeline_rows(items, pair_mode=True, show_attempt=True, show_success=True, show_initial=True)
+    rows = repair_timeline.build_timeline_rows(
+        items, pair_mode=True, show_attempt=True, show_success=True, show_initial=True
+    )
     assert len(rows) == 2
     # reverseソートにより success が先頭に来ることを確認
     assert rows[0][0].startswith("20250101") and "success" in rows[0][0]

@@ -198,4 +198,3 @@ def is_effectively_empty(value: str) -> bool:
             return True
 
     return False
-

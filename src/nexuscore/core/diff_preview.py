@@ -12,8 +12,6 @@ Self-Healing / PatchApplier が生成した unified diff を、
 
 from __future__ import annotations
 
-from typing import Iterable, List
-
 
 def truncate_diff(diff_text: str, max_lines: int = 200) -> str:
     """
@@ -47,7 +45,7 @@ def wrap_diff_as_markdown(diff_text: str, max_lines: int = 200) -> str:
     return "```diff\n" + safe + "\n```"
 
 
-def summarize_diff_files(diff_text: str) -> List[str]:
+def summarize_diff_files(diff_text: str) -> list[str]:
     """
     unified diff から変更ファイルのパス一覧を抽出する。
 
@@ -57,7 +55,7 @@ def summarize_diff_files(diff_text: str) -> List[str]:
     :param diff_text: unified diff 文字列
     :return: 変更されたファイルパスのリスト
     """
-    files: List[str] = []
+    files: list[str] = []
     for line in diff_text.splitlines():
         line = line.rstrip("\n")
         if not line.startswith("+++ "):
@@ -72,4 +70,3 @@ def summarize_diff_files(diff_text: str) -> List[str]:
             files.append(path)
 
     return files
-

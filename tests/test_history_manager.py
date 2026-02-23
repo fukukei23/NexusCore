@@ -1,10 +1,9 @@
 """Tests for history_manager.py"""
-import os
+
 import json
-import tempfile
-from pathlib import Path
-import pytest
+import os
 import sys
+from pathlib import Path
 
 # プロジェクトルートをパスに追加
 project_root = Path(__file__).parent.parent
@@ -139,7 +138,7 @@ def test_history_manager_save_history(tmp_path):
 
     # ファイルが存在し、正しい内容が保存されているか確認
     assert os.path.exists(hm.history_path)
-    with open(hm.history_path, "r", encoding="utf-8") as f:
+    with open(hm.history_path, encoding="utf-8") as f:
         saved_data = json.load(f)
         assert "history" in saved_data
         assert "current_index" in saved_data
@@ -224,7 +223,7 @@ def test_history_manager_save_history_persists(tmp_path):
 
     # ファイルが存在し、内容が正しいことを確認
     assert os.path.exists(hm.history_path)
-    with open(hm.history_path, "r", encoding="utf-8") as f:
+    with open(hm.history_path, encoding="utf-8") as f:
         saved_data = json.load(f)
         assert len(saved_data["history"]) == 2
         assert saved_data["current_index"] == 1
@@ -255,7 +254,7 @@ def test_history_manager_large_state(tmp_path):
     large_state = {
         "data": "x" * 10000,
         "items": list(range(1000)),
-        "nested": {"level1": {"level2": {"level3": "deep"}}}
+        "nested": {"level1": {"level2": {"level3": "deep"}}},
     }
 
     hm.add_state(large_state)
@@ -275,7 +274,7 @@ def test_history_manager_complex_state(tmp_path):
         "boolean": True,
         "list": [1, 2, 3],
         "dict": {"key": "value"},
-        "none": None
+        "none": None,
     }
 
     hm.add_state(complex_state)
@@ -300,7 +299,7 @@ def test_history_manager_multiple_saves(tmp_path):
 
     # ファイルが存在し、すべての状態が保存されていることを確認
     assert os.path.exists(hm.history_path)
-    with open(hm.history_path, "r", encoding="utf-8") as f:
+    with open(hm.history_path, encoding="utf-8") as f:
         saved_data = json.load(f)
         assert len(saved_data["history"]) == 5
         assert saved_data["current_index"] == 4
@@ -311,6 +310,7 @@ def test_history_manager_path_generation(tmp_path):
     history_dir = str(tmp_path / "history")
     hm1 = HistoryManager(history_dir=history_dir)
     import time
+
     time.sleep(1.1)  # タイムスタンプが異なるように（秒単位で異なる必要がある）
     hm2 = HistoryManager(history_dir=history_dir)
 
@@ -385,14 +385,12 @@ def test_history_manager_rollback_chain(tmp_path):
 def test_history_manager_state_with_datetime(tmp_path):
     """datetimeオブジェクトを含む状態のテスト"""
     from datetime import datetime
+
     history_dir = str(tmp_path / "history")
     hm = HistoryManager(history_dir=history_dir)
 
     # datetimeはJSONシリアライズできないため、文字列として保存
-    state = {
-        "timestamp": datetime.now().isoformat(),
-        "data": "test"
-    }
+    state = {"timestamp": datetime.now().isoformat(), "data": "test"}
 
     hm.add_state(state)
     saved_state = hm.get_current_state()
@@ -422,7 +420,7 @@ def test_history_manager_state_with_nested_lists(tmp_path):
 
     nested_state = {
         "matrix": [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
-        "nested": [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
+        "nested": [[[1, 2], [3, 4]], [[5, 6], [7, 8]]],
     }
 
     hm.add_state(nested_state)
@@ -445,7 +443,7 @@ def test_history_manager_file_persistence_across_instances(tmp_path):
     assert os.path.exists(hm1.history_path)
 
     # ファイルの内容を直接確認
-    with open(hm1.history_path, "r", encoding="utf-8") as f:
+    with open(hm1.history_path, encoding="utf-8") as f:
         saved_data = json.load(f)
         assert len(saved_data["history"]) == 2
 
@@ -490,10 +488,7 @@ def test_history_manager_state_with_function_handling(tmp_path):
     def test_function():
         return "test"
 
-    state = {
-        "data": "test",
-        "func": test_function  # 関数はJSONシリアライズできない
-    }
+    state = {"data": "test", "func": test_function}  # 関数はJSONシリアライズできない
 
     # エラーが発生する可能性がある
     try:
@@ -513,11 +508,7 @@ def test_history_manager_very_large_history(tmp_path):
 
     # 大量の状態を追加
     for i in range(100):
-        state = {
-            "step": i,
-            "data": "x" * 1000,  # 各状態に1KBのデータ
-            "items": list(range(100))
-        }
+        state = {"step": i, "data": "x" * 1000, "items": list(range(100))}  # 各状態に1KBのデータ
         hm.add_state(state)
 
     assert len(hm.state_history) == 100
@@ -595,8 +586,9 @@ def test_history_manager_file_corruption_recovery(tmp_path):
 
     # ファイルが正しく保存されていることを確認
     assert os.path.exists(hm.history_path)
-    with open(hm.history_path, "r", encoding="utf-8") as f:
+    with open(hm.history_path, encoding="utf-8") as f:
         import json
+
         try:
             data = json.load(f)
             assert "history" in data
@@ -611,7 +603,10 @@ def test_history_manager_empty_prefix(tmp_path):
     hm = HistoryManager(history_dir=history_dir, prefix="")
 
     assert hm.prefix == ""
-    assert os.path.basename(hm.history_path).startswith("_") or os.path.basename(hm.history_path)[0].isdigit()
+    assert (
+        os.path.basename(hm.history_path).startswith("_")
+        or os.path.basename(hm.history_path)[0].isdigit()
+    )
 
 
 def test_history_manager_state_with_bytes_handling(tmp_path):
@@ -620,10 +615,7 @@ def test_history_manager_state_with_bytes_handling(tmp_path):
     hm = HistoryManager(history_dir=history_dir)
 
     # バイト列はJSONシリアライズできないため、文字列に変換
-    state = {
-        "data": "test",
-        "bytes_as_str": b"binary_data".decode("utf-8")
-    }
+    state = {"data": "test", "bytes_as_str": b"binary_data".decode("utf-8")}
 
     hm.add_state(state)
     saved_state = hm.get_current_state()
@@ -715,7 +707,7 @@ def test_history_manager_file_locking_simulation(tmp_path):
     hm.add_state({"step": 2, "data": "test2"})
 
     # ファイルが正しく更新されていることを確認
-    with open(hm.history_path, "r", encoding="utf-8") as f:
+    with open(hm.history_path, encoding="utf-8") as f:
         data = json.load(f)
         assert len(data["history"]) == 2
 
@@ -725,11 +717,7 @@ def test_history_manager_state_equality_after_save_load(tmp_path):
     history_dir = str(tmp_path / "history")
     hm1 = HistoryManager(history_dir=history_dir)
 
-    original_state = {
-        "step": 1,
-        "data": "test",
-        "nested": {"key": "value", "number": 123}
-    }
+    original_state = {"step": 1, "data": "test", "nested": {"key": "value", "number": 123}}
 
     hm1.add_state(original_state)
     saved_state = hm1.get_current_state()
@@ -795,7 +783,9 @@ def test_history_manager_custom_prefix_edge_cases(tmp_path):
     for prefix in edge_prefixes:
         hm = HistoryManager(history_dir=history_dir, prefix=prefix)
         assert hm.prefix == prefix
-        assert prefix in os.path.basename(hm.history_path) or os.path.basename(hm.history_path).startswith(prefix)
+        assert prefix in os.path.basename(hm.history_path) or os.path.basename(
+            hm.history_path
+        ).startswith(prefix)
 
 
 def test_history_manager_integration_with_file_creator(tmp_path):
@@ -813,11 +803,7 @@ def test_history_manager_integration_with_file_creator(tmp_path):
     result_path = create_code_file(filename, code, folder)
 
     # ファイル作成を履歴に追加
-    state = {
-        "action": "file_created",
-        "file_path": result_path,
-        "code": code
-    }
+    state = {"action": "file_created", "file_path": result_path, "code": code}
     hm.add_state(state)
 
     # 履歴が正しく保存されていることを確認
@@ -919,7 +905,7 @@ def test_history_manager_file_io_error_handling(tmp_path, monkeypatch):
 
     def mock_open_error(*args, **kwargs):
         if "w" in kwargs.get("mode", "") or "w" in args[1] if len(args) > 1 else False:
-            raise IOError("Disk full")
+            raise OSError("Disk full")
         return original_open(*args, **kwargs)
 
     monkeypatch.setattr("builtins.open", mock_open_error)
@@ -927,7 +913,7 @@ def test_history_manager_file_io_error_handling(tmp_path, monkeypatch):
     # エラーが発生してもクラッシュしないことを確認
     try:
         hm.add_state({"step": 2, "data": "test2"})
-    except IOError:
+    except OSError:
         pass  # エラーは期待される
 
     # 元の状態が保持されていることを確認
@@ -937,6 +923,7 @@ def test_history_manager_file_io_error_handling(tmp_path, monkeypatch):
 def test_history_manager_memory_usage_large_states(tmp_path):
     """大きな状態でのメモリ使用量テスト"""
     import gc
+
     history_dir = str(tmp_path / "history")
     hm = HistoryManager(history_dir=history_dir)
 
@@ -948,7 +935,7 @@ def test_history_manager_memory_usage_large_states(tmp_path):
             "step": i,
             "data": "x" * 10000,  # 10KBのデータ
             "items": list(range(1000)),
-            "matrix": [[j for j in range(100)] for _ in range(10)]
+            "matrix": [[j for j in range(100)] for _ in range(10)],
         }
         hm.add_state(large_state)
 
@@ -967,10 +954,7 @@ def test_history_manager_file_size_growth_control(tmp_path):
 
     # 大量の状態を追加
     for i in range(200):
-        state = {
-            "step": i,
-            "data": f"data_{i}" * 100
-        }
+        state = {"step": i, "data": f"data_{i}" * 100}
         hm.add_state(state)
 
     # ファイルサイズを確認
@@ -986,10 +970,7 @@ def test_history_manager_state_compression_simulation(tmp_path):
     hm = HistoryManager(history_dir=history_dir)
 
     # 繰り返しデータを含む状態
-    repetitive_state = {
-        "data": "repeat" * 1000,
-        "items": [1, 2, 3] * 100
-    }
+    repetitive_state = {"data": "repeat" * 1000, "items": [1, 2, 3] * 100}
 
     hm.add_state(repetitive_state)
     saved_state = hm.get_current_state()
@@ -1033,6 +1014,7 @@ def test_history_manager_rollback_performance(tmp_path):
 
     # 大量の状態を追加
     import time
+
     for i in range(100):
         hm.add_state({"step": i})
 

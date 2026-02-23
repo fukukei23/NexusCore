@@ -4,9 +4,11 @@ FastAPI Projects エンドポイントのテスト
 CR-FASTAPI-005 で作成された /api/v1/projects エンドポイントのテスト。
 既存の Flask テストの期待値に準拠。
 """
+
+from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
 from nexuscore.api.fastapi_app import app
 
@@ -29,11 +31,13 @@ def mock_api_key(monkeypatch):
 @pytest.fixture
 def mock_db_models():
     """データベースモデルをモック"""
-    with patch("nexuscore.webapp.models.Project") as mock_project, \
-         patch("nexuscore.webapp.models.User") as mock_user, \
-         patch("nexuscore.webapp.db") as mock_db, \
-         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model, \
-         patch("nexuscore.webapp.models.User") as mock_auth_user:
+    with (
+        patch("nexuscore.webapp.models.Project") as mock_project,
+        patch("nexuscore.webapp.models.User") as mock_user,
+        patch("nexuscore.webapp.db") as mock_db,
+        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.webapp.models.User") as mock_auth_user,
+    ):
         yield {
             "Project": mock_project,
             "User": mock_user,
@@ -79,7 +83,10 @@ def test_list_projects_success(client: TestClient, mock_api_key, mock_db_models)
 
     with patch("nexuscore.api.routes.projects.desc", side_effect=mock_desc):
         mock_query = MagicMock()
-        mock_query.filter_by.return_value.order_by.return_value.all.return_value = [mock_project1, mock_project2]
+        mock_query.filter_by.return_value.order_by.return_value.all.return_value = [
+            mock_project1,
+            mock_project2,
+        ]
         mock_db_models["Project"].query = mock_query
 
         # API Key認証のモック
@@ -88,10 +95,7 @@ def test_list_projects_success(client: TestClient, mock_api_key, mock_db_models)
         mock_db_models["ApiKey"].hash_token.return_value = "hashed_key"
         mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
 
-        response = client.get(
-            "/api/v1/projects",
-            headers={"X-API-Key": mock_api_key}
-        )
+        response = client.get("/api/v1/projects", headers={"X-API-Key": mock_api_key})
 
         assert response.status_code == 200
         data = response.json()
@@ -112,17 +116,16 @@ def test_list_projects_requires_authentication(client: TestClient, mock_api_key,
     assert response.status_code in [401, 422]
 
     # 不正な API Key でリクエスト
-    with patch("nexuscore.webapp.models.ApiKey") as MockApiKey, \
-         patch("nexuscore.webapp.models.User") as MockUser:
+    with (
+        patch("nexuscore.webapp.models.ApiKey") as MockApiKey,
+        patch("nexuscore.webapp.models.User") as MockUser,
+    ):
         MockApiKey.hash_token.return_value = "hashed_invalid_key"
-        MockApiKey.query.filter_by.return_value.first.return_value = None  # 不正なキーは見つからない
-
-        response = client.get(
-            "/api/v1/projects",
-            headers={
-                "X-API-Key": "invalid-api-key"
-            }
+        MockApiKey.query.filter_by.return_value.first.return_value = (
+            None  # 不正なキーは見つからない
         )
+
+        response = client.get("/api/v1/projects", headers={"X-API-Key": "invalid-api-key"})
 
         # 無効な API Key は 401 を返す（500 ではない）
         assert response.status_code == 401
@@ -177,9 +180,9 @@ def test_create_project_success(client: TestClient, mock_api_key, mock_db_models
         json={
             "name": "New Project",
             "repo_url": "https://github.com/owner/repo",
-            "local_path": "/path/to/project"
+            "local_path": "/path/to/project",
         },
-        headers={"X-API-Key": mock_api_key}
+        headers={"X-API-Key": mock_api_key},
     )
 
     assert response.status_code == 201
@@ -208,11 +211,8 @@ def test_create_project_validation_error(client: TestClient, mock_api_key, mock_
     # name が欠如
     response = client.post(
         "/api/v1/projects",
-        json={
-            "repo_url": "https://github.com/owner/repo",
-            "local_path": "/path/to/project"
-        },
-        headers={"X-API-Key": mock_api_key}
+        json={"repo_url": "https://github.com/owner/repo", "local_path": "/path/to/project"},
+        headers={"X-API-Key": mock_api_key},
     )
 
     assert response.status_code == 422  # FastAPI のバリデーションエラー
@@ -246,10 +246,7 @@ def test_get_project_success(client: TestClient, mock_api_key, mock_db_models):
     mock_db_models["ApiKey"].hash_token.return_value = "hashed_key"
     mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
 
-    response = client.get(
-        "/api/v1/projects/1",
-        headers={"X-API-Key": mock_api_key}
-    )
+    response = client.get("/api/v1/projects/1", headers={"X-API-Key": mock_api_key})
 
     assert response.status_code == 200
     data = response.json()
@@ -279,10 +276,7 @@ def test_get_project_not_found(client: TestClient, mock_api_key, mock_db_models)
     mock_db_models["ApiKey"].hash_token.return_value = "hashed_key"
     mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
 
-    response = client.get(
-        "/api/v1/projects/999",
-        headers={"X-API-Key": mock_api_key}
-    )
+    response = client.get("/api/v1/projects/999", headers={"X-API-Key": mock_api_key})
 
     assert response.status_code == 404
     data = response.json()
@@ -345,10 +339,7 @@ def test_projects_response_structure(client: TestClient, mock_api_key, mock_db_m
     mock_db_models["ApiKey"].hash_token.return_value = "hashed_key"
     mock_db_models["ApiKey"].query.filter_by.return_value.first.return_value = mock_api_key_obj
 
-    response = client.get(
-        "/api/v1/projects/1",
-        headers={"X-API-Key": mock_api_key}
-    )
+    response = client.get("/api/v1/projects/1", headers={"X-API-Key": mock_api_key})
 
     assert response.status_code == 200
     data = response.json()
@@ -363,4 +354,3 @@ def test_projects_response_structure(client: TestClient, mock_api_key, mock_db_m
     assert isinstance(data["id"], int)
     assert isinstance(data["name"], str)
     assert isinstance(data["local_path"], str)
-

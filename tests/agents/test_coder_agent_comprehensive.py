@@ -24,16 +24,18 @@ def mock_dependencies():
     """各テストの前後で依存モジュールをモック化/復元（テスト分離のため）"""
     # テスト前：元の状態を保存してモック化
     original_modules = {
-        'nexuscore.llm.llm_router': sys.modules.get('nexuscore.llm.llm_router'),
-        'nexuscore.core.retry_utils': sys.modules.get('nexuscore.core.retry_utils'),
-        'nexuscore.core.errors': sys.modules.get('nexuscore.core.errors'),
-        'nexuscore.utils.tree_sitter_checker': sys.modules.get('nexuscore.utils.tree_sitter_checker'),
+        "nexuscore.llm.llm_router": sys.modules.get("nexuscore.llm.llm_router"),
+        "nexuscore.core.retry_utils": sys.modules.get("nexuscore.core.retry_utils"),
+        "nexuscore.core.errors": sys.modules.get("nexuscore.core.errors"),
+        "nexuscore.utils.tree_sitter_checker": sys.modules.get(
+            "nexuscore.utils.tree_sitter_checker"
+        ),
     }
 
-    sys.modules['nexuscore.llm.llm_router'] = MagicMock()
-    sys.modules['nexuscore.core.retry_utils'] = MagicMock()
-    sys.modules['nexuscore.core.errors'] = MagicMock()
-    sys.modules['nexuscore.utils.tree_sitter_checker'] = MagicMock()
+    sys.modules["nexuscore.llm.llm_router"] = MagicMock()
+    sys.modules["nexuscore.core.retry_utils"] = MagicMock()
+    sys.modules["nexuscore.core.errors"] = MagicMock()
+    sys.modules["nexuscore.utils.tree_sitter_checker"] = MagicMock()
 
     yield  # ← ここでテストが実行される
 
@@ -46,8 +48,9 @@ def mock_dependencies():
 
 
 try:
-    from nexuscore.agents.coder_agent import CoderAgent
     from nexuscore.agents.base_agent import BaseAgent
+    from nexuscore.agents.coder_agent import CoderAgent
+
     HAS_CODER_AGENT = True
 except ImportError:
     HAS_CODER_AGENT = False
@@ -59,7 +62,7 @@ except ImportError:
 class TestCoderAgentInit:
     """CoderAgent 初期化のテスト"""
 
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_init_inherits_base_agent(self, mock_router_class):
         """BaseAgentを継承している"""
         mock_router_class.return_value = Mock()
@@ -67,12 +70,12 @@ class TestCoderAgentInit:
         agent = CoderAgent()
 
         assert isinstance(agent, BaseAgent)
-        assert hasattr(agent, 'llm_router')
-        assert hasattr(agent, 'logger')
+        assert hasattr(agent, "llm_router")
+        assert hasattr(agent, "logger")
 
     def test_system_prompt_defined(self):
         """SYSTEM_PROMPTが定義されている"""
-        assert hasattr(CoderAgent, 'SYSTEM_PROMPT')
+        assert hasattr(CoderAgent, "SYSTEM_PROMPT")
         assert "Python開発者" in CoderAgent.SYSTEM_PROMPT
 
     def test_retry_limit_defined(self):
@@ -84,8 +87,8 @@ class TestCoderAgentInit:
 class TestImplementCode:
     """CoderAgent.implement_code() のテスト"""
 
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_implement_code_basic(self, mock_router_class):
         """基本的なコード実装"""
         valid_code = "def hello():\n    return 'Hello, World!'"
@@ -99,17 +102,15 @@ class TestImplementCode:
 
         agent = CoderAgent()
         result = agent.implement_code(
-            task_description="Create a hello function",
-            existing_code="",
-            code_language="python"
+            task_description="Create a hello function", existing_code="", code_language="python"
         )
 
         assert result == valid_code
         # AST検証を通過していることを確認
         ast.parse(result)  # 例外が発生しないことを確認
 
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_implement_code_with_syntax_error_retry(self, mock_router_class):
         """構文エラーがある場合はリトライする"""
         invalid_code = "def broken(\n    pass"  # 構文エラー
@@ -124,17 +125,15 @@ class TestImplementCode:
 
         agent = CoderAgent()
         result = agent.implement_code(
-            task_description="Create a function",
-            existing_code="",
-            code_language="python"
+            task_description="Create a function", existing_code="", code_language="python"
         )
 
         # 2回目の試行で成功したコードが返る
         assert result == valid_code
         assert mock_llm.execute.call_count == 2
 
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_implement_code_max_retries_exceeded(self, mock_router_class):
         """最大リトライ回数を超えた場合は最後の結果を返す"""
         invalid_code = "def broken(\n    pass"
@@ -148,17 +147,15 @@ class TestImplementCode:
 
         agent = CoderAgent()
         result = agent.implement_code(
-            task_description="Create a function",
-            existing_code="",
-            code_language="python"
+            task_description="Create a function", existing_code="", code_language="python"
         )
 
         # RETRY_LIMIT回試行しても失敗した場合は最後の結果を返す
         assert result == invalid_code
         assert mock_llm.execute.call_count == agent.RETRY_LIMIT
 
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_implement_code_with_existing_code(self, mock_router_class):
         """既存コードに対する修正"""
         existing = "def old():\n    pass"
@@ -175,20 +172,20 @@ class TestImplementCode:
         result = agent.implement_code(
             task_description="Update the function to return 'updated'",
             existing_code=existing,
-            code_language="python"
+            code_language="python",
         )
 
         assert result == new_code
         # プロンプトに既存コードが含まれていることを確認
         call_args = mock_llm.execute.call_args[1]
-        assert existing in call_args['prompt']
+        assert existing in call_args["prompt"]
 
 
 @pytest.mark.skipif(not HAS_CODER_AGENT, reason="coder_agent module not available")
 class TestValidatePythonSyntax:
     """CoderAgent._validate_python_syntax() のテスト"""
 
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_validate_valid_python_code(self, mock_router_class):
         """有効なPythonコードの検証"""
         mock_router_class.return_value = Mock()
@@ -199,7 +196,7 @@ class TestValidatePythonSyntax:
         assert valid is True
         assert error == ""
 
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_validate_invalid_python_code(self, mock_router_class):
         """無効なPythonコードの検証"""
         mock_router_class.return_value = Mock()
@@ -210,7 +207,7 @@ class TestValidatePythonSyntax:
         assert valid is False
         assert "SyntaxError" in error
 
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_validate_empty_code(self, mock_router_class):
         """空のコードの検証"""
         mock_router_class.return_value = Mock()
@@ -226,7 +223,7 @@ class TestValidatePythonSyntax:
 class TestValidateCode:
     """CoderAgent._validate_code() のテスト"""
 
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_validate_code_python(self, mock_router_class):
         """Python言語のコード検証"""
         mock_router_class.return_value = Mock()
@@ -236,7 +233,7 @@ class TestValidateCode:
 
         assert valid is True
 
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_validate_code_unsupported_language(self, mock_router_class):
         """サポートされていない言語の場合はスキップ"""
         mock_router_class.return_value = Mock()
@@ -252,8 +249,8 @@ class TestValidateCode:
 class TestEdgeCases:
     """エッジケースのテスト"""
 
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_japanese_task_description(self, mock_router_class):
         """日本語のタスク記述"""
         valid_code = "def 挨拶():\n    return 'こんにちは'"
@@ -267,15 +264,13 @@ class TestEdgeCases:
 
         agent = CoderAgent()
         result = agent.implement_code(
-            task_description="挨拶関数を作成してください",
-            existing_code="",
-            code_language="python"
+            task_description="挨拶関数を作成してください", existing_code="", code_language="python"
         )
 
         assert result == valid_code
 
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_task_with_guardian_feedback(self, mock_router_class):
         """Guardianからのフィードバックを含むタスク"""
         code = "def test():\n    return True"
@@ -291,30 +286,28 @@ class TestEdgeCases:
         result = agent.implement_code(
             task_description="Create a test function [Guardianからのフィードバック: Add error handling]",
             existing_code="",
-            code_language="python"
+            code_language="python",
         )
 
         assert result == code
         # プロンプトにフィードバックが含まれていることを確認
         call_args = mock_llm.execute.call_args[1]
-        assert "Guardianからのフィードバック" in call_args['prompt']
+        assert "Guardianからのフィードバック" in call_args["prompt"]
 
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter', None)
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter", None)
     def test_no_llm_router_available(self):
         """LLMRouterが利用できない場合"""
         agent = CoderAgent()
         result = agent.implement_code(
-            task_description="Test",
-            existing_code="",
-            code_language="python"
+            task_description="Test", existing_code="", code_language="python"
         )
 
         # BaseAgentのフォールバックで空文字列が返る
         assert result == ""
 
-    @patch('nexuscore.agents.base_agent.HAS_RETRY', False)
-    @patch('nexuscore.agents.base_agent.LLMRouter')
+    @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
+    @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_implement_code_with_task_type(self, mock_router_class):
         """task_type="code_generate"が使用される"""
         mock_llm = Mock()
@@ -325,11 +318,7 @@ class TestEdgeCases:
         mock_router_class.return_value = mock_router
 
         agent = CoderAgent()
-        agent.implement_code(
-            task_description="Test",
-            existing_code="",
-            code_language="python"
-        )
+        agent.implement_code(task_description="Test", existing_code="", code_language="python")
 
         # task_type="code_generate"で呼ばれることを確認
         mock_router.get_llm_for_task.assert_called()

@@ -67,6 +67,7 @@ def test_load_api_key_from_secrets(monkeypatch):
     class Loader:
         def create_module(self, spec=None):
             import types
+
             return types.ModuleType("secrets")
 
         def exec_module(self, module):

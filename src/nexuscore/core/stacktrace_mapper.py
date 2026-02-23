@@ -11,20 +11,19 @@ stacktrace_mapper.py
 from __future__ import annotations
 
 import re
-from typing import List
 
 # 例: File "/app/src/foo/bar.py", line 123, in some_function
 STACKTRACE_FILE_RE = re.compile(r'File "([^"]+)", line (\d+), in (.+)$')
 
 
-def extract_candidate_files(error_log: str) -> List[str]:
+def extract_candidate_files(error_log: str) -> list[str]:
     """
     Python スタックトレースから、登場順にファイルパスを抽出する。
 
     :param error_log: pytest やユニットテストの標準エラー出力など
     :return: スタックトレースに登場したファイルパスのリスト（重複は除外）
     """
-    candidates: List[str] = []
+    candidates: list[str] = []
 
     for line in error_log.splitlines():
         line = line.rstrip("\n")
@@ -37,4 +36,3 @@ def extract_candidate_files(error_log: str) -> List[str]:
             candidates.append(path)
 
     return candidates
-

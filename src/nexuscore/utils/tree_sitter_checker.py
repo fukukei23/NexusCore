@@ -6,34 +6,42 @@
 # 依存関係: pip install tree-sitter tree-sitter-language-pack tqdm colorama
 # ==============================================================================
 
+import argparse
+import hashlib
+import json
+import logging
 import os
 import sys
 import time
-import json
-import logging
-import argparse
-import hashlib
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
+from pathlib import Path
+from typing import Any
 
 # サードパーティライブラリ
 try:
+    from colorama import Fore, Style, init
     from tqdm import tqdm
-    from colorama import init, Fore, Style
+
     init(autoreset=True)
     HAS_EXTRAS = True
 except ImportError:
     HAS_EXTRAS = False
-    class Fore: RED = GREEN = YELLOW = BLUE = MAGENTA = CYAN = WHITE = ""
-    class Style: BRIGHT = RESET_ALL = ""
+
+    class Fore:
+        RED = GREEN = YELLOW = BLUE = MAGENTA = CYAN = WHITE = ""
+
+    class Style:
+        BRIGHT = RESET_ALL = ""
+
 
 # Tree-sitter（修正版）
 try:
-    from tree_sitter import Parser, Node
+    from tree_sitter import Node, Parser
     from tree_sitter_language_pack import get_language, get_parser
+
     TREE_SITTER_AVAILABLE = True
 except ImportError:
     TREE_SITTER_AVAILABLE = False
@@ -45,14 +53,22 @@ except ImportError:
 
 # 環境変数から設定を読み込み
 CONFIG = {
-    'supported_languages': {
-        '.py': 'python', '.js': 'javascript', '.ts': 'typescript', '.go': 'go',
-        '.rs': 'rust', '.c': 'c', '.cpp': 'cpp', '.java': 'java', '.rb': 'ruby'
+    "supported_languages": {
+        ".py": "python",
+        ".js": "javascript",
+        ".ts": "typescript",
+        ".go": "go",
+        ".rs": "rust",
+        ".c": "c",
+        ".cpp": "cpp",
+        ".java": "java",
+        ".rb": "ruby",
     },
-    'max_workers': int(os.getenv('NEXUS_TREESITTER_MAX_WORKERS', os.cpu_count() or 4)),
-    'timeout_seconds': int(os.getenv('NEXUS_TREESITTER_TIMEOUT_SEC', 60)),
-    'enable_cache': os.getenv('NEXUS_TREESITTER_ENABLE_CACHE', '1').lower() in ('1', 'true', 'yes'),
-    'enable_profiling': os.getenv('NEXUS_TREESITTER_ENABLE_PROFILING', '0').lower() in ('1', 'true', 'yes'),
+    "max_workers": int(os.getenv("NEXUS_TREESITTER_MAX_WORKERS", os.cpu_count() or 4)),
+    "timeout_seconds": int(os.getenv("NEXUS_TREESITTER_TIMEOUT_SEC", 60)),
+    "enable_cache": os.getenv("NEXUS_TREESITTER_ENABLE_CACHE", "1").lower() in ("1", "true", "yes"),
+    "enable_profiling": os.getenv("NEXUS_TREESITTER_ENABLE_PROFILING", "0").lower()
+    in ("1", "true", "yes"),
 }
 
 logger = logging.getLogger(__name__)
@@ -61,16 +77,24 @@ logger = logging.getLogger(__name__)
 # メインクラス
 # ==============================================================================
 
+
 class AnalysisResult:
     """解析結果データクラス"""
+
     def __init__(self, success: bool = False, **kwargs):
         self.success = success
         self.timestamp = datetime.now().isoformat()
         self.data = kwargs
 
-    def __getitem__(self, key): return self.data.get(key)
-    def to_dict(self): return {'success': self.success, 'timestamp': self.timestamp, **self.data}
-    def to_json(self, indent=2): return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
+    def __getitem__(self, key):
+        return self.data.get(key)
+
+    def to_dict(self):
+        return {"success": self.success, "timestamp": self.timestamp, **self.data}
+
+    def to_json(self, indent=2):
+        return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
+
 
 class SemanticAnalyzer:
     """
@@ -91,31 +115,31 @@ class SemanticAnalyzer:
         self.parsers = {}
         self.languages = {}
         # TODO: キャッシュ機能 - ファイルパス × 内容ハッシュをキーに解析結果をキャッシュ
-        self._cache_enabled = enable_cache if enable_cache is not None else CONFIG['enable_cache']
-        self._cache: Dict[str, AnalysisResult] = {}
+        self._cache_enabled = enable_cache if enable_cache is not None else CONFIG["enable_cache"]
+        self._cache: dict[str, AnalysisResult] = {}
         # TODO: プロファイリング統計 - 解析時間の集計
         self._profiling_stats = {
-            'total_files': 0,
-            'cache_hits': 0,
-            'cache_misses': 0,
-            'total_time': 0.0,
-            'file_times': []
+            "total_files": 0,
+            "cache_hits": 0,
+            "cache_misses": 0,
+            "total_time": 0.0,
+            "file_times": [],
         }
 
-    def check_availability(self) -> Tuple[bool, str]:
+    def check_availability(self) -> tuple[bool, str]:
         """利用可能性チェック"""
         if not TREE_SITTER_AVAILABLE:
             return False, "Missing: pip install tree-sitter tree-sitter-language-pack"
         try:
-            get_parser('python')
+            get_parser("python")
             return True, "Tree-sitter ready"
         except Exception as e:
             return False, f"Setup error: {e}"
 
-    def setup_parsers(self, languages: List[str] = None) -> bool:
+    def setup_parsers(self, languages: list[str] = None) -> bool:
         """パーサーセットアップ"""
         if not languages:
-            languages = list(set(CONFIG['supported_languages'].values()))
+            languages = list(set(CONFIG["supported_languages"].values()))
 
         available, message = self.check_availability()
         if not available:
@@ -132,32 +156,32 @@ class SemanticAnalyzer:
         logger.info(f"Loaded parsers: {list(self.parsers.keys())}")
         return len(self.parsers) > 0
 
-    def _extract_symbols(self, language: str, root_node: Node) -> Dict[str, List[Dict]]:
+    def _extract_symbols(self, language: str, root_node: Node) -> dict[str, list[dict]]:
         """★★★ セマンティッククエリでシンボル抽出 ★★★"""
 
         # 言語別のS式クエリ定義
         queries = {
-            'python': {
-                'functions': '(function_definition name: (identifier) @name)',
-                'classes': '(class_definition name: (identifier) @name)',
-                'imports': '(import_statement name: (dotted_name) @name)',
-                'variables': '(assignment left: (identifier) @name)'
+            "python": {
+                "functions": "(function_definition name: (identifier) @name)",
+                "classes": "(class_definition name: (identifier) @name)",
+                "imports": "(import_statement name: (dotted_name) @name)",
+                "variables": "(assignment left: (identifier) @name)",
             },
-            'javascript': {
-                'functions': '[(function_declaration name: (identifier) @name) (arrow_function)]',
-                'classes': '(class_declaration name: (identifier) @name)',
-                'imports': '(import_statement source: (string) @name)'
+            "javascript": {
+                "functions": "[(function_declaration name: (identifier) @name) (arrow_function)]",
+                "classes": "(class_declaration name: (identifier) @name)",
+                "imports": "(import_statement source: (string) @name)",
             },
-            'go': {
-                'functions': '(function_declaration name: (identifier) @name)',
-                'types': '(type_declaration (type_spec name: (type_identifier) @name))',
-                'packages': '(package_clause (package_identifier) @name)'
+            "go": {
+                "functions": "(function_declaration name: (identifier) @name)",
+                "types": "(type_declaration (type_spec name: (type_identifier) @name))",
+                "packages": "(package_clause (package_identifier) @name)",
             },
-            'rust': {
-                'functions': '(function_item name: (identifier) @name)',
-                'structs': '(struct_item name: (type_identifier) @name)',
-                'impls': '(impl_item type: (type_identifier) @name)'
-            }
+            "rust": {
+                "functions": "(function_item name: (identifier) @name)",
+                "structs": "(struct_item name: (type_identifier) @name)",
+                "impls": "(impl_item type: (type_identifier) @name)",
+            },
         }
 
         lang_queries = queries.get(language, {})
@@ -173,14 +197,16 @@ class SemanticAnalyzer:
                 captures = query.captures(root_node)
 
                 for node, capture_name in captures:
-                    symbol_name = node.text.decode('utf8')
+                    symbol_name = node.text.decode("utf8")
                     # 重複除去
-                    if not any(s['name'] == symbol_name for s in symbols[symbol_type]):
-                        symbols[symbol_type].append({
-                            'name': symbol_name,
-                            'line': node.start_point[0] + 1,
-                            'column': node.start_point[1] + 1
-                        })
+                    if not any(s["name"] == symbol_name for s in symbols[symbol_type]):
+                        symbols[symbol_type].append(
+                            {
+                                "name": symbol_name,
+                                "line": node.start_point[0] + 1,
+                                "column": node.start_point[1] + 1,
+                            }
+                        )
             except Exception as e:
                 logger.debug(f"Query failed for {symbol_type}: {e}")
 
@@ -188,13 +214,15 @@ class SemanticAnalyzer:
 
     def _compute_content_hash(self, source_code: str) -> str:
         """ファイル内容のハッシュを計算"""
-        return hashlib.sha256(source_code.encode('utf-8')).hexdigest()
+        return hashlib.sha256(source_code.encode("utf-8")).hexdigest()
 
     def _get_cache_key(self, file_path: str, content_hash: str) -> str:
         """キャッシュキーを生成"""
         return f"{file_path}:{content_hash}"
 
-    def analyze_source_code(self, source_code: str, language: str, file_path: str = None) -> AnalysisResult:
+    def analyze_source_code(
+        self, source_code: str, language: str, file_path: str = None
+    ) -> AnalysisResult:
         """
         ソースコード解析（セマンティック機能付き）
 
@@ -204,9 +232,7 @@ class SemanticAnalyzer:
         """
         if language not in self.parsers:
             return AnalysisResult(
-                success=False,
-                error=f"Parser not available: {language}",
-                file_path=file_path
+                success=False, error=f"Parser not available: {language}", file_path=file_path
             )
 
         # TODO: キャッシュチェック - 同じファイル内容ならキャッシュから返す
@@ -215,10 +241,10 @@ class SemanticAnalyzer:
             content_hash = self._compute_content_hash(source_code)
             cache_key = self._get_cache_key(file_path, content_hash)
             if cache_key in self._cache:
-                self._profiling_stats['cache_hits'] += 1
+                self._profiling_stats["cache_hits"] += 1
                 logger.debug(f"Cache hit: {file_path}")
                 return self._cache[cache_key]
-            self._profiling_stats['cache_misses'] += 1
+            self._profiling_stats["cache_misses"] += 1
 
         try:
             start_time = time.time()
@@ -244,13 +270,13 @@ class SemanticAnalyzer:
                 file_path=file_path,
                 language=language,
                 source_stats={
-                    'line_count': len(lines),
-                    'character_count': len(source_code),
-                    'empty_lines': sum(1 for line in lines if not line.strip())
+                    "line_count": len(lines),
+                    "character_count": len(source_code),
+                    "empty_lines": sum(1 for line in lines if not line.strip()),
                 },
                 semantic_symbols=symbols,
-                errors={'has_syntax_errors': has_errors},
-                performance={'analysis_time': round(analysis_time, 4)}
+                errors={"has_syntax_errors": has_errors},
+                performance={"analysis_time": round(analysis_time, 4)},
             )
 
             # TODO: キャッシュ保存 - 成功した解析結果をキャッシュに保存
@@ -258,19 +284,16 @@ class SemanticAnalyzer:
                 self._cache[cache_key] = result
 
             # TODO: プロファイリング統計 - 解析時間を記録
-            if CONFIG['enable_profiling']:
-                self._profiling_stats['file_times'].append(analysis_time)
-                self._profiling_stats['total_time'] += analysis_time
+            if CONFIG["enable_profiling"]:
+                self._profiling_stats["file_times"].append(analysis_time)
+                self._profiling_stats["total_time"] += analysis_time
 
             return result
 
         except Exception as e:
             logger.warning(f"Analysis failed for {file_path}: {e}")
             return AnalysisResult(
-                success=False,
-                error=str(e),
-                file_path=file_path,
-                language=language
+                success=False, error=str(e), file_path=file_path, language=language
             )
 
     def analyze_file(self, file_path: Path) -> AnalysisResult:
@@ -284,19 +307,19 @@ class SemanticAnalyzer:
         if not file_path.is_file():
             return AnalysisResult(success=False, error=f"File not found: {file_path}")
 
-        language = CONFIG['supported_languages'].get(file_path.suffix.lower())
+        language = CONFIG["supported_languages"].get(file_path.suffix.lower())
         if not language:
             return AnalysisResult(success=False, error=f"Unsupported: {file_path.suffix}")
 
         try:
             # TODO: ファイル I/O - 大きなファイルで時間がかかる可能性
-            content = file_path.read_text(encoding='utf-8')
+            content = file_path.read_text(encoding="utf-8")
             return self.analyze_source_code(content, language, str(file_path))
         except Exception as e:
             logger.warning(f"File read error for {file_path}: {e}")
             return AnalysisResult(success=False, error=f"Read error: {e}")
 
-    def analyze_project(self, project_path: Path) -> Dict[str, AnalysisResult]:
+    def analyze_project(self, project_path: Path) -> dict[str, AnalysisResult]:
         """
         プロジェクト解析
 
@@ -306,58 +329,57 @@ class SemanticAnalyzer:
         - タイムアウト処理
         """
         start_time = time.time()
-        exclude_patterns = ['**/node_modules/**', '**/.git/**', '**/build/**']
+        exclude_patterns = ["**/node_modules/**", "**/.git/**", "**/build/**"]
 
         # TODO: ファイルリスト取得 - 大量ファイルで時間がかかる可能性
         target_files = [
-            f for ext in CONFIG['supported_languages']
+            f
+            for ext in CONFIG["supported_languages"]
             for f in project_path.rglob(f"*{ext}")
             if f.is_file() and not any(f.match(p) for p in exclude_patterns)
         ]
 
-        self._profiling_stats['total_files'] = len(target_files)
+        self._profiling_stats["total_files"] = len(target_files)
 
-        if CONFIG['enable_profiling']:
+        if CONFIG["enable_profiling"]:
             logger.info(f"Analyzing {len(target_files)} files with {CONFIG['max_workers']} workers")
 
         results = {}
         progress = tqdm(target_files, desc="Analyzing", disable=not HAS_EXTRAS)
 
         # TODO: 並列処理 - ThreadPoolExecutor のオーバーヘッドとワーカー数の最適化
-        with ThreadPoolExecutor(max_workers=CONFIG['max_workers']) as executor:
+        with ThreadPoolExecutor(max_workers=CONFIG["max_workers"]) as executor:
             future_to_file = {executor.submit(self.analyze_file, f): f for f in target_files}
 
             for future in as_completed(future_to_file):
                 file_path = future_to_file[future]
                 try:
                     # TODO: タイムアウト処理 - 1ファイルあたりのタイムアウトを設定
-                    results[str(file_path)] = future.result(timeout=CONFIG['timeout_seconds'])
+                    results[str(file_path)] = future.result(timeout=CONFIG["timeout_seconds"])
                 except FutureTimeoutError:
                     logger.warning(f"Timeout analyzing {file_path} (>{CONFIG['timeout_seconds']}s)")
                     results[str(file_path)] = AnalysisResult(
                         success=False,
                         error=f"Timeout after {CONFIG['timeout_seconds']}s",
-                        file_path=str(file_path)
+                        file_path=str(file_path),
                     )
                 except Exception as e:
                     logger.warning(f"Error analyzing {file_path}: {e}")
                     results[str(file_path)] = AnalysisResult(
-                        success=False,
-                        error=str(e),
-                        file_path=str(file_path)
+                        success=False, error=str(e), file_path=str(file_path)
                     )
                 progress.update(1)
 
         progress.close()
 
         # TODO: プロファイリング統計 - 解析完了後の統計をログ出力
-        if CONFIG['enable_profiling']:
+        if CONFIG["enable_profiling"]:
             total_time = time.time() - start_time
             avg_time = total_time / len(target_files) if target_files else 0
             cache_hit_rate = (
-                self._profiling_stats['cache_hits'] /
-                (self._profiling_stats['cache_hits'] + self._profiling_stats['cache_misses'])
-                if (self._profiling_stats['cache_hits'] + self._profiling_stats['cache_misses']) > 0
+                self._profiling_stats["cache_hits"]
+                / (self._profiling_stats["cache_hits"] + self._profiling_stats["cache_misses"])
+                if (self._profiling_stats["cache_hits"] + self._profiling_stats["cache_misses"]) > 0
                 else 0
             )
             logger.info(
@@ -368,13 +390,13 @@ class SemanticAnalyzer:
 
         return results
 
-    def get_profiling_stats(self) -> Dict[str, Any]:
+    def get_profiling_stats(self) -> dict[str, Any]:
         """プロファイリング統計を取得"""
         stats = self._profiling_stats.copy()
-        if stats['file_times']:
-            stats['avg_file_time'] = sum(stats['file_times']) / len(stats['file_times'])
-            stats['min_file_time'] = min(stats['file_times'])
-            stats['max_file_time'] = max(stats['file_times'])
+        if stats["file_times"]:
+            stats["avg_file_time"] = sum(stats["file_times"]) / len(stats["file_times"])
+            stats["min_file_time"] = min(stats["file_times"])
+            stats["max_file_time"] = max(stats["file_times"])
         return stats
 
     def clear_cache(self):
@@ -382,64 +404,68 @@ class SemanticAnalyzer:
         self._cache.clear()
         logger.debug("Cache cleared")
 
+
 # ==============================================================================
 # レポート生成
 # ==============================================================================
 
+
 class ReportGenerator:
     @staticmethod
-    def generate_summary(results: Dict[str, AnalysisResult]) -> Dict[str, Any]:
+    def generate_summary(results: dict[str, AnalysisResult]) -> dict[str, Any]:
         successful = [r for r in results.values() if r.success]
 
         # ★★★ セマンティック統計 ★★★
         symbol_stats = Counter()
         for result in successful:
-            if symbols := result['semantic_symbols']:
+            if symbols := result["semantic_symbols"]:
                 for symbol_type, symbol_list in symbols.items():
                     symbol_stats[symbol_type] += len(symbol_list)
 
         return {
-            'overview': {
-                'total_files': len(results),
-                'successful': len(successful),
-                'total_lines': sum(r['source_stats']['line_count'] for r in successful)
+            "overview": {
+                "total_files": len(results),
+                "successful": len(successful),
+                "total_lines": sum(r["source_stats"]["line_count"] for r in successful),
             },
-            'languages': Counter(r['language'] for r in successful),
-            'symbols': dict(symbol_stats),
-            'errors': sum(1 for r in successful if r['errors']['has_syntax_errors'])
+            "languages": Counter(r["language"] for r in successful),
+            "symbols": dict(symbol_stats),
+            "errors": sum(1 for r in successful if r["errors"]["has_syntax_errors"]),
         }
 
     @staticmethod
-    def print_report(summary: Dict[str, Any]):
+    def print_report(summary: dict[str, Any]):
         print(f"\n{Fore.CYAN}{Style.BRIGHT}=== SEMANTIC ANALYSIS REPORT ==={Style.RESET_ALL}")
 
-        o = summary['overview']
+        o = summary["overview"]
         print(f"\n{Fore.GREEN}📊 Overview:")
         print(f"  • Files: {Fore.WHITE}{o['total_files']} ({o['successful']} analyzed)")
         print(f"  • Lines: {Fore.WHITE}{o['total_lines']:,}")
 
         print(f"\n{Fore.BLUE}🔤 Languages:")
-        for lang, count in summary['languages'].items():
+        for lang, count in summary["languages"].items():
             print(f"  • {lang.title()}: {Fore.WHITE}{count} files")
 
         # ★★★ セマンティック情報表示 ★★★
-        if summary['symbols']:
+        if summary["symbols"]:
             print(f"\n{Fore.MAGENTA}🧬 Discovered Symbols:")
-            for symbol_type, count in summary['symbols'].items():
+            for symbol_type, count in summary["symbols"].items():
                 print(f"  • {symbol_type.title()}: {Fore.WHITE}{count}")
 
-        if summary['errors'] > 0:
+        if summary["errors"] > 0:
             print(f"\n{Fore.RED}⚠️  Syntax Errors: {Fore.WHITE}{summary['errors']} files")
+
 
 # ==============================================================================
 # CLI
 # ==============================================================================
 
+
 def main():
     parser = argparse.ArgumentParser(description="Semantic Code Analyzer v2.2.0")
-    parser.add_argument('target', help='File or directory to analyze')
-    parser.add_argument('--output', help='JSON output file')
-    parser.add_argument('--verbose', '-v', action='store_true')
+    parser.add_argument("target", help="File or directory to analyze")
+    parser.add_argument("--output", help="JSON output file")
+    parser.add_argument("--verbose", "-v", action="store_true")
 
     args = parser.parse_args()
 
@@ -463,14 +489,16 @@ def main():
 
         if args.output:
             Path(args.output).write_text(
-                json.dumps({
-                    'summary': summary,
-                    'details': {k: v.to_dict() for k, v in results.items()}
-                }, indent=2, ensure_ascii=False)
+                json.dumps(
+                    {"summary": summary, "details": {k: v.to_dict() for k, v in results.items()}},
+                    indent=2,
+                    ensure_ascii=False,
+                )
             )
             print(f"\n{Fore.GREEN}✅ Saved to {args.output}")
 
     return 0
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     sys.exit(main())

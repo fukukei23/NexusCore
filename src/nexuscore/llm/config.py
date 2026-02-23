@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Optional
 
 try:
     from dotenv import find_dotenv, load_dotenv
@@ -24,13 +24,13 @@ _ENV_LOADED = False
 _LOGGER = logging.getLogger("LLMRouterConfig")
 
 
-def _bool_from_env(value: Optional[str], default: bool = False) -> bool:
+def _bool_from_env(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def ensure_env_loaded() -> Optional[str]:
+def ensure_env_loaded() -> str | None:
     """
     Load environment variables from the nearest .env file (if python-dotenv is available).
     Only runs once per process.
@@ -72,9 +72,7 @@ def ensure_env_loaded() -> Optional[str]:
                 _ENV_LOADED = True
                 return os.getenv("NEXUSCORE_ENV_LOADED")
     else:
-        _LOGGER.warning(
-            "[ENV] python-dotenv is not installed; skipping automatic .env loading."
-        )
+        _LOGGER.warning("[ENV] python-dotenv is not installed; skipping automatic .env loading.")
 
     _ENV_LOADED = True
     return os.getenv("NEXUSCORE_ENV_LOADED")
@@ -100,16 +98,16 @@ def synchronize_aliases() -> None:
 
 @dataclass(frozen=True)
 class LLMRouterConfig:
-    openai_api_key: Optional[str]
-    gemini_api_key: Optional[str]
-    deepseek_api_key: Optional[str]
-    kimi_api_key: Optional[str]
+    openai_api_key: str | None
+    gemini_api_key: str | None
+    deepseek_api_key: str | None
+    kimi_api_key: str | None
     request_timeout: float
     dry_run: bool
     real_calls_enabled: bool
 
     @classmethod
-    def from_env(cls) -> "LLMRouterConfig":
+    def from_env(cls) -> LLMRouterConfig:
         ensure_env_loaded()
         synchronize_aliases()
 

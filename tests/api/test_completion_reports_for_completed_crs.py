@@ -7,8 +7,6 @@ docs/api/README.md でステータスが「✅ 完了」になっている CR-ID
 
 from pathlib import Path
 
-import pytest
-
 from tests.api._readme_cr_helpers import extract_completed_cr_ids
 
 # プロジェクトルートのパス
@@ -39,11 +37,10 @@ def test_completion_reports_exist_for_completed_crs():
             missing_files.append((cr_id, filename, file_path))
 
     assert not missing_files, (
-        f"Completion report files for completed CRs do not exist:\n"
+        "Completion report files for completed CRs do not exist:\n"
         + "\n".join(
             f"  - CR-ID: {cr_id}\n    Expected file: {filename}\n    Expected path: {file_path}"
             for cr_id, filename, file_path in missing_files
         )
         + f"\n\nExpected location: {DOCS_API_DIR}"
     )
-

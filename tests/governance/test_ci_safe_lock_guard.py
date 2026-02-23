@@ -9,8 +9,6 @@ import hashlib
 import re
 from pathlib import Path
 
-import pytest
-
 # プロジェクトルートのパス
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 TXT_PATH = PROJECT_ROOT / "requirements-ci-safe.txt"
@@ -42,7 +40,7 @@ def extract_source_sha256_from_lock(lock_path: Path) -> str | None:
     Returns:
         SOURCE_SHA256 の値（16進数文字列）、見つからない場合は None
     """
-    with open(lock_path, "r", encoding="utf-8") as f:
+    with open(lock_path, encoding="utf-8") as f:
         # 先頭50行を読み込む（コメントブロックは先頭にある想定）
         lines = [f.readline() for _ in range(50)]
         content = "".join(lines)
@@ -74,7 +72,9 @@ def test_ci_safe_lock_source_sha256_format():
         "Lock file must start with metadata comment block containing SOURCE_SHA256."
     )
     assert len(source_sha) == 64, f"SOURCE_SHA256 must be 64 hex characters, got {len(source_sha)}"
-    assert re.match(r"^[a-fA-F0-9]{64}$", source_sha), f"SOURCE_SHA256 must be hex string, got: {source_sha}"
+    assert re.match(
+        r"^[a-fA-F0-9]{64}$", source_sha
+    ), f"SOURCE_SHA256 must be hex string, got: {source_sha}"
 
 
 def test_ci_safe_lock_source_sha256_matches_txt():
@@ -106,4 +106,3 @@ def test_ci_safe_lock_source_sha256_matches_txt():
         "注記:\n"
         "- lock の手編集は禁止（piptools + 更新ツールで生成する）"
     )
-

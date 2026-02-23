@@ -3,20 +3,16 @@ Comprehensive tests for test_utils module.
 Tests utilities for test generation and validation.
 """
 
-import pytest
-import sys
-import subprocess
 from pathlib import Path
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import MagicMock, patch
 
 from nexuscore.utils.test_utils import (
-    project_path_to_module_path,
-    validate_test_code,
-    extract_code_from_markdown,
     create_fallback_test_file,
+    extract_code_from_markdown,
+    project_path_to_module_path,
     run_tests,
+    validate_test_code,
 )
-
 
 # ==============================================================================
 # project_path_to_module_path Tests
@@ -127,7 +123,7 @@ def test_dangerous():
 """
         is_valid, error, warnings = validate_test_code(code)
         assert is_valid is True  # Syntax is valid
-        assert any('os.system()' in w for w in warnings)
+        assert any("os.system()" in w for w in warnings)
 
     def test_detects_subprocess_calls(self):
         """Detects dangerous subprocess calls"""
@@ -140,7 +136,7 @@ def test_dangerous():
 """
         is_valid, error, warnings = validate_test_code(code)
         assert is_valid is True
-        assert any('subprocess' in w for w in warnings)
+        assert any("subprocess" in w for w in warnings)
 
     def test_detects_file_write(self):
         """Detects file write operations"""
@@ -153,7 +149,7 @@ def test_writes():
 """
         is_valid, error, warnings = validate_test_code(code)
         assert is_valid is True
-        assert any('write' in w.lower() for w in warnings)
+        assert any("write" in w.lower() for w in warnings)
 
     def test_detects_file_append(self):
         """Detects file append operations"""
@@ -166,7 +162,7 @@ def test_appends():
 """
         is_valid, error, warnings = validate_test_code(code)
         assert is_valid is True
-        assert any('append' in w.lower() for w in warnings)
+        assert any("append" in w.lower() for w in warnings)
 
     def test_detects_eval(self):
         """Detects eval() calls"""
@@ -178,7 +174,7 @@ def test_eval():
 """
         is_valid, error, warnings = validate_test_code(code)
         assert is_valid is True
-        assert any('eval()' in w for w in warnings)
+        assert any("eval()" in w for w in warnings)
 
     def test_detects_exec(self):
         """Detects exec() calls"""
@@ -190,7 +186,7 @@ def test_exec():
 """
         is_valid, error, warnings = validate_test_code(code)
         assert is_valid is True
-        assert any('exec()' in w for w in warnings)
+        assert any("exec()" in w for w in warnings)
 
     def test_detects_import_builtin(self):
         """Detects __import__() calls"""
@@ -202,7 +198,7 @@ def test_import():
 """
         is_valid, error, warnings = validate_test_code(code)
         assert is_valid is True
-        assert any('__import__()' in w for w in warnings)
+        assert any("__import__()" in w for w in warnings)
 
     def test_detects_main_block(self):
         """Detects if __name__ == __main__ block"""
@@ -217,7 +213,7 @@ if __name__ == "__main__":
 """
         is_valid, error, warnings = validate_test_code(code)
         assert is_valid is True
-        assert any('__main__' in w for w in warnings)
+        assert any("__main__" in w for w in warnings)
 
     def test_warns_no_test_functions(self):
         """Warns when no test functions found"""
@@ -229,7 +225,7 @@ def helper_function():
 """
         is_valid, error, warnings = validate_test_code(code)
         assert is_valid is True
-        assert any('No test functions' in w for w in warnings)
+        assert any("No test functions" in w for w in warnings)
 
     def test_warns_no_pytest_import(self):
         """Warns when pytest is not imported"""
@@ -239,7 +235,7 @@ def test_example():
 """
         is_valid, error, warnings = validate_test_code(code)
         assert is_valid is True
-        assert any('pytest is not imported' in w for w in warnings)
+        assert any("pytest is not imported" in w for w in warnings)
 
     def test_valid_test_with_from_import(self):
         """Valid with 'from pytest import' style"""
@@ -251,7 +247,7 @@ def test_example():
 """
         is_valid, error, warnings = validate_test_code(code)
         # Should not warn about missing pytest import
-        assert not any('pytest is not imported' in w for w in warnings)
+        assert not any("pytest is not imported" in w for w in warnings)
 
     def test_multiple_test_functions(self):
         """Recognizes multiple test functions"""
@@ -267,7 +263,7 @@ def test_two():
         is_valid, error, warnings = validate_test_code(code)
         assert is_valid is True
         # Should not warn about no test functions
-        assert not any('No test functions' in w for w in warnings)
+        assert not any("No test functions" in w for w in warnings)
 
     def test_empty_code(self):
         """Handles empty code"""
@@ -299,9 +295,9 @@ def hello():
 Some text after
 """
         result = extract_code_from_markdown(text)
-        assert 'def hello():' in result
+        assert "def hello():" in result
         assert 'print("world")' in result
-        assert 'Some text' not in result
+        assert "Some text" not in result
 
     def test_extract_generic_code_block(self):
         """Extracts code from ``` fence"""
@@ -312,8 +308,8 @@ more code
 ```
 """
         result = extract_code_from_markdown(text)
-        assert 'code here' in result
-        assert 'more code' in result
+        assert "code here" in result
+        assert "more code" in result
 
     def test_multiple_code_blocks_returns_first(self):
         """Returns first code block when multiple exist"""
@@ -327,8 +323,8 @@ second block
 ```
 """
         result = extract_code_from_markdown(text)
-        assert 'first block' in result
-        assert 'second block' not in result
+        assert "first block" in result
+        assert "second block" not in result
 
     def test_no_code_block_returns_text(self):
         """Returns original text when no code block"""
@@ -358,9 +354,9 @@ line3
 ```
 """
         result = extract_code_from_markdown(text)
-        assert 'line1' in result
-        assert 'line2' in result
-        assert 'line3' in result
+        assert "line1" in result
+        assert "line2" in result
+        assert "line3" in result
 
     def test_empty_code_block(self):
         """Handles empty code block"""
@@ -379,7 +375,7 @@ code with `backticks` inside
 ```
 """
         result = extract_code_from_markdown(text)
-        assert '`backticks`' in result
+        assert "`backticks`" in result
 
 
 # ==============================================================================
@@ -399,6 +395,7 @@ class TestCreateFallbackTestFile:
 
         # Should be valid Python
         import ast
+
         ast.parse(result)
 
     def test_includes_error_message(self):
@@ -417,7 +414,7 @@ class TestCreateFallbackTestFile:
 
         result = create_fallback_test_file(file_path, error_msg)
 
-        assert 'import pytest' in result
+        assert "import pytest" in result
 
     def test_contains_test_function(self):
         """Contains at least one test function"""
@@ -426,7 +423,7 @@ class TestCreateFallbackTestFile:
 
         result = create_fallback_test_file(file_path, error_msg)
 
-        assert 'def test_' in result
+        assert "def test_" in result
 
     def test_test_function_fails(self):
         """Test function calls pytest.fail"""
@@ -435,7 +432,7 @@ class TestCreateFallbackTestFile:
 
         result = create_fallback_test_file(file_path, error_msg)
 
-        assert 'pytest.fail' in result
+        assert "pytest.fail" in result
 
     def test_has_docstring(self):
         """Includes docstring"""
@@ -462,7 +459,7 @@ class TestRunTests:
         mock_result.stdout = "test passed"
         mock_result.stderr = ""
 
-        with patch('subprocess.run', return_value=mock_result):
+        with patch("subprocess.run", return_value=mock_result):
             success, output = run_tests("/path/to/project")
 
         assert success is True
@@ -475,7 +472,7 @@ class TestRunTests:
         mock_result.stdout = "test failed"
         mock_result.stderr = "error"
 
-        with patch('subprocess.run', return_value=mock_result):
+        with patch("subprocess.run", return_value=mock_result):
             success, output = run_tests("/path/to/project")
 
         assert success is False
@@ -488,7 +485,7 @@ class TestRunTests:
         mock_result.stdout = ""
         mock_result.stderr = ""
 
-        with patch('subprocess.run', return_value=mock_result) as mock_run:
+        with patch("subprocess.run", return_value=mock_result) as mock_run:
             run_tests("/path/to/project")
 
         args = mock_run.call_args[0][0]
@@ -504,14 +501,14 @@ class TestRunTests:
 
         project_path = "/test/project"
 
-        with patch('subprocess.run', return_value=mock_result) as mock_run:
+        with patch("subprocess.run", return_value=mock_result) as mock_run:
             run_tests(project_path)
 
-        assert mock_run.call_args[1]['cwd'] == project_path
+        assert mock_run.call_args[1]["cwd"] == project_path
 
     def test_handles_pytest_not_found(self):
         """Handles FileNotFoundError when pytest not installed"""
-        with patch('subprocess.run', side_effect=FileNotFoundError):
+        with patch("subprocess.run", side_effect=FileNotFoundError):
             success, output = run_tests("/path/to/project")
 
         assert success is False
@@ -519,7 +516,7 @@ class TestRunTests:
 
     def test_handles_general_exception(self):
         """Handles general exceptions during test run"""
-        with patch('subprocess.run', side_effect=Exception("Test error")):
+        with patch("subprocess.run", side_effect=Exception("Test error")):
             success, output = run_tests("/path/to/project")
 
         assert success is False
@@ -532,7 +529,7 @@ class TestRunTests:
         mock_result.stdout = "stdout content"
         mock_result.stderr = "stderr content"
 
-        with patch('subprocess.run', return_value=mock_result):
+        with patch("subprocess.run", return_value=mock_result):
             success, output = run_tests("/path/to/project")
 
         assert "stdout content" in output
@@ -545,7 +542,7 @@ class TestRunTests:
         mock_result.stdout = None
         mock_result.stderr = None
 
-        with patch('subprocess.run', return_value=mock_result):
+        with patch("subprocess.run", return_value=mock_result):
             success, output = run_tests("/path/to/project")
 
         # Should not crash
@@ -558,11 +555,13 @@ class TestRunTests:
         mock_result.stdout = "test"
         mock_result.stderr = ""
 
-        with patch('subprocess.run', return_value=mock_result) as mock_run, \
-             patch('locale.getpreferredencoding', return_value='utf-8'):
+        with (
+            patch("subprocess.run", return_value=mock_result) as mock_run,
+            patch("locale.getpreferredencoding", return_value="utf-8"),
+        ):
             run_tests("/path/to/project")
 
-        assert mock_run.call_args[1]['encoding'] == 'utf-8'
+        assert mock_run.call_args[1]["encoding"] == "utf-8"
 
 
 # ==============================================================================
@@ -607,4 +606,4 @@ def test_example():
         module_path = project_path_to_module_path(root, file_path)
 
         # Module path should be valid identifier
-        assert module_path.replace('.', '').replace('_', '').isalnum()
+        assert module_path.replace(".", "").replace("_", "").isalnum()

@@ -3,20 +3,21 @@ Comprehensive tests for config/constitution_loader.py
 
 憲法ローダーのシングルトンパターンとYAML読み込みのテスト
 """
+
 import sys
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, mock_open
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 # PyYAMLのモック化（必要に応じて）
 try:
     import yaml
+
     HAS_YAML = True
 except ImportError:
     HAS_YAML = False
-    sys.modules['yaml'] = MagicMock()
-    import yaml
+    sys.modules["yaml"] = MagicMock()
 
 from nexuscore.config.constitution_loader import (
     ConstitutionLoader,
@@ -311,13 +312,8 @@ class TestValidateConstitution:
         """有効な憲法の検証成功"""
         loader = ConstitutionLoader()
         valid_const = {
-            "quality_gates": {
-                "tier1": {
-                    "test_coverage_min": 90,
-                    "pylint_score_min": 8.0
-                }
-            },
-            "security": {}
+            "quality_gates": {"tier1": {"test_coverage_min": 90, "pylint_score_min": 8.0}},
+            "security": {},
         }
 
         # 例外が発生しない
@@ -335,9 +331,7 @@ class TestValidateConstitution:
         """securityセクション欠落でエラー"""
         loader = ConstitutionLoader()
         invalid_const = {
-            "quality_gates": {
-                "tier1": {"test_coverage_min": 90, "pylint_score_min": 8.0}
-            }
+            "quality_gates": {"tier1": {"test_coverage_min": 90, "pylint_score_min": 8.0}}
         }
 
         with pytest.raises(ValueError, match="security"):
@@ -347,12 +341,8 @@ class TestValidateConstitution:
         """Tier1のtest_coverage_min欠落でエラー"""
         loader = ConstitutionLoader()
         invalid_const = {
-            "quality_gates": {
-                "tier1": {
-                    "pylint_score_min": 8.0  # test_coverage_minがない
-                }
-            },
-            "security": {}
+            "quality_gates": {"tier1": {"pylint_score_min": 8.0}},  # test_coverage_minがない
+            "security": {},
         }
 
         with pytest.raises(ValueError, match="test_coverage_min"):
@@ -362,12 +352,8 @@ class TestValidateConstitution:
         """Tier1のpylint_score_min欠落でエラー"""
         loader = ConstitutionLoader()
         invalid_const = {
-            "quality_gates": {
-                "tier1": {
-                    "test_coverage_min": 90  # pylint_score_minがない
-                }
-            },
-            "security": {}
+            "quality_gates": {"tier1": {"test_coverage_min": 90}},  # pylint_score_minがない
+            "security": {},
         }
 
         with pytest.raises(ValueError, match="pylint_score_min"):
@@ -377,13 +363,8 @@ class TestValidateConstitution:
         """カバレッジが負の値でエラー"""
         loader = ConstitutionLoader()
         invalid_const = {
-            "quality_gates": {
-                "tier1": {
-                    "test_coverage_min": -10,
-                    "pylint_score_min": 8.0
-                }
-            },
-            "security": {}
+            "quality_gates": {"tier1": {"test_coverage_min": -10, "pylint_score_min": 8.0}},
+            "security": {},
         }
 
         with pytest.raises(ValueError, match="0-100"):
@@ -393,13 +374,8 @@ class TestValidateConstitution:
         """カバレッジが100超でエラー"""
         loader = ConstitutionLoader()
         invalid_const = {
-            "quality_gates": {
-                "tier1": {
-                    "test_coverage_min": 150,
-                    "pylint_score_min": 8.0
-                }
-            },
-            "security": {}
+            "quality_gates": {"tier1": {"test_coverage_min": 150, "pylint_score_min": 8.0}},
+            "security": {},
         }
 
         with pytest.raises(ValueError, match="0-100"):
@@ -409,13 +385,8 @@ class TestValidateConstitution:
         """カバレッジ0%は有効"""
         loader = ConstitutionLoader()
         valid_const = {
-            "quality_gates": {
-                "tier1": {
-                    "test_coverage_min": 0,
-                    "pylint_score_min": 8.0
-                }
-            },
-            "security": {}
+            "quality_gates": {"tier1": {"test_coverage_min": 0, "pylint_score_min": 8.0}},
+            "security": {},
         }
 
         loader._validate_constitution(valid_const)
@@ -424,13 +395,8 @@ class TestValidateConstitution:
         """カバレッジ100%は有効"""
         loader = ConstitutionLoader()
         valid_const = {
-            "quality_gates": {
-                "tier1": {
-                    "test_coverage_min": 100,
-                    "pylint_score_min": 8.0
-                }
-            },
-            "security": {}
+            "quality_gates": {"tier1": {"test_coverage_min": 100, "pylint_score_min": 8.0}},
+            "security": {},
         }
 
         loader._validate_constitution(valid_const)
@@ -510,9 +476,9 @@ class TestFindConstitutionFile:
         loader = ConstitutionLoader()
 
         # プロジェクトルートが見つからないようにモック
-        with patch.object(loader, '_find_project_root', return_value=None):
+        with patch.object(loader, "_find_project_root", return_value=None):
             # カレントディレクトリにもファイルがない
-            with patch('nexuscore.config.constitution_loader.Path') as mock_path:
+            with patch("nexuscore.config.constitution_loader.Path") as mock_path:
                 mock_path.cwd.return_value = Path("/nonexistent")
                 found = loader._find_constitution_file()
 
@@ -541,11 +507,7 @@ class TestMergeEnvironmentConfig:
         loader = ConstitutionLoader()
         base = {
             "quality_gates": {"tier1": {"test_coverage_min": 90}},
-            "environments": {
-                "production": {
-                    "quality_gates": {"tier1": {"test_coverage_min": 95}}
-                }
-            }
+            "environments": {"production": {"quality_gates": {"tier1": {"test_coverage_min": 95}}}},
         }
 
         merged = loader._merge_environment_config(base, "production")
@@ -558,10 +520,8 @@ class TestMergeEnvironmentConfig:
         base = {
             "quality_gates": {"tier1": {"test_coverage_min": 90}},
             "environments": {
-                "development": {
-                    "quality_gates": {"tier1": {"test_coverage_min": 70}}
-                }
-            }
+                "development": {"quality_gates": {"tier1": {"test_coverage_min": 70}}}
+            },
         }
 
         merged = loader._merge_environment_config(base, "development")
@@ -573,11 +533,7 @@ class TestMergeEnvironmentConfig:
         loader = ConstitutionLoader()
         base = {
             "quality_gates": {"tier1": {"test_coverage_min": 90}},
-            "environments": {
-                "staging": {
-                    "quality_gates": {"tier1": {"test_coverage_min": 85}}
-                }
-            }
+            "environments": {"staging": {"quality_gates": {"tier1": {"test_coverage_min": 85}}}},
         }
 
         merged = loader._merge_environment_config(base, "staging")
@@ -597,7 +553,7 @@ class TestLoadConstitution:
     def test_load_constitution_without_yaml(self, monkeypatch):
         """PyYAMLなしでデフォルト憲法を返す"""
         # yamlをNoneに偽装
-        with patch('nexuscore.config.constitution_loader.yaml', None):
+        with patch("nexuscore.config.constitution_loader.yaml", None):
             loader = ConstitutionLoader()
             constitution = loader._load_constitution()
 
@@ -608,7 +564,7 @@ class TestLoadConstitution:
         """憲法ファイルが見つからない場合"""
         loader = ConstitutionLoader()
 
-        with patch.object(loader, '_find_constitution_file', return_value=None):
+        with patch.object(loader, "_find_constitution_file", return_value=None):
             constitution = loader._load_constitution()
 
             # デフォルト憲法を返す
@@ -621,7 +577,7 @@ class TestLoadConstitution:
         invalid_yaml_file = tmp_path / "invalid.yaml"
         invalid_yaml_file.write_text("invalid: yaml: content:")
 
-        with patch.object(loader, '_find_constitution_file', return_value=invalid_yaml_file):
+        with patch.object(loader, "_find_constitution_file", return_value=invalid_yaml_file):
             constitution = loader._load_constitution()
 
             # デフォルト憲法を返す
@@ -637,6 +593,7 @@ class TestGlobalFunctions:
         ConstitutionLoader._constitution = None
         # グローバル変数もリセット
         import nexuscore.config.constitution_loader as module
+
         module._loader_instance = None
 
     def test_get_constitution_returns_dict(self):
@@ -706,9 +663,10 @@ class TestConstitutionLoaderIntegration:
         fkb = loader.get_fkb_config()
 
         # 全て辞書
-        assert all(isinstance(config, dict) for config in [
-            constitution, tier1, tier2, guardian, security, npe, error_handling, fkb
-        ])
+        assert all(
+            isinstance(config, dict)
+            for config in [constitution, tier1, tier2, guardian, security, npe, error_handling, fkb]
+        )
 
     def test_default_constitution_passes_validation(self):
         """デフォルト憲法がバリデーションをパス"""
@@ -724,14 +682,10 @@ class TestConstitutionLoaderIntegration:
         base = {
             "quality_gates": {
                 "tier1": {"test_coverage_min": 90, "pylint_score_min": 8.0},
-                "tier2": {"mutation_score_min": 80}
+                "tier2": {"mutation_score_min": 80},
             }
         }
-        override = {
-            "quality_gates": {
-                "tier1": {"test_coverage_min": 95}
-            }
-        }
+        override = {"quality_gates": {"tier1": {"test_coverage_min": 95}}}
 
         merged = loader._deep_merge(base, override)
 
@@ -750,10 +704,7 @@ class TestConstitutionLoaderIntegration:
         loader = ConstitutionLoader()
 
         # 憲法を最小限のものに置き換え
-        loader._constitution = {
-            "quality_gates": {},
-            "security": {}
-        }
+        loader._constitution = {"quality_gates": {}, "security": {}}
 
         # 空の辞書を返す
         assert loader.get_tier1_config() == {}

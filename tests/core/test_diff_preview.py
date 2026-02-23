@@ -1,10 +1,10 @@
 """diff_preview.py のテスト"""
-import pytest
+
 
 from nexuscore.core.diff_preview import (
+    summarize_diff_files,
     truncate_diff,
     wrap_diff_as_markdown,
-    summarize_diff_files,
 )
 
 
@@ -195,4 +195,3 @@ def test_summarize_diff_files_strips_whitespace():
 
     assert len(files) == 1
     assert files[0] == "b/src/file.py"
-

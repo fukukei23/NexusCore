@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # 目的:
 #  1) .env の読み込み結果を確認
 #  2) LLMRouter が生成され、OpenAI(=gpt-5) も初期化できるかを確認
@@ -7,6 +6,7 @@
 #   (.venv) PS C:\Users\USER\tools\NexusCore> python tests/test_env_load.py
 
 from __future__ import annotations
+
 import os
 import sys
 from pathlib import Path
@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 
 # --- .env を明示読み込み（REPL/単体実行でも確実に）---
 from dotenv import load_dotenv
+
 env_path = ROOT / ".env"
 load_dotenv(dotenv_path=str(env_path), override=True)
 

@@ -16,15 +16,13 @@ context_analyzer.py の包括的テスト
 """
 
 import os
-import sys
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
 
 try:
     from nexuscore.agents.context_analyzer import ContextAnalyzer
+
     HAS_CONTEXT_ANALYZER = True
 except ImportError:
     HAS_CONTEXT_ANALYZER = False
@@ -42,7 +40,7 @@ class TestContextAnalyzerInit:
         assert analyzer.project_root == str(tmp_path)
         assert analyzer.max_files == 1000
         assert analyzer.max_file_size == 1024 * 1024  # 1MB
-        assert hasattr(analyzer, 'standard_libs')
+        assert hasattr(analyzer, "standard_libs")
 
     def test_get_standard_libraries(self, tmp_path):
         """標準ライブラリセットが取得できる"""
@@ -124,7 +122,7 @@ class TestSafeParseRequirements:
         frameworks = analyzer._safe_parse_requirements()
 
         # フォールバックが返る
-        assert frameworks == ['gradio', 'openai']
+        assert frameworks == ["gradio", "openai"]
 
     def test_parse_requirements_no_file(self, tmp_path):
         """requirements.txtが存在しない場合"""
@@ -239,13 +237,15 @@ class TestParseDependencies:
     def test_parse_dependencies_with_imports(self, tmp_path):
         """インポート文を含むファイルからの依存関係解析"""
         # Pythonファイルを作成
-        (tmp_path / "module.py").write_text("""
+        (tmp_path / "module.py").write_text(
+            """
 import os
 import sys
 from typing import Dict
 from nexuscore.agents import base_agent
 import gradio
-""")
+"""
+        )
 
         analyzer = ContextAnalyzer(str(tmp_path))
         dependencies = analyzer.parse_dependencies()

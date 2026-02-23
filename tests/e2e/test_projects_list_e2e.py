@@ -4,6 +4,7 @@ Projects List E2E テスト
 FastAPI の Projects API の E2E テスト。
 E2E 用 SQLite DB を使用して、実際の DB 操作をテストする。
 """
+
 from __future__ import annotations
 
 import sys
@@ -19,7 +20,6 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from tests.e2e.fixtures.test_db import (
     create_e2e_db,
     setup_test_data,
-    e2e_test_api_key,
 )
 
 
@@ -38,6 +38,7 @@ def e2e_app():
 
     # FastAPI アプリを作成（テスト用 DB を指定）
     from nexuscore.api.fastapi_app import create_app
+
     fastapi_app = create_app(test_db_path=db_path)
 
     return fastapi_app
@@ -89,4 +90,3 @@ def test_projects_list_e2e(e2e_client, e2e_test_api_key):
     assert "local_path" in project, f"Project should have 'local_path' key: {project}"
     assert "created_at" in project, f"Project should have 'created_at' key: {project}"
     assert "updated_at" in project, f"Project should have 'updated_at' key: {project}"
-

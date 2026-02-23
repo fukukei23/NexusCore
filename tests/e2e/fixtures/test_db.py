@@ -3,23 +3,20 @@ E2E テスト用 SQLite DB セットアップ
 
 FastAPI アプリの E2E テストで使用する SQLite DB を作成・初期化する。
 """
+
 from __future__ import annotations
 
 import os
 import tempfile
-from pathlib import Path
-from typing import Optional
 
 import pytest
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 
 from nexuscore.webapp import db
-from nexuscore.webapp.models import User, Project, ApiKey
-
+from nexuscore.webapp.models import ApiKey, Project, User
 
 # E2E テスト用の SQLite DB パス
-E2E_DB_PATH: Optional[str] = None
+E2E_DB_PATH: str | None = None
 
 
 def create_e2e_db() -> tuple[str, Flask]:
@@ -146,4 +143,3 @@ def e2e_test_user_id():
     # setup_test_data で作成されたユーザーの ID を返す
     # 実際の実装では、e2e_flask_app から取得する
     return 1
-

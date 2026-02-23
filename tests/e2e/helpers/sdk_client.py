@@ -3,11 +3,12 @@ SDK クライアントヘルパー
 
 生成された Python SDK を使用してクライアントを作成するヘルパー関数。
 """
+
 from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any
 
 # プロジェクトルートを取得
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
@@ -19,21 +20,23 @@ if SDK_PYTHON_DIR.exists():
 
 # SDK の import を試みる
 SDK_AVAILABLE = False
-SDK_IMPORT_ERROR: Optional[str] = None
-ApiClient: Optional[Any] = None
-Configuration: Optional[Any] = None
-DefaultApi: Optional[Any] = None
+SDK_IMPORT_ERROR: str | None = None
+ApiClient: Any | None = None
+Configuration: Any | None = None
+DefaultApi: Any | None = None
 
 if SDK_PYTHON_DIR.exists() and (SDK_PYTHON_DIR / "nexuscore_sdk").exists():
     try:
         from nexuscore_sdk import ApiClient, Configuration
+
         # DefaultApi またはタグごとの API クラスを試みる
         try:
             from nexuscore_sdk.api import DefaultApi
         except ImportError:
             # タグごとの API クラスを試みる
             try:
-                from nexuscore_sdk.api import HealthApi, ProjectsApi, ExecuteApi
+                from nexuscore_sdk.api import ExecuteApi, HealthApi, ProjectsApi
+
                 DefaultApi = None  # DefaultApi が存在しない場合は None
             except ImportError:
                 DefaultApi = None
@@ -45,7 +48,7 @@ else:
     SDK_IMPORT_ERROR = f"SDK not found at {SDK_PYTHON_DIR}"
 
 
-def create_sdk_client(base_url: str, api_key: Optional[str] = None) -> Any:
+def create_sdk_client(base_url: str, api_key: str | None = None) -> Any:
     """
     生成された Python SDK を使用してクライアントを作成する。
 
@@ -86,4 +89,3 @@ def create_sdk_client(base_url: str, api_key: Optional[str] = None) -> Any:
         # タグごとの API クラスを使用する場合は、ここで適切なクラスを返す
         # または、api_client を直接返して、テスト側で適切な API クラスを使用する
         return api_client
-

@@ -47,9 +47,14 @@ class TestGeneratePrChangeSummary:
         with patch("nexuscore.integration.github_pr_summary.PatchRecord") as mock_patch_record:
             with patch("nexuscore.integration.github_pr_summary.ExecutionLog") as mock_log_record:
                 mock_patch_record.query.filter_by.return_value.all.return_value = [mock_patch]
-                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = [mock_log]
+                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = [
+                    mock_log
+                ]
 
-                with patch("nexuscore.integration.github_pr_summary.guarded_llm_call", return_value={"ok": True, "content": "要約テキスト"}):
+                with patch(
+                    "nexuscore.integration.github_pr_summary.guarded_llm_call",
+                    return_value={"ok": True, "content": "要約テキスト"},
+                ):
                     result = generate_pr_change_summary(mock_run, guardian_review)
 
         assert result == "要約テキスト"
@@ -71,9 +76,14 @@ class TestGeneratePrChangeSummary:
         with patch("nexuscore.integration.github_pr_summary.PatchRecord") as mock_patch_record:
             with patch("nexuscore.integration.github_pr_summary.ExecutionLog") as mock_log_record:
                 mock_patch_record.query.filter_by.return_value.all.return_value = []
-                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = []
+                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = (
+                    []
+                )
 
-                with patch("nexuscore.integration.github_pr_summary.guarded_llm_call", return_value={"ok": True, "content": "要約"}) as mock_llm:
+                with patch(
+                    "nexuscore.integration.github_pr_summary.guarded_llm_call",
+                    return_value={"ok": True, "content": "要約"},
+                ) as mock_llm:
                     result = generate_pr_change_summary(mock_run, "Review")
 
                 # "(no diff available)" がプロンプトに含まれることを確認
@@ -88,9 +98,14 @@ class TestGeneratePrChangeSummary:
         with patch("nexuscore.integration.github_pr_summary.PatchRecord") as mock_patch_record:
             with patch("nexuscore.integration.github_pr_summary.ExecutionLog") as mock_log_record:
                 mock_patch_record.query.filter_by.return_value.all.return_value = mock_patches
-                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = []
+                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = (
+                    []
+                )
 
-                with patch("nexuscore.integration.github_pr_summary.guarded_llm_call", return_value={"ok": True, "content": "要約"}) as mock_llm:
+                with patch(
+                    "nexuscore.integration.github_pr_summary.guarded_llm_call",
+                    return_value={"ok": True, "content": "要約"},
+                ) as mock_llm:
                     result = generate_pr_change_summary(mock_run, "Review")
 
                 user_prompt = mock_llm.call_args[1]["user_prompt"]
@@ -106,9 +121,14 @@ class TestGeneratePrChangeSummary:
         with patch("nexuscore.integration.github_pr_summary.PatchRecord") as mock_patch_record:
             with patch("nexuscore.integration.github_pr_summary.ExecutionLog") as mock_log_record:
                 mock_patch_record.query.filter_by.return_value.all.return_value = [mock_patch]
-                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = []
+                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = (
+                    []
+                )
 
-                with patch("nexuscore.integration.github_pr_summary.guarded_llm_call", return_value={"ok": True, "content": "要約"}):
+                with patch(
+                    "nexuscore.integration.github_pr_summary.guarded_llm_call",
+                    return_value={"ok": True, "content": "要約"},
+                ):
                     result = generate_pr_change_summary(mock_run, "Review")
 
         assert result == "要約"
@@ -125,9 +145,14 @@ class TestGeneratePrChangeSummary:
         with patch("nexuscore.integration.github_pr_summary.PatchRecord") as mock_patch_record:
             with patch("nexuscore.integration.github_pr_summary.ExecutionLog") as mock_log_record:
                 mock_patch_record.query.filter_by.return_value.all.return_value = []
-                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = mock_logs
+                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = (
+                    mock_logs
+                )
 
-                with patch("nexuscore.integration.github_pr_summary.guarded_llm_call", return_value={"ok": True, "content": "要約"}) as mock_llm:
+                with patch(
+                    "nexuscore.integration.github_pr_summary.guarded_llm_call",
+                    return_value={"ok": True, "content": "要約"},
+                ) as mock_llm:
                     result = generate_pr_change_summary(mock_run, "Review")
 
                 user_prompt = mock_llm.call_args[1]["user_prompt"]
@@ -141,9 +166,14 @@ class TestGeneratePrChangeSummary:
         with patch("nexuscore.integration.github_pr_summary.PatchRecord") as mock_patch_record:
             with patch("nexuscore.integration.github_pr_summary.ExecutionLog") as mock_log_record:
                 mock_patch_record.query.filter_by.return_value.all.return_value = []
-                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = []
+                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = (
+                    []
+                )
 
-                with patch("nexuscore.integration.github_pr_summary.guarded_llm_call", return_value={"ok": False, "reason": "LLM error"}):
+                with patch(
+                    "nexuscore.integration.github_pr_summary.guarded_llm_call",
+                    return_value={"ok": False, "reason": "LLM error"},
+                ):
                     result = generate_pr_change_summary(mock_run, "Review")
 
         assert result is None
@@ -153,9 +183,14 @@ class TestGeneratePrChangeSummary:
         with patch("nexuscore.integration.github_pr_summary.PatchRecord") as mock_patch_record:
             with patch("nexuscore.integration.github_pr_summary.ExecutionLog") as mock_log_record:
                 mock_patch_record.query.filter_by.return_value.all.return_value = []
-                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = []
+                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = (
+                    []
+                )
 
-                with patch("nexuscore.integration.github_pr_summary.guarded_llm_call", return_value={"ok": True, "content": "   "}):
+                with patch(
+                    "nexuscore.integration.github_pr_summary.guarded_llm_call",
+                    return_value={"ok": True, "content": "   "},
+                ):
                     result = generate_pr_change_summary(mock_run, "Review")
 
         assert result is None
@@ -167,10 +202,17 @@ class TestGeneratePrChangeSummary:
         with patch("nexuscore.integration.github_pr_summary.PatchRecord") as mock_patch_record:
             with patch("nexuscore.integration.github_pr_summary.ExecutionLog") as mock_log_record:
                 mock_patch_record.query.filter_by.return_value.all.return_value = []
-                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = []
+                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = (
+                    []
+                )
 
-                with patch("nexuscore.integration.github_pr_summary.guarded_llm_call", return_value={"ok": True, "content": "要約"}):
-                    result = generate_pr_change_summary(mock_run, "Review", llm_router=mock_llm_router)
+                with patch(
+                    "nexuscore.integration.github_pr_summary.guarded_llm_call",
+                    return_value={"ok": True, "content": "要約"},
+                ):
+                    result = generate_pr_change_summary(
+                        mock_run, "Review", llm_router=mock_llm_router
+                    )
 
         assert result == "要約"
 
@@ -188,9 +230,14 @@ class TestEdgeCases:
         with patch("nexuscore.integration.github_pr_summary.PatchRecord") as mock_patch_record:
             with patch("nexuscore.integration.github_pr_summary.ExecutionLog") as mock_log_record:
                 mock_patch_record.query.filter_by.return_value.all.return_value = []
-                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = []
+                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = (
+                    []
+                )
 
-                with patch("nexuscore.integration.github_pr_summary.guarded_llm_call", return_value={"ok": True, "content": "要約"}):
+                with patch(
+                    "nexuscore.integration.github_pr_summary.guarded_llm_call",
+                    return_value={"ok": True, "content": "要約"},
+                ):
                     result = generate_pr_change_summary(mock_run, "")
 
         assert result == "要約"
@@ -203,9 +250,14 @@ class TestEdgeCases:
         with patch("nexuscore.integration.github_pr_summary.PatchRecord") as mock_patch_record:
             with patch("nexuscore.integration.github_pr_summary.ExecutionLog") as mock_log_record:
                 mock_patch_record.query.filter_by.return_value.all.return_value = [mock_patch]
-                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = [mock_log]
+                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = [
+                    mock_log
+                ]
 
-                with patch("nexuscore.integration.github_pr_summary.guarded_llm_call", return_value={"ok": True, "content": "要約結果"}):
+                with patch(
+                    "nexuscore.integration.github_pr_summary.guarded_llm_call",
+                    return_value={"ok": True, "content": "要約結果"},
+                ):
                     result = generate_pr_change_summary(mock_run, "レビュー")
 
         assert result == "要約結果"
@@ -240,9 +292,13 @@ class TestEdgeCases:
         """LLMRouter が None の場合は None を返す"""
         with patch("nexuscore.integration.github_pr_summary.LLMRouter", None):
             with patch("nexuscore.integration.github_pr_summary.PatchRecord") as mock_patch_record:
-                with patch("nexuscore.integration.github_pr_summary.ExecutionLog") as mock_log_record:
+                with patch(
+                    "nexuscore.integration.github_pr_summary.ExecutionLog"
+                ) as mock_log_record:
                     mock_patch_record.query.filter_by.return_value.all.return_value = []
-                    mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = []
+                    mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = (
+                        []
+                    )
 
                     result = generate_pr_change_summary(mock_run, "Review")
 
@@ -255,9 +311,14 @@ class TestEdgeCases:
         with patch("nexuscore.integration.github_pr_summary.PatchRecord") as mock_patch_record:
             with patch("nexuscore.integration.github_pr_summary.ExecutionLog") as mock_log_record:
                 mock_patch_record.query.filter_by.return_value.all.return_value = []
-                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = []
+                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = (
+                    []
+                )
 
-                with patch("nexuscore.integration.github_pr_summary.guarded_llm_call", return_value={"ok": True, "content": "要約"}):
+                with patch(
+                    "nexuscore.integration.github_pr_summary.guarded_llm_call",
+                    return_value={"ok": True, "content": "要約"},
+                ):
                     result = generate_pr_change_summary(mock_run_no_id, "Review")
 
         # 実装は hasattr でチェックするため、エラーにならない
@@ -270,9 +331,14 @@ class TestEdgeCases:
         with patch("nexuscore.integration.github_pr_summary.PatchRecord") as mock_patch_record:
             with patch("nexuscore.integration.github_pr_summary.ExecutionLog") as mock_log_record:
                 mock_patch_record.query.filter_by.return_value.all.return_value = [mock_patch]
-                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = []
+                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = (
+                    []
+                )
 
-                with patch("nexuscore.integration.github_pr_summary.guarded_llm_call", return_value={"ok": True, "content": "要約"}):
+                with patch(
+                    "nexuscore.integration.github_pr_summary.guarded_llm_call",
+                    return_value={"ok": True, "content": "要約"},
+                ):
                     result = generate_pr_change_summary(mock_run, "Review")
 
         assert result == "要約"
@@ -284,9 +350,14 @@ class TestEdgeCases:
         with patch("nexuscore.integration.github_pr_summary.PatchRecord") as mock_patch_record:
             with patch("nexuscore.integration.github_pr_summary.ExecutionLog") as mock_log_record:
                 mock_patch_record.query.filter_by.return_value.all.return_value = []
-                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = [mock_log]
+                mock_log_record.query.filter.return_value.order_by.return_value.all.return_value = [
+                    mock_log
+                ]
 
-                with patch("nexuscore.integration.github_pr_summary.guarded_llm_call", return_value={"ok": True, "content": "要約"}):
+                with patch(
+                    "nexuscore.integration.github_pr_summary.guarded_llm_call",
+                    return_value={"ok": True, "content": "要約"},
+                ):
                     result = generate_pr_change_summary(mock_run, "Review")
 
         assert result == "要約"

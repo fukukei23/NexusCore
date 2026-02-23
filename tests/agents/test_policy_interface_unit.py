@@ -1,4 +1,3 @@
-import queue
 from nexuscore.agents.policy_interface import PolicyInterface
 
 
@@ -19,6 +18,8 @@ def test_launch_and_wait_gradio_unavailable(monkeypatch):
 def test_launch_timeout_returns_default(monkeypatch):
     pi = PolicyInterface()
     # force GRADIO_AVAILABLE True but create_gradio_interface raises to hit fallback
-    monkeypatch.setattr(pi, "create_gradio_interface", lambda: (_ for _ in ()).throw(RuntimeError("fail")))
+    monkeypatch.setattr(
+        pi, "create_gradio_interface", lambda: (_ for _ in ()).throw(RuntimeError("fail"))
+    )
     result = pi.launch_and_wait_for_input(timeout=0)
     assert result["method"] == "safe_default"

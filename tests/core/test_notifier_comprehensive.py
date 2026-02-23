@@ -19,17 +19,18 @@ notifier.py の包括的テスト
 """
 
 import os
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
 
 # NOTE: requestsがない環境でもテスト可能にする
 try:
     from nexuscore.core.notifier import (
+        HAS_REQUESTS,
         SlackNotifier,
         get_notifier,
-        HAS_REQUESTS,
     )
+
     HAS_NOTIFIER = True
 except ImportError:
     HAS_NOTIFIER = False
@@ -92,7 +93,7 @@ class TestSlackNotifierSend:
         assert result is False
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_send_success(self, mock_post):
         """送信成功のテスト"""
         mock_response = Mock()
@@ -117,7 +118,7 @@ class TestSlackNotifierSend:
         assert call_kwargs["timeout"] == 10
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_send_failure(self, mock_post):
         """送信失敗のテスト"""
         mock_post.side_effect = Exception("Network error")
@@ -133,7 +134,7 @@ class TestSlackNotifierSend:
         assert result is False
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_send_with_details(self, mock_post):
         """詳細情報を含む送信"""
         mock_response = Mock()
@@ -161,7 +162,7 @@ class TestSlackNotifierSend:
         assert "value1" in detail_field["value"]
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_send_with_long_details(self, mock_post):
         """詳細情報が1000文字を超える場合の切り詰め"""
         mock_response = Mock()
@@ -188,7 +189,7 @@ class TestSlackNotifierSend:
         assert len(detail_field["value"]) <= 1000
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_send_status_color_mapping(self, mock_post):
         """ステータスに応じたカラーマッピング"""
         mock_response = Mock()
@@ -218,7 +219,7 @@ class TestSlackNotifierSend:
         assert call_kwargs["json"]["attachments"][0]["color"] == "#36a64f"
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_send_custom_color(self, mock_post):
         """カスタムカラーの指定"""
         mock_response = Mock()
@@ -239,7 +240,7 @@ class TestSlackNotifierSend:
         assert call_kwargs["json"]["attachments"][0]["color"] == "#123456"
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_send_japanese_status_mapping(self, mock_post):
         """ステータスの日本語マッピング"""
         mock_response = Mock()
@@ -263,7 +264,7 @@ class TestNotifySelfHealingComplete:
     """notify_self_healing_complete() のテスト"""
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_notify_self_healing_fixed(self, mock_post):
         """Self-Healing完了通知（fixed）"""
         mock_response = Mock()
@@ -290,7 +291,7 @@ class TestNotifySelfHealingComplete:
         assert "PR #123" in payload["text"]
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_notify_self_healing_error(self, mock_post):
         """Self-Healing完了通知（error）"""
         mock_response = Mock()
@@ -314,7 +315,7 @@ class TestNotifySelfHealingComplete:
         assert "❌" in payload["text"]
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_notify_self_healing_with_metrics(self, mock_post):
         """メトリクスを含むSelf-Healing通知"""
         mock_response = Mock()
@@ -357,7 +358,7 @@ class TestNotifySelfHealingComplete:
         assert "85.0%" in message
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_notify_self_healing_with_urls(self, mock_post):
         """URLを含むSelf-Healing通知"""
         mock_response = Mock()
@@ -392,7 +393,7 @@ class TestNotifyOrchestratorComplete:
     """notify_orchestrator_complete() のテスト"""
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_notify_orchestrator_success(self, mock_post):
         """Orchestrator完了通知（success）"""
         mock_response = Mock()
@@ -417,7 +418,7 @@ class TestNotifyOrchestratorComplete:
         assert "/path/to/project" in payload["text"]
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_notify_orchestrator_error(self, mock_post):
         """Orchestrator完了通知（error）"""
         mock_response = Mock()
@@ -440,7 +441,7 @@ class TestNotifyOrchestratorComplete:
         assert "❌" in payload["text"]
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_notify_orchestrator_stopped(self, mock_post):
         """Orchestrator完了通知（stopped）"""
         mock_response = Mock()
@@ -468,7 +469,7 @@ class TestNotifyProjectComplete:
     """notify_project_complete() のテスト"""
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_notify_project_complete(self, mock_post):
         """プロジェクト完了通知"""
         mock_response = Mock()
@@ -530,7 +531,7 @@ class TestEdgeCases:
         assert notifier.enabled is False
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_send_with_none_details_values(self, mock_post):
         """詳細情報にNone値が含まれる場合"""
         mock_response = Mock()
@@ -558,7 +559,7 @@ class TestEdgeCases:
         assert "key3" in detail_field["value"]
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_send_with_unicode_message(self, mock_post):
         """Unicode文字を含むメッセージ"""
         mock_response = Mock()
@@ -581,7 +582,7 @@ class TestEdgeCases:
         assert payload["text"] == "テスト 🎉"
 
     @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
-    @patch('requests.post')
+    @patch("requests.post")
     def test_send_unknown_status_defaults_to_info(self, mock_post):
         """未知のステータスはinfoとして扱われる"""
         mock_response = Mock()

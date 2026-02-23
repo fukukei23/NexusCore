@@ -1,6 +1,6 @@
 """unified_analyzer.py の包括的なテスト（カバレッジ向上用）"""
+
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -8,9 +8,9 @@ import pytest
 from nexuscore.analyzer.unified_analyzer import (
     AnalysisResult,
     TreeSitterEngine,
+    analyze_python_file,
     check_tree_sitter_availability,
     print_syntax_tree,
-    analyze_python_file,
 )
 
 
@@ -58,7 +58,7 @@ def test_tree_sitter_engine_custom_config(tmp_path):
     """カスタム設定での初期化テスト"""
     custom_config = {
         "cache_dir": tmp_path / "custom_cache",
-        "supported_languages": {".py": "python"}
+        "supported_languages": {".py": "python"},
     }
 
     engine = TreeSitterEngine(config=custom_config)
@@ -172,6 +172,7 @@ def test_tree_sitter_engine_manual_extract():
     engine = TreeSitterEngine()
 
     from collections import defaultdict
+
     info = defaultdict(list)
 
     # モックノードで手動抽出をテスト
@@ -254,6 +255,7 @@ def test_tree_sitter_engine_extract_semantic_info_fallback():
     mock_root.children = []
 
     from collections import defaultdict
+
     info = defaultdict(list)
 
     # モック言語でクエリ失敗をシミュレート
@@ -363,6 +365,7 @@ def test_tree_sitter_engine_manual_extract_function():
     """_manual_extractで関数定義の抽出テスト"""
     engine = TreeSitterEngine()
     from collections import defaultdict
+
     info = defaultdict(list)
 
     mock_function_node = MagicMock()
@@ -382,6 +385,7 @@ def test_tree_sitter_engine_manual_extract_class():
     """_manual_extractでクラス定義の抽出テスト"""
     engine = TreeSitterEngine()
     from collections import defaultdict
+
     info = defaultdict(list)
 
     mock_class_node = MagicMock()
@@ -401,6 +405,7 @@ def test_tree_sitter_engine_manual_extract_call():
     """_manual_extractで関数呼び出しの抽出テスト"""
     engine = TreeSitterEngine()
     from collections import defaultdict
+
     info = defaultdict(list)
 
     # まずクラス定義を追加（クラス名の呼び出しは除外される）
@@ -427,6 +432,7 @@ def test_tree_sitter_engine_manual_extract_call_class_instantiation():
     """_manual_extractでクラスインスタンス化の除外テスト"""
     engine = TreeSitterEngine()
     from collections import defaultdict
+
     info = defaultdict(list)
 
     # クラス定義を追加
@@ -453,6 +459,7 @@ def test_tree_sitter_engine_manual_extract_recursive():
     """_manual_extractの再帰的処理テスト"""
     engine = TreeSitterEngine()
     from collections import defaultdict
+
     info = defaultdict(list)
 
     # 親ノード
@@ -499,4 +506,3 @@ def test_tree_sitter_engine_query_failure_handling():
 
     # 成功または失敗のどちらかが返される
     assert isinstance(result, AnalysisResult)
-

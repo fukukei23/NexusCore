@@ -40,10 +40,10 @@ def check_section_not_empty(report_content: str, section_name: str) -> tuple[boo
     """
     content = extract_section_content(report_content, section_name)
     if content is None:
-        return False, f"セクションが見つからない"
+        return False, "セクションが見つからない"
 
     if is_effectively_empty_text(content):
-        return False, f"セクションが実質的に空（空行のみ、プレースホルダ、またはMarkdown記号のみ）"
+        return False, "セクションが実質的に空（空行のみ、プレースホルダ、またはMarkdown記号のみ）"
 
     return True, ""
 
@@ -182,15 +182,9 @@ def test_completion_reports_have_content_quality():
         if issues:
             failures.append({"cr_id": cr_id, "file_path": file_path, "issues": issues})
 
-    assert not failures, (
-        f"Completion reports with content quality issues:\n"
-        + "\n".join(
-            f"  - CR-ID: {f['cr_id']}\n"
-            f"    File: {f['file_path']}\n"
-            + "\n".join(
-                f"    ✗ {issue['section']}: {issue['reason']}" for issue in f["issues"]
-            )
-            for f in failures
-        )
+    assert not failures, "Completion reports with content quality issues:\n" + "\n".join(
+        f"  - CR-ID: {f['cr_id']}\n"
+        f"    File: {f['file_path']}\n"
+        + "\n".join(f"    ✗ {issue['section']}: {issue['reason']}" for issue in f["issues"])
+        for f in failures
     )
-

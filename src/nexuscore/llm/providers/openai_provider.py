@@ -35,7 +35,9 @@ class OpenAILLM(BaseLLM):
                 raise ValueError("OPENAI_AZURE=1 requires OPENAI_AZURE_DEPLOYMENT to be set.")
             session = HTTP_CLIENT_FACTORY.create_session()
             if not session:
-                self.logger.warning("OpenAILLM could not obtain an HTTP session. Falling back to stub mode.")
+                self.logger.warning(
+                    "OpenAILLM could not obtain an HTTP session. Falling back to stub mode."
+                )
                 self.real_calls = False
             else:
                 self.session = session
@@ -54,7 +56,9 @@ class OpenAILLM(BaseLLM):
             try:
                 if self.azure:
                     if not self.azure_deployment:
-                        raise ValueError("OPENAI_AZURE=1 requires OPENAI_AZURE_DEPLOYMENT to be set.")
+                        raise ValueError(
+                            "OPENAI_AZURE=1 requires OPENAI_AZURE_DEPLOYMENT to be set."
+                        )
                     url = (
                         f"{self.base_url}/openai/deployments/{self.azure_deployment}/chat/completions"
                         f"?api-version={self.azure_api_version}"
@@ -62,13 +66,18 @@ class OpenAILLM(BaseLLM):
                     headers = {"api-key": self.api_key, "Content-Type": "application/json"}
                 else:
                     url = f"{self.base_url}/v1/chat/completions"
-                    headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+                    headers = {
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    }
 
                 messages = [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ]
-                is_gpt5_or_o = self.model_name.startswith("gpt-5") or self.model_name.startswith("o")
+                is_gpt5_or_o = self.model_name.startswith("gpt-5") or self.model_name.startswith(
+                    "o"
+                )
 
                 payload = {
                     "model": self.model_name,
@@ -102,8 +111,8 @@ class OpenAILLM(BaseLLM):
 
                 data = resp.json()
                 text = ""
-                for ch in (data.get("choices") or []):
-                    msg = (ch.get("message") or {})
+                for ch in data.get("choices") or []:
+                    msg = ch.get("message") or {}
                     if msg.get("content"):
                         text += str(msg["content"])
 

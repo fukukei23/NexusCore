@@ -8,15 +8,15 @@ Comprehensive Tests for RequirementAgent
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
-import pytest
+
 import json
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from nexuscore.agents.requirement_agent import (
     RequirementAgent,
-    TextLocalization,
     StateMachine,
+    TextLocalization,
 )
-
 
 # ============================================================================
 # Tests: TextLocalization
@@ -50,10 +50,20 @@ class TestTextLocalization:
         """すべての日本語キーが存在"""
         text = TextLocalization(language="ja")
         required_keys = [
-            "title", "boot_msg", "initial_greeting", "status_ready",
-            "status_thinking", "status_suggesting", "status_finished",
-            "input_placeholder", "send_button", "finish_button",
-            "final_output_label", "yes_button", "no_button", "suggest_button"
+            "title",
+            "boot_msg",
+            "initial_greeting",
+            "status_ready",
+            "status_thinking",
+            "status_suggesting",
+            "status_finished",
+            "input_placeholder",
+            "send_button",
+            "finish_button",
+            "final_output_label",
+            "yes_button",
+            "no_button",
+            "suggest_button",
         ]
         for key in required_keys:
             assert text[key] != f"<{key}>"
@@ -61,9 +71,7 @@ class TestTextLocalization:
     def test_all_english_keys_exist(self):
         """すべての英語キーが存在"""
         text = TextLocalization(language="en")
-        required_keys = [
-            "title", "boot_msg", "initial_greeting", "status_ready"
-        ]
+        required_keys = ["title", "boot_msg", "initial_greeting", "status_ready"]
         for key in required_keys:
             assert text[key] != f"<{key}>"
 
@@ -228,12 +236,14 @@ class TestAnalyzeRequirement:
     @patch.object(RequirementAgent, "execute_llm_task")
     def test_with_valid_json_response(self, mock_execute):
         """有効なJSONレスポンスで要件を分析"""
-        mock_execute.return_value = json.dumps({
-            "summary": "Webアプリケーション",
-            "features": ["ユーザー認証", "ダッシュボード"],
-            "constraints": ["レスポンス時間は1秒以内"],
-            "acceptance_criteria": ["全機能がテスト済み"]
-        })
+        mock_execute.return_value = json.dumps(
+            {
+                "summary": "Webアプリケーション",
+                "features": ["ユーザー認証", "ダッシュボード"],
+                "constraints": ["レスポンス時間は1秒以内"],
+                "acceptance_criteria": ["全機能がテスト済み"],
+            }
+        )
 
         agent = RequirementAgent()
         result = agent.analyze_requirement("Webアプリを作成")
@@ -260,12 +270,14 @@ class TestAnalyzeRequirement:
     @patch.object(RequirementAgent, "execute_llm_task")
     def test_with_empty_requirement(self, mock_execute):
         """空の要件の場合"""
-        mock_execute.return_value = json.dumps({
-            "summary": "No requirement",
-            "features": [],
-            "constraints": [],
-            "acceptance_criteria": []
-        })
+        mock_execute.return_value = json.dumps(
+            {
+                "summary": "No requirement",
+                "features": [],
+                "constraints": [],
+                "acceptance_criteria": [],
+            }
+        )
 
         agent = RequirementAgent()
         result = agent.analyze_requirement("")
@@ -276,12 +288,9 @@ class TestAnalyzeRequirement:
     @patch.object(RequirementAgent, "execute_llm_task")
     def test_uses_initial_requirement_if_empty(self, mock_execute):
         """空の場合は初期要件を使用"""
-        mock_execute.return_value = json.dumps({
-            "summary": "Test",
-            "features": [],
-            "constraints": [],
-            "acceptance_criteria": []
-        })
+        mock_execute.return_value = json.dumps(
+            {"summary": "Test", "features": [], "constraints": [], "acceptance_criteria": []}
+        )
 
         agent = RequirementAgent()
         agent.set_initial_requirement("初期要件")
@@ -350,12 +359,14 @@ class TestIntegrationScenarios:
     @patch.object(RequirementAgent, "execute_llm_task")
     def test_full_headless_workflow(self, mock_execute):
         """完全なヘッドレスワークフロー"""
-        mock_execute.return_value = json.dumps({
-            "summary": "タスク管理アプリ",
-            "features": ["タスク作成", "タスク編集", "タスク削除"],
-            "constraints": ["モバイル対応"],
-            "acceptance_criteria": ["すべてのCRUD操作が動作する"]
-        })
+        mock_execute.return_value = json.dumps(
+            {
+                "summary": "タスク管理アプリ",
+                "features": ["タスク作成", "タスク編集", "タスク削除"],
+                "constraints": ["モバイル対応"],
+                "acceptance_criteria": ["すべてのCRUD操作が動作する"],
+            }
+        )
 
         agent = RequirementAgent(language="ja", use_ui=False)
         agent.set_initial_requirement("タスク管理アプリを作りたい")
@@ -392,12 +403,14 @@ class TestRequirementAgentEdgeCases:
     @patch.object(RequirementAgent, "execute_llm_task")
     def test_analyze_requirement_with_special_characters(self, mock_execute):
         """特殊文字を含む要件の分析"""
-        mock_execute.return_value = json.dumps({
-            "summary": "特殊文字テスト: <>\"'&",
-            "features": ["機能<1>", "機能\"2\""],
-            "constraints": ["制約's"],
-            "acceptance_criteria": ["基準&1"]
-        })
+        mock_execute.return_value = json.dumps(
+            {
+                "summary": "特殊文字テスト: <>\"'&",
+                "features": ["機能<1>", '機能"2"'],
+                "constraints": ["制約's"],
+                "acceptance_criteria": ["基準&1"],
+            }
+        )
 
         agent = RequirementAgent()
         result = agent.analyze_requirement("特殊文字を含む要件: <>\"'&")
@@ -410,12 +423,14 @@ class TestRequirementAgentEdgeCases:
     def test_analyze_requirement_with_very_long_text(self, mock_execute):
         """非常に長い要件テキストの処理"""
         long_requirement = "要件" * 1000  # 3000文字
-        mock_execute.return_value = json.dumps({
-            "summary": long_requirement[:80],
-            "features": ["機能1"],
-            "constraints": [],
-            "acceptance_criteria": []
-        })
+        mock_execute.return_value = json.dumps(
+            {
+                "summary": long_requirement[:80],
+                "features": ["機能1"],
+                "constraints": [],
+                "acceptance_criteria": [],
+            }
+        )
 
         agent = RequirementAgent()
         result = agent.analyze_requirement(long_requirement)
@@ -470,12 +485,14 @@ class TestRequirementAgentEdgeCases:
     @patch.object(RequirementAgent, "execute_llm_task")
     def test_analyze_requirement_with_unicode_characters(self, mock_execute):
         """Unicode文字を含む要件の処理"""
-        mock_execute.return_value = json.dumps({
-            "summary": "絵文字テスト 🎉 📱 ✨",
-            "features": ["機能①", "機能②"],
-            "constraints": ["日本語制約"],
-            "acceptance_criteria": ["基準✓"]
-        })
+        mock_execute.return_value = json.dumps(
+            {
+                "summary": "絵文字テスト 🎉 📱 ✨",
+                "features": ["機能①", "機能②"],
+                "constraints": ["日本語制約"],
+                "acceptance_criteria": ["基準✓"],
+            }
+        )
 
         agent = RequirementAgent()
         result = agent.analyze_requirement("絵文字を含む要件 🎉")
@@ -513,23 +530,17 @@ class TestRequirementAgentEdgeCases:
 
         # 1回目の要件設定
         agent.set_initial_requirement("要件v1")
-        mock_execute.return_value = json.dumps({
-            "summary": "v1",
-            "features": ["機能1"],
-            "constraints": [],
-            "acceptance_criteria": []
-        })
+        mock_execute.return_value = json.dumps(
+            {"summary": "v1", "features": ["機能1"], "constraints": [], "acceptance_criteria": []}
+        )
         result1 = agent.analyze_requirement("")
         assert result1["summary"] == "v1"
 
         # 2回目の要件設定（上書き）
         agent.set_initial_requirement("要件v2")
-        mock_execute.return_value = json.dumps({
-            "summary": "v2",
-            "features": ["機能2"],
-            "constraints": [],
-            "acceptance_criteria": []
-        })
+        mock_execute.return_value = json.dumps(
+            {"summary": "v2", "features": ["機能2"], "constraints": [], "acceptance_criteria": []}
+        )
         result2 = agent.analyze_requirement("")
         assert result2["summary"] == "v2"
         # final_requirementsが更新される
@@ -562,12 +573,14 @@ class TestRequirementAgentAdvancedScenarios:
     @patch.object(RequirementAgent, "execute_llm_task")
     def test_analyze_requirement_with_nested_json_in_text(self, mock_execute):
         """ネストされたJSON構造を含む要件テキストの処理"""
-        mock_execute.return_value = json.dumps({
-            "summary": "Nested JSON handling",
-            "features": ["Parse nested data", "Validate structure"],
-            "constraints": ["Must handle depth > 5"],
-            "acceptance_criteria": ["All nested keys accessible"]
-        })
+        mock_execute.return_value = json.dumps(
+            {
+                "summary": "Nested JSON handling",
+                "features": ["Parse nested data", "Validate structure"],
+                "constraints": ["Must handle depth > 5"],
+                "acceptance_criteria": ["All nested keys accessible"],
+            }
+        )
 
         agent = RequirementAgent()
         result = agent.analyze_requirement(
@@ -580,12 +593,14 @@ class TestRequirementAgentAdvancedScenarios:
     @patch.object(RequirementAgent, "execute_llm_task")
     def test_generate_final_spec_with_conflicting_history(self, mock_execute):
         """矛盾する履歴からの最終仕様生成"""
-        mock_execute.return_value = json.dumps({
-            "summary": "Resolved conflicts",
-            "features": ["Final feature set"],
-            "constraints": ["Latest constraints"],
-            "acceptance_criteria": ["Criteria after resolution"]
-        })
+        mock_execute.return_value = json.dumps(
+            {
+                "summary": "Resolved conflicts",
+                "features": ["Final feature set"],
+                "constraints": ["Latest constraints"],
+                "acceptance_criteria": ["Criteria after resolution"],
+            }
+        )
 
         agent = RequirementAgent()
         conflicting_history = [
@@ -626,12 +641,14 @@ class TestRequirementAgentAdvancedScenarios:
 
         def slow_response(*args, **kwargs):
             time.sleep(0.1)  # 小さい遅延をシミュレート
-            return json.dumps({
-                "summary": "Slow response",
-                "features": ["Feature after delay"],
-                "constraints": [],
-                "acceptance_criteria": []
-            })
+            return json.dumps(
+                {
+                    "summary": "Slow response",
+                    "features": ["Feature after delay"],
+                    "constraints": [],
+                    "acceptance_criteria": [],
+                }
+            )
 
         mock_execute.side_effect = slow_response
 
@@ -645,12 +662,14 @@ class TestRequirementAgentAdvancedScenarios:
     @patch.object(RequirementAgent, "execute_llm_task")
     def test_analyze_requirement_with_extremely_long_text(self, mock_execute):
         """極端に長いテキストの要件分析"""
-        mock_execute.return_value = json.dumps({
-            "summary": "Long text processed",
-            "features": ["Handle large inputs"],
-            "constraints": ["Memory efficient"],
-            "acceptance_criteria": ["No truncation"]
-        })
+        mock_execute.return_value = json.dumps(
+            {
+                "summary": "Long text processed",
+                "features": ["Handle large inputs"],
+                "constraints": ["Memory efficient"],
+                "acceptance_criteria": ["No truncation"],
+            }
+        )
 
         agent = RequirementAgent()
         # 10000文字の長いテキスト
@@ -661,4 +680,3 @@ class TestRequirementAgentAdvancedScenarios:
         # 長いテキストでも処理される
         assert "summary" in result
         assert mock_execute.called
-

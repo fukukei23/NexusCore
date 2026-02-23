@@ -11,23 +11,23 @@ NexusTrace trace_writer のテスト
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
 
 import pytest
 
 from nexuscore.guard.policy_engine import (
+    DiffInput,
+    EvalInput,
     GuardDecision,
     GuardInput,
     GuardResult,
-    EvalInput,
-    TestInput,
-    DiffInput,
     SecurityInput,
+    TestInput,
 )
 from nexuscore.trace.trace_writer import (
-    write_guard_decision_event,
-    TraceWriter,
     SCHEMA_VERSION,
+    TraceWriter,
+    write_guard_decision_event,
 )
 
 
@@ -55,7 +55,7 @@ class TestRequiredFields:
             )
 
             # ファイルを読み込んで検証
-            with open(trace_file, "r", encoding="utf-8") as f:
+            with open(trace_file, encoding="utf-8") as f:
                 line = f.readline()
                 event = json.loads(line)
 
@@ -115,7 +115,7 @@ class TestJsonlAppend:
             )
 
             # ファイルを読み込んで検証
-            with open(trace_file, "r", encoding="utf-8") as f:
+            with open(trace_file, encoding="utf-8") as f:
                 lines = f.readlines()
 
             assert len(lines) == 2
@@ -153,7 +153,7 @@ class TestOverrideHandling:
                 trace_file=trace_file,
             )
 
-            with open(trace_file, "r", encoding="utf-8") as f:
+            with open(trace_file, encoding="utf-8") as f:
                 line = f.readline()
                 event = json.loads(line)
 
@@ -186,7 +186,7 @@ class TestOverrideHandling:
                 trace_file=trace_file,
             )
 
-            with open(trace_file, "r", encoding="utf-8") as f:
+            with open(trace_file, encoding="utf-8") as f:
                 line = f.readline()
                 event = json.loads(line)
 
@@ -230,7 +230,7 @@ class TestOverrideHandling:
                 trace_file=trace_file,
             )
 
-            with open(trace_file, "r", encoding="utf-8") as f:
+            with open(trace_file, encoding="utf-8") as f:
                 line = f.readline()
                 event = json.loads(line)
 
@@ -266,7 +266,7 @@ class TestArtifacts:
                 trace_file=trace_file,
             )
 
-            with open(trace_file, "r", encoding="utf-8") as f:
+            with open(trace_file, encoding="utf-8") as f:
                 line = f.readline()
                 event = json.loads(line)
 
@@ -301,7 +301,7 @@ class TestArtifacts:
                 trace_file=trace_file,
             )
 
-            with open(trace_file, "r", encoding="utf-8") as f:
+            with open(trace_file, encoding="utf-8") as f:
                 line = f.readline()
                 event = json.loads(line)
 
@@ -340,7 +340,7 @@ class TestArtifacts:
                 trace_file=trace_file,
             )
 
-            with open(trace_file, "r", encoding="utf-8") as f:
+            with open(trace_file, encoding="utf-8") as f:
                 line = f.readline()
                 event = json.loads(line)
 
@@ -372,7 +372,7 @@ class TestWriteFailure:
         )
 
         # open を失敗させる（モンキーパッチ）
-        with patch("builtins.open", side_effect=IOError("Permission denied")):
+        with patch("builtins.open", side_effect=OSError("Permission denied")):
             # 例外が外に出ないことを確認
             try:
                 write_guard_decision_event(
@@ -432,7 +432,7 @@ class TestTraceWriter:
             # ファイルが作成されていることを確認
             assert trace_file.exists()
 
-            with open(trace_file, "r", encoding="utf-8") as f:
+            with open(trace_file, encoding="utf-8") as f:
                 line = f.readline()
                 event = json.loads(line)
 

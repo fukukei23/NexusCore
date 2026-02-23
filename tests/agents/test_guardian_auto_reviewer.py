@@ -6,14 +6,12 @@ GuardianAutoReviewer のユニットテスト。
 
 from __future__ import annotations
 
-import pytest
-
 from nexuscore.agents.guardian_auto_reviewer import (
     GuardianAutoReviewer,
+    ProjectType,
     ReviewDecision,
     ReviewIssue,
     ReviewResult,
-    ProjectType,
 )
 
 
@@ -186,4 +184,3 @@ class TestGuardianAutoReviewer:
         assert len(files) == 2
         assert files[0].path == "src/file1.py"
         assert files[1].path == "src/file2.py"
-

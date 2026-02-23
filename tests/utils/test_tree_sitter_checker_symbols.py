@@ -5,7 +5,11 @@ tsc = pytest.importorskip("nexuscore.utils.tree_sitter_checker")
 
 def test_report_generator_print_report(monkeypatch, capsys):
     # avoid color codes
-    monkeypatch.setattr(tsc, "Fore", type("F", (), {"CYAN": "", "GREEN": "", "BLUE": "", "MAGENTA": "", "RED": "", "WHITE": ""}))
+    monkeypatch.setattr(
+        tsc,
+        "Fore",
+        type("F", (), {"CYAN": "", "GREEN": "", "BLUE": "", "MAGENTA": "", "RED": "", "WHITE": ""}),
+    )
     monkeypatch.setattr(tsc, "Style", type("S", (), {"BRIGHT": "", "RESET_ALL": ""}))
     summary = {
         "overview": {"total_files": 1, "successful": 1, "total_lines": 10},

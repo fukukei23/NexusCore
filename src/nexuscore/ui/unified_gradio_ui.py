@@ -6,29 +6,27 @@
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 import subprocess
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 
 import gradio as gr
 
 # 既存のモジュールをインポート
 try:
     from nexuscore.modules.whisper_handler import transcribe_audio
+
     HAS_WHISPER = True
 except ImportError:
     HAS_WHISPER = False
     transcribe_audio = None  # type: ignore
 
 try:
-    from nexuscore.services.self_healing_service import SelfHealingService
     from nexuscore.agents.debugger_agent import DebuggerAgent
     from nexuscore.integration.github_pr_comment import load_run_markdown
+    from nexuscore.services.self_healing_service import SelfHealingService
+
     HAS_SELF_HEALING = True
 except ImportError:
     HAS_SELF_HEALING = False
@@ -42,17 +40,19 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AppState:
     """アプリケーション全体で共有する State"""
-    current_file_path: Optional[str] = None
-    generated_code: Optional[str] = None
-    latest_test_result: Optional[str] = None
-    latest_run_id: Optional[str] = None
-    before_code: Dict[str, str] = field(default_factory=dict)  # ファイルパス -> コード
-    after_code: Dict[str, str] = field(default_factory=dict)  # ファイルパス -> コード
+
+    current_file_path: str | None = None
+    generated_code: str | None = None
+    latest_test_result: str | None = None
+    latest_run_id: str | None = None
+    before_code: dict[str, str] = field(default_factory=dict)  # ファイルパス -> コード
+    after_code: dict[str, str] = field(default_factory=dict)  # ファイルパス -> コード
 
 
 # ============================================================================
 # Tab 1: Code / Prompt
 # ============================================================================
+
 
 def build_code_prompt_tab(state: gr.State) -> None:
     """
@@ -99,6 +99,7 @@ def build_code_prompt_tab(state: gr.State) -> None:
 
     # イベントハンドラ
     if HAS_WHISPER:
+
         def transcribe_handler(audio_path: str) -> str:
             """音声を文字起こし"""
             try:
@@ -116,7 +117,9 @@ def build_code_prompt_tab(state: gr.State) -> None:
             outputs=[prompt_input],
         )
 
-    def generate_code_handler(prompt: str, filename: str, current_state: AppState) -> Tuple[str, AppState]:
+    def generate_code_handler(
+        prompt: str, filename: str, current_state: AppState
+    ) -> tuple[str, AppState]:
         """プロンプトからコードを生成"""
         if not prompt.strip():
             return "💡 プロンプトを入力してください。", current_state
@@ -140,7 +143,9 @@ def placeholder_function():
             logger.error(f"Code generation failed: {e}", exc_info=True)
             return f"❌ エラー: {e}", current_state
 
-    def save_code_handler(code: str, filename: str, current_state: AppState) -> Tuple[str, AppState]:
+    def save_code_handler(
+        code: str, filename: str, current_state: AppState
+    ) -> tuple[str, AppState]:
         """コードを保存"""
         if not code.strip():
             return "💡 コードが空です。", current_state
@@ -178,6 +183,7 @@ def placeholder_function():
 # ============================================================================
 # Tab 2: AI Revision
 # ============================================================================
+
 
 def build_ai_revision_tab(state: gr.State) -> None:
     """
@@ -220,7 +226,9 @@ def build_ai_revision_tab(state: gr.State) -> None:
                     interactive=False,
                 )
 
-    def generate_patch_handler(code: str, prompt: str, current_state: AppState) -> Tuple[str, str, AppState]:
+    def generate_patch_handler(
+        code: str, prompt: str, current_state: AppState
+    ) -> tuple[str, str, AppState]:
         """パッチを生成"""
         if not code.strip() or not prompt.strip():
             return "", "💡 コードと修正指示を入力してください。", current_state
@@ -239,7 +247,7 @@ def build_ai_revision_tab(state: gr.State) -> None:
             logger.error(f"Patch generation failed: {e}", exc_info=True)
             return "", f"❌ エラー: {e}", current_state
 
-    def apply_patch_handler(patch: str, current_state: AppState) -> Tuple[str, AppState]:
+    def apply_patch_handler(patch: str, current_state: AppState) -> tuple[str, AppState]:
         """パッチを適用"""
         if not patch.strip():
             return "💡 パッチが空です。", current_state
@@ -277,6 +285,7 @@ def build_ai_revision_tab(state: gr.State) -> None:
 # Tab 3: Test Runner
 # ============================================================================
 
+
 def build_test_runner_tab(state: gr.State) -> None:
     """
     Tab 3: Test Runner（pytest 実行＋結果表示）
@@ -309,8 +318,9 @@ def build_test_runner_tab(state: gr.State) -> None:
 
                 test_status = gr.Markdown("**ステータス:** 未実行")
 
-
-    def run_test_handler(command: str, test_file: str, current_state: AppState) -> Tuple[str, str, AppState]:
+    def run_test_handler(
+        command: str, test_file: str, current_state: AppState
+    ) -> tuple[str, str, AppState]:
         """テストを実行"""
         try:
             # テストコマンドを構築（リスト形式でコマンドインジェクション対策）
@@ -341,7 +351,7 @@ def build_test_runner_tab(state: gr.State) -> None:
         except Exception as e:
             logger.error(f"Test execution failed: {e}", exc_info=True)
             error_msg = f"❌ エラー: {e}"
-            return error_msg, f"**ステータス:** ❌ エラー", current_state
+            return error_msg, "**ステータス:** ❌ エラー", current_state
 
     run_test_button.click(
         fn=run_test_handler,
@@ -355,6 +365,7 @@ def build_test_runner_tab(state: gr.State) -> None:
 # ============================================================================
 # Tab 4: History & Diff
 # ============================================================================
+
 
 def build_history_diff_tab(state: gr.State) -> None:
     """
@@ -418,7 +429,7 @@ def build_history_diff_tab(state: gr.State) -> None:
                     interactive=False,
                 )
 
-    def load_run_handler(run_id: str, current_state: AppState) -> Tuple[str, str, str, AppState]:
+    def load_run_handler(run_id: str, current_state: AppState) -> tuple[str, str, str, AppState]:
         """Run を読み込み"""
         if not run_id.strip():
             return "", "", "💡 Run ID を入力してください。", current_state
@@ -430,6 +441,7 @@ def build_history_diff_tab(state: gr.State) -> None:
             else:
                 # フォールバック: ファイルから直接読み込み
                 from nexuscore.integration.run_report_generator import get_markdown_report_path
+
                 report_path = get_markdown_report_path(run_id)
                 if report_path.exists():
                     markdown_content = report_path.read_text(encoding="utf-8")
@@ -454,7 +466,7 @@ def build_history_diff_tab(state: gr.State) -> None:
         pr_number: int,
         head_sha: str,
         current_state: AppState,
-    ) -> Tuple[str, AppState]:
+    ) -> tuple[str, AppState]:
         """Self-Healing Run を実行"""
         if not repo_full_name.strip() or not head_sha.strip() or pr_number <= 0:
             return "💡 Repository、PR Number、Head SHA を入力してください。", current_state
@@ -480,14 +492,14 @@ Summary: {result.get('summary', 'N/A')}
 Run ID: {result.get('run_id', 'N/A')}
 Duration: {result.get('duration_seconds', 0):.2f}s
 """
-            if result.get('details'):
-                details = result['details']
-                if details.get('retry_count'):
+            if result.get("details"):
+                details = result["details"]
+                if details.get("retry_count"):
                     result_text += f"Retry Count: {details.get('retry_count')}\n"
-                if details.get('last_error_class'):
+                if details.get("last_error_class"):
                     result_text += f"Last Error: {details.get('last_error_class')}\n"
 
-            current_state.latest_run_id = result.get('run_id')
+            current_state.latest_run_id = result.get("run_id")
 
             return result_text, current_state
         except Exception as e:
@@ -513,7 +525,10 @@ Duration: {result.get('duration_seconds', 0):.2f}s
 # メイン UI 構築
 # ============================================================================
 
-def run_test_handler(command: str, test_file: str, current_state: AppState) -> Tuple[str, str, AppState]:
+
+def run_test_handler(
+    command: str, test_file: str, current_state: AppState
+) -> tuple[str, str, AppState]:
     """
     テストを実行するハンドラー関数
 
@@ -521,7 +536,7 @@ def run_test_handler(command: str, test_file: str, current_state: AppState) -> T
     """
     try:
         # テストコマンドを構築（コマンドインジェクション対策: 引数リスト形式を使用）
-        cmd: List[str]
+        cmd: list[str]
         if test_file and test_file.strip():
             cmd = [command, test_file]
         else:
@@ -549,7 +564,7 @@ def run_test_handler(command: str, test_file: str, current_state: AppState) -> T
     except Exception as e:
         logger.error(f"Test execution failed: {e}", exc_info=True)
         error_msg = f"❌ エラー: {e}"
-        return error_msg, f"**ステータス:** ❌ エラー", current_state
+        return error_msg, "**ステータス:** ❌ エラー", current_state
 
 
 def build_unified_ui() -> gr.Blocks:
@@ -601,4 +616,3 @@ def launch_unified_ui(
 
 if __name__ == "__main__":
     launch_unified_ui()
-

@@ -7,13 +7,13 @@ GitHub pull_request Webhook を受信して Self-Healing Service を実行する
 注意: このエンドポイントは GitHub Webhook の署名認証（X-Hub-Signature-256）のみを使用し、
 API Key 認証（X-API-Key）は使用しません。これは GitHub Webhook の標準的な実装パターンです。
 """
+
 import hashlib
 import hmac
 import logging
 import os
-from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException, Request, status
+from fastapi import APIRouter, Header, Request, status
 
 from ..schemas.error import ErrorResponse
 from ..schemas.github_webhook import GitHubWebhookPayload, GitHubWebhookResponse
@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 
 def verify_github_signature(
     payload_body: bytes,
-    signature_header: Optional[str],
-    secret: Optional[str],
+    signature_header: str | None,
+    secret: str | None,
 ) -> bool:
     """
     GitHub Webhook の署名を検証する
@@ -87,9 +87,9 @@ def verify_github_signature(
 )
 async def github_webhook_endpoint(
     request: Request,
-    x_github_event: Optional[str] = Header(None, alias="X-GitHub-Event"),
-    x_github_delivery: Optional[str] = Header(None, alias="X-GitHub-Delivery"),
-    x_hub_signature_256: Optional[str] = Header(None, alias="X-Hub-Signature-256"),
+    x_github_event: str | None = Header(None, alias="X-GitHub-Event"),
+    x_github_delivery: str | None = Header(None, alias="X-GitHub-Delivery"),
+    x_hub_signature_256: str | None = Header(None, alias="X-Hub-Signature-256"),
 ) -> GitHubWebhookResponse:
     """
     GitHub Webhook エンドポイント
@@ -144,6 +144,7 @@ async def github_webhook_endpoint(
     # JSON ペイロードをパース
     try:
         import json
+
         payload_dict = json.loads(payload_body.decode("utf-8"))
         payload = GitHubWebhookPayload(**payload_dict)
     except json.JSONDecodeError as e:
@@ -261,11 +262,18 @@ def _send_slack_notification_if_configured(result: dict, payload: dict) -> None:
 
     try:
         from nexuscore.core.notifier import SlackNotifier
+
         try:
-            from nexuscore.integration.github_pr_comment import _collect_run_metrics, _compute_recent_success_rate
+            from nexuscore.integration.github_pr_comment import (
+                _collect_run_metrics,
+                _compute_recent_success_rate,
+            )
         except ImportError:
             # フォールバック: run_report_generator からインポート
-            from nexuscore.integration.run_report_generator import _collect_run_metrics, _compute_recent_success_rate
+            from nexuscore.integration.run_report_generator import (
+                _collect_run_metrics,
+                _compute_recent_success_rate,
+            )
 
         repo_full_name = payload.get("repository", {}).get("full_name")
         pr_number = payload.get("pull_request", {}).get("number")
@@ -280,8 +288,7 @@ def _send_slack_notification_if_configured(result: dict, payload: dict) -> None:
         metrics = None
 
         try:
-            from nexuscore.webapp.models import Run, Project
-            from nexuscore.webapp import db
+            from nexuscore.webapp.models import Run
 
             # result から run_id を取得（run_id が含まれている場合）
             run_id = result.get("run_id") or result.get("details", {}).get("run_id")
@@ -297,12 +304,17 @@ def _send_slack_notification_if_configured(result: dict, payload: dict) -> None:
             logger.warning(f"Failed to collect metrics for Slack notification: {e}", exc_info=True)
 
         # PR URL と Run ログ URL を構築
-        pr_url = f"https://github.com/{repo_full_name}/pull/{pr_number}" if repo_full_name and pr_number else None
+        pr_url = (
+            f"https://github.com/{repo_full_name}/pull/{pr_number}"
+            if repo_full_name and pr_number
+            else None
+        )
 
         run_logs_url = None
         if run and run.run_id:
             try:
                 from nexuscore.config.config import AppConfig
+
                 base_url = AppConfig.WEBAPP_BASE_URL.rstrip("/")
                 run_logs_url = f"{base_url}/logs/runs/{run.run_id}"
             except Exception as e:
@@ -333,9 +345,10 @@ def _send_slack_notification_if_configured(result: dict, payload: dict) -> None:
         if success:
             logger.info(f"Sent Slack notification for {repo_full_name} PR #{pr_number}")
         else:
-            logger.warning(f"Failed to send Slack notification for {repo_full_name} PR #{pr_number}")
+            logger.warning(
+                f"Failed to send Slack notification for {repo_full_name} PR #{pr_number}"
+            )
 
     except Exception as e:
         # Slack 通知失敗は致命的ではないのでログだけ
         logger.error(f"Failed to send Slack notification: {e}", exc_info=True)
-

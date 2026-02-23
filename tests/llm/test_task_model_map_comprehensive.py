@@ -3,6 +3,7 @@ Comprehensive tests for llm/task_model_map.py
 
 タスク→モデル設定マッピングのテスト
 """
+
 import pytest
 
 from nexuscore.llm.task_model_map import (
@@ -46,18 +47,14 @@ class TestTaskModelConfig:
 
     def test_config_is_frozen(self):
         """frozenデータクラスのため変更不可"""
-        config = TaskModelConfig(
-            primary="test", secondary=[], fallback="test"
-        )
+        config = TaskModelConfig(primary="test", secondary=[], fallback="test")
 
         with pytest.raises(Exception):  # FrozenInstanceError
             config.primary = "new_value"  # type: ignore
 
     def test_config_secondary_can_be_empty(self):
         """secondaryは空リスト可能"""
-        config = TaskModelConfig(
-            primary="gpt5_default", secondary=[], fallback="gpt5_nano"
-        )
+        config = TaskModelConfig(primary="gpt5_default", secondary=[], fallback="gpt5_nano")
 
         assert config.secondary == []
 
@@ -315,9 +312,7 @@ class TestBuildTaskModelMapDict:
             from nexuscore.llm.llm_profiles import profile_to_model_name
 
             fallback_model = profile_to_model_name(config.fallback)
-            assert (
-                fallback_model in fallbacks
-            ), f"Task {task} fallback not in fallbacks list"
+            assert fallback_model in fallbacks, f"Task {task} fallback not in fallbacks list"
 
     def test_build_temperature_included_when_present(self):
         """temperatureが設定されている場合、エントリに含まれる"""
@@ -334,9 +329,7 @@ class TestBuildTaskModelMapDict:
         result = build_task_model_map_dict()
 
         # 少なくとも一つのタスクでtemperatureがNone
-        has_none_temp = any(
-            config.temperature is None for config in TASK_MODEL_CONFIGS.values()
-        )
+        has_none_temp = any(config.temperature is None for config in TASK_MODEL_CONFIGS.values())
         assert has_none_temp  # テストの前提条件
 
     def test_build_deterministic(self):
@@ -360,9 +353,7 @@ class TestTaskAliasIntegration:
         assert "test_generate" in TASK_MODEL_CONFIGS
 
         # 同じ設定を参照している
-        assert (
-            TASK_MODEL_CONFIGS["testing"] == TASK_MODEL_CONFIGS["test_generate"]
-        )
+        assert TASK_MODEL_CONFIGS["testing"] == TASK_MODEL_CONFIGS["test_generate"]
 
     def test_debugging_alias(self):
         """debuggingはdebugのエイリアス"""
@@ -374,27 +365,19 @@ class TestTaskAliasIntegration:
         """reviewはcode_reviewのエイリアス"""
         assert "review" in TASK_MODEL_CONFIGS
         assert "code_review" in TASK_MODEL_CONFIGS
-        assert (
-            TASK_MODEL_CONFIGS["review"] == TASK_MODEL_CONFIGS["code_review"]
-        )
+        assert TASK_MODEL_CONFIGS["review"] == TASK_MODEL_CONFIGS["code_review"]
 
     def test_policy_alias(self):
         """policyはpolicy_checkのエイリアス"""
         assert "policy" in TASK_MODEL_CONFIGS
         assert "policy_check" in TASK_MODEL_CONFIGS
-        assert (
-            TASK_MODEL_CONFIGS["policy"]
-            == TASK_MODEL_CONFIGS["policy_check"]
-        )
+        assert TASK_MODEL_CONFIGS["policy"] == TASK_MODEL_CONFIGS["policy_check"]
 
     def test_planning_alias(self):
         """planningはplan_generateのエイリアス"""
         assert "planning" in TASK_MODEL_CONFIGS
         assert "plan_generate" in TASK_MODEL_CONFIGS
-        assert (
-            TASK_MODEL_CONFIGS["planning"]
-            == TASK_MODEL_CONFIGS["plan_generate"]
-        )
+        assert TASK_MODEL_CONFIGS["planning"] == TASK_MODEL_CONFIGS["plan_generate"]
 
 
 # ============================================================================

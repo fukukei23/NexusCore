@@ -4,14 +4,11 @@ Tests logging directory management and file logging setup.
 """
 
 import logging
-import os
-import tempfile
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+
+import pytest
 
 from nexuscore.utils.log_config import get_logs_dir, setup_file_logging
-
 
 # ==============================================================================
 # get_logs_dir Tests
@@ -74,7 +71,7 @@ class TestSetupFileLogging:
             for handler in logger.handlers[:]:
                 handler.close()
                 logger.removeHandler(handler)
-        
+
         # Clean up root logger
         root = logging.getLogger()
         for handler in root.handlers[:]:
@@ -91,10 +88,10 @@ class TestSetupFileLogging:
         logger = setup_file_logging("test_file.log")
         logs_dir = get_logs_dir()
         log_file = logs_dir / "test_file.log"
-        
+
         # Write a log message to ensure file is created
         logger.info("Test message")
-        
+
         assert log_file.exists()
 
     def test_setup_file_logging_default_log_level(self):
@@ -120,11 +117,11 @@ class TestSetupFileLogging:
     def test_setup_file_logging_default_format(self):
         """Uses default format when not specified"""
         logger = setup_file_logging("test.log")
-        
+
         # Check that a FileHandler was added
         file_handlers = [h for h in logger.handlers if isinstance(h, logging.FileHandler)]
         assert len(file_handlers) > 0
-        
+
         # Check format includes expected fields
         formatter = file_handlers[0].formatter
         assert formatter is not None
@@ -133,7 +130,7 @@ class TestSetupFileLogging:
         """Can set custom format string"""
         custom_format = "%(levelname)s - %(message)s"
         logger = setup_file_logging("test.log", format_string=custom_format)
-        
+
         file_handlers = [h for h in logger.handlers if isinstance(h, logging.FileHandler)]
         assert len(file_handlers) > 0
 
@@ -141,7 +138,7 @@ class TestSetupFileLogging:
         """Can create named logger"""
         logger_name = "my.custom.logger"
         logger = setup_file_logging("test.log", logger_name=logger_name)
-        
+
         assert logger.name == logger_name
 
     def test_setup_file_logging_root_logger(self):
@@ -154,7 +151,7 @@ class TestSetupFileLogging:
         # Call twice with same logger
         logger1 = setup_file_logging("test.log", logger_name="duplicate_test")
         logger2 = setup_file_logging("test.log", logger_name="duplicate_test")
-        
+
         # Should only have one FileHandler
         file_handlers = [h for h in logger2.handlers if isinstance(h, logging.FileHandler)]
         assert len(file_handlers) == 1
@@ -163,16 +160,16 @@ class TestSetupFileLogging:
         """Appends to existing log file (mode='a')"""
         logger = setup_file_logging("append_test.log")
         logger.info("First message")
-        
+
         # Create new logger with same file
         logger2 = setup_file_logging("append_test.log")
         logger2.info("Second message")
-        
+
         # Check file contains both messages
         logs_dir = get_logs_dir()
         log_file = logs_dir / "append_test.log"
         content = log_file.read_text()
-        
+
         assert "First message" in content
         assert "Second message" in content
 
@@ -180,28 +177,28 @@ class TestSetupFileLogging:
         """Uses UTF-8 encoding for log file"""
         logger = setup_file_logging("utf8_test.log")
         logger.info("日本語メッセージ")
-        
+
         logs_dir = get_logs_dir()
         log_file = logs_dir / "utf8_test.log"
-        
+
         # Should be able to read UTF-8 content
-        content = log_file.read_text(encoding='utf-8')
+        content = log_file.read_text(encoding="utf-8")
         assert "日本語メッセージ" in content
 
     def test_setup_file_logging_writes_to_correct_directory(self):
         """Log file is created in logs directory"""
         logger = setup_file_logging("dir_test.log")
         logger.info("Test")
-        
+
         logs_dir = get_logs_dir()
         log_file = logs_dir / "dir_test.log"
-        
+
         assert log_file.parent == logs_dir
 
     def test_setup_file_logging_handler_has_correct_level(self):
         """FileHandler has same level as logger"""
         logger = setup_file_logging("level_test.log", log_level=logging.WARNING)
-        
+
         file_handlers = [h for h in logger.handlers if isinstance(h, logging.FileHandler)]
         assert file_handlers[0].level == logging.WARNING
 
@@ -223,7 +220,7 @@ class TestLogConfigIntegration:
             for handler in logger.handlers[:]:
                 handler.close()
                 logger.removeHandler(handler)
-        
+
         root = logging.getLogger()
         for handler in root.handlers[:]:
             handler.close()
@@ -233,10 +230,10 @@ class TestLogConfigIntegration:
         """Can create multiple loggers with different files"""
         logger1 = setup_file_logging("logger1.log", logger_name="app.module1")
         logger2 = setup_file_logging("logger2.log", logger_name="app.module2")
-        
+
         logger1.info("Message from logger1")
         logger2.info("Message from logger2")
-        
+
         logs_dir = get_logs_dir()
         assert (logs_dir / "logger1.log").exists()
         assert (logs_dir / "logger2.log").exists()
@@ -245,17 +242,17 @@ class TestLogConfigIntegration:
         """Named loggers create proper hierarchy"""
         parent = setup_file_logging("parent.log", logger_name="parent")
         child = setup_file_logging("child.log", logger_name="parent.child")
-        
+
         assert child.name.startswith(parent.name)
 
     def test_log_message_contains_expected_fields(self):
         """Log messages contain timestamp, level, name, message"""
         logger = setup_file_logging("fields_test.log", logger_name="test.logger")
         logger.info("Test message")
-        
+
         logs_dir = get_logs_dir()
         content = (logs_dir / "fields_test.log").read_text()
-        
+
         # Default format: "%(asctime)s - %(levelname)-8s - %(name)-20s - %(message)s"
         assert "INFO" in content
         assert "test.logger" in content
@@ -264,15 +261,15 @@ class TestLogConfigIntegration:
     def test_different_log_levels_in_same_file(self):
         """Can log different levels to same file"""
         logger = setup_file_logging("levels_test.log", log_level=logging.DEBUG)
-        
+
         logger.debug("Debug message")
         logger.info("Info message")
         logger.warning("Warning message")
         logger.error("Error message")
-        
+
         logs_dir = get_logs_dir()
         content = (logs_dir / "levels_test.log").read_text()
-        
+
         assert "DEBUG" in content
         assert "INFO" in content
         assert "WARNING" in content
@@ -296,7 +293,7 @@ class TestLogConfigEdgeCases:
             for handler in logger.handlers[:]:
                 handler.close()
                 logger.removeHandler(handler)
-        
+
         root = logging.getLogger()
         for handler in root.handlers[:]:
             handler.close()
@@ -306,7 +303,7 @@ class TestLogConfigEdgeCases:
         """Handle special characters in log filename"""
         logger = setup_file_logging("test-log_file.2024.log")
         logger.info("Test")
-        
+
         logs_dir = get_logs_dir()
         assert (logs_dir / "test-log_file.2024.log").exists()
 

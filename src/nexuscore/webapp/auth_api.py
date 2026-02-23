@@ -6,17 +6,18 @@ APIキー認証ヘルパー
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable, TypeVar, Any, Optional, cast
+from typing import Any, TypeVar, cast
 
-from flask import request, jsonify, g
+from flask import g, jsonify, request
 
 from nexuscore.webapp.models import ApiKey, User
 
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def _resolve_user_from_api_key(raw_token: str) -> Optional[User]:
+def _resolve_user_from_api_key(raw_token: str) -> User | None:
     """
     API キーから User を解決する
 
@@ -46,6 +47,7 @@ def _resolve_user_from_api_key(raw_token: str) -> Optional[User]:
     if user is None:
         # リレーションが読み込まれていない場合は明示的に取得
         from nexuscore.webapp.models import User
+
         user = User.query.get(api_key_obj.user_id)
 
     return user
@@ -65,6 +67,7 @@ def api_key_required(func: F) -> F:
     有効な場合は g.current_api_user に User をセットする。
     無効な場合は 401 JSON を返す。
     """
+
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any):
         raw_token = request.headers.get("X-Api-Key") or request.args.get("api_key")
@@ -77,4 +80,3 @@ def api_key_required(func: F) -> F:
         return func(*args, **kwargs)
 
     return cast(F, wrapper)
-

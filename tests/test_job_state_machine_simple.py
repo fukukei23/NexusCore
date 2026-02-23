@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """JobStateMachine の簡単な動作確認スクリプト"""
-import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from nexuscore.core.job_state_machine import (
+    CompletedState,
+    FailedState,
     JobStateMachine,
     PendingState,
     RunningState,
-    CompletedState,
-    FailedState,
 )
+
 
 def test_basic():
     """基本的な動作確認"""
@@ -57,6 +59,7 @@ def test_basic():
     print("=" * 60)
     return True
 
+
 if __name__ == "__main__":
     try:
         test_basic()
@@ -64,6 +67,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ テスト失敗: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
-

@@ -11,10 +11,10 @@ on an orchestrator instance (duck-typed).
 from __future__ import annotations
 
 import threading
-import time
 import uuid
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple
+from typing import Any
 
 from .constants import AuthorityLevel
 from .explainability import build_explainability
@@ -32,23 +32,22 @@ class RunLockLease:
     If refresh fails, sets a flag that can be checked to trigger safe shutdown.
     """
 
-    def __init__(self, run_id: str, refresh_interval_seconds: Optional[float] = None):
+    def __init__(self, run_id: str, refresh_interval_seconds: float | None = None):
         self.run_id = run_id
         self.refresh_interval = refresh_interval_seconds
         if self.refresh_interval is None:
             # Default: read from env or use ttl // 3 (minimum 5 seconds)
-            import os
             from .run_lock import _get_lock_refresh_seconds
 
             self.refresh_interval = float(_get_lock_refresh_seconds())
         self._lock_acquired = False
-        self._refresh_thread: Optional[threading.Thread] = None
+        self._refresh_thread: threading.Thread | None = None
         self._stop_refresh = threading.Event()
         self._refresh_failed = threading.Event()
-        self._refresh_failure_reason: Optional[str] = None
-        self._refresh_failure_details: Optional[Dict[str, Any]] = None
+        self._refresh_failure_reason: str | None = None
+        self._refresh_failure_details: dict[str, Any] | None = None
 
-    def __enter__(self) -> "RunLockLease":
+    def __enter__(self) -> RunLockLease:
         """Acquire lock and start refresh loop."""
         ok, reason = try_acquire_run_lock(self.run_id)
         if not ok:
@@ -71,7 +70,9 @@ class RunLockLease:
         # Stop refresh loop
         self._stop_refresh.set()
         if self._refresh_thread is not None:
-            self._refresh_thread.join(timeout=self.refresh_interval * 2)  # Wait up to 2 refresh cycles
+            self._refresh_thread.join(
+                timeout=self.refresh_interval * 2
+            )  # Wait up to 2 refresh cycles
 
         # Release lock
         if self._lock_acquired:
@@ -98,12 +99,12 @@ class RunLockLease:
         """Check if refresh has failed (caller should trigger safe shutdown)."""
         return self._refresh_failed.is_set()
 
-    def get_refresh_failure(self) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    def get_refresh_failure(self) -> tuple[str | None, dict[str, Any] | None]:
         """Get refresh failure reason and details (if failed)."""
         return self._refresh_failure_reason, self._refresh_failure_details
 
 
-PHASES_ORDER: Tuple[str, ...] = (
+PHASES_ORDER: tuple[str, ...] = (
     "requirements",
     "planning",
     "architecture",
@@ -112,7 +113,7 @@ PHASES_ORDER: Tuple[str, ...] = (
     "review",
 )
 
-PHASE_TO_METHOD: Dict[str, str] = {
+PHASE_TO_METHOD: dict[str, str] = {
     "requirements": "run_requirements_phase",
     "planning": "run_planning_phase",
     "architecture": "run_architecture_phase",
@@ -122,7 +123,7 @@ PHASE_TO_METHOD: Dict[str, str] = {
 }
 
 
-def phases_for_authority_level(authority_level: int) -> Tuple[str, ...]:
+def phases_for_authority_level(authority_level: int) -> tuple[str, ...]:
     """
     Map AuthorityLevel to the phases that are allowed to run.
 
@@ -149,7 +150,7 @@ class RunnerConfig:
     """
 
     authority_level: int
-    allowed_phases: Optional[Sequence[str]] = None
+    allowed_phases: Sequence[str] | None = None
 
 
 def _default_context_factory(
@@ -157,7 +158,7 @@ def _default_context_factory(
     user_requirement: str,
     language: str,
     fast_lane: bool,
-    run_db_id: Optional[int],
+    run_db_id: int | None,
 ) -> Any:
     """
     Create an OrchestratorContext without importing core at module import time.
@@ -182,13 +183,13 @@ def _default_context_factory(
             user_requirement: str
             language: str
             fast_lane: bool
-            run_db_id: Optional[int]
-            specs: Dict[str, Any]
-            plan: Dict[str, Any]
-            architecture: Dict[str, Any]
-            implementation: Dict[str, Any]
-            testing: Dict[str, Any]
-            review: Dict[str, Any]
+            run_db_id: int | None
+            specs: dict[str, Any]
+            plan: dict[str, Any]
+            architecture: dict[str, Any]
+            implementation: dict[str, Any]
+            testing: dict[str, Any]
+            review: dict[str, Any]
             phase_log: list[str]
 
         return _FallbackContext(
@@ -214,11 +215,9 @@ def run_with_authority_level(
     authority_level: int,
     language: str = "ja",
     fast_lane: bool = False,
-    run_db_id: Optional[int] = None,
-    allowed_phases: Optional[Sequence[str]] = None,
-    context_factory: Optional[
-        Callable[..., Any]
-    ] = None,
+    run_db_id: int | None = None,
+    allowed_phases: Sequence[str] | None = None,
+    context_factory: Callable[..., Any] | None = None,
 ) -> Any:
     """
     Run Orchestrator phases up to the allowed authority level.
@@ -251,9 +250,7 @@ def run_with_authority_level(
         method_name = PHASE_TO_METHOD[phase]
         method = getattr(orchestrator, method_name, None)
         if not callable(method):
-            raise AttributeError(
-                f"Orchestrator does not provide required method: {method_name}"
-            )
+            raise AttributeError(f"Orchestrator does not provide required method: {method_name}")
         context = method(context)
 
     return context
@@ -263,10 +260,10 @@ def run_with_authority(
     *,
     orchestrator: Any,
     user_requirement: str,
-    authority_level: Optional[str] = None,
+    authority_level: str | None = None,
     language: str = "ja",
     fast_lane: bool = False,
-    run_db_id: Optional[int] = None,
+    run_db_id: int | None = None,
 ) -> Any:
     """
     STEP2 wiring entrypoint.
@@ -280,7 +277,9 @@ def run_with_authority(
         try:
             constitution = getattr(orchestrator, "constitution", None)
             if isinstance(constitution, dict):
-                constitution.setdefault("automation_policy", {})["authority_level"] = authority_level
+                constitution.setdefault("automation_policy", {})[
+                    "authority_level"
+                ] = authority_level
         except Exception:
             # Wiring must not fail the run if metadata attachment fails.
             pass
@@ -288,7 +287,7 @@ def run_with_authority(
     stop_before_phases = stop_before_phases_for_authority_level(authority_level)
 
     # L1 reachability: always construct an execution context that includes authority_level.
-    execution_context: Dict[str, Any] = {
+    execution_context: dict[str, Any] = {
         "authority_level": authority_level,
         "stop_before_phases": list(stop_before_phases),
         "user_requirement": user_requirement,
@@ -306,7 +305,7 @@ def run_with_authority(
     )
 
 
-def stop_before_phases_for_authority_level(authority_level: Optional[str]) -> list[str]:
+def stop_before_phases_for_authority_level(authority_level: str | None) -> list[str]:
     """
     Convert authority_level (human|partial|full|None) into a stop policy.
 
@@ -333,8 +332,8 @@ def _invoke_orchestrator(
     user_requirement: str,
     language: str,
     fast_lane: bool,
-    run_db_id: Optional[int],
-    execution_context: Dict[str, Any],
+    run_db_id: int | None,
+    execution_context: dict[str, Any],
     stop_before_phases: list[str],
 ) -> Any:
     """
@@ -433,7 +432,7 @@ def _invoke_orchestrator(
 
 
 _RESUME_ORCHESTRATOR: Any = None
-_RESUME_ORCHESTRATOR_FACTORY: Optional[Callable[[], Any]] = None
+_RESUME_ORCHESTRATOR_FACTORY: Callable[[], Any] | None = None
 
 
 def set_resume_orchestrator(orchestrator: Any) -> None:
@@ -461,8 +460,8 @@ def set_resume_orchestrator_factory(factory: Callable[[], Any]) -> None:
 def resume_run(
     run_id: str,
     *,
-    orchestrator_factory: Optional[Callable[[], Any]] = None,
-) -> Dict[str, Any]:
+    orchestrator_factory: Callable[[], Any] | None = None,
+) -> dict[str, Any]:
     """
     Contract Layer resume entrypoint (MVP).
 
@@ -487,14 +486,14 @@ def resume_run(
         Dict with status, run_id, and optionally explainability
     """
     lock_acquired = False
-    state: Dict[str, Any]
+    state: dict[str, Any]
 
     # 1) Load (untrusted)
     try:
         state = load_state(run_id)
     except FileNotFoundError:
         # Not found -> FAILED + explainability (create minimal state for auditability).
-        failed_state: Dict[str, Any] = {
+        failed_state: dict[str, Any] = {
             "schema_version": "1.0",
             "run_id": run_id,
             "status": "FAILED",
@@ -521,7 +520,10 @@ def resume_run(
         ok, code, message = validate_run_state(state)
         if not ok:
             state["status"] = "FAILED"
-            state["last_error"] = {"code": code or "SCHEMA_INVALID", "message": message or "Schema invalid"}
+            state["last_error"] = {
+                "code": code or "SCHEMA_INVALID",
+                "message": message or "Schema invalid",
+            }
             update_state(state)
             return {
                 "status": "FAILED",
@@ -671,7 +673,11 @@ def resume_run(
         # Exception -> FAILED + last_error + explainability
         try:
             state["status"] = "FAILED"
-            state["last_error"] = {"code": "INTERNAL_ERROR", "message": str(e), "next_action": "Check logs and retry"}
+            state["last_error"] = {
+                "code": "INTERNAL_ERROR",
+                "message": str(e),
+                "next_action": "Check logs and retry",
+            }
             update_state(state)
         except Exception:
             pass
@@ -687,11 +693,11 @@ def resume_run(
         }
 
 
-def _extract_context_snapshot(context: Any) -> Dict[str, Any]:
+def _extract_context_snapshot(context: Any) -> dict[str, Any]:
     """
     Extract a JSON-serializable subset of orchestration context for resume.
     """
-    snapshot: Dict[str, Any] = {}
+    snapshot: dict[str, Any] = {}
     for key in ("user_requirement", "language", "fast_lane", "run_db_id"):
         if hasattr(context, key):
             snapshot[key] = getattr(context, key)
@@ -702,7 +708,7 @@ def _extract_context_snapshot(context: Any) -> Dict[str, Any]:
     return snapshot
 
 
-def _apply_context_snapshot(context: Any, snapshot: Dict[str, Any]) -> None:
+def _apply_context_snapshot(context: Any, snapshot: dict[str, Any]) -> None:
     for key, val in snapshot.items():
         try:
             setattr(context, key, val)
@@ -714,10 +720,10 @@ def _persist_run_state(
     *,
     run_id: str,
     status: str,
-    authority_level: Optional[str],
-    next_phase: Optional[str],
-    execution_context: Dict[str, Any],
-    context_snapshot: Optional[Dict[str, Any]],
+    authority_level: str | None,
+    next_phase: str | None,
+    execution_context: dict[str, Any],
+    context_snapshot: dict[str, Any] | None,
 ) -> None:
     # Persist contract-aligned statuses while keeping runner return values unchanged.
     status_map = {
@@ -725,7 +731,7 @@ def _persist_run_state(
         "completed": "SUCCEEDED",
     }
     persisted_status = status_map.get(status, status)
-    state: Dict[str, Any] = {
+    state: dict[str, Any] = {
         "schema_version": "1.0",
         "run_id": run_id,
         "status": persisted_status,
@@ -762,7 +768,7 @@ def _get_or_create_session_controller(orchestrator: Any) -> Any:
 
     sc = SessionController(session_id=uuid.uuid4().hex, root_dir=root_dir)
     try:
-        setattr(orchestrator, "session_controller", sc)
+        orchestrator.session_controller = sc
     except Exception:
         pass
     return sc
@@ -779,7 +785,6 @@ def _set_stop_policy(session_controller: Any, stop_before_phases: list[str]) -> 
             return
     # Fallback: attach attribute (best-effort).
     try:
-        setattr(session_controller, "stop_before_phases", list(stop_before_phases))
+        session_controller.stop_before_phases = list(stop_before_phases)
     except Exception:
         pass
-

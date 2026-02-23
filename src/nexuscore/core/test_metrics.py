@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +30,11 @@ class TestGenerationRecord:
     test_file_path: str
     test_count: int
     generated_by: str  # "ai" | "human" | "ai+human"
-    coverage_before: Optional[float] = None
-    coverage_after: Optional[float] = None
+    coverage_before: float | None = None
+    coverage_after: float | None = None
     bugs_found: int = 0
     deleted: bool = False
-    deleted_reason: Optional[str] = None
+    deleted_reason: str | None = None
 
 
 @dataclass
@@ -77,8 +77,8 @@ class TestMetricsCollector:
         test_file_path: str,
         test_count: int,
         generated_by: str = "ai",
-        coverage_before: Optional[float] = None,
-        coverage_after: Optional[float] = None,
+        coverage_before: float | None = None,
+        coverage_after: float | None = None,
     ) -> None:
         """
         テスト生成を記録する。
@@ -93,7 +93,7 @@ class TestMetricsCollector:
         :param coverage_after: 生成後のカバレッジ（%）
         """
         record = TestGenerationRecord(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             module_name=module_name,
             risk_level=risk_level,
             strategy=strategy,
@@ -157,7 +157,7 @@ class TestMetricsCollector:
         except Exception as e:
             logger.error(f"Failed to record test deletion: {e}", exc_info=True)
 
-    def get_metrics(self, module_name: str) -> Optional[TestMetrics]:
+    def get_metrics(self, module_name: str) -> TestMetrics | None:
         """
         モジュールのテストメトリクスを取得する。
 
@@ -188,9 +188,7 @@ class TestMetricsCollector:
         coverage_target = strategy_manager.get_min_coverage(module_name)
 
         # 効果スコア（バグ検出数 / 生成テスト数）
-        effectiveness_score = (
-            bugs_found / total_generated if total_generated > 0 else 0.0
-        )
+        effectiveness_score = bugs_found / total_generated if total_generated > 0 else 0.0
 
         return TestMetrics(
             module_name=module_name,
@@ -205,7 +203,7 @@ class TestMetricsCollector:
             effectiveness_score=effectiveness_score,
         )
 
-    def get_ai_effectiveness_by_risk(self) -> Dict[str, Dict[str, Any]]:
+    def get_ai_effectiveness_by_risk(self) -> dict[str, dict[str, Any]]:
         """
         リスクランク別のAI生成テストの効果を集計する。
 
@@ -215,7 +213,7 @@ class TestMetricsCollector:
         records = self._load_history()
         ai_records = [r for r in records if r.get("generated_by") == "ai"]
 
-        by_risk: Dict[str, Dict[str, Any]] = {}
+        by_risk: dict[str, dict[str, Any]] = {}
 
         for record in ai_records:
             risk = record.get("risk_level", "B")
@@ -236,16 +234,14 @@ class TestMetricsCollector:
         # 効果スコアを計算
         for risk, data in by_risk.items():
             data["effectiveness_score"] = (
-                data["bugs_found"] / data["total_generated"]
-                if data["total_generated"] > 0
-                else 0.0
+                data["bugs_found"] / data["total_generated"] if data["total_generated"] > 0 else 0.0
             )
             data["modules"] = list(data["modules"])
             data["module_count"] = len(data["modules"])
 
         return by_risk
 
-    def _load_history(self) -> List[Dict[str, Any]]:
+    def _load_history(self) -> list[dict[str, Any]]:
         """履歴ファイルを読み込む"""
         if not self.history_file.exists():
             return []
@@ -266,7 +262,7 @@ class TestMetricsCollector:
 
         return records
 
-    def _rewrite_history(self, records: List[Dict[str, Any]]) -> None:
+    def _rewrite_history(self, records: list[dict[str, Any]]) -> None:
         """履歴ファイルを再書き込み（簡易実装）"""
         try:
             with self.history_file.open("w", encoding="utf-8") as f:
@@ -275,4 +271,3 @@ class TestMetricsCollector:
                     f.write("\n")
         except Exception as e:
             logger.error(f"Failed to rewrite history: {e}", exc_info=True)
-

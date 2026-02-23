@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """JobStateMachine の動作確認スクリプト"""
-import sys
 import os
+import sys
 
 # パスを追加
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+
 
 def main():
     print("=" * 60)
@@ -15,12 +16,13 @@ def main():
         # インポートテスト
         print("\n[1] インポートテスト...")
         from nexuscore.core.job_state_machine import (
+            CompletedState,
+            FailedState,
             JobStateMachine,
             PendingState,
             RunningState,
-            CompletedState,
-            FailedState,
         )
+
         print("✓ インポート成功")
 
         # 基本動作テスト
@@ -59,9 +61,10 @@ def main():
     except Exception as e:
         print(f"\n❌ エラー: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 
+
 if __name__ == "__main__":
     sys.exit(main())
-

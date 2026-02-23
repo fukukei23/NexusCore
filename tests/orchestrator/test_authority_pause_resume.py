@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
-
-import pytest
+from typing import Any
 
 from nexuscore.orchestrator import authority_runner
 from nexuscore.orchestrator.run_state_store import load_state
@@ -11,18 +9,18 @@ from nexuscore.orchestrator.run_state_store import load_state
 class FakeOrchestrator:
     def __init__(self) -> None:
         self.project_path = "/tmp/nxcore"
-        self.constitution: Dict[str, Any] = {}
-        self.calls: List[str] = []
+        self.constitution: dict[str, Any] = {}
+        self.calls: list[str] = []
 
         class _SC:
             def __init__(self) -> None:
                 self.session_id = "run-123"
-                self.stop_before_phases: List[str] = []
+                self.stop_before_phases: list[str] = []
 
             def set_stop_before_phases(self, phases: list[str]) -> None:
                 self.stop_before_phases = list(phases)
 
-            def checkpoint(self, phase: str, metadata: Dict[str, Any] | None = None) -> None:
+            def checkpoint(self, phase: str, metadata: dict[str, Any] | None = None) -> None:
                 # state saving is handled by runner; this is just a stub
                 return None
 
@@ -56,7 +54,9 @@ class FakeOrchestrator:
         return context
 
 
-def test_pause_saves_state_and_resume_continues_from_next_phase(monkeypatch: Any, tmp_path: Any) -> None:
+def test_pause_saves_state_and_resume_continues_from_next_phase(
+    monkeypatch: Any, tmp_path: Any
+) -> None:
     monkeypatch.setenv("NEXUSCORE_RUN_STATE_DIR", str(tmp_path / "run_state"))
     monkeypatch.setenv("NEXUSCORE_RUNSTATE_HMAC_SECRET", "test-secret-key")
 
@@ -89,7 +89,9 @@ def test_pause_saves_state_and_resume_continues_from_next_phase(monkeypatch: Any
     assert orch2.calls == []
 
 
-def test_session_controller_should_not_gate_on_stop_before_phases(monkeypatch: Any, tmp_path: Any) -> None:
+def test_session_controller_should_not_gate_on_stop_before_phases(
+    monkeypatch: Any, tmp_path: Any
+) -> None:
     from nexuscore.core.session_control import SessionController
 
     sc = SessionController(session_id="s1", root_dir=str(tmp_path / "sessions"))
@@ -100,5 +102,3 @@ def test_session_controller_should_not_gate_on_stop_before_phases(monkeypatch: A
 
     sc.request_pause()
     assert sc.should_stop() is True
-
-

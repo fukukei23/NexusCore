@@ -14,10 +14,7 @@ class LocalLLM(BaseLLM):
 
     def execute(self, prompt: str, system_prompt: str, **kwargs) -> str:
         as_json = kwargs.get("as_json", False)
-        preview = (
-            "LOCAL FALLBACK: この応答はスタブです。"
-            "（本番APIコールは行われていません）"
-        )
+        preview = "LOCAL FALLBACK: この応答はスタブです。" "（本番APIコールは行われていません）"
         self.last_call_mode = "stub"
         if as_json:
             return json.dumps(

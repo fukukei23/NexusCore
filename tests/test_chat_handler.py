@@ -1,6 +1,7 @@
 """Tests for nexuscore.modules.chat_handler"""
-import os
-from unittest.mock import patch, MagicMock
+
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from nexuscore.modules import chat_handler
@@ -219,15 +220,10 @@ def test_handle_chat_multiple_messages(monkeypatch):
 
     mock_client = MagicMock()
 
-    responses = [
-        "Response 1",
-        "Response 2",
-        "Response 3"
-    ]
+    responses = ["Response 1", "Response 2", "Response 3"]
 
     mock_client.chat.completions.create.side_effect = [
-        MagicMock(choices=[MagicMock(message=MagicMock(content=r))])
-        for r in responses
+        MagicMock(choices=[MagicMock(message=MagicMock(content=r))]) for r in responses
     ]
 
     with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
@@ -253,7 +249,7 @@ def test_handle_chat_history_preservation(monkeypatch):
     with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
         initial_history = [
             {"role": "user", "content": "Previous message"},
-            {"role": "assistant", "content": "Previous response"}
+            {"role": "assistant", "content": "Previous response"},
         ]
 
         response, updated_history = chat_handler.handle_chat("New message", initial_history.copy())
@@ -346,8 +342,7 @@ def test_handle_chat_conversation_flow(monkeypatch):
     responses = ["Hello", "How can I help?", "Goodbye"]
 
     mock_client.chat.completions.create.side_effect = [
-        MagicMock(choices=[MagicMock(message=MagicMock(content=r))])
-        for r in responses
+        MagicMock(choices=[MagicMock(message=MagicMock(content=r))]) for r in responses
     ]
 
     with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
@@ -554,9 +549,7 @@ def test_handle_chat_with_custom_messages_structure(monkeypatch):
 
     with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
         # カスタムフィールドを含む履歴
-        custom_history = [
-            {"role": "user", "content": "Test", "custom_field": "value"}
-        ]
+        custom_history = [{"role": "user", "content": "Test", "custom_field": "value"}]
 
         response, updated_history = chat_handler.handle_chat("New message", custom_history)
 
@@ -572,8 +565,7 @@ def test_handle_chat_stress_test_many_messages(monkeypatch):
     responses = [f"Response {i}" for i in range(100)]
 
     mock_client.chat.completions.create.side_effect = [
-        MagicMock(choices=[MagicMock(message=MagicMock(content=r))])
-        for r in responses
+        MagicMock(choices=[MagicMock(message=MagicMock(content=r))]) for r in responses
     ]
 
     with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
@@ -654,8 +646,7 @@ def test_handle_chat_message_ordering_preservation(monkeypatch):
     responses = ["A", "B", "C"]
 
     mock_client.chat.completions.create.side_effect = [
-        MagicMock(choices=[MagicMock(message=MagicMock(content=r))])
-        for r in responses
+        MagicMock(choices=[MagicMock(message=MagicMock(content=r))]) for r in responses
     ]
 
     with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
@@ -711,7 +702,7 @@ def test_handle_chat_with_system_message_simulation(monkeypatch):
         # システムメッセージを含む履歴
         history_with_system = [
             {"role": "system", "content": "You are a helpful assistant"},
-            {"role": "user", "content": "Hello"}
+            {"role": "user", "content": "Hello"},
         ]
 
         response, updated_history = chat_handler.handle_chat("New message", history_with_system)
@@ -742,10 +733,7 @@ def test_handle_chat_integration_with_history_manager(monkeypatch):
         response, updated_history = chat_handler.handle_chat("Test message", history)
 
         # 履歴をHistoryManagerに保存
-        state = {
-            "conversation": updated_history,
-            "last_response": response
-        }
+        state = {"conversation": updated_history, "last_response": response}
         hm.add_state(state)
 
         # 履歴が正しく保存されていることを確認
@@ -758,6 +746,7 @@ def test_handle_chat_with_code_generation_integration(monkeypatch):
     """コード生成との統合テスト"""
     import sys
     from pathlib import Path
+
     project_root = Path(__file__).parent.parent
     sys.path.insert(0, str(project_root / "src"))
     from nexuscore.modules import code_generator
@@ -774,10 +763,7 @@ def test_handle_chat_with_code_generation_integration(monkeypatch):
     mock_code_response.choices[0].message.content = "```python\ndef func():\n    pass\n```"
 
     mock_client = MagicMock()
-    mock_client.chat.completions.create.side_effect = [
-        mock_chat_response,
-        mock_code_response
-    ]
+    mock_client.chat.completions.create.side_effect = [mock_chat_response, mock_code_response]
 
     with patch("nexuscore.modules.chat_handler.get_client", return_value=mock_client):
         with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
@@ -848,4 +834,3 @@ def test_handle_chat_response_content_validation(monkeypatch):
 
             assert response == test_response
             assert updated_history[1]["content"] == test_response
-

@@ -3,14 +3,12 @@ Comprehensive tests for vcs (Version Control System) module.
 Covers GitController initialization, commit operations, and error handling.
 """
 
-import pytest
-import tempfile
-import shutil
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-import git
-from nexuscore.utils.vcs import GitController
+from unittest.mock import MagicMock, patch
 
+import git
+import pytest
+
+from nexuscore.utils.vcs import GitController
 
 # ==============================================================================
 # GitController Initialization Tests
@@ -64,7 +62,9 @@ class TestGitControllerInit:
 
     def test_init_with_nonexistent_path_raises_error(self):
         """Initialize with nonexistent path raises error"""
-        with pytest.raises((git.InvalidGitRepositoryError, git.GitCommandError, git.NoSuchPathError)):
+        with pytest.raises(
+            (git.InvalidGitRepositoryError, git.GitCommandError, git.NoSuchPathError)
+        ):
             GitController("/nonexistent/path/to/repo")
 
 
@@ -89,10 +89,7 @@ class TestGitControllerCommitChanges:
         controller = GitController(str(tmp_path))
 
         # Commit the file
-        commit_hash = controller.commit_changes(
-            ["test.txt"],
-            "Add test file"
-        )
+        commit_hash = controller.commit_changes(["test.txt"], "Add test file")
 
         assert commit_hash is not None
         assert len(commit_hash) == 40  # SHA-1 hash length
@@ -115,10 +112,7 @@ class TestGitControllerCommitChanges:
         controller = GitController(str(tmp_path))
 
         # Commit both files
-        commit_hash = controller.commit_changes(
-            ["file1.txt", "file2.txt"],
-            "Add two files"
-        )
+        commit_hash = controller.commit_changes(["file1.txt", "file2.txt"], "Add two files")
 
         assert commit_hash is not None
 
@@ -140,10 +134,7 @@ class TestGitControllerCommitChanges:
         controller = GitController(str(tmp_path))
 
         # Try to commit same file without changes
-        result = controller.commit_changes(
-            ["test.txt"],
-            "No changes commit"
-        )
+        result = controller.commit_changes(["test.txt"], "No changes commit")
 
         assert result is None
 
@@ -167,10 +158,7 @@ with multiple lines.
 - Added test.txt
 - Contains test content"""
 
-        commit_hash = controller.commit_changes(
-            ["test.txt"],
-            multiline_message
-        )
+        commit_hash = controller.commit_changes(["test.txt"], multiline_message)
 
         assert commit_hash is not None
 
@@ -191,10 +179,7 @@ with multiple lines.
 
         # Commit with Unicode message
         unicode_message = "日本語のコミットメッセージ 🎉"
-        commit_hash = controller.commit_changes(
-            ["test.txt"],
-            unicode_message
-        )
+        commit_hash = controller.commit_changes(["test.txt"], unicode_message)
 
         assert commit_hash is not None
         commit = repo.commit(commit_hash)
@@ -217,10 +202,7 @@ with multiple lines.
         controller = GitController(str(tmp_path))
 
         # Commit modification
-        commit_hash = controller.commit_changes(
-            ["test.txt"],
-            "Update to version 2"
-        )
+        commit_hash = controller.commit_changes(["test.txt"], "Update to version 2")
 
         assert commit_hash is not None
         commit = repo.commit(commit_hash)
@@ -240,10 +222,7 @@ with multiple lines.
         controller = GitController(str(tmp_path))
 
         # Commit file in subdirectory
-        commit_hash = controller.commit_changes(
-            ["src/main.py"],
-            "Add main.py"
-        )
+        commit_hash = controller.commit_changes(["src/main.py"], "Add main.py")
 
         assert commit_hash is not None
 
@@ -259,10 +238,7 @@ with multiple lines.
         controller = GitController(str(tmp_path))
 
         # Commit file
-        commit_hash = controller.commit_changes(
-            ["test file (1).txt"],
-            "Add file with spaces"
-        )
+        commit_hash = controller.commit_changes(["test file (1).txt"], "Add file with spaces")
 
         assert commit_hash is not None
 
@@ -282,15 +258,12 @@ class TestGitControllerErrorHandling:
         controller = GitController(str(tmp_path))
 
         # Try to commit nonexistent file
-        result = controller.commit_changes(
-            ["nonexistent.txt"],
-            "Attempt to commit"
-        )
+        result = controller.commit_changes(["nonexistent.txt"], "Attempt to commit")
 
         # Should return None (no changes to commit)
         assert result is None
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_commit_with_git_error_returns_none(self, mock_repo_class, tmp_path):
         """Commit with git error returns None"""
         # Setup mock to raise exception on commit
@@ -302,14 +275,11 @@ class TestGitControllerErrorHandling:
         controller = GitController(str(tmp_path))
 
         # Try to commit
-        result = controller.commit_changes(
-            ["test.txt"],
-            "Test commit"
-        )
+        result = controller.commit_changes(["test.txt"], "Test commit")
 
         assert result is None
 
-    @patch('nexuscore.utils.vcs.git.Repo')
+    @patch("nexuscore.utils.vcs.git.Repo")
     def test_commit_with_index_error_returns_none(self, mock_repo_class, tmp_path):
         """Commit with index add error returns None"""
         # Setup mock to raise exception on add
@@ -321,10 +291,7 @@ class TestGitControllerErrorHandling:
         controller = GitController(str(tmp_path))
 
         # Try to commit
-        result = controller.commit_changes(
-            ["test.txt"],
-            "Test commit"
-        )
+        result = controller.commit_changes(["test.txt"], "Test commit")
 
         assert result is None
 
@@ -380,10 +347,7 @@ class TestGitControllerIntegration:
         test_file = tmp_path / "test.txt"
         test_file.write_text(test_content)
 
-        commit_hash = controller.commit_changes(
-            ["test.txt"],
-            "Add test content"
-        )
+        commit_hash = controller.commit_changes(["test.txt"], "Add test content")
 
         assert commit_hash is not None
 
@@ -404,10 +368,7 @@ class TestGitControllerIntegration:
         binary_file.write_bytes(binary_data)
 
         # Commit binary file
-        commit_hash = controller.commit_changes(
-            ["image.bin"],
-            "Add binary file"
-        )
+        commit_hash = controller.commit_changes(["image.bin"], "Add binary file")
 
         assert commit_hash is not None
 
@@ -422,10 +383,7 @@ class TestGitControllerIntegration:
         empty_file.write_text("")
 
         # Commit empty file
-        commit_hash = controller.commit_changes(
-            ["empty.txt"],
-            "Add empty file"
-        )
+        commit_hash = controller.commit_changes(["empty.txt"], "Add empty file")
 
         assert commit_hash is not None
 
@@ -449,10 +407,7 @@ class TestGitControllerEdgeCases:
         test_file.write_text("Content")
 
         # Commit with empty message
-        commit_hash = controller.commit_changes(
-            ["test.txt"],
-            ""
-        )
+        commit_hash = controller.commit_changes(["test.txt"], "")
 
         assert commit_hash is not None
         commit = repo.commit(commit_hash)
@@ -481,10 +436,7 @@ class TestGitControllerEdgeCases:
         test_file.write_text("Content")
 
         # Commit with duplicate entry
-        commit_hash = controller.commit_changes(
-            ["test.txt", "test.txt"],
-            "Duplicate entry"
-        )
+        commit_hash = controller.commit_changes(["test.txt", "test.txt"], "Duplicate entry")
 
         assert commit_hash is not None
         # Should still work (git handles duplicates)

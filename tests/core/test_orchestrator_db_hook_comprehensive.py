@@ -8,11 +8,11 @@ Comprehensive Tests for orchestrator_db_hook.py
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
-import pytest
-import sys
-from unittest.mock import Mock, patch, MagicMock
-from typing import Any, Optional
 
+import sys
+from unittest.mock import MagicMock
+
+import pytest
 
 # ============================================================================
 # Fixtures
@@ -23,24 +23,24 @@ from typing import Any, Optional
 def reset_webapp_module():
     """各テスト前後でwebappモジュールをリセット"""
     # テスト前の状態を保存
-    webapp_module = sys.modules.get('nexuscore.webapp')
-    logging_service_module = sys.modules.get('nexuscore.webapp.logging_service')
+    webapp_module = sys.modules.get("nexuscore.webapp")
+    logging_service_module = sys.modules.get("nexuscore.webapp.logging_service")
 
     yield
 
     # テスト後に復元
-    if 'nexuscore.core.orchestrator_db_hook' in sys.modules:
-        del sys.modules['nexuscore.core.orchestrator_db_hook']
+    if "nexuscore.core.orchestrator_db_hook" in sys.modules:
+        del sys.modules["nexuscore.core.orchestrator_db_hook"]
 
     if webapp_module is not None:
-        sys.modules['nexuscore.webapp'] = webapp_module
+        sys.modules["nexuscore.webapp"] = webapp_module
     else:
-        sys.modules.pop('nexuscore.webapp', None)
+        sys.modules.pop("nexuscore.webapp", None)
 
     if logging_service_module is not None:
-        sys.modules['nexuscore.webapp.logging_service'] = logging_service_module
+        sys.modules["nexuscore.webapp.logging_service"] = logging_service_module
     else:
-        sys.modules.pop('nexuscore.webapp.logging_service', None)
+        sys.modules.pop("nexuscore.webapp.logging_service", None)
 
 
 # ============================================================================
@@ -56,8 +56,8 @@ class TestLogOrchestratorEventWithWebapp:
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules['nexuscore.webapp'] = mock_webapp
-        sys.modules['nexuscore.webapp.logging_service'] = mock_webapp.logging_service
+        sys.modules["nexuscore.webapp"] = mock_webapp
+        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
 
         # モジュールを再インポート
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
@@ -67,7 +67,7 @@ class TestLogOrchestratorEventWithWebapp:
             phase="planning",
             status="SUCCESS",
             message="Planning completed",
-            extra={"duration": 5.2, "files": 10}
+            extra={"duration": 5.2, "files": 10},
         )
 
         mock_log_func.assert_called_once()
@@ -87,16 +87,13 @@ class TestLogOrchestratorEventWithWebapp:
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules['nexuscore.webapp'] = mock_webapp
-        sys.modules['nexuscore.webapp.logging_service'] = mock_webapp.logging_service
+        sys.modules["nexuscore.webapp"] = mock_webapp
+        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
         log_orchestrator_event(
-            run_db_id=123,
-            phase="coding",
-            status="FAILED",
-            message="Coding failed"
+            run_db_id=123, phase="coding", status="FAILED", message="Coding failed"
         )
 
         call_kwargs = mock_log_func.call_args[1]
@@ -108,17 +105,12 @@ class TestLogOrchestratorEventWithWebapp:
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules['nexuscore.webapp'] = mock_webapp
-        sys.modules['nexuscore.webapp.logging_service'] = mock_webapp.logging_service
+        sys.modules["nexuscore.webapp"] = mock_webapp
+        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
-        log_orchestrator_event(
-            run_db_id=123,
-            phase="testing",
-            status="error",
-            message="Test error"
-        )
+        log_orchestrator_event(run_db_id=123, phase="testing", status="error", message="Test error")
 
         call_kwargs = mock_log_func.call_args[1]
         assert call_kwargs["level"] == "ERROR"
@@ -129,16 +121,13 @@ class TestLogOrchestratorEventWithWebapp:
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules['nexuscore.webapp'] = mock_webapp
-        sys.modules['nexuscore.webapp.logging_service'] = mock_webapp.logging_service
+        sys.modules["nexuscore.webapp"] = mock_webapp
+        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
         log_orchestrator_event(
-            run_db_id=123,
-            phase="startup",
-            status="STARTED",
-            message="Orchestrator started"
+            run_db_id=123, phase="startup", status="STARTED", message="Orchestrator started"
         )
 
         call_kwargs = mock_log_func.call_args[1]
@@ -152,16 +141,13 @@ class TestLogOrchestratorEventWithWebapp:
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules['nexuscore.webapp'] = mock_webapp
-        sys.modules['nexuscore.webapp.logging_service'] = mock_webapp.logging_service
+        sys.modules["nexuscore.webapp"] = mock_webapp
+        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
         log_orchestrator_event(
-            run_db_id=None,
-            phase="review",
-            status="SUCCESS",
-            message="Review completed"
+            run_db_id=None, phase="review", status="SUCCESS", message="Review completed"
         )
 
         call_kwargs = mock_log_func.call_args[1]
@@ -173,8 +159,8 @@ class TestLogOrchestratorEventWithWebapp:
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules['nexuscore.webapp'] = mock_webapp
-        sys.modules['nexuscore.webapp.logging_service'] = mock_webapp.logging_service
+        sys.modules["nexuscore.webapp"] = mock_webapp
+        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -183,7 +169,7 @@ class TestLogOrchestratorEventWithWebapp:
             phase="shutdown",
             status="FINISHED",
             message="Orchestrator shutdown",
-            extra={}
+            extra={},
         )
 
         call_kwargs = mock_log_func.call_args[1]
@@ -196,8 +182,8 @@ class TestLogOrchestratorEventWithWebapp:
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules['nexuscore.webapp'] = mock_webapp
-        sys.modules['nexuscore.webapp.logging_service'] = mock_webapp.logging_service
+        sys.modules["nexuscore.webapp"] = mock_webapp
+        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -205,10 +191,7 @@ class TestLogOrchestratorEventWithWebapp:
 
         for phase in phases:
             log_orchestrator_event(
-                run_db_id=123,
-                phase=phase,
-                status="SUCCESS",
-                message=f"{phase} completed"
+                run_db_id=123, phase=phase, status="SUCCESS", message=f"{phase} completed"
             )
 
         assert mock_log_func.call_count == len(phases)
@@ -224,8 +207,8 @@ class TestLogOrchestratorEventWithWebapp:
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules['nexuscore.webapp'] = mock_webapp
-        sys.modules['nexuscore.webapp.logging_service'] = mock_webapp.logging_service
+        sys.modules["nexuscore.webapp"] = mock_webapp
+        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -234,11 +217,8 @@ class TestLogOrchestratorEventWithWebapp:
             "files_changed": 25,
             "tests_run": 150,
             "coverage": 85.5,
-            "metadata": {
-                "agent": "guardian",
-                "version": "1.0.0"
-            },
-            "errors": ["error1", "error2"]
+            "metadata": {"agent": "guardian", "version": "1.0.0"},
+            "errors": ["error1", "error2"],
         }
 
         log_orchestrator_event(
@@ -246,7 +226,7 @@ class TestLogOrchestratorEventWithWebapp:
             phase="testing",
             status="SUCCESS",
             message="Testing completed",
-            extra=complex_extra
+            extra=complex_extra,
         )
 
         call_kwargs = mock_log_func.call_args[1]
@@ -264,25 +244,22 @@ class TestLogOrchestratorEventWithoutWebapp:
     def test_log_event_without_webapp_module(self):
         """webappモジュールがない場合は何もしない"""
         # webappモジュールを削除
-        sys.modules.pop('nexuscore.webapp', None)
-        sys.modules.pop('nexuscore.webapp.logging_service', None)
+        sys.modules.pop("nexuscore.webapp", None)
+        sys.modules.pop("nexuscore.webapp.logging_service", None)
 
         # モジュールを再インポート
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
         # 例外が発生しないことを確認
         log_orchestrator_event(
-            run_db_id=123,
-            phase="planning",
-            status="SUCCESS",
-            message="Planning completed"
+            run_db_id=123, phase="planning", status="SUCCESS", message="Planning completed"
         )
 
     def test_log_event_with_import_error(self):
         """webappのインポートがImportErrorの場合"""
         # ImportErrorをシミュレート
-        sys.modules.pop('nexuscore.webapp', None)
-        sys.modules.pop('nexuscore.webapp.logging_service', None)
+        sys.modules.pop("nexuscore.webapp", None)
+        sys.modules.pop("nexuscore.webapp.logging_service", None)
 
         # モジュールを再インポート
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
@@ -292,23 +269,20 @@ class TestLogOrchestratorEventWithoutWebapp:
             run_db_id=None,
             phase="startup",
             status="STARTED",
-            message="Orchestrator started in CLI mode"
+            message="Orchestrator started in CLI mode",
         )
 
     def test_log_event_cli_mode_multiple_calls(self):
         """CLI モードで複数回呼び出しても安全"""
-        sys.modules.pop('nexuscore.webapp', None)
-        sys.modules.pop('nexuscore.webapp.logging_service', None)
+        sys.modules.pop("nexuscore.webapp", None)
+        sys.modules.pop("nexuscore.webapp.logging_service", None)
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
         # 複数回呼び出しても例外が発生しない
         for i in range(10):
             log_orchestrator_event(
-                run_db_id=None,
-                phase=f"phase{i}",
-                status="SUCCESS",
-                message=f"Phase {i} completed"
+                run_db_id=None, phase=f"phase{i}", status="SUCCESS", message=f"Phase {i} completed"
             )
 
 
@@ -324,8 +298,8 @@ class TestStatusLevelMapping:
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules['nexuscore.webapp'] = mock_webapp
-        sys.modules['nexuscore.webapp.logging_service'] = mock_webapp.logging_service
+        sys.modules["nexuscore.webapp"] = mock_webapp
+        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -335,10 +309,7 @@ class TestStatusLevelMapping:
         for status in error_statuses:
             mock_log_func.reset_mock()
             log_orchestrator_event(
-                run_db_id=123,
-                phase="test",
-                status=status,
-                message=f"Status: {status}"
+                run_db_id=123, phase="test", status=status, message=f"Status: {status}"
             )
 
             call_kwargs = mock_log_func.call_args[1]
@@ -350,10 +321,7 @@ class TestStatusLevelMapping:
         for status in info_statuses:
             mock_log_func.reset_mock()
             log_orchestrator_event(
-                run_db_id=123,
-                phase="test",
-                status=status,
-                message=f"Status: {status}"
+                run_db_id=123, phase="test", status=status, message=f"Status: {status}"
             )
 
             call_kwargs = mock_log_func.call_args[1]
@@ -372,16 +340,13 @@ class TestPayloadConstruction:
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules['nexuscore.webapp'] = mock_webapp
-        sys.modules['nexuscore.webapp.logging_service'] = mock_webapp.logging_service
+        sys.modules["nexuscore.webapp"] = mock_webapp
+        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
         log_orchestrator_event(
-            run_db_id=123,
-            phase="coding",
-            status="RUNNING",
-            message="Coding in progress"
+            run_db_id=123, phase="coding", status="RUNNING", message="Coding in progress"
         )
 
         call_kwargs = mock_log_func.call_args[1]
@@ -398,23 +363,15 @@ class TestPayloadConstruction:
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules['nexuscore.webapp'] = mock_webapp
-        sys.modules['nexuscore.webapp.logging_service'] = mock_webapp.logging_service
+        sys.modules["nexuscore.webapp"] = mock_webapp
+        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
-        extra = {
-            "custom_field": "value",
-            "count": 42,
-            "nested": {"key": "value"}
-        }
+        extra = {"custom_field": "value", "count": 42, "nested": {"key": "value"}}
 
         log_orchestrator_event(
-            run_db_id=123,
-            phase="review",
-            status="SUCCESS",
-            message="Review completed",
-            extra=extra
+            run_db_id=123, phase="review", status="SUCCESS", message="Review completed", extra=extra
         )
 
         call_kwargs = mock_log_func.call_args[1]
@@ -432,24 +389,16 @@ class TestPayloadConstruction:
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules['nexuscore.webapp'] = mock_webapp
-        sys.modules['nexuscore.webapp.logging_service'] = mock_webapp.logging_service
+        sys.modules["nexuscore.webapp"] = mock_webapp
+        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
         # extraでphaseとstatusを上書きしようとする
-        extra = {
-            "phase": "fake_phase",
-            "status": "fake_status",
-            "other": "value"
-        }
+        extra = {"phase": "fake_phase", "status": "fake_status", "other": "value"}
 
         log_orchestrator_event(
-            run_db_id=123,
-            phase="real_phase",
-            status="REAL_STATUS",
-            message="Test",
-            extra=extra
+            run_db_id=123, phase="real_phase", status="REAL_STATUS", message="Test", extra=extra
         )
 
         call_kwargs = mock_log_func.call_args[1]
@@ -473,8 +422,8 @@ class TestIntegrationScenarios:
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules['nexuscore.webapp'] = mock_webapp
-        sys.modules['nexuscore.webapp.logging_service'] = mock_webapp.logging_service
+        sys.modules["nexuscore.webapp"] = mock_webapp
+        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -482,10 +431,7 @@ class TestIntegrationScenarios:
 
         # Startup
         log_orchestrator_event(
-            run_db_id=run_id,
-            phase="startup",
-            status="STARTED",
-            message="Orchestrator started"
+            run_db_id=run_id, phase="startup", status="STARTED", message="Orchestrator started"
         )
 
         # Requirement
@@ -494,7 +440,7 @@ class TestIntegrationScenarios:
             phase="requirement",
             status="SUCCESS",
             message="Requirements analyzed",
-            extra={"requirement_count": 5}
+            extra={"requirement_count": 5},
         )
 
         # Planning
@@ -503,7 +449,7 @@ class TestIntegrationScenarios:
             phase="planning",
             status="SUCCESS",
             message="Plan created",
-            extra={"steps": 10}
+            extra={"steps": 10},
         )
 
         # Coding
@@ -512,7 +458,7 @@ class TestIntegrationScenarios:
             phase="coding",
             status="SUCCESS",
             message="Code generated",
-            extra={"files": 15}
+            extra={"files": 15},
         )
 
         # Testing (failed)
@@ -521,15 +467,12 @@ class TestIntegrationScenarios:
             phase="testing",
             status="FAILED",
             message="Tests failed",
-            extra={"failures": 3}
+            extra={"failures": 3},
         )
 
         # Shutdown
         log_orchestrator_event(
-            run_db_id=run_id,
-            phase="shutdown",
-            status="FINISHED",
-            message="Orchestrator finished"
+            run_db_id=run_id, phase="shutdown", status="FINISHED", message="Orchestrator finished"
         )
 
         # 6回呼ばれているはず

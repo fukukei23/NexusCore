@@ -5,9 +5,9 @@ Utility for LLM task classification prompts.
 from __future__ import annotations
 
 import json
-from typing import Dict
 
-def build_classify_prompt(prompt: str, allowed_task_types: Dict[str, object]) -> tuple[str, str]:
+
+def build_classify_prompt(prompt: str, allowed_task_types: dict[str, object]) -> tuple[str, str]:
     allowed = ",".join(allowed_task_types.keys())
     system_prompt = (
         "You are a task classifier. "
@@ -16,9 +16,7 @@ def build_classify_prompt(prompt: str, allowed_task_types: Dict[str, object]) ->
         "If unsure, respond with general."
     )
     classify_prompt = (
-        "Classify this developer request:\n"
-        f"{prompt}\n\n"
-        "Which task type best matches?"
+        "Classify this developer request:\n" f"{prompt}\n\n" "Which task type best matches?"
     )
     return classify_prompt, system_prompt
 
@@ -30,7 +28,7 @@ class TaskClassifier:
         self.model_name = model_name
         self.client = client
 
-    def classify(self, prompt: str, task_model_map: Dict[str, object]) -> str:
+    def classify(self, prompt: str, task_model_map: dict[str, object]) -> str:
         classify_prompt, system_prompt = build_classify_prompt(prompt, task_model_map)
         raw = self.client.execute(
             classify_prompt,

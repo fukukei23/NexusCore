@@ -8,8 +8,6 @@ docs/api/README.md でステータスが「✅ 完了」になっている CR-ID
 import re
 from pathlib import Path
 
-import pytest
-
 from tests.api._readme_cr_helpers import extract_completed_cr_ids
 
 # プロジェクトルートのパス
@@ -91,13 +89,9 @@ def test_completion_reports_have_required_sections():
                 }
             )
 
-    assert not failures, (
-        f"Completion reports missing required sections:\n"
-        + "\n".join(
-            f"  - CR-ID: {f['cr_id']}\n"
-            f"    File: {f['file_path']}\n"
-            f"    Missing sections: {', '.join(f['missing_sections'])}"
-            for f in failures
-        )
+    assert not failures, "Completion reports missing required sections:\n" + "\n".join(
+        f"  - CR-ID: {f['cr_id']}\n"
+        f"    File: {f['file_path']}\n"
+        f"    Missing sections: {', '.join(f['missing_sections'])}"
+        for f in failures
     )
-

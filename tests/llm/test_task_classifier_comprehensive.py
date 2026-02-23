@@ -8,15 +8,16 @@ Comprehensive Tests for task_classifier.py
 - エッジケースとエラー条件をカバー
 ============================================================================
 """
-import pytest
+
 import json
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
+
+import pytest
 
 from nexuscore.llm.task_classifier import (
-    build_classify_prompt,
     TaskClassifier,
+    build_classify_prompt,
 )
-
 
 # ============================================================================
 # Tests: build_classify_prompt
@@ -29,12 +30,11 @@ class TestBuildClassifyPrompt:
         allowed_tasks = {
             "code_generation": "Generate code",
             "code_review": "Review code",
-            "general": "General task"
+            "general": "General task",
         }
 
         classify_prompt, system_prompt = build_classify_prompt(
-            "Write a function to sort numbers",
-            allowed_tasks
+            "Write a function to sort numbers", allowed_tasks
         )
 
         # classify_promptに元のプロンプトが含まれる
@@ -53,8 +53,7 @@ class TestBuildClassifyPrompt:
         allowed_tasks = {"general": "General task"}
 
         classify_prompt, system_prompt = build_classify_prompt(
-            "Help me with something",
-            allowed_tasks
+            "Help me with something", allowed_tasks
         )
 
         assert "general" in system_prompt
@@ -62,14 +61,9 @@ class TestBuildClassifyPrompt:
 
     def test_build_prompt_many_task_types(self):
         """多数のタスクタイプ"""
-        allowed_tasks = {
-            f"task_{i}": f"Task {i}" for i in range(20)
-        }
+        allowed_tasks = {f"task_{i}": f"Task {i}" for i in range(20)}
 
-        classify_prompt, system_prompt = build_classify_prompt(
-            "Complex request",
-            allowed_tasks
-        )
+        classify_prompt, system_prompt = build_classify_prompt("Complex request", allowed_tasks)
 
         # 全てのタスクタイプがカンマ区切りで含まれる
         for task_type in allowed_tasks.keys():
@@ -90,8 +84,7 @@ class TestBuildClassifyPrompt:
         allowed_tasks = {"code_generation": "Generate"}
 
         classify_prompt, system_prompt = build_classify_prompt(
-            "Write code with {} and [] and <>\n\t\"quotes\"",
-            allowed_tasks
+            'Write code with {} and [] and <>\n\t"quotes"', allowed_tasks
         )
 
         # 特殊文字がそのまま保持される
@@ -171,13 +164,10 @@ class TestTaskClassifierClassify:
         task_types = {
             "code_generation": "Generate code",
             "code_review": "Review code",
-            "general": "General"
+            "general": "General",
         }
 
-        result = classifier.classify(
-            "Write a function to calculate fibonacci",
-            task_types
-        )
+        result = classifier.classify("Write a function to calculate fibonacci", task_types)
 
         assert result == "code_generation"
         mock_client.execute.assert_called_once()
@@ -209,7 +199,7 @@ class TestTaskClassifierClassify:
     def test_classify_missing_task_type(self):
         """task_typeが欠落している場合"""
         mock_client = Mock()
-        mock_client.execute.return_value = '{}'
+        mock_client.execute.return_value = "{}"
 
         classifier = TaskClassifier("gpt-4", mock_client)
         task_types = {"general": "General"}
@@ -271,13 +261,13 @@ class TestTaskClassifierClassify:
         """複雑なJSONレスポンス"""
         mock_client = Mock()
         # 追加フィールドがあっても動作する
-        mock_client.execute.return_value = '''
+        mock_client.execute.return_value = """
         {
             "task_type": "code_generation",
             "confidence": 0.95,
             "reasoning": "User wants to generate code"
         }
-        '''
+        """
 
         classifier = TaskClassifier("gpt-4", mock_client)
         task_types = {"code_generation": "Generate"}
@@ -292,15 +282,11 @@ class TestTaskClassifierClassify:
         mock_client.execute.side_effect = [
             '{"task_type": "code_generation"}',
             '{"task_type": "code_review"}',
-            '{"task_type": "general"}'
+            '{"task_type": "general"}',
         ]
 
         classifier = TaskClassifier("gpt-4", mock_client)
-        task_types = {
-            "code_generation": "Generate",
-            "code_review": "Review",
-            "general": "General"
-        }
+        task_types = {"code_generation": "Generate", "code_review": "Review", "general": "General"}
 
         result1 = classifier.classify("Write code", task_types)
         result2 = classifier.classify("Review code", task_types)
@@ -333,7 +319,7 @@ class TestIntegrationScenarios:
             "code_review": "Review existing code",
             "documentation": "Write documentation",
             "testing": "Create tests",
-            "general": "General programming task"
+            "general": "General programming task",
         }
 
         # 4. ユーザープロンプトを分類
@@ -358,11 +344,7 @@ class TestIntegrationScenarios:
         task_types = {"general": "General"}
 
         # 異なるプロンプトで複数回使用
-        prompts = [
-            "Help with coding",
-            "Explain this concept",
-            "Debug this issue"
-        ]
+        prompts = ["Help with coding", "Explain this concept", "Debug this issue"]
 
         for i, prompt in enumerate(prompts):
             mock_client.execute.return_value = '{"task_type": "general"}'
@@ -460,7 +442,7 @@ class TestEdgeCases:
         allowed_tasks = {
             "code-generation": "Generate",
             "code_review_v2": "Review",
-            "general.task": "General"
+            "general.task": "General",
         }
 
         classify_prompt, system_prompt = build_classify_prompt("test", allowed_tasks)

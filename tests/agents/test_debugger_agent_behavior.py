@@ -1,5 +1,3 @@
-import json
-from pathlib import Path
 
 import pytest
 
@@ -8,9 +6,7 @@ from nexuscore.agents.debugger_agent import DebuggerAgent
 
 @pytest.fixture(autouse=True)
 def patch_base_init(monkeypatch):
-    monkeypatch.setattr(
-        "nexuscore.agents.debugger_agent.BaseAgent.__init__", lambda self: None
-    )
+    monkeypatch.setattr("nexuscore.agents.debugger_agent.BaseAgent.__init__", lambda self: None)
 
 
 def test_debug_and_patch_success(monkeypatch, tmp_path):
@@ -37,4 +33,6 @@ def test_debug_and_patch_success(monkeypatch, tmp_path):
 
 def test_debug_and_patch_no_files(monkeypatch):
     agent = DebuggerAgent()
-    assert agent.debug_and_patch("error", {}, "/tmp") == {"error": "No files provided for debugging."}
+    assert agent.debug_and_patch("error", {}, "/tmp") == {
+        "error": "No files provided for debugging."
+    }

@@ -5,6 +5,7 @@ webapp/auth.py の高品質なテスト
 CR-FASTAPI-010 で Flask API が削除されたため、このテストファイルは skip されます。
 FastAPI 側の認証テストは tests/api/test_fastapi_*.py を参照してください。
 """
+
 import pytest
 
 # CR-FASTAPI-010: Flask レガシー前提のテストは削除済み
@@ -12,7 +13,7 @@ import pytest
 pytest.skip(
     "Flask legacy auth tests have been removed in CR-FASTAPI-010. "
     "Use FastAPI tests in tests/api/test_fastapi_*.py instead.",
-    allow_module_level=True
+    allow_module_level=True,
 )
 
 
@@ -30,11 +31,14 @@ def app():
     }
 
     # OAuth 設定を環境変数でモック
-    with patch.dict("os.environ", {
-        "GITHUB_CLIENT_ID": "test_client_id",
-        "GITHUB_CLIENT_SECRET": "test_client_secret",
-        "GITHUB_REDIRECT_URI": "http://localhost:5000/auth/github/callback",
-    }):
+    with patch.dict(
+        "os.environ",
+        {
+            "GITHUB_CLIENT_ID": "test_client_id",
+            "GITHUB_CLIENT_SECRET": "test_client_secret",
+            "GITHUB_REDIRECT_URI": "http://localhost:5000/auth/github/callback",
+        },
+    ):
         app = create_app(config_overrides=config_overrides)
 
         with app.app_context():
@@ -54,6 +58,7 @@ def client(app):
 def db_session(app):
     """Database session for tests"""
     from nexuscore.webapp import db
+
     with app.app_context():
         yield db.session
 
@@ -134,7 +139,9 @@ class TestGitHubCallback:
             {"email": "test@example.com", "primary": True, "verified": True}
         ]
 
-        with patch("nexuscore.webapp.auth.oauth.github.authorize_access_token", return_value=mock_token):
+        with patch(
+            "nexuscore.webapp.auth.oauth.github.authorize_access_token", return_value=mock_token
+        ):
             with patch("nexuscore.webapp.auth.requests.get") as mock_get:
                 mock_get.side_effect = [mock_user_response, mock_email_response]
 
@@ -187,7 +194,9 @@ class TestGitHubCallback:
             {"email": "new@example.com", "primary": True, "verified": True}
         ]
 
-        with patch("nexuscore.webapp.auth.oauth.github.authorize_access_token", return_value=mock_token):
+        with patch(
+            "nexuscore.webapp.auth.oauth.github.authorize_access_token", return_value=mock_token
+        ):
             with patch("nexuscore.webapp.auth.requests.get") as mock_get:
                 mock_get.side_effect = [mock_user_response, mock_email_response]
 
@@ -218,7 +227,9 @@ class TestGitHubCallback:
         mock_email_response = Mock()
         mock_email_response.status_code = 404
 
-        with patch("nexuscore.webapp.auth.oauth.github.authorize_access_token", return_value=mock_token):
+        with patch(
+            "nexuscore.webapp.auth.oauth.github.authorize_access_token", return_value=mock_token
+        ):
             with patch("nexuscore.webapp.auth.requests.get") as mock_get:
                 mock_get.side_effect = [mock_user_response, mock_email_response]
 
@@ -250,7 +261,9 @@ class TestGitHubCallback:
             {"email": "unverified@example.com", "primary": False, "verified": False},
         ]
 
-        with patch("nexuscore.webapp.auth.oauth.github.authorize_access_token", return_value=mock_token):
+        with patch(
+            "nexuscore.webapp.auth.oauth.github.authorize_access_token", return_value=mock_token
+        ):
             with patch("nexuscore.webapp.auth.requests.get") as mock_get:
                 mock_get.side_effect = [mock_user_response, mock_email_response]
 
@@ -280,7 +293,9 @@ class TestGitHubCallback:
             {"email": "second@example.com", "primary": False, "verified": True},
         ]
 
-        with patch("nexuscore.webapp.auth.oauth.github.authorize_access_token", return_value=mock_token):
+        with patch(
+            "nexuscore.webapp.auth.oauth.github.authorize_access_token", return_value=mock_token
+        ):
             with patch("nexuscore.webapp.auth.requests.get") as mock_get:
                 mock_get.side_effect = [mock_user_response, mock_email_response]
 
@@ -304,7 +319,9 @@ class TestGitHubCallback:
         """github_callback() が GitHub API エラーを処理する"""
         mock_token = {"access_token": "test_access_token"}
 
-        with patch("nexuscore.webapp.auth.oauth.github.authorize_access_token", return_value=mock_token):
+        with patch(
+            "nexuscore.webapp.auth.oauth.github.authorize_access_token", return_value=mock_token
+        ):
             with patch("nexuscore.webapp.auth.requests.get") as mock_get:
                 # GitHub API がエラーを返す
                 mock_get.side_effect = Exception("GitHub API error")
@@ -331,7 +348,9 @@ class TestGitHubCallback:
         mock_email_response = Mock()
         mock_email_response.status_code = 404
 
-        with patch("nexuscore.webapp.auth.oauth.github.authorize_access_token", return_value=mock_token):
+        with patch(
+            "nexuscore.webapp.auth.oauth.github.authorize_access_token", return_value=mock_token
+        ):
             with patch("nexuscore.webapp.auth.requests.get") as mock_get:
                 mock_get.side_effect = [mock_user_response, mock_email_response]
 
@@ -375,8 +394,9 @@ class TestGetCurrentUser:
 
     def test_get_current_user_returns_user_if_logged_in(self, app, db_session):
         """get_current_user() がログイン中のユーザーを返す"""
-        from nexuscore.webapp.auth import get_current_user
         from flask import session
+
+        from nexuscore.webapp.auth import get_current_user
 
         # ユーザーを作成
         user = User(github_id="12345", github_login="testuser")
@@ -411,8 +431,9 @@ class TestGetCurrentUser:
 
     def test_get_current_user_returns_none_if_user_not_found(self, app):
         """get_current_user() がユーザーが存在しない場合 None を返す"""
-        from nexuscore.webapp.auth import get_current_user
         from flask import session
+
+        from nexuscore.webapp.auth import get_current_user
 
         # リクエストコンテキスト内で get_current_user を呼ぶ
         with app.test_request_context():
@@ -428,8 +449,9 @@ class TestRequireAuth:
 
     def test_require_auth_allows_authenticated_user(self, app, db_session):
         """require_auth() が認証済みユーザーを通す"""
-        from nexuscore.webapp.auth import require_auth
         from flask import Blueprint
+
+        from nexuscore.webapp.auth import require_auth
 
         # テスト用 blueprint
         test_bp = Blueprint("test", __name__)
@@ -459,8 +481,9 @@ class TestRequireAuth:
 
     def test_require_auth_redirects_unauthenticated_user(self, app):
         """require_auth() が未認証ユーザーをログインページにリダイレクトする"""
-        from nexuscore.webapp.auth import require_auth
         from flask import Blueprint
+
+        from nexuscore.webapp.auth import require_auth
 
         # テスト用 blueprint
         test_bp = Blueprint("test2", __name__)

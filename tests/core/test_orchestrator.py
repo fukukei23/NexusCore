@@ -12,24 +12,22 @@
 # ==============================================================================
 
 import json
-import os
-import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from nexuscore.core.orchestrator import (
     Orchestrator,
-    assemble_agent_team,
     _build_arg_parser,
+    assemble_agent_team,
     main,
 )
-
 
 # ==============================================================================
 # Fixtures
 # ==============================================================================
+
 
 @pytest.fixture
 def mock_agents():
@@ -62,6 +60,7 @@ def temp_project(tmp_path):
 # TestOrchestratorInit: 初期化とロガー設定
 # ==============================================================================
 
+
 class TestOrchestratorInit:
     """Orchestrator初期化とロガー設定のテスト"""
 
@@ -70,7 +69,7 @@ class TestOrchestratorInit:
         orchestrator = Orchestrator(
             project_path=temp_project,
             constitution={"automation_policy": {"autonomy_level": 1}},
-            **mock_agents
+            **mock_agents,
         )
 
         # インスタンスが正しく作成される
@@ -85,7 +84,7 @@ class TestOrchestratorInit:
             project_path=temp_project,
             constitution={"test": "constitution"},
             max_retries=10,
-            **mock_agents
+            **mock_agents,
         )
 
         assert orchestrator.max_retries == 10
@@ -93,9 +92,7 @@ class TestOrchestratorInit:
     def test_orchestrator_post_init_creates_logger(self, temp_project, mock_agents):
         """__post_init__でロガーが作成される"""
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
         assert orchestrator.logger is not None
@@ -105,9 +102,7 @@ class TestOrchestratorInit:
     def test_setup_logger_creates_log_directory(self, temp_project, mock_agents):
         """_setup_loggerがログディレクトリを作成（実際のファイルI/O）"""
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
         log_dir = Path(temp_project) / "logs" / "orchestrator"
@@ -124,25 +119,22 @@ class TestOrchestratorInit:
 # TestExecuteTaskViaNPE: NPE経由のLLM実行
 # ==============================================================================
 
+
 class TestExecuteTaskViaNPE:
     """_execute_task_via_npe メソッドのテスト"""
 
     def test_execute_task_with_dict_response(self, temp_project, mock_agents):
         """guarded_llm_callがdict形式を返す場合"""
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
-        with patch("nexuscore.core.orchestrator.guarded_llm_call", return_value={
-            "ok": True,
-            "content": "Test response content",
-            "usage": {"tokens": 100}
-        }):
+        with patch(
+            "nexuscore.core.orchestrator.guarded_llm_call",
+            return_value={"ok": True, "content": "Test response content", "usage": {"tokens": 100}},
+        ):
             result = orchestrator._execute_task_via_npe(
-                prompt="Test prompt",
-                metadata={"task_type": "planning", "as_json": False}
+                prompt="Test prompt", metadata={"task_type": "planning", "as_json": False}
             )
 
             assert "Test response content" in result
@@ -150,15 +142,14 @@ class TestExecuteTaskViaNPE:
     def test_execute_task_with_string_response(self, temp_project, mock_agents):
         """guarded_llm_callが文字列を返す場合"""
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
-        with patch("nexuscore.core.orchestrator.guarded_llm_call", return_value="Direct string response"):
+        with patch(
+            "nexuscore.core.orchestrator.guarded_llm_call", return_value="Direct string response"
+        ):
             result = orchestrator._execute_task_via_npe(
-                prompt="Test prompt",
-                metadata={"task_type": "coding"}
+                prompt="Test prompt", metadata={"task_type": "coding"}
             )
 
             assert result == "Direct string response"
@@ -167,25 +158,19 @@ class TestExecuteTaskViaNPE:
         """llm_router.task_model_mapからモデルを選択"""
         mock_agents["llm_router"].task_model_map = {
             "planning": "openai:gpt-4",
-            "coding": "anthropic:claude-3"
+            "coding": "anthropic:claude-3",
         }
         mock_agents["llm_router"].default_model = "openai:gpt-3.5"
 
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
-        with patch("nexuscore.core.orchestrator.guarded_llm_call", return_value={
-            "ok": True,
-            "content": "Response",
-            "usage": {}
-        }) as mock_call:
-            orchestrator._execute_task_via_npe(
-                prompt="Test",
-                metadata={"task_type": "planning"}
-            )
+        with patch(
+            "nexuscore.core.orchestrator.guarded_llm_call",
+            return_value={"ok": True, "content": "Response", "usage": {}},
+        ) as mock_call:
+            orchestrator._execute_task_via_npe(prompt="Test", metadata={"task_type": "planning"})
 
             # guarded_llm_callが呼ばれ、モデルが正しく設定されている
             assert mock_call.called
@@ -195,20 +180,14 @@ class TestExecuteTaskViaNPE:
     def test_execute_task_default_task_type(self, temp_project, mock_agents):
         """metadataにtask_typeがない場合は"generic"を使用"""
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
-        with patch("nexuscore.core.orchestrator.guarded_llm_call", return_value={
-            "ok": True,
-            "content": "Response",
-            "usage": {}
-        }) as mock_call:
-            orchestrator._execute_task_via_npe(
-                prompt="Test",
-                metadata={}  # task_typeなし
-            )
+        with patch(
+            "nexuscore.core.orchestrator.guarded_llm_call",
+            return_value={"ok": True, "content": "Response", "usage": {}},
+        ) as mock_call:
+            orchestrator._execute_task_via_npe(prompt="Test", metadata={})  # task_typeなし
 
             assert mock_call.called
             # デフォルトは"generic"
@@ -220,6 +199,7 @@ class TestExecuteTaskViaNPE:
 # TestMaybeStop: SessionController統合
 # ==============================================================================
 
+
 class TestMaybeStop:
     """_maybe_stop メソッドのテスト（SessionController統合）"""
 
@@ -229,7 +209,7 @@ class TestMaybeStop:
             project_path=temp_project,
             constitution={"test": "constitution"},
             session_controller=None,
-            **mock_agents
+            **mock_agents,
         )
 
         # 例外が発生しないことを確認
@@ -244,14 +224,13 @@ class TestMaybeStop:
             project_path=temp_project,
             constitution={"test": "constitution"},
             session_controller=mock_session_controller,
-            **mock_agents
+            **mock_agents,
         )
 
         orchestrator._maybe_stop("requirement", {"task_id": "test123"})
 
         mock_session_controller.checkpoint.assert_called_once_with(
-            "requirement",
-            {"task_id": "test123"}
+            "requirement", {"task_id": "test123"}
         )
 
     def test_maybe_stop_raises_when_should_stop(self, temp_project, mock_agents):
@@ -263,7 +242,7 @@ class TestMaybeStop:
             project_path=temp_project,
             constitution={"test": "constitution"},
             session_controller=mock_session_controller,
-            **mock_agents
+            **mock_agents,
         )
 
         with pytest.raises(RuntimeError, match="SessionStopped"):
@@ -279,7 +258,7 @@ class TestMaybeStop:
             project_path=temp_project,
             constitution={"test": "constitution"},
             session_controller=mock_session_controller,
-            **mock_agents
+            **mock_agents,
         )
 
         # 例外が発生せず処理が継続
@@ -290,49 +269,48 @@ class TestMaybeStop:
 # TestRunFullProject: メインワークフロー
 # ==============================================================================
 
+
 class TestRunFullProject:
     """run_full_project メソッドのテスト"""
 
     def test_run_full_project_basic_workflow(self, temp_project, mock_agents):
         """基本的なワークフロー（requirement → planning）"""
         mock_agents["requirement_agent"].use_ui = False
-        mock_agents["requirement_agent"].analyze_requirement = MagicMock(return_value={
-            "requirements": ["req1", "req2"]
-        })
-        mock_agents["planner_agent"].generate_plan = MagicMock(return_value=json.dumps({
-            "functions_to_implement": ["func1", "func2"]
-        }))
+        mock_agents["requirement_agent"].analyze_requirement = MagicMock(
+            return_value={"requirements": ["req1", "req2"]}
+        )
+        mock_agents["planner_agent"].generate_plan = MagicMock(
+            return_value=json.dumps({"functions_to_implement": ["func1", "func2"]})
+        )
         mock_agents["coder_agent"].implement_code = MagicMock(return_value="code content")
         mock_agents["tester_agent"].generate_tests = MagicMock(return_value="test content")
 
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
         orchestrator.run_full_project("Test requirement", language="ja", fast_lane=False)
 
         # エージェントメソッドが呼ばれた
-        mock_agents["requirement_agent"].analyze_requirement.assert_called_once_with("Test requirement")
+        mock_agents["requirement_agent"].analyze_requirement.assert_called_once_with(
+            "Test requirement"
+        )
         mock_agents["planner_agent"].generate_plan.assert_called_once()
 
     def test_run_full_project_with_fast_lane(self, temp_project, mock_agents):
         """fast_laneモードで並列実行"""
         mock_agents["requirement_agent"].use_ui = False
-        mock_agents["requirement_agent"].analyze_requirement = MagicMock(return_value={
-            "requirements": ["req1"]
-        })
-        mock_agents["planner_agent"].generate_plan = MagicMock(return_value=json.dumps({
-            "functions_to_implement": ["func1"]
-        }))
+        mock_agents["requirement_agent"].analyze_requirement = MagicMock(
+            return_value={"requirements": ["req1"]}
+        )
+        mock_agents["planner_agent"].generate_plan = MagicMock(
+            return_value=json.dumps({"functions_to_implement": ["func1"]})
+        )
         mock_agents["coder_agent"].implement_code = MagicMock(return_value="code")
         mock_agents["tester_agent"].generate_tests = MagicMock(return_value="tests")
 
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
         orchestrator.run_full_project("Test requirement", fast_lane=True)
@@ -350,9 +328,7 @@ class TestRunFullProject:
         )
 
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
         # 例外が発生してもクラッシュしない
@@ -364,9 +340,7 @@ class TestRunFullProject:
         mock_agents["requirement_agent"].analyze_requirement = MagicMock(return_value={})
 
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
         orchestrator.run_full_project("Test requirement")
@@ -377,15 +351,15 @@ class TestRunFullProject:
     def test_run_full_project_planning_failure(self, temp_project, mock_agents):
         """計画フェーズの失敗"""
         mock_agents["requirement_agent"].use_ui = False
-        mock_agents["requirement_agent"].analyze_requirement = MagicMock(return_value={"req": "test"})
+        mock_agents["requirement_agent"].analyze_requirement = MagicMock(
+            return_value={"req": "test"}
+        )
         mock_agents["planner_agent"].generate_plan = MagicMock(
             side_effect=Exception("Planning error")
         )
 
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
         # 例外が発生してもクラッシュしない
@@ -397,15 +371,15 @@ class TestRunFullProject:
         mock_session_controller.should_stop.return_value = True
 
         mock_agents["requirement_agent"].use_ui = False
-        mock_agents["requirement_agent"].analyze_requirement = MagicMock(return_value={
-            "requirements": ["req1"]
-        })
+        mock_agents["requirement_agent"].analyze_requirement = MagicMock(
+            return_value={"requirements": ["req1"]}
+        )
 
         orchestrator = Orchestrator(
             project_path=temp_project,
             constitution={"test": "constitution"},
             session_controller=mock_session_controller,
-            **mock_agents
+            **mock_agents,
         )
 
         # SessionStoppedが内部で発生し、正常に処理される
@@ -414,14 +388,12 @@ class TestRunFullProject:
     def test_run_full_project_with_gradio_ui(self, temp_project, mock_agents):
         """Gradio UIを使用する場合"""
         mock_agents["requirement_agent"].use_ui = True
-        mock_agents["requirement_agent"].launch_gradio_ui = MagicMock(return_value={
-            "specs": "from_ui"
-        })
+        mock_agents["requirement_agent"].launch_gradio_ui = MagicMock(
+            return_value={"specs": "from_ui"}
+        )
 
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
         orchestrator.run_full_project("Test requirement")
@@ -435,30 +407,33 @@ class TestRunFullProject:
         del mock_agents["requirement_agent"].analyze_requirement
 
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
         # raw_requirementが使用される（クラッシュしない）
         orchestrator.run_full_project("Test requirement")
 
-    @pytest.mark.parametrize("plan_text,expected_type", [
-        ('{"functions_to_implement": ["func1"]}', dict),  # valid JSON
-        ("Not valid JSON", dict),  # invalid JSON -> raw_plan
-    ])
-    def test_run_full_project_plan_parsing(self, temp_project, mock_agents, plan_text, expected_type):
+    @pytest.mark.parametrize(
+        "plan_text,expected_type",
+        [
+            ('{"functions_to_implement": ["func1"]}', dict),  # valid JSON
+            ("Not valid JSON", dict),  # invalid JSON -> raw_plan
+        ],
+    )
+    def test_run_full_project_plan_parsing(
+        self, temp_project, mock_agents, plan_text, expected_type
+    ):
         """計画のJSONパース（成功/失敗）"""
         mock_agents["requirement_agent"].use_ui = False
-        mock_agents["requirement_agent"].analyze_requirement = MagicMock(return_value={"req": "test"})
+        mock_agents["requirement_agent"].analyze_requirement = MagicMock(
+            return_value={"req": "test"}
+        )
         mock_agents["planner_agent"].generate_plan = MagicMock(return_value=plan_text)
         mock_agents["coder_agent"].implement_code = MagicMock(return_value="code")
         mock_agents["tester_agent"].generate_tests = MagicMock(return_value="tests")
 
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
         # JSONパース失敗でもクラッシュしない
@@ -469,61 +444,51 @@ class TestRunFullProject:
 # TestEnsureFastlaneTests: Fastlaneテスト生成フォールバック
 # ==============================================================================
 
+
 class TestEnsureFastlaneTests:
     """_ensure_fastlane_tests メソッドのテスト"""
 
     def test_ensure_fastlane_tests_returns_initial_result(self, temp_project, mock_agents):
         """initial_resultがある場合はそのまま返す"""
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
         result = orchestrator._ensure_fastlane_tests(
-            initial_result="Existing tests",
-            plan_text="",
-            code_result="",
-            requirement="Test"
+            initial_result="Existing tests", plan_text="", code_result="", requirement="Test"
         )
 
         assert result == "Existing tests"
 
     def test_ensure_fastlane_tests_from_plan(self, temp_project, mock_agents):
         """plan_textからテストを生成"""
-        mock_agents["tester_agent"].generate_tests_from_plan = MagicMock(return_value="Tests from plan")
+        mock_agents["tester_agent"].generate_tests_from_plan = MagicMock(
+            return_value="Tests from plan"
+        )
 
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
         plan_json = json.dumps({"functions": ["func1"]})
         result = orchestrator._ensure_fastlane_tests(
-            initial_result="",
-            plan_text=plan_json,
-            code_result="",
-            requirement="Test"
+            initial_result="", plan_text=plan_json, code_result="", requirement="Test"
         )
 
         assert result == "Tests from plan"
 
     def test_ensure_fastlane_tests_from_code(self, temp_project, mock_agents):
         """code_resultからテストを生成"""
-        mock_agents["tester_agent"].generate_tests_and_testimony = MagicMock(return_value="Tests from code")
+        mock_agents["tester_agent"].generate_tests_and_testimony = MagicMock(
+            return_value="Tests from code"
+        )
 
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
         result = orchestrator._ensure_fastlane_tests(
-            initial_result="",
-            plan_text="",
-            code_result="def func(): pass",
-            requirement="Test"
+            initial_result="", plan_text="", code_result="def func(): pass", requirement="Test"
         )
 
         assert result == "Tests from code"
@@ -533,16 +498,11 @@ class TestEnsureFastlaneTests:
         mock_agents["tester_agent"].generate_tests = MagicMock(return_value="Fallback tests")
 
         orchestrator = Orchestrator(
-            project_path=temp_project,
-            constitution={"test": "constitution"},
-            **mock_agents
+            project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
         result = orchestrator._ensure_fastlane_tests(
-            initial_result="",
-            plan_text="",
-            code_result="",
-            requirement="Test requirement"
+            initial_result="", plan_text="", code_result="", requirement="Test requirement"
         )
 
         assert result == "Fallback tests"
@@ -553,14 +513,11 @@ class TestEnsureFastlaneTests:
             project_path=temp_project,
             constitution={"test": "constitution"},
             tester_agent=None,
-            **{k: v for k, v in mock_agents.items() if k != "tester_agent"}
+            **{k: v for k, v in mock_agents.items() if k != "tester_agent"},
         )
 
         result = orchestrator._ensure_fastlane_tests(
-            initial_result="",
-            plan_text="",
-            code_result="",
-            requirement="Test"
+            initial_result="", plan_text="", code_result="", requirement="Test"
         )
 
         assert result == ""
@@ -569,6 +526,7 @@ class TestEnsureFastlaneTests:
 # ==============================================================================
 # TestAssembleAgentTeam: エージェントチーム組成
 # ==============================================================================
+
 
 class TestAssembleAgentTeam:
     """assemble_agent_team 関数のテスト"""
@@ -606,6 +564,7 @@ class TestAssembleAgentTeam:
 # TestCLI: CLIエントリポイント
 # ==============================================================================
 
+
 class TestCLI:
     """CLI関数（_build_arg_parser, main）のテスト"""
 
@@ -634,12 +593,18 @@ class TestCLI:
     def test_main_creates_orchestrator_and_runs(self, monkeypatch, temp_project):
         """main()がOrchestratorを作成してrun_full_projectを実行"""
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-api-key")
-        monkeypatch.setattr("sys.argv", [
-            "prog",
-            "--project", temp_project,
-            "--requirement", "Test requirement",
-            "--autonomy-level", "1"
-        ])
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "prog",
+                "--project",
+                temp_project,
+                "--requirement",
+                "Test requirement",
+                "--autonomy-level",
+                "1",
+            ],
+        )
 
         with patch("nexuscore.core.orchestrator.assemble_agent_team") as mock_assemble:
             mock_team = {
@@ -670,11 +635,9 @@ class TestCLI:
     def test_main_handles_session_stopped(self, monkeypatch, temp_project):
         """main()がSessionStoppedを正常終了として扱う"""
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-api-key")
-        monkeypatch.setattr("sys.argv", [
-            "prog",
-            "--project", temp_project,
-            "--requirement", "Test"
-        ])
+        monkeypatch.setattr(
+            "sys.argv", ["prog", "--project", temp_project, "--requirement", "Test"]
+        )
 
         with patch("nexuscore.core.orchestrator.assemble_agent_team") as mock_assemble:
             mock_team = {
@@ -693,7 +656,9 @@ class TestCLI:
             }
             mock_assemble.return_value = mock_team
 
-            with patch.object(Orchestrator, "run_full_project", side_effect=RuntimeError("SessionStopped")):
+            with patch.object(
+                Orchestrator, "run_full_project", side_effect=RuntimeError("SessionStopped")
+            ):
                 with pytest.raises(SystemExit) as exc_info:
                     main()
 

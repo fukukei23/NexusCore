@@ -7,23 +7,23 @@ Guardian Agent - 品質ゲート統合のテスト
 
 import os
 import sys
-import json
-import pytest
 import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, patch, Mock
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # gitモジュールをモック（テスト環境でGitPythonが不要）
-sys.modules['git'] = MagicMock()
+sys.modules["git"] = MagicMock()
 
 from nexuscore.agents import guardian_agent as guardian_module
 from nexuscore.agents.guardian_agent import GuardianAgent
-from nexuscore.utils.code_analyzer import QualityReport, SecurityIssue
-from nexuscore.agents.mutation_tester_agent import MutationReport, Mutant
+from nexuscore.agents.mutation_tester_agent import Mutant, MutationReport
+from nexuscore.utils.code_analyzer import QualityReport
 
 
 class DummyGitController:
     """テスト用ダミーGitController"""
+
     def __init__(self):
         self.calls = []
 
@@ -36,6 +36,7 @@ class DummyGitController:
 def disable_llm_router(monkeypatch):
     """LLMRouterを無効化（テスト高速化）"""
     from nexuscore.agents import base_agent
+
     monkeypatch.setattr(base_agent, "LLMRouter", None)
 
 
@@ -62,7 +63,7 @@ def mock_constitution():
             "tier2": {
                 "mutation_score_min": 80,
                 "mutation_timeout_sec": 10,
-            }
+            },
         }
     }
 
@@ -81,7 +82,7 @@ def mock_quality_report_pass():
         bandit_passed=True,
         security_issues=[],
         feedback="全ての品質基準を満たしています。",
-        violations=[]
+        violations=[],
     )
 
 
@@ -102,8 +103,8 @@ def mock_quality_report_fail():
         violations=[
             "カバレッジ 75.0% < 90% (最低基準)",
             "Pylint 6.5/10 < 8.0 (最低基準)",
-            "MyPy型チェックが不合格"
-        ]
+            "MyPy型チェックが不合格",
+        ],
     )
 
 
@@ -119,7 +120,7 @@ def mock_mutation_report_pass():
         timeout=0,
         suspicious=0,
         survived_mutants=[],
-        feedback="ミューテーションスコアが基準を満たしています。"
+        feedback="ミューテーションスコアが基準を満たしています。",
     )
 
 
@@ -133,7 +134,7 @@ def mock_mutation_report_fail():
             mutator="BinaryOperator",
             original_code="x + y",
             mutated_code="x - y",
-            status="survived"
+            status="survived",
         )
     ]
     return MutationReport(
@@ -145,21 +146,23 @@ def mock_mutation_report_fail():
         timeout=0,
         suspicious=0,
         survived_mutants=survived,
-        feedback="ミューテーションスコアが不足しています。"
+        feedback="ミューテーションスコアが不足しています。",
     )
 
 
 @pytest.fixture
 def temp_source_file():
     """テスト用のソースファイルを作成"""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-        f.write("""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write(
+            """
 def add(a, b):
     return a + b
 
 def subtract(a, b):
     return a - b
-""")
+"""
+        )
         source_path = f.name
     yield source_path
     os.unlink(source_path)
@@ -168,8 +171,9 @@ def subtract(a, b):
 @pytest.fixture
 def temp_test_file():
     """テスト用のテストファイルを作成"""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-        f.write("""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write(
+            """
 import pytest
 
 def test_add():
@@ -179,7 +183,8 @@ def test_add():
 def test_subtract():
     from example import subtract
     assert subtract(5, 3) == 2
-""")
+"""
+        )
         test_path = f.name
     yield test_path
     os.unlink(test_path)
@@ -189,17 +194,13 @@ class TestGuardianQualityGates:
     """Guardian Agent品質ゲート統合テスト"""
 
     def test_run_quality_gates_all_pass(
-        self,
-        setup_guardian,
-        mock_constitution,
-        mock_quality_report_pass,
-        mock_mutation_report_pass
+        self, setup_guardian, mock_constitution, mock_quality_report_pass, mock_mutation_report_pass
     ):
         """Tier 1とTier 2が両方合格する場合"""
         guardian = GuardianAgent()
 
-        with patch('nexuscore.agents.guardian_agent.analyze_code_quality') as mock_analyze:
-            with patch('nexuscore.agents.guardian_agent.MutationTesterAgent') as mock_mutation_cls:
+        with patch("nexuscore.agents.guardian_agent.analyze_code_quality") as mock_analyze:
+            with patch("nexuscore.agents.guardian_agent.MutationTesterAgent") as mock_mutation_cls:
                 mock_analyze.return_value = mock_quality_report_pass
                 mock_mutation_agent = Mock()
                 mock_mutation_agent.run_mutation_testing.return_value = mock_mutation_report_pass
@@ -208,7 +209,7 @@ class TestGuardianQualityGates:
                 result = guardian._run_quality_gates(
                     source_path="src/example.py",
                     test_path="tests/test_example.py",
-                    constitution=mock_constitution
+                    constitution=mock_constitution,
                 )
 
                 assert result["overall_passed"] is True
@@ -217,17 +218,13 @@ class TestGuardianQualityGates:
                 assert len(result["violations"]) == 0
 
     def test_run_quality_gates_tier1_fail(
-        self,
-        setup_guardian,
-        mock_constitution,
-        mock_quality_report_fail,
-        mock_mutation_report_pass
+        self, setup_guardian, mock_constitution, mock_quality_report_fail, mock_mutation_report_pass
     ):
         """Tier 1が不合格の場合"""
         guardian = GuardianAgent()
 
-        with patch('nexuscore.agents.guardian_agent.analyze_code_quality') as mock_analyze:
-            with patch('nexuscore.agents.guardian_agent.MutationTesterAgent') as mock_mutation_cls:
+        with patch("nexuscore.agents.guardian_agent.analyze_code_quality") as mock_analyze:
+            with patch("nexuscore.agents.guardian_agent.MutationTesterAgent") as mock_mutation_cls:
                 mock_analyze.return_value = mock_quality_report_fail
                 mock_mutation_agent = Mock()
                 mock_mutation_agent.run_mutation_testing.return_value = mock_mutation_report_pass
@@ -236,7 +233,7 @@ class TestGuardianQualityGates:
                 result = guardian._run_quality_gates(
                     source_path="src/example.py",
                     test_path="tests/test_example.py",
-                    constitution=mock_constitution
+                    constitution=mock_constitution,
                 )
 
                 assert result["overall_passed"] is False
@@ -244,17 +241,13 @@ class TestGuardianQualityGates:
                 assert len(result["violations"]) == 3  # カバレッジ、Pylint、MyPy
 
     def test_run_quality_gates_tier2_fail(
-        self,
-        setup_guardian,
-        mock_constitution,
-        mock_quality_report_pass,
-        mock_mutation_report_fail
+        self, setup_guardian, mock_constitution, mock_quality_report_pass, mock_mutation_report_fail
     ):
         """Tier 2が不合格の場合"""
         guardian = GuardianAgent()
 
-        with patch('nexuscore.agents.guardian_agent.analyze_code_quality') as mock_analyze:
-            with patch('nexuscore.agents.guardian_agent.MutationTesterAgent') as mock_mutation_cls:
+        with patch("nexuscore.agents.guardian_agent.analyze_code_quality") as mock_analyze:
+            with patch("nexuscore.agents.guardian_agent.MutationTesterAgent") as mock_mutation_cls:
                 mock_analyze.return_value = mock_quality_report_pass
                 mock_mutation_agent = Mock()
                 mock_mutation_agent.run_mutation_testing.return_value = mock_mutation_report_fail
@@ -263,7 +256,7 @@ class TestGuardianQualityGates:
                 result = guardian._run_quality_gates(
                     source_path="src/example.py",
                     test_path="tests/test_example.py",
-                    constitution=mock_constitution
+                    constitution=mock_constitution,
                 )
 
                 assert result["overall_passed"] is False
@@ -271,21 +264,17 @@ class TestGuardianQualityGates:
                 assert any("Tier 2不合格" in v for v in result["violations"])
 
     def test_review_with_quality_gates_reject_on_quality_fail(
-        self,
-        setup_guardian,
-        mock_constitution,
-        mock_quality_report_fail,
-        mock_mutation_report_pass
+        self, setup_guardian, mock_constitution, mock_quality_report_fail, mock_mutation_report_pass
     ):
         """品質ゲート不合格時にREJECTを返す"""
         guardian = GuardianAgent()
 
-        with patch.object(guardian, '_run_quality_gates') as mock_run_qg:
+        with patch.object(guardian, "_run_quality_gates") as mock_run_qg:
             mock_run_qg.return_value = {
                 "tier1": mock_quality_report_fail,
                 "tier2": mock_mutation_report_pass,
                 "overall_passed": False,
-                "violations": ["カバレッジ不足", "Pylint不足"]
+                "violations": ["カバレッジ不足", "Pylint不足"],
             }
 
             result = guardian.review_with_quality_gates(
@@ -296,7 +285,7 @@ class TestGuardianQualityGates:
                 test_result="PASSED",
                 testimony="実装しました",
                 constitution_dict=mock_constitution,
-                task_description="新機能追加"
+                task_description="新機能追加",
             )
 
             assert result["decision"] == "REJECT"
@@ -305,22 +294,18 @@ class TestGuardianQualityGates:
             assert "quality_gates" in result
 
     def test_review_with_quality_gates_llm_review_on_pass(
-        self,
-        setup_guardian,
-        mock_constitution,
-        mock_quality_report_pass,
-        mock_mutation_report_pass
+        self, setup_guardian, mock_constitution, mock_quality_report_pass, mock_mutation_report_pass
     ):
         """品質ゲート合格時にLLMレビューを実行"""
         guardian = GuardianAgent()
 
-        with patch.object(guardian, '_run_quality_gates') as mock_run_qg:
-            with patch.object(guardian, 'execute_llm_task') as mock_llm:
+        with patch.object(guardian, "_run_quality_gates") as mock_run_qg:
+            with patch.object(guardian, "execute_llm_task") as mock_llm:
                 mock_run_qg.return_value = {
                     "tier1": mock_quality_report_pass,
                     "tier2": mock_mutation_report_pass,
                     "overall_passed": True,
-                    "violations": []
+                    "violations": [],
                 }
                 mock_llm.return_value = '{"decision": "APPROVE", "reason": "コードは優れています"}'
 
@@ -332,7 +317,7 @@ class TestGuardianQualityGates:
                     test_result="PASSED",
                     testimony="実装しました",
                     constitution_dict=mock_constitution,
-                    task_description="新機能追加"
+                    task_description="新機能追加",
                 )
 
                 assert result["decision"] == "APPROVE"
@@ -340,19 +325,15 @@ class TestGuardianQualityGates:
                 assert "quality_gates" in result
                 mock_llm.assert_called_once()
 
-    def test_review_and_commit_with_quality_gates_enabled(
-        self,
-        setup_guardian,
-        mock_constitution
-    ):
+    def test_review_and_commit_with_quality_gates_enabled(self, setup_guardian, mock_constitution):
         """review_and_commitで品質ゲートを有効化"""
         guardian = GuardianAgent()
 
-        with patch.object(guardian, 'review_with_quality_gates') as mock_review_qg:
+        with patch.object(guardian, "review_with_quality_gates") as mock_review_qg:
             mock_review_qg.return_value = {
                 "decision": "APPROVE",
                 "reason": "全て合格",
-                "quality_gates": {"overall_passed": True}
+                "quality_gates": {"overall_passed": True},
             }
 
             result = guardian.review_and_commit(
@@ -366,7 +347,7 @@ class TestGuardianQualityGates:
                 enable_quality_gates=True,
                 source_path="src/example.py",
                 test_path="tests/test_example.py",
-                allow_commit=False  # コミットはスキップ
+                allow_commit=False,  # コミットはスキップ
             )
 
             assert result["decision"] == "APPROVE"
@@ -386,17 +367,14 @@ class TestGuardianQualityGates:
             changed_files=["example.py"],
             enable_quality_gates=True,
             # source_path と test_path を省略
-            allow_commit=False
+            allow_commit=False,
         )
 
         assert result["decision"] == "REJECT"
         assert "source_path と test_path が必須" in result["reason"]
 
     def test_format_quality_gates_summary(
-        self,
-        setup_guardian,
-        mock_quality_report_pass,
-        mock_mutation_report_pass
+        self, setup_guardian, mock_quality_report_pass, mock_mutation_report_pass
     ):
         """品質ゲート結果のフォーマット"""
         guardian = GuardianAgent()
@@ -405,7 +383,7 @@ class TestGuardianQualityGates:
             "tier1": mock_quality_report_pass,
             "tier2": mock_mutation_report_pass,
             "overall_passed": True,
-            "violations": []
+            "violations": [],
         }
 
         summary = guardian._format_quality_gates_summary(quality_gates_result)
