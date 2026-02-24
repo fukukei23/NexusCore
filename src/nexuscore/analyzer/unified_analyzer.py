@@ -184,7 +184,7 @@ class TreeSitterEngine:
                 if "class.definition" in parts and "class.name" in parts
             }
 
-            for node_id, captured_parts in node_to_captures.items():
+            for _node_id, captured_parts in node_to_captures.items():
                 if "function.definition" in captured_parts and "function.name" in captured_parts:
                     info["definitions"].append(
                         {
@@ -563,7 +563,7 @@ class UnifiedAnalyzer:
             ]
 
         target_files = []
-        for ext, lang in self.config["supported_languages"].items():
+        for ext, _lang in self.config["supported_languages"].items():
             for file_path in self.project_root.rglob(f"*{ext}"):
                 if not file_path.is_file():
                     continue

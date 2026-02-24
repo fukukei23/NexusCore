@@ -1004,8 +1004,7 @@ class SelfHealingService:
             self.logger.info(f"Running git diff to get changed files: {' '.join(cmd)}")
             proc = subprocess.run(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
             )
 

@@ -92,8 +92,7 @@ def run_pytest() -> str:
     try:
         result = subprocess.run(
             ["pytest", str(TEST_FILE)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             cwd=str(ROOT),  # ルートで実行（相対 import を安定させる）
         )

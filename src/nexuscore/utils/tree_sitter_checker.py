@@ -196,7 +196,7 @@ class SemanticAnalyzer:
                 query = language_obj.query(query_string)
                 captures = query.captures(root_node)
 
-                for node, capture_name in captures:
+                for node, _capture_name in captures:
                     symbol_name = node.text.decode("utf8")
                     # 重複除去
                     if not any(s["name"] == symbol_name for s in symbols[symbol_type]):

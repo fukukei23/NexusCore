@@ -58,7 +58,7 @@ def read_file(path):
 def run_pytest():
     try:
         result = subprocess.run(
-            ["pytest", TEST_FILE], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            ["pytest", TEST_FILE], capture_output=True, text=True
         )
         output = result.stdout + "\n" + result.stderr
         save_file(RESULT_LOG, output)

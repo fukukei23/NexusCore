@@ -53,7 +53,7 @@ def _resolve_user_from_api_key(raw_token: str) -> User | None:
     return user
 
 
-def api_key_required(func: F) -> F:
+def api_key_required[F: Callable[..., Any]](func: F) -> F:
     """
     API キー認証を要求するデコレータ
 

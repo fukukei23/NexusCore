@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 
-class ReviewDecision(str, enum.Enum):
+class ReviewDecision(enum.StrEnum):
     APPROVE = "approve"
     REJECT = "reject"
     MANUAL_REVIEW = "manual_review"
@@ -58,7 +58,7 @@ class ReviewResult:
         return "\n".join(lines)
 
 
-class ProjectType(str, enum.Enum):
+class ProjectType(enum.StrEnum):
     NEXUSCORE = "nexuscore"
     ATELIER = "atelier-kyo-manager"
     OTHER = "other"
