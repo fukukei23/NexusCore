@@ -49,11 +49,11 @@ try:
     HAS_RETRY = True
 except ImportError:
     HAS_RETRY = False
-    RetryContext = None  # type: ignore
-    SandboxExecutionError = Exception  # type: ignore
-    convert_http_error_to_nexus_error = None  # type: ignore
-    run_in_sandbox = None  # type: ignore
-    SandboxResult = None  # type: ignore
+    RetryContext = None
+    SandboxExecutionError = Exception
+    convert_http_error_to_nexus_error = None
+    run_in_sandbox = None
+    SandboxResult = None
 
 
 logger = logging.getLogger(__name__)
@@ -1173,7 +1173,7 @@ class SelfHealingService:
             from nexuscore.integration.run_report_generator import write_run_report_file
             from nexuscore.webapp.models import Run
 
-            run = Run.query.filter_by(run_id=run_id).first()  # type: ignore
+            run = Run.query.filter_by(run_id=run_id).first()
             if run and hasattr(run, "id"):
                 report_path = write_run_report_file(run.id, base_dir=self.project_root)
                 self.logger.info(f"Run report generated: {report_path}")

@@ -983,7 +983,7 @@ class SelfHealingService:
             from nexuscore.webapp.models import Run
 
             # run_id で Run を検索
-            run = Run.query.filter_by(run_id=run_id).first()  # type: ignore
+            run = Run.query.filter_by(run_id=run_id).first()
             if run and hasattr(run, "id"):
                 report_path = write_run_report_file(run.id, base_dir=self.project_root)
                 self.logger.info(f"Run report generated: {report_path}")

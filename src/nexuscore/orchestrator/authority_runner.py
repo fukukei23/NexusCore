@@ -166,7 +166,7 @@ def _default_context_factory(
     """
     try:
         # Local import: avoid importing frozen core during module import.
-        from nexuscore.core.orchestrator import OrchestratorContext  # type: ignore
+        from nexuscore.core.orchestrator import OrchestratorContext
 
         return OrchestratorContext(
             task_id=uuid.uuid4().hex,

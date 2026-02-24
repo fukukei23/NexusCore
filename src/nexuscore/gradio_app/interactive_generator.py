@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 try:
     from openai import OpenAI
 except Exception:  # pragma: no cover - openai missing
-    OpenAI = None  # type: ignore
+    OpenAI = None
 
 # パスはプロジェクトルート基準に統一（他UIと同様の sandbox/logs を想定）
 HERE = Path(__file__).resolve()

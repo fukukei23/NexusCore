@@ -175,10 +175,10 @@ def _collect_run_metrics(run: object) -> dict:
 
     try:
         if hasattr(run, "id") and PatchRecord:
-            patches = PatchRecord.query.filter_by(run_id=run.id).all()  # type: ignore
+            patches = PatchRecord.query.filter_by(run_id=run.id).all()
             for p in patches:
-                patch_files.add(p.file_path)  # type: ignore
-                diff_text = p.diff_text or ""  # type: ignore
+                patch_files.add(p.file_path)
+                diff_text = p.diff_text or ""
                 total_patch_lines += _estimate_diff_lines(diff_text)
                 # CR-E3: 追加行数と削除行数を分けて収集
                 added, removed = _estimate_diff_lines_separated(diff_text)
@@ -193,9 +193,9 @@ def _collect_run_metrics(run: object) -> dict:
 
     try:
         if hasattr(run, "id") and ExecutionLog:
-            logs = ExecutionLog.query.filter_by(run_id=run.id, source="NPE").all()  # type: ignore
+            logs = ExecutionLog.query.filter_by(run_id=run.id, source="NPE").all()
             for lg in logs:
-                payload = lg.payload_json or {}  # type: ignore
+                payload = lg.payload_json or {}
                 if isinstance(payload, str):
                     try:
                         payload = json.loads(payload)
@@ -222,13 +222,13 @@ def _collect_run_metrics(run: object) -> dict:
     end_time = None
     duration_seconds = 0.0
 
-    if hasattr(run, "started_at") and run.started_at:  # type: ignore
-        start_time = run.started_at  # type: ignore
-    if hasattr(run, "finished_at") and run.finished_at:  # type: ignore
-        end_time = run.finished_at  # type: ignore
+    if hasattr(run, "started_at") and run.started_at:
+        start_time = run.started_at
+    if hasattr(run, "finished_at") and run.finished_at:
+        end_time = run.finished_at
 
     if start_time and end_time:
-        delta = end_time - start_time  # type: ignore
+        delta = end_time - start_time
         duration_seconds = delta.total_seconds()
 
     return {
@@ -254,10 +254,10 @@ def _compute_recent_success_rate(project_id: int, limit: int = 30) -> float:
 
     try:
         q = (
-            Run.query.filter(  # type: ignore
+            Run.query.filter(
                 Run.project_id == project_id
-            )  # type: ignore
-            .order_by(Run.started_at.desc().nullslast())  # type: ignore
+            )
+            .order_by(Run.started_at.desc().nullslast())
             .limit(limit)
         )
         runs = q.all()
@@ -265,7 +265,7 @@ def _compute_recent_success_rate(project_id: int, limit: int = 30) -> float:
         if not runs:
             return 0.0
 
-        success = sum(1 for r in runs if hasattr(r, "status") and r.status == "SUCCESS")  # type: ignore
+        success = sum(1 for r in runs if hasattr(r, "status") and r.status == "SUCCESS")
         return success / len(runs)
     except Exception as e:
         logger.warning(f"Failed to compute success rate: {e}", exc_info=True)
@@ -278,9 +278,9 @@ def build_run_logs_url(project_id: int, run: object) -> str:
     """
     base = AppConfig.WEBAPP_BASE_URL.rstrip("/")
     if hasattr(run, "run_id"):
-        return f"{base}/logs/runs/{run.run_id}"  # type: ignore
+        return f"{base}/logs/runs/{run.run_id}"
     elif hasattr(run, "id"):
-        return f"{base}/logs/runs/{run.id}"  # type: ignore
+        return f"{base}/logs/runs/{run.id}"
     else:
         return f"{base}/logs/runs/unknown"
 
@@ -690,7 +690,7 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
             # プロジェクトIDを取得
             project_id = 0
             if hasattr(ctx.project, "id"):
-                project_id = ctx.project.id  # type: ignore
+                project_id = ctx.project.id
 
             success_rate = None
             if project_id > 0:
@@ -699,7 +699,7 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
             # Run ID を取得
             run_id = "unknown"
             if hasattr(ctx.run, "run_id"):
-                run_id = ctx.run.run_id  # type: ignore
+                run_id = ctx.run.run_id
 
             # 実行時間を取得
             start_time = metrics.get("start_time")
@@ -761,7 +761,7 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
             # プロジェクトIDを取得
             project_id = 0
             if hasattr(ctx.project, "id"):
-                project_id = ctx.project.id  # type: ignore
+                project_id = ctx.project.id
 
             success_rate = 0.0
             if project_id > 0:
@@ -770,15 +770,15 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
             # プロジェクト名を取得
             project_name = "Unknown"
             if hasattr(ctx.project, "name"):
-                project_name = ctx.project.name  # type: ignore
+                project_name = ctx.project.name
 
             # Run ID とステータスを取得
             run_id = "unknown"
             run_status = "UNKNOWN"
             if hasattr(ctx.run, "run_id"):
-                run_id = ctx.run.run_id  # type: ignore
+                run_id = ctx.run.run_id
             if hasattr(ctx.run, "status"):
-                run_status = ctx.run.status  # type: ignore
+                run_status = ctx.run.status
 
             # E-5: details から実行メトリクスを取得
             details_for_card = ctx.details
@@ -835,7 +835,7 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
         # run_id から自動的に読み込む
         try:
             if hasattr(ctx.run, "run_id"):
-                run_id = ctx.run.run_id  # type: ignore
+                run_id = ctx.run.run_id
                 markdown_content = load_run_markdown(run_id)
                 if markdown_content:
                     parts.append("\n---\n\n")
@@ -849,7 +849,7 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
         try:
             project_id = 0
             if hasattr(ctx.project, "id"):
-                project_id = ctx.project.id  # type: ignore
+                project_id = ctx.project.id
 
             if project_id > 0:
                 run_logs_url = build_run_logs_url(project_id, ctx.run)

@@ -147,7 +147,7 @@ Write the summary in Japanese, 5 bullets or fewer.
         # LLMRouter の complete メソッドをラップ
         def llm_complete_fn(model: str, system_prompt: str, user_prompt: str) -> dict:
             if hasattr(llm_router, "complete"):
-                return llm_router.complete(  # type: ignore
+                return llm_router.complete(
                     model=model,
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
