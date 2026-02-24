@@ -108,6 +108,9 @@ project_chronicle.jsonl
 # Sandbox logs（repair logs等の一時ファイル）
 src/sandbox_logs/
 
+# Run state（テスト・実行時に生成される一時ファイル）
+var/run_state/
+
 # --- Archives / Backups ---
 *.zip
 *.tar.gz
