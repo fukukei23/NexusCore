@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 try:
     from openai import OpenAI
 except Exception:  # pragma: no cover - openai missing
-    OpenAI = None  # type: ignore
+    OpenAI = None
 
 # ====== 設定・クライアント =====================================================
 

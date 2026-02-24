@@ -20,7 +20,7 @@ try:
     HAS_WHISPER = True
 except ImportError:
     HAS_WHISPER = False
-    transcribe_audio = None  # type: ignore
+    transcribe_audio = None
 
 try:
     from nexuscore.agents.debugger_agent import DebuggerAgent
@@ -30,9 +30,9 @@ try:
     HAS_SELF_HEALING = True
 except ImportError:
     HAS_SELF_HEALING = False
-    SelfHealingService = None  # type: ignore
-    DebuggerAgent = None  # type: ignore
-    load_run_markdown = None  # type: ignore
+    SelfHealingService = None
+    DebuggerAgent = None
+    load_run_markdown = None
 
 logger = logging.getLogger(__name__)
 

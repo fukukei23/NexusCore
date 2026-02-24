@@ -47,11 +47,11 @@ try:
     HAS_RETRY = True
 except ImportError:
     HAS_RETRY = False
-    RetryContext = None  # type: ignore
-    SandboxExecutionError = Exception  # type: ignore
-    convert_http_error_to_nexus_error = None  # type: ignore
-    run_in_sandbox = None  # type: ignore
-    SandboxResult = None  # type: ignore
+    RetryContext = None
+    SandboxExecutionError = Exception
+    convert_http_error_to_nexus_error = None
+    run_in_sandbox = None
+    SandboxResult = None
 
 
 logger = logging.getLogger(__name__)

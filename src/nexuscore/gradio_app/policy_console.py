@@ -36,7 +36,7 @@ USE_MOCK = False
 CouncilCls = None
 try:
     # 例: src/constitutional_council_agent.py の想定
-    from constitutional_council_agent import ConstitutionalCouncilAgent as _Agent  # type: ignore
+    from constitutional_council_agent import ConstitutionalCouncilAgent as _Agent
 
     CouncilCls = _Agent
 except Exception:
@@ -211,7 +211,7 @@ def _init_engine(policy_json: str):
         return "mock", None
     try:
         obj = json.loads(policy_json)
-        engine = CouncilCls(obj)  # type: ignore
+        engine = CouncilCls(obj)
         return "real", engine
     except Exception:
         return "mock", None
@@ -227,7 +227,7 @@ def evaluate_text(policy_json: str, text: str) -> tuple[str, list[list[Any]], st
     try:
         if mode == "real" and engine is not None:
             # 想定: engine.evaluate(text) -> {"ok": bool, "violations": [...], "redacted_suggestion": "..."}
-            result = engine.evaluate(text)  # type: ignore
+            result = engine.evaluate(text)
         else:
             # モック
             result = _mock_evaluate(json.loads(policy_json), text)

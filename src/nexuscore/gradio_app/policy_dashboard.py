@@ -34,7 +34,7 @@ POLICY_FILE = POLICY_DIR / "constitution.json"
 AGENT_AVAILABLE = False
 try:
     # 例: from nexuscore.agents.constitutional_council_agent import ConstitutionalCouncilAgent
-    from ..agents.constitutional_council_agent import ConstitutionalCouncilAgent  # type: ignore
+    from ..agents.constitutional_council_agent import ConstitutionalCouncilAgent
 
     AGENT_AVAILABLE = True
 except Exception:

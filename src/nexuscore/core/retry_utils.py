@@ -349,7 +349,7 @@ def retry(
                 retry_config=retry_config,
             )
 
-        return decorator  # type: ignore[return-value]
+        return decorator
     else:
         # 関数を直接渡された場合
         return retry_with_context(

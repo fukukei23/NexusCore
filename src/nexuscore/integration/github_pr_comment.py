@@ -25,11 +25,11 @@ try:
     HAS_WEBAPP = True
 except ImportError:
     HAS_WEBAPP = False
-    Run = None  # type: ignore
-    Project = None  # type: ignore
-    PatchRecord = None  # type: ignore
-    ExecutionLog = None  # type: ignore
-    db = None  # type: ignore
+    Run = None
+    Project = None
+    PatchRecord = None
+    ExecutionLog = None
+    db = None
 
 # Config は必須
 try:
@@ -72,10 +72,10 @@ def _format_duration(run: object) -> str:
     if not HAS_WEBAPP or not hasattr(run, "started_at") or not hasattr(run, "finished_at"):
         return "N/A"
 
-    if not run.started_at or not run.finished_at:  # type: ignore
+    if not run.started_at or not run.finished_at:
         return "N/A"
 
-    delta = run.finished_at - run.started_at  # type: ignore
+    delta = run.finished_at - run.started_at
     total_seconds = int(delta.total_seconds())
 
     if total_seconds < 60:

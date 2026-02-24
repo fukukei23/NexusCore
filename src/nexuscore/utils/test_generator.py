@@ -32,7 +32,7 @@ try:
     HAS_OPENAI = True
 except ImportError:
     HAS_OPENAI = False
-    OpenAI = None  # type: ignore
+    OpenAI = None
 
 from nexuscore.utils.test_utils import (
     create_fallback_test_file,
