@@ -32,10 +32,10 @@ try:
 except ImportError:
     HAS_COLORAMA = False
 
-    class Fore:
+    class Fore:  # type: ignore[no-redef]
         RED = GREEN = YELLOW = BLUE = MAGENTA = CYAN = WHITE = ""
 
-    class Style:
+    class Style:  # type: ignore[no-redef]
         BRIGHT = RESET_ALL = ""
 
 
@@ -114,14 +114,14 @@ class AnalysisResult:
 class TreeSitterEngine:
     """Tree-sitterベースのコア解析エンジン"""
 
-    def __init__(self, config: dict[str, Any] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         self.config = {**CONFIG, **(config or {})}
-        self.parsers = {}
-        self.languages = {}
+        self.parsers: dict[str, Any] = {}
+        self.languages: dict[str, Any] = {}
         self.cache_dir = self.config.get("cache_dir", Path("./cache"))
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-    def setup_parsers(self, languages: list[str] = None) -> bool:
+    def setup_parsers(self, languages: list[str] | None = None) -> bool:
         if not TREE_SITTER_AVAILABLE:
             return False
         languages_to_load = languages or list(set(self.config["supported_languages"].values()))
@@ -135,7 +135,7 @@ class TreeSitterEngine:
         return len(self.parsers) > 0
 
     def analyze_source(
-        self, source_code: str, language: str, file_path: str = None
+        self, source_code: str, language: str, file_path: str | None = None
     ) -> AnalysisResult:
         if language not in self.parsers:
             return AnalysisResult(success=False, error=f"Parser not available for '{language}'")
@@ -173,7 +173,7 @@ class TreeSitterEngine:
             query = Query(self.languages[language], query_string)
             captures = query.captures(root_node)
 
-            node_to_captures = defaultdict(dict)
+            node_to_captures: dict[int, dict[str, Any]] = defaultdict(dict)
             for node, name in captures:
                 node_to_captures[node.id][name] = node
 
