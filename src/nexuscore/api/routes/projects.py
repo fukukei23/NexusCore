@@ -394,7 +394,7 @@ async def trigger_project_run(
 
         if use_celery:
             # 非同期実行（Celery）
-            async_result = run_orchestrator_task.delay(run.id)
+            run_orchestrator_task.delay(run.id)
             queue_mode = "async"
             status_code = status.HTTP_202_ACCEPTED
         else:

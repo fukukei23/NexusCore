@@ -249,7 +249,7 @@ def build_ui():
                     ],
                     wrap=True,
                 )
-                rl_help = gr.Markdown(
+                gr.Markdown(
                     "例: `RL-FIN-001 | 無許可の投資助言の禁止（免責表記なし） | high`<br>"
                     "severity: low / medium / high"
                 )

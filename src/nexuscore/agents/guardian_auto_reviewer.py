@@ -320,7 +320,6 @@ class GuardianAutoReviewer:
             is_src = fc.path.startswith("src/")
             for h in fc.hunks:
                 line_no = h.new_start
-                recent_try_line: int | None = None
                 for line in h.lines:
                     if not line.startswith("+"):
                         if line.startswith("-"):
@@ -330,7 +329,7 @@ class GuardianAutoReviewer:
 
                     # 例外握りつぶし
                     if try_except_pass_re.search(content):
-                        recent_try_line = line_no
+                        pass
 
                     if except_pass_re.search(content):
                         issues.append(

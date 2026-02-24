@@ -11,6 +11,7 @@ WebApp HTML UI view.
 
 from __future__ import annotations
 
+import json
 import os
 import uuid
 from collections.abc import Sequence
@@ -640,7 +641,7 @@ def trigger_run(project_id: int):
         # ========================================================================
         from nexuscore.webapp.celery_app import run_orchestrator_task
 
-        async_result = run_orchestrator_task.delay(run.id)
+        run_orchestrator_task.delay(run.id)
 
         # 必要なら Run に task_id を保存してもよい（進捗トラッキング用）
         # run.celery_task_id = async_result.id

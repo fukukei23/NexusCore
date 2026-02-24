@@ -681,7 +681,6 @@ class LLMRouter:
         guarded_llm_call から呼ばれる統一エントリ。
         戻り値は {"ok": bool, "reason": str, "content": str, "usage": {...}} 形式。
         """
-        task_type = task or None
         try:
             routed = None
             if model:

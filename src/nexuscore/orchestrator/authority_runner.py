@@ -485,7 +485,6 @@ def resume_run(
     Returns:
         Dict with status, run_id, and optionally explainability
     """
-    lock_acquired = False
     state: dict[str, Any]
 
     # 1) Load (untrusted)
