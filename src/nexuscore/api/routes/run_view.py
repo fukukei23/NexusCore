@@ -13,7 +13,7 @@ import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from starlette.requests import Request
 
@@ -96,7 +96,7 @@ async def get_run_view(
         try:
             run_state = load_state(run_id)
         except FileNotFoundError:
-            raise make_not_found_error("RunState", run_id)
+            raise make_not_found_error("RunState", run_id) from None
 
         # Build RunView from RunState
         result = {
@@ -117,7 +117,7 @@ async def get_run_view(
         logger.error(f"Failed to get run view: {e}", exc_info=True)
         from ..utils.errors import make_internal_error
 
-        raise make_internal_error(f"Failed to get run view: {str(e)}")
+        raise make_internal_error(f"Failed to get run view: {str(e)}") from e
 
 
 @canonical_router.post(
@@ -169,7 +169,7 @@ async def resume_run_view(
         try:
             run_state = load_state(run_id)
         except FileNotFoundError:
-            raise make_not_found_error("RunState", run_id)
+            raise make_not_found_error("RunState", run_id) from None
 
         # Get project_path from RunState or default
         project_path = _get_project_path_from_run_state(run_state)
@@ -212,12 +212,12 @@ async def resume_run_view(
     except HTTPException:
         raise
     except FileNotFoundError:
-        raise make_not_found_error("RunState", run_id)
+        raise make_not_found_error("RunState", run_id) from None
     except Exception as e:
         logger.error(f"Failed to resume run: {e}", exc_info=True)
         from ..utils.errors import make_internal_error
 
-        raise make_internal_error(f"Failed to resume run: {str(e)}")
+        raise make_internal_error(f"Failed to resume run: {str(e)}") from e
 
 
 @canonical_router.post(
@@ -302,7 +302,7 @@ async def create_run_view(
         logger.error(f"Failed to create run: {e}", exc_info=True)
         from ..utils.errors import make_internal_error
 
-        raise make_internal_error(f"Failed to create run: {str(e)}")
+        raise make_internal_error(f"Failed to create run: {str(e)}") from e
 
 
 # Deprecated endpoints (delegate to canonical handlers)

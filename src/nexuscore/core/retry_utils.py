@@ -200,13 +200,9 @@ def retry_with_context(
         if base_delay != 1.0:  # デフォルト値以外が指定された場合
             retry_config.base_delay = base_delay
 
-    # 後方互換性のため、retry_on の型を tuple に固定
-    retry_on_tuple: tuple[type[Exception], ...]
-    if retry_on is None:
-        pass
-
-    else:
-        # Iterable を tuple に変換
+    # 後方互換性のため、retry_on の型を tuple に固定（未使用変数を除去）
+    if retry_on is not None:
+        # Iterable を tuple に変換（将来の拡張のための変換ロジック）
         tuple(retry_on) if not isinstance(retry_on, tuple) else retry_on
 
     @wraps(func)

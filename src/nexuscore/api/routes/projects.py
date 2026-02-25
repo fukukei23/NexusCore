@@ -57,7 +57,7 @@ def _get_user_id_from_auth(current_user: AuthenticatedUser) -> int:
         return user_id
     except (ValueError, TypeError):
         logger.error(f"Invalid user_id in AuthenticatedUser: {current_user.user_id}")
-        raise make_internal_error("Invalid user ID in authentication token")
+        raise make_internal_error("Invalid user ID in authentication token") from None
 
 
 @router.get(
@@ -104,7 +104,6 @@ async def list_projects(
         HTTPException: 内部エラー時（500）
     """
     try:
-        from nexuscore.webapp import db
         from nexuscore.webapp.models import Project
 
         user_id = _get_user_id_from_auth(current_user)
@@ -129,10 +128,10 @@ async def list_projects(
 
     except ImportError:
         logger.error("webapp models not available")
-        raise make_internal_error("Database models not available")
+        raise make_internal_error("Database models not available") from None
     except Exception as e:
         logger.error(f"Failed to list projects: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to list projects: {str(e)}")
+        raise make_internal_error(f"Failed to list projects: {str(e)}") from e
 
 
 @router.post(
@@ -217,11 +216,11 @@ async def create_project(
 
     except ImportError:
         logger.error("webapp models not available")
-        raise make_internal_error("Database models not available")
+        raise make_internal_error("Database models not available") from None
     except Exception as e:
         logger.error(f"Failed to create project: {e}", exc_info=True)
         db.session.rollback()
-        raise make_internal_error(f"Failed to create project: {str(e)}")
+        raise make_internal_error(f"Failed to create project: {str(e)}") from e
 
 
 @router.get(
@@ -293,7 +292,7 @@ async def get_project(
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise
         logger.error(f"Failed to get project: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to get project: {str(e)}")
+        raise make_internal_error(f"Failed to get project: {str(e)}") from e
 
 
 @router.post(
@@ -413,7 +412,7 @@ async def trigger_project_run(
                 # エラーが発生した場合でも Run レコードは作成済み
                 db.session.refresh(run)
                 logger.error(f"Failed to run orchestrator inline: {exc}", exc_info=True)
-                raise make_internal_error(f"Failed to run orchestrator: {str(exc)}")
+                raise make_internal_error(f"Failed to run orchestrator: {str(exc)}") from exc
 
         db.session.refresh(run)
 
@@ -432,7 +431,7 @@ async def trigger_project_run(
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise
         logger.error(f"Failed to trigger project run: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to trigger project run: {str(e)}")
+        raise make_internal_error(f"Failed to trigger project run: {str(e)}") from e
 
 
 @router.get(
@@ -518,4 +517,4 @@ async def get_latest_run(
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise
         logger.error(f"Failed to get latest run: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to get latest run: {str(e)}")
+        raise make_internal_error(f"Failed to get latest run: {str(e)}") from e

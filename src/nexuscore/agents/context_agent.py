@@ -14,7 +14,6 @@ try:
     from nexuscore.agents.context_analyzer import ContextAnalyzer
 
     # policy_interfaceはオプション機能の可能性があるため、より安全にインポート
-    PolicyInterface = None
     from nexuscore.agents.policy_interface import PolicyInterface
 except ImportError:
     # フォールバック: 同じディレクトリから

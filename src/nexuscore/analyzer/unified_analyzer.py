@@ -18,7 +18,7 @@ from typing import Any
 
 # --- サードパーティライブラリ ---
 try:
-    from tqdm import tqdm
+    import tqdm as _tqdm  # noqa: F401
 
     HAS_TQDM = True
 except ImportError:
@@ -40,7 +40,7 @@ except ImportError:
 
 
 try:
-    import speech_recognition as sr
+    import speech_recognition as _sr  # noqa: F401
 
     HAS_SPEECH = True
 except ImportError:

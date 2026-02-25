@@ -12,8 +12,8 @@ import tempfile
 import threading
 import time
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import ContextManager, Union
 
 import numpy as np
 import openai
@@ -35,8 +35,8 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-AudioInput = Union[str, bytes, np.ndarray]
-StreamFactory = Callable[[Callable[[np.ndarray, int, float, object], None]], ContextManager[object]]
+AudioInput = str | bytes | np.ndarray
+StreamFactory = Callable[[Callable[[np.ndarray, int, float, object], None]], AbstractContextManager[object]]
 
 _DEFAULT_CONFIG: dict[str, str | int] = {
     "language": os.getenv("VOICE_TO_TEXT_TARGET_LANG", "en"),
@@ -225,7 +225,7 @@ def record_until_keypress(
             raise sd.CallbackAbort
         recording.append(indata.copy())
 
-    def default_stream_factory(cb) -> ContextManager[object]:
+    def default_stream_factory(cb) -> AbstractContextManager[object]:
         return sd.InputStream(samplerate=sr, channels=int(_AUDIO_CONFIG["channels"]), callback=cb)
 
     stream_ctx = stream_factory(callback) if stream_factory else default_stream_factory(callback)
@@ -248,7 +248,7 @@ def record_until_keypress(
     return None, sr
 
 
-def _wait_for_stream(stream_ctx: ContextManager[object], event: threading.Event) -> None:
+def _wait_for_stream(stream_ctx: AbstractContextManager[object], event: threading.Event) -> None:
     with stream_ctx:
         event.wait()
 

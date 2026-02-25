@@ -232,7 +232,7 @@ class TestMetricsCollector:
             by_risk[risk]["modules"].add(record.get("module_name", "unknown"))
 
         # 効果スコアを計算
-        for risk, data in by_risk.items():
+        for _risk, data in by_risk.items():
             data["effectiveness_score"] = (
                 data["bugs_found"] / data["total_generated"] if data["total_generated"] > 0 else 0.0
             )
