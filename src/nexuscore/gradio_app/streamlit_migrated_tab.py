@@ -100,8 +100,8 @@ def load_api_key() -> tuple[str | None, str]:
         if os.path.exists(secrets_path):
             logger.info(f"    secrets.py ファイルを発見: {secrets_path}")
             spec = importlib.util.spec_from_file_location("secrets", secrets_path)
-            secrets_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(secrets_module)
+            secrets_module = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+            spec.loader.exec_module(secrets_module)  # type: ignore[union-attr]
             api_key = getattr(
                 secrets_module, "OPENAI_API_KEY", getattr(secrets_module, "API_KEY", None)
             )

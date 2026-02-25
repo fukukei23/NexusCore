@@ -94,7 +94,7 @@ class TestTreeSitterCheckerOptimized:
         """プロファイリング統計が記録されることを確認"""
         # プロファイリングを有効化
         with patch.dict(CONFIG, {"enable_profiling": True}):
-            results = analyzer.analyze_project(sample_project_dir)
+            analyzer.analyze_project(sample_project_dir)
 
             stats = analyzer.get_profiling_stats()
             assert stats["total_files"] > 0

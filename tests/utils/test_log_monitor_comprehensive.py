@@ -109,7 +109,7 @@ class TestLogWatcher:
 
         with (
             patch("os.listdir", return_value=["test.txt", "readme.md", "data.json"]),
-            patch("builtins.open", mock_open()) as mock_file,
+            patch("builtins.open", mock_open()),
             patch("time.sleep", side_effect=[None, KeyboardInterrupt]),
         ):
 
@@ -132,7 +132,7 @@ class TestLogWatcher:
 
         with (
             patch("os.listdir", return_value=["seen.py"]),
-            patch("builtins.open", mock_open()) as mock_file,
+            patch("builtins.open", mock_open()),
             patch("time.sleep", side_effect=[None, KeyboardInterrupt]),
         ):
 
@@ -156,7 +156,7 @@ class TestLogWatcher:
 
         with (
             patch("os.listdir", return_value=["file1.py", "file2.py", "file3.py"]),
-            patch("builtins.open", mock_open(read_data=test_code)) as mock_file,
+            patch("builtins.open", mock_open(read_data=test_code)),
             patch("time.sleep", side_effect=[None, KeyboardInterrupt]),
         ):
 
@@ -255,7 +255,7 @@ class TestLogWatcher:
 
         with (
             patch("os.listdir", return_value=["unicode_test.py"]),
-            patch("builtins.open", mock_open(read_data=test_code)) as mock_file,
+            patch("builtins.open", mock_open(read_data=test_code)),
             patch("time.sleep", side_effect=[None, KeyboardInterrupt]),
         ):
 

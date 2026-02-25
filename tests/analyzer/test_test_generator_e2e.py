@@ -22,8 +22,8 @@ try:
         generate_unit_tests,
     )
     from nexuscore.utils.test_utils import (
-        extract_code_from_markdown,
-        project_path_to_module_path,
+        extract_code_from_markdown,  # noqa: F401
+        project_path_to_module_path,  # noqa: F401
         validate_test_code,
     )
 

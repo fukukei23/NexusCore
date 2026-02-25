@@ -23,8 +23,8 @@ try:
         Mutant,
         MutationReport,
         MutationTesterAgent,
-        MutationTestError,
-        MutationTestTimeoutError,
+        MutationTestError,  # noqa: F401
+        MutationTestTimeoutError,  # noqa: F401
     )
 
     HAS_MUTATION_TESTER = True

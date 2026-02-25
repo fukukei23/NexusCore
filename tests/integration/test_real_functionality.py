@@ -79,7 +79,7 @@ class TestRealFunctionality(unittest.TestCase):
                 # 拒否の場合の詳細チェック
                 if result["result"] == "REJECTED":
                     violation_info_keys = ["violations", "reason", "details", "issues"]
-                    has_violation_info = any(key in result for key in violation_info_keys)
+                    any(key in result for key in violation_info_keys)
                     self.assertTrue(True, "Code rejection is functioning")
 
             except TypeError as e:
@@ -249,7 +249,7 @@ class TestRealFunctionality(unittest.TestCase):
             from nexuscore.agents.policy_agent import PolicyAgent
 
             try:
-                policy_agent = PolicyAgent(api_key="test", model="test")
+                PolicyAgent(api_key="test", model="test")
                 policy_available = True
             except Exception:
                 policy_available = False

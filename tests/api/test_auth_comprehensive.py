@@ -153,7 +153,7 @@ class TestVerifyToken:
         wrong_secret = "wrong-secret-key"
         try:
             jwt.decode(token, wrong_secret, algorithms=["HS256"])
-            assert False, "Should have raised an exception"
+            raise AssertionError("Should have raised an exception")
         except jwt.InvalidSignatureError:
             pass  # 期待通り
 

@@ -28,7 +28,7 @@ def mock_auth_token(monkeypatch):
     # get_current_user 内で使用される webapp.models をモック
     with (
         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
-        patch("nexuscore.webapp.models.User") as mock_user_model,
+        patch("nexuscore.webapp.models.User"),
     ):
         mock_user = MagicMock()
         mock_user.id = 1
@@ -108,7 +108,7 @@ def test_execute_endpoint_with_constitution_text(client: TestClient, auth_header
     Execute エンドポイントが constitution_text を受け入れることを確認
     既存の Flask テスト (`test_execute_task_with_constitution`) に準拠
     """
-    with patch("nexuscore.api.routes.execute.run_orchestrator_task") as mock_task:
+    with patch("nexuscore.api.routes.execute.run_orchestrator_task"):
         response = client.post(
             "/api/v1/execute",
             json={

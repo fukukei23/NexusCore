@@ -141,11 +141,11 @@ def get_current_user(
             # ApiKey.query が存在しない場合、または DB が初期化されていない場合
             # RuntimeError は SQLAlchemy が DB コンテキストを持っていない場合に発生する可能性がある
             logger.warning(f"Database not initialized or query unavailable: {e}")
-            raise make_unauthorized_error("Invalid or missing API key")
+            raise make_unauthorized_error("Invalid or missing API key") from e
         except SQLAlchemyError as e:
             # DB アクセスエラー（接続エラーなど）
             logger.error(f"Database error during API Key lookup: {e}", exc_info=True)
-            raise make_internal_error("Database connection error during authentication")
+            raise make_internal_error("Database connection error during authentication") from e
         except Exception as e:
             # HTTPException はそのまま再発生（make_error で生成されたもの）
             if isinstance(e, Exception) and hasattr(e, "status_code"):
@@ -155,9 +155,9 @@ def get_current_user(
             error_str = str(e).lower()
             if "no application" in error_str or "context" in error_str or "query" in error_str:
                 logger.warning(f"Database context error (likely DB not initialized): {e}")
-                raise make_unauthorized_error("Invalid or missing API key")
+                raise make_unauthorized_error("Invalid or missing API key") from None
             logger.error(f"Unexpected error during API Key hash: {e}", exc_info=True)
-            raise make_internal_error("Unexpected error during authentication")
+            raise make_internal_error("Unexpected error during authentication") from e
 
         # API Key が見つからない場合は認証フェイル（401）
         if not api_key_obj:
@@ -178,11 +178,11 @@ def get_current_user(
             # User.query が存在しない場合、または DB が初期化されていない場合
             # RuntimeError は SQLAlchemy が DB コンテキストを持っていない場合に発生する可能性がある
             logger.warning(f"Database not initialized or query unavailable: {e}")
-            raise make_unauthorized_error("Invalid or missing API key")
+            raise make_unauthorized_error("Invalid or missing API key") from e
         except SQLAlchemyError as e:
             # DB アクセスエラー（接続エラーなど）
             logger.error(f"Database error during User lookup: {e}", exc_info=True)
-            raise make_internal_error("Database connection error during user lookup")
+            raise make_internal_error("Database connection error during user lookup") from e
         except Exception as e:
             # HTTPException はそのまま再発生（make_error で生成されたもの）
             if isinstance(e, Exception) and hasattr(e, "status_code"):
@@ -192,9 +192,9 @@ def get_current_user(
             error_str = str(e).lower()
             if "no application" in error_str or "context" in error_str or "query" in error_str:
                 logger.warning(f"Database context error (likely DB not initialized): {e}")
-                raise make_unauthorized_error("Invalid or missing API key")
+                raise make_unauthorized_error("Invalid or missing API key") from None
             logger.error(f"Unexpected error during User lookup: {e}", exc_info=True)
-            raise make_internal_error("Unexpected error during user lookup")
+            raise make_internal_error("Unexpected error during user lookup") from e
 
         # User が見つからない場合は認証フェイル（401）
         if not user:
@@ -217,7 +217,7 @@ def get_current_user(
 
         if x_api_key != expected_api_key:
             logger.warning("Invalid API Key provided")
-            raise make_unauthorized_error("Invalid or missing API key")
+            raise make_unauthorized_error("Invalid or missing API key") from None
         logger.debug("API Key authentication successful (fallback mode)")
         return AuthenticatedUser(user_id="api_user", roles=["api_user"])
     except Exception as e:
@@ -230,7 +230,7 @@ def get_current_user(
             f"Unexpected error during authentication (not an authentication failure): {e}",
             exc_info=True,
         )
-        raise make_internal_error("Unexpected server error during authentication")
+        raise make_internal_error("Unexpected server error during authentication") from e
 
 
 def get_current_user_optional(

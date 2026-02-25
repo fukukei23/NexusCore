@@ -978,7 +978,6 @@ class SelfHealingService:
         # E-5: Run レポートの自動生成（webapp が利用可能な場合）
         try:
             from nexuscore.integration.run_report_generator import write_run_report_file
-            from nexuscore.webapp import db
             from nexuscore.webapp.models import Run
 
             # run_id で Run を検索

@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 4.5: Flask SaaS UI - External API テスト UI のスモークテスト（リファクタ版）
 

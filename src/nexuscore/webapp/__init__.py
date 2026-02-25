@@ -18,8 +18,6 @@ Web UI と API を提供するための Flask アプリケーション。
 
 from __future__ import annotations
 
-import os
-
 from flask import Flask
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy

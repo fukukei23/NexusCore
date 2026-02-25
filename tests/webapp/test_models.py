@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 webapp/models.py の高品質なテスト
 
@@ -94,7 +95,7 @@ class TestUserModel:
         user2 = User(github_id="123456", github_login="user2")
         db_session.add(user2)
 
-        with pytest.raises(Exception):  # IntegrityError
+        with pytest.raises(Exception):  # IntegrityError  # noqa: B017
             db_session.commit()
 
     def test_user_repr(self, db_session):
@@ -350,7 +351,7 @@ class TestRunModel:
         run2 = Run(project_id=project.id, run_id="run-123", status="PENDING")
         db_session.add(run2)
 
-        with pytest.raises(Exception):  # IntegrityError
+        with pytest.raises(Exception):  # IntegrityError  # noqa: B017
             db_session.commit()
 
     def test_run_project_relationship(self, db_session):
@@ -700,7 +701,7 @@ class TestApiKeyModel:
         api_key2 = ApiKey(user_id=user.id, token_hash=token_hash, name="Key 2")
         db_session.add(api_key2)
 
-        with pytest.raises(Exception):  # IntegrityError
+        with pytest.raises(Exception):  # IntegrityError  # noqa: B017
             db_session.commit()
 
     def test_api_key_user_relationship(self, db_session):

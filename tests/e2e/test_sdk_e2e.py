@@ -52,12 +52,12 @@ except ImportError:
 # SDK が利用可能な場合のみ、SDK のクラスを import
 if SDK_AVAILABLE:
     try:
-        from nexuscore_sdk import ApiClient, Configuration
-        from nexuscore_sdk.api import DefaultApi
+        from nexuscore_sdk import ApiClient, Configuration  # noqa: F401
+        from nexuscore_sdk.api import DefaultApi  # noqa: F401
     except ImportError:
         # DefaultApi が存在しない場合は、タグごとの API クラスを試みる
         try:
-            from nexuscore_sdk.api import ExecuteApi, HealthApi, ProjectsApi
+            from nexuscore_sdk.api import ExecuteApi, HealthApi, ProjectsApi  # noqa: F401
         except ImportError:
             pass
 
@@ -164,7 +164,6 @@ def test_health_e2e(fastapi_server, sdk_client):
 
     # SDK のメソッド名は実際の生成物に依存するため、複数のパターンを試みる
     health_response = None
-    error = None
 
     # パターン1: DefaultApi を使用
     if hasattr(sdk_client, "get_health"):
@@ -187,8 +186,8 @@ def test_health_e2e(fastapi_server, sdk_client):
                 health_response = health_api.get_health()
             elif hasattr(health_api, "health_get"):
                 health_response = health_api.health_get()
-        except (ImportError, AttributeError) as e:
-            error = e
+        except (ImportError, AttributeError):
+            pass
 
     # レスポンスが取得できた場合の検証
     if health_response is None:

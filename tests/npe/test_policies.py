@@ -276,7 +276,7 @@ AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE"
 
         # マスキング後は安全になる（再スキャンでは検出されない）
         # 注意: [REDACTED_AWS_KEY_BY_NPE] はパターンマッチしないため safe になる
-        rescan_result = context_scanner(masked)
+        context_scanner(masked)
         # マスキング後のテキストには元の機密情報がないことを確認
         assert "[REDACTED" in masked, "Redaction markers should be present"
 

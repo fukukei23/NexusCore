@@ -170,7 +170,7 @@ def test_resume_fails_on_integrity_violation(monkeypatch: Any, tmp_path: Any) ->
         assert "abort" in result["explainability"]["next_action"].lower()
 
         # Verify RunState was NOT updated (still has original status)
-        stored = load_state(run_id)
+        load_state(run_id)
         # Note: The tampered state is what we loaded, but the integrity check should have failed
         # The stored state still has the tampered status (not reverted), but resume failed
         # This is expected behavior: integrity failure prevents resume, but doesn't modify the file

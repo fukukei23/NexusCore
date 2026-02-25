@@ -388,7 +388,7 @@ class TestNexusConfig:
         clean_env.setenv("FLASK_ENV", "production")
 
         with pytest.raises(ValueError, match="Must set FLASK_SECRET_KEY in production"):
-            config = NexusConfig.from_env()
+            NexusConfig.from_env()
 
     def test_validate_production_with_custom_secret_key(self, clean_env):
         """本番環境でカスタムsecret keyは正常"""
@@ -404,7 +404,7 @@ class TestNexusConfig:
         clean_env.setenv("DATABASE_URI", "")
 
         with pytest.raises(ValueError, match="DATABASE_URI is required"):
-            config = NexusConfig.from_env()
+            NexusConfig.from_env()
 
     def test_to_flask_config(self, clean_env):
         """Flask設定辞書への変換"""

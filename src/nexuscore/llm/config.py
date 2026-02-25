@@ -53,7 +53,7 @@ def ensure_env_loaded() -> str | None:
         ]
     )
 
-    if load_dotenv:
+    if load_dotenv is not None:
         for candidate in candidates:
             try:
                 if candidate.is_file():
@@ -64,7 +64,7 @@ def ensure_env_loaded() -> str | None:
             except Exception:  # pragma: no cover - defensive
                 continue
 
-        if not _ENV_LOADED and find_dotenv:
+        if not _ENV_LOADED and find_dotenv is not None:
             auto = find_dotenv(usecwd=True)
             if auto:
                 load_dotenv(auto, override=False)

@@ -95,7 +95,7 @@ async def project_success_rate_badge(project_id: int) -> BadgeResponse:
             schemaVersion=1,
             label="self-healing",
             message=f"{success_rate:.1f}% success",
-            color=color,
+            color=color,  # type: ignore[arg-type]
         )
 
     except Exception as e:
@@ -103,7 +103,7 @@ async def project_success_rate_badge(project_id: int) -> BadgeResponse:
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise
         logger.error(f"Failed to get success rate badge: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to get success rate badge: {str(e)}")
+        raise make_internal_error(f"Failed to get success rate badge: {str(e)}") from e
 
 
 @router.get(
@@ -186,7 +186,7 @@ async def project_last_run_badge(project_id: int) -> BadgeResponse:
             schemaVersion=1,
             label="self-healing",
             message=message,
-            color=color,
+            color=color,  # type: ignore[arg-type]
         )
 
     except Exception as e:
@@ -194,4 +194,4 @@ async def project_last_run_badge(project_id: int) -> BadgeResponse:
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise
         logger.error(f"Failed to get last run badge: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to get last run badge: {str(e)}")
+        raise make_internal_error(f"Failed to get last run badge: {str(e)}") from e

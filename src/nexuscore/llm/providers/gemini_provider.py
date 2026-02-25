@@ -30,10 +30,10 @@ class GeminiLLM(BaseLLM):
                     "REAL-CALL init failed: 'google-generativeai' not installed",
                     e,
                 )
-                self.client = None
+                self.client = None  # type: ignore[assignment]
                 self.real_calls = False
         else:
-            self.client = None
+            self.client = None  # type: ignore[assignment]
             self.logger.info("GeminiLLM initialized in STUB mode (reason: missing key or dry-run).")
 
     def execute(self, prompt: str, system_prompt: str, **kwargs) -> str:
@@ -65,7 +65,7 @@ class GeminiLLM(BaseLLM):
                     gen_cfg["max_output_tokens"] = int(max_out)
                 except ValueError:
                     pass
-            gen_cfg["response_mime_type"] = "application/json" if as_json else "text/plain"
+            gen_cfg["response_mime_type"] = "application/json" if as_json else "text/plain"  # type: ignore[assignment]
 
             try:
                 resp = model.generate_content(

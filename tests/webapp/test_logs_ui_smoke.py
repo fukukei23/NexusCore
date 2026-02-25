@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 4.5: Flask SaaS UI - Run 詳細（Self-Healing Metrics）のスモークテスト（リファクタ版）
 

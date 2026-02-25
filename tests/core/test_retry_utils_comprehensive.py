@@ -234,7 +234,7 @@ class TestRetryWithContext:
 
         with patch("time.sleep"):
             wrapped = retry_with_context(mock_func, max_retries=3, context=ctx)
-            result = wrapped()
+            wrapped()
 
         assert ctx.retry_count == 2
         assert len(ctx.error_summary) == 2
@@ -261,7 +261,7 @@ class TestRetryWithContext:
 
         with patch("time.sleep"):
             wrapped = retry_with_context(mock_func, max_retries=2, logger_instance=mock_logger)
-            result = wrapped()
+            wrapped()
 
         # Should have logged warning for retry
         assert mock_logger.warning.call_count == 1
@@ -395,7 +395,7 @@ class TestRetryIntegration:
 
         with patch("time.sleep"):
             wrapped = retry_with_context(mock_func, max_retries=3, context=ctx)
-            result = wrapped()
+            wrapped()
 
         details = ctx.to_dict()
         assert details["retry_count"] == 2
@@ -439,7 +439,7 @@ class TestRetryIntegration:
 
         with patch("time.sleep") as mock_sleep:
             wrapped = retry_with_context(mock_func, max_retries=2, base_delay=5.0)
-            result = wrapped()
+            wrapped()
 
         # First retry should sleep for 5.0 seconds
         assert mock_sleep.call_args_list[0][0][0] == 5.0

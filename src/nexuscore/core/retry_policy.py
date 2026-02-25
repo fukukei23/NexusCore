@@ -37,7 +37,7 @@ class RetryDecision:
 
 
 # Decision Table の定義（CR-NEXUS-051-B Spec Section 3）
-DECISION_TABLE = {
+DECISION_TABLE: dict[type[Exception], dict[str, Any]] = {
     ModelRateLimitError: {
         "max_attempts": 5,
         "backoff": "exponential",

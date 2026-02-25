@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 db_logger.py の包括的なテスト
 

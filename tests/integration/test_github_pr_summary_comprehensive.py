@@ -106,7 +106,7 @@ class TestGeneratePrChangeSummary:
                     "nexuscore.integration.github_pr_summary.guarded_llm_call",
                     return_value={"ok": True, "content": "要約"},
                 ) as mock_llm:
-                    result = generate_pr_change_summary(mock_run, "Review")
+                    generate_pr_change_summary(mock_run, "Review")
 
                 user_prompt = mock_llm.call_args[1]["user_prompt"]
                 assert "file_0.py" in user_prompt
@@ -153,7 +153,7 @@ class TestGeneratePrChangeSummary:
                     "nexuscore.integration.github_pr_summary.guarded_llm_call",
                     return_value={"ok": True, "content": "要約"},
                 ) as mock_llm:
-                    result = generate_pr_change_summary(mock_run, "Review")
+                    generate_pr_change_summary(mock_run, "Review")
 
                 user_prompt = mock_llm.call_args[1]["user_prompt"]
                 assert "Error message" in user_prompt
@@ -319,7 +319,7 @@ class TestEdgeCases:
                     "nexuscore.integration.github_pr_summary.guarded_llm_call",
                     return_value={"ok": True, "content": "要約"},
                 ):
-                    result = generate_pr_change_summary(mock_run_no_id, "Review")
+                    generate_pr_change_summary(mock_run_no_id, "Review")
 
         # 実装は hasattr でチェックするため、エラーにならない
         # （パッチは空リストとして扱われる）

@@ -112,7 +112,7 @@ class TestVoiceToText(unittest.TestCase):
         for error in error_scenarios:
             with self.subTest(error_type=type(error).__name__):
                 mock_openai.audio.transcriptions.create.side_effect = error
-                with self.assertRaises(Exception):
+                with self.assertRaises(Exception):  # noqa: B017
                     transcribe_with_whisper("test_audio.wav")
 
 

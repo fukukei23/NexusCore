@@ -109,5 +109,5 @@ def assert_buttons_exist(demo: gr.Blocks, expected_buttons: list[str]) -> None:
     # 期待されるボタンがすべて含まれていることを確認
     for button in expected_buttons:
         # 部分一致でも OK
-        found = any(button in l or l in button for l in labels)
+        found = any(button in lbl or lbl in button for lbl in labels)
         assert found, f"Missing Gradio button: {button} (found: {labels})"

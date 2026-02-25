@@ -104,7 +104,7 @@ def _collect_run_metrics(run: Run) -> dict[str, Any]:
             logger.warning(f"Failed to collect patch metrics: {e}", exc_info=True)
 
         # LLMログ (NPE)
-        models = defaultdict(int)
+        models: defaultdict[str, int] = defaultdict(int)
         total_cost = 0.0
 
         try:

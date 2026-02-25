@@ -118,7 +118,7 @@ def test_list_projects_requires_authentication(client: TestClient, mock_api_key,
     # 不正な API Key でリクエスト
     with (
         patch("nexuscore.webapp.models.ApiKey") as MockApiKey,
-        patch("nexuscore.webapp.models.User") as MockUser,
+        patch("nexuscore.webapp.models.User"),
     ):
         MockApiKey.hash_token.return_value = "hashed_invalid_key"
         MockApiKey.query.filter_by.return_value.first.return_value = (
@@ -141,7 +141,7 @@ def test_list_projects_requires_authentication(client: TestClient, mock_api_key,
     assert data["projects"][0]["name"] == "Project 1"
 
 
-def test_list_projects_requires_authentication(client: TestClient):
+def test_list_projects_requires_header_authentication(client: TestClient):
     """
     プロジェクト一覧取得は認証必須
     """
