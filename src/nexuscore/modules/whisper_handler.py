@@ -9,12 +9,12 @@ Whisper 依存のラッパーモジュール。
 from __future__ import annotations
 
 try:
-    import whisper  # type: ignore[import-not-found]
+    import whisper
 except ImportError:  # pragma: no cover - optional dependency path
-    whisper = None  # type: ignore[assignment]
+    whisper = None
 
 
-WHISPER_AVAILABLE: bool = whisper is not None  # type: ignore[truthy-function]
+WHISPER_AVAILABLE: bool = whisper is not None
 
 
 def _require_whisper() -> None:
@@ -33,7 +33,7 @@ def _get_model():
     _require_whisper()
     global _model
     if _model is None:
-        _model = whisper.load_model("small")  # type: ignore[union-attr]
+        _model = whisper.load_model("small")
     return _model
 
 

@@ -65,7 +65,6 @@ class CoderAgent(BaseAgent):
 - あなたの思考プロセスや解釈を、Pythonのコメント（`#`）以外でコードに含めてはなりません。
 - 出力は、そのまま `.py` ファイルとして保存できる、純粋なPythonコードでなければなりません。
 """
-        last_error = ""
         for attempt in range(self.RETRY_LIMIT):
             raw_response = self.execute_llm_task(prompt, task_type="code_generate")
             # マークダウンコードブロックからコードを抽出
@@ -73,7 +72,6 @@ class CoderAgent(BaseAgent):
             ok, err = self._validate_code(code_language, code)
             if ok:
                 return code
-            last_error = err
             logging.getLogger(self.__class__.__name__).warning(
                 "AST validation failed (attempt %s/%s): %s",
                 attempt + 1,

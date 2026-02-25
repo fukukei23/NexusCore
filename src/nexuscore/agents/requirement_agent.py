@@ -182,7 +182,7 @@ Ensure the response is strictly valid JSON with filled arrays (no empty strings)
             with gr.Row():
                 msg_input = gr.Textbox(placeholder=self.text["input_placeholder"], scale=4)
                 send_button = gr.Button(self.text["send_button"], scale=1)
-            with gr.Row(visible=False) as suggestion_row:
+            with gr.Row(visible=False):
                 yes_btn = gr.Button(self.text["yes_button"])
                 no_btn = gr.Button(self.text["no_button"])
                 suggest_btn = gr.Button(self.text["suggest_button"])

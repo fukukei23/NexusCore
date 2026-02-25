@@ -44,7 +44,7 @@ from nexuscore.llm.runtime import HTTP_CLIENT_FACTORY, REQUEST_TIMEOUT
 # from pathlib import Path # (↑でインポート済み)
 try:
     # v1系: クラス BudgetManager（check_budget / track_cost）
-    from nexuscore.npe.budget import BudgetManager as _BudgetManagerV1  # type: ignore
+    from nexuscore.npe.budget import BudgetManager as _BudgetManagerV1
 
     BUDGET_API = "v1"
 
@@ -54,7 +54,7 @@ try:
 except Exception:
     # v1が無い → v2（関数API）を探す
     try:
-        from nexuscore.npe import budget as _budget_v2  # type: ignore
+        from nexuscore.npe import budget as _budget_v2
 
         BUDGET_API = "v2"
 
@@ -681,7 +681,6 @@ class LLMRouter:
         guarded_llm_call から呼ばれる統一エントリ。
         戻り値は {"ok": bool, "reason": str, "content": str, "usage": {...}} 形式。
         """
-        task_type = task or None
         try:
             routed = None
             if model:

@@ -52,7 +52,7 @@ def api_test():
         # API を実行
         project_id = request.form.get("project_id", type=int)
         requirement = request.form.get("requirement", "")
-        api_key_id = request.form.get("api_key_id", type=int)
+        request.form.get("api_key_id", type=int)
 
         if not project_id or not requirement:
             error_msg = "Project ID and requirement are required."

@@ -34,9 +34,9 @@ try:
     from nexuscore.agents.test_strategy import TestStrategyManager
     from nexuscore.core.test_metrics import TestMetricsCollector
 except ImportError:
-    TestStrategyManager = None  # type: ignore
-    build_test_generation_prompt = None  # type: ignore
-    TestMetricsCollector = None  # type: ignore
+    TestStrategyManager = None
+    build_test_generation_prompt = None
+    TestMetricsCollector = None
 
 logger = logging.getLogger(__name__)
 

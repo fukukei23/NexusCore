@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 try:
     from openai import OpenAI
 except Exception:  # pragma: no cover - fallback when openai is not installed
-    OpenAI = None  # type: ignore
+    OpenAI = None
 
 # .env 読み込みは遅延のためここだけ（クライアント生成は関数内で行う）
 load_dotenv()

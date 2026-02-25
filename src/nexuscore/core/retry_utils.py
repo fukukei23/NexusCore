@@ -203,16 +203,11 @@ def retry_with_context(
     # 後方互換性のため、retry_on の型を tuple に固定
     retry_on_tuple: tuple[type[Exception], ...]
     if retry_on is None:
-        from nexuscore.core.errors import (
-            ModelConnectionError,
-            ModelRateLimitError,
-            ModelTimeoutError,
-        )
+        pass
 
-        retry_on_tuple = (ModelRateLimitError, ModelTimeoutError, ModelConnectionError)
     else:
         # Iterable を tuple に変換
-        retry_on_tuple = tuple(retry_on) if not isinstance(retry_on, tuple) else retry_on
+        tuple(retry_on) if not isinstance(retry_on, tuple) else retry_on
 
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> T:
@@ -354,7 +349,7 @@ def retry(
                 retry_config=retry_config,
             )
 
-        return decorator  # type: ignore[return-value]
+        return decorator
     else:
         # 関数を直接渡された場合
         return retry_with_context(

@@ -8,7 +8,7 @@ def zip_project(output_dir="deploy_output"):
     zip_filename = os.path.join(output_dir, f"OpenCodeInterpreter_{timestamp}.zip")
 
     with zipfile.ZipFile(zip_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for foldername, subfolders, filenames in os.walk("."):
+        for foldername, _subfolders, filenames in os.walk("."):
             if any(x in foldername for x in [".git", "__pycache__", "venv", ".mypy_cache"]):
                 continue
             for filename in filenames:

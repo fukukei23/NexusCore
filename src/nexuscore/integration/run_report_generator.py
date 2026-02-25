@@ -24,11 +24,11 @@ try:
     HAS_WEBAPP = True
 except ImportError:
     HAS_WEBAPP = False
-    Run = None  # type: ignore
-    Project = None  # type: ignore
-    PatchRecord = None  # type: ignore
-    ExecutionLog = None  # type: ignore
-    db = None  # type: ignore
+    Run = None
+    Project = None
+    PatchRecord = None
+    ExecutionLog = None
+    db = None
 
 # Config は必須
 try:

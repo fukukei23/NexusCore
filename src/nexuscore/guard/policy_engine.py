@@ -15,14 +15,14 @@ NexusGuard: 最小ポリシー判定器
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 # NexusEval の Verdict を参照（型のみ、実装依存なし）
 EvalVerdict = Literal["GO", "CONDITIONAL_GO", "NO"]
 
 
-class GuardDecision(str, Enum):
+class GuardDecision(StrEnum):
     """Guard判定結果"""
 
     ALLOW = "ALLOW"
