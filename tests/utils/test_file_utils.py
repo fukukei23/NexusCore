@@ -105,7 +105,7 @@ class TestFileUtilsBasic(unittest.TestCase):
                     func = getattr(file_utils, func_name)
                     if callable(func):
                         try:
-                            result = func(self.test_filename, self.test_content)
+                            func(self.test_filename, self.test_content)
                             # 書き込み操作の確認
                             mock_file.assert_called()
                         except Exception:
@@ -222,7 +222,7 @@ class TestFileUtilsAdvanced(unittest.TestCase):
             if hasattr(file_utils, func_name):
                 func = getattr(file_utils, func_name)
                 try:
-                    result = func("test/new/directory")
+                    func("test/new/directory")
                     # ディレクトリ作成の確認
                 except Exception:
                     # ディレクトリ作成エラーは許容
@@ -305,7 +305,7 @@ class TestFileUtilsErrorHandling(unittest.TestCase):
                     func = getattr(file_utils, operation)
                     try:
                         # エラーが発生しても例外処理されることを確認
-                        result = func(test_input)
+                        func(test_input)
                     except Exception as e:
                         # 適切なエラーハンドリングの確認
                         self.assertIsInstance(e, Exception)
@@ -328,7 +328,7 @@ class TestFileUtilsErrorHandling(unittest.TestCase):
                 for invalid_input in invalid_inputs:
                     with self.subTest(function=func_name, input=invalid_input):
                         try:
-                            result = func(invalid_input)
+                            func(invalid_input)
                             # 無効入力が適切に処理されることを確認
                         except (TypeError, ValueError, AttributeError):
                             # 期待される例外は正常

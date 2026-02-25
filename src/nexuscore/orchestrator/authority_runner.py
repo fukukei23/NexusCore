@@ -71,7 +71,7 @@ class RunLockLease:
         self._stop_refresh.set()
         if self._refresh_thread is not None:
             self._refresh_thread.join(
-                timeout=self.refresh_interval * 2
+                timeout=(self.refresh_interval or 0) * 2
             )  # Wait up to 2 refresh cycles
 
         # Release lock

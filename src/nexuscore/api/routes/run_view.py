@@ -197,12 +197,12 @@ async def resume_run_view(
         # CONFLICT -> 409, FAILED/ABORTED -> 400 (with explainability in RunView)
         status_code = result.get("status", "").upper()
         if status_code == "CONFLICT":
-            return JSONResponse(
+            return JSONResponse(  # type: ignore[return-value]
                 status_code=status.HTTP_409_CONFLICT,
                 content=run_view.dict(),
             )
         elif status_code in ("FAILED", "ABORTED"):
-            return JSONResponse(
+            return JSONResponse(  # type: ignore[return-value]
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content=run_view.dict(),
             )
@@ -291,7 +291,7 @@ async def create_run_view(
         # But handle edge cases
         status_code = result.get("status", "").upper()
         if status_code in ("FAILED", "ABORTED"):
-            return JSONResponse(
+            return JSONResponse(  # type: ignore[return-value]
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content=run_view.dict(),
             )

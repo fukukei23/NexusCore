@@ -239,7 +239,7 @@ class TestJobStateMachineInit:
     def test_init_calls_initial_state_handle(self):
         """Test initialization calls handle() on initial state."""
         with patch.object(PendingState, "handle") as mock_handle:
-            machine = JobStateMachine("job-1")
+            JobStateMachine("job-1")
 
             mock_handle.assert_called_once()
 

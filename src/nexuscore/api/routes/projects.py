@@ -423,7 +423,7 @@ async def trigger_project_run(
             run_id=run.run_id,
             project_id=project.id,
             status=run.status,
-            queue_mode=queue_mode,
+            queue_mode=queue_mode,  # type: ignore[arg-type]
         )
 
     except Exception as e:

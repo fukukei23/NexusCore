@@ -282,7 +282,7 @@ class TestAppEdgeCases:
                 del sys.modules["nexuscore.utils.app"]
 
             try:
-                import nexuscore.utils.app as app_module
+                import nexuscore.utils.app as app_module  # noqa: F401
 
                 # Should raise ImportError or ModuleNotFoundError
             except (ImportError, ModuleNotFoundError):
@@ -310,7 +310,7 @@ class TestAppEdgeCases:
                 del sys.modules["nexuscore.utils.app"]
 
             try:
-                import nexuscore.utils.app as app_module
+                import nexuscore.utils.app as app_module  # noqa: F401
 
                 # Should raise ImportError or ModuleNotFoundError
             except (ImportError, ModuleNotFoundError):

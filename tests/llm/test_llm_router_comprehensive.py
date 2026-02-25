@@ -890,7 +890,7 @@ def test_llm_router_log_dir_creation():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         log_dir = os.path.join(tmpdir, "custom_logs")
-        router = LLMRouter(log_dir=log_dir)
+        LLMRouter(log_dir=log_dir)
 
         assert Path(log_dir).exists()
 
@@ -936,7 +936,7 @@ def test_routed_llm_execute_with_no_last_usage():
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.001) as mock_track:
             with patch("nexuscore.llm.llm_router.log_transaction"):
-                result = routed.execute("Short test prompt", "System prompt")
+                routed.execute("Short test prompt", "System prompt")
 
                 # 推定トークンが使用される
                 assert mock_track.called
@@ -958,7 +958,7 @@ def test_routed_llm_execute_with_partial_usage_data():
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.001) as mock_track:
             with patch("nexuscore.llm.llm_router.log_transaction"):
-                result = routed.execute("Test prompt", "System")
+                routed.execute("Test prompt", "System")
 
                 # 推定トークンが使用される（_last_usageがリセットされるため）
                 assert mock_track.called
@@ -979,7 +979,7 @@ def test_routed_llm_execute_with_zero_output_tokens():
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.001) as mock_track:
             with patch("nexuscore.llm.llm_router.log_transaction"):
-                result = routed.execute("Test", "Sys")
+                routed.execute("Test", "Sys")
 
                 # completion_tokensが0なので推定値が使用される
                 assert mock_track.called
@@ -1079,7 +1079,7 @@ def test_llm_router_get_llm_for_task_with_force_cheap_override():
     router.cheap_model = "openai:gpt-3.5-turbo"
 
     with patch.object(router, "_make_client", return_value=MockLLM("gpt-3.5-turbo")) as mock_make:
-        routed = router.get_llm_for_task("Test prompt", task_type="code_generate")
+        router.get_llm_for_task("Test prompt", task_type="code_generate")
 
         # cheap_modelが使用される
         mock_make.assert_called_with("openai:gpt-3.5-turbo")

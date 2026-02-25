@@ -124,7 +124,7 @@ class TestDeepSeekProviderExecute:
         mock_factory.create_session.return_value = mock_session
 
         provider = DeepSeekLLM("deepseek-chat")
-        result = provider.execute("prompt", "system", temperature=0.7)
+        provider.execute("prompt", "system", temperature=0.7)
 
         call_args = mock_session.post.call_args
         assert call_args[1]["json"]["temperature"] == 0.7
@@ -150,7 +150,7 @@ class TestDeepSeekProviderExecute:
         mock_factory.create_session.return_value = mock_session
 
         provider = DeepSeekLLM("deepseek-chat")
-        result = provider.execute("prompt", "system")
+        provider.execute("prompt", "system")
 
         call_args = mock_session.post.call_args
         assert call_args[1]["json"]["max_tokens"] == 2000
@@ -172,7 +172,7 @@ class TestDeepSeekProviderExecute:
         mock_factory.create_session.return_value = mock_session
 
         provider = DeepSeekLLM("deepseek-chat")
-        result = provider.execute("prompt", "system", as_json=True)
+        provider.execute("prompt", "system", as_json=True)
 
         call_args = mock_session.post.call_args
         assert call_args[1]["json"]["response_format"] == {"type": "json_object"}

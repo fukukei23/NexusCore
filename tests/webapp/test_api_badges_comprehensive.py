@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 api_badges.py の包括的なテスト
 
@@ -190,7 +191,7 @@ class TestProjectSuccessRateBadge:
         """30回を超えるRunがある場合は最新30回のみを使用"""
         # 古いRun: すべて失敗（無視される）
         for i in range(20):
-            run = create_run(
+            create_run(
                 test_project.id,
                 "FAILED",
                 test_user.id,

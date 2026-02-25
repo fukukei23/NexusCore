@@ -15,7 +15,7 @@ def test_actual_functionality():
 
     try:
         # タブを作成
-        tab = tab_streamlit_port()
+        tab_streamlit_port()
         print("✅ タブ作成: 成功")
 
         # コード生成機能をテスト

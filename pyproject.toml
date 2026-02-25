@@ -51,6 +51,7 @@ select = [
 ]
 ignore = [
   "E501",  # 行長は Black に任せる
+  "UP040", # Python 3.12+ type文構文 (Python 3.11 非対応)
   "UP047", # Python 3.12+ 型パラメータ構文 (Python 3.11 非対応)
   "B008",  # FastAPI Depends() のデフォルト引数パターン (フレームワーク仕様)
   "E402",  # モジュールレベルimport順序 - sys.path設定後の意図的なimport

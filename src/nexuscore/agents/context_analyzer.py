@@ -7,6 +7,7 @@ Context Analyzer - 安全版（simple版の安定性を統合）
 import os
 import platform
 import sys
+from typing import Any
 
 
 class ContextAnalyzer:
@@ -60,7 +61,7 @@ class ContextAnalyzer:
 
     def detect_tech_stack(self) -> dict:
         """技術スタックの安全検出"""
-        tech_stack = {
+        tech_stack: dict[str, Any] = {
             "languages": ["Python"],
             "frameworks": [],
             "tools": [],
@@ -152,7 +153,7 @@ class ContextAnalyzer:
 
     def scan_file_structure(self) -> dict:
         """安全なファイル構造スキャン"""
-        structure = {
+        structure: dict[str, Any] = {
             "modules": [],
             "test_dirs": [],
             "config_files": [],
@@ -211,7 +212,7 @@ class ContextAnalyzer:
 
     def parse_dependencies(self) -> dict:
         """安全な依存関係解析"""
-        dependencies = {"internal": [], "external": [], "standard": [], "relative": []}
+        dependencies: dict[str, Any] = {"internal": [], "external": [], "standard": [], "relative": []}
 
         try:
             # 基本的な依存関係を設定（AST解析回避）
@@ -324,7 +325,7 @@ class ContextAnalyzer:
 
     def _safe_detect_virtual_env(self) -> dict:
         """安全な仮想環境検出"""
-        venv_info = {"active": False, "type": None, "path": None}
+        venv_info: dict[str, Any] = {"active": False, "type": None, "path": None}
 
         try:
             virtual_env = os.getenv("VIRTUAL_ENV")

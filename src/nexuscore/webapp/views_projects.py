@@ -524,7 +524,7 @@ def project_detail(project_id: int):
 
     # フラッシュメッセージの表示
     if flash_messages:
-        for _category, message in flash_messages:
+        for _category, message in flash_messages:  # type: ignore[misc]
             html += f'<div class="flash-message">{message}</div>'
 
     # Run 一覧テーブルをヘルパー関数で生成

@@ -12,7 +12,7 @@ from typing import Any
 try:
     import yaml
 except ImportError:
-    yaml = None
+    yaml = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 

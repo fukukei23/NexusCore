@@ -13,6 +13,13 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
+try:
+    import gradio as gr
+    import matplotlib.pyplot as plt
+except ImportError:
+    gr = None  # type: ignore[assignment]
+    plt = None  # type: ignore[assignment]
+
 import pytest
 
 # Mock gradio and matplotlib before importing dashboard

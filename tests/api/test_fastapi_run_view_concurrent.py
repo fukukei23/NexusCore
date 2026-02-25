@@ -248,7 +248,7 @@ def test_resume_run_view_concurrent_different_run_ids(
     def mock_resume_run(run_id_param: str, *, orchestrator_factory=None):
         # Both should succeed
         if orchestrator_factory:
-            orch = orchestrator_factory()
+            orchestrator_factory()
         return {
             "status": "RUNNING",
             "run_id": run_id_param,

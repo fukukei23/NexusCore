@@ -52,10 +52,10 @@ class TestGitController(unittest.TestCase):
 
             # リポジトリ操作のテスト
             if hasattr(git_controller, "get_current_branch"):
-                branch = git_controller.get_current_branch()
+                git_controller.get_current_branch()
 
             if hasattr(git_controller, "is_repo_clean"):
-                is_clean = git_controller.is_repo_clean()
+                git_controller.is_repo_clean()
 
             # モックが呼び出されたことを確認
             # mock_repo_class.assert_called()
@@ -79,15 +79,15 @@ class TestGitController(unittest.TestCase):
 
             # ブランチ一覧取得のテスト
             if hasattr(git_controller, "list_branches"):
-                branches = git_controller.list_branches()
+                git_controller.list_branches()
 
             # コミット履歴取得のテスト
             if hasattr(git_controller, "get_commit_history"):
-                history = git_controller.get_commit_history()
+                git_controller.get_commit_history()
 
             # ステータス取得のテスト
             if hasattr(git_controller, "get_status"):
-                status = git_controller.get_status()
+                git_controller.get_status()
 
         except Exception:
             # Git操作エラーは許容範囲
@@ -145,7 +145,7 @@ class TestGitController(unittest.TestCase):
 
             # 変更検出のテスト
             if hasattr(git_controller, "get_changed_files"):
-                changed_files = git_controller.get_changed_files()
+                git_controller.get_changed_files()
 
         except Exception:
             # ファイル操作エラーは許容
@@ -170,11 +170,11 @@ class TestGitControllerAdvanced(unittest.TestCase):
 
             # マージ操作のテスト
             if hasattr(git_controller, "merge_branch"):
-                result = git_controller.merge_branch("feature-branch")
+                git_controller.merge_branch("feature-branch")
 
             # コンフリクト検出のテスト
             if hasattr(git_controller, "has_conflicts"):
-                conflicts = git_controller.has_conflicts()
+                git_controller.has_conflicts()
 
         except Exception:
             # マージ操作エラーは許容
@@ -195,7 +195,7 @@ class TestGitControllerAdvanced(unittest.TestCase):
 
             # リモート取得のテスト
             if hasattr(git_controller, "get_remotes"):
-                remotes = git_controller.get_remotes()
+                git_controller.get_remotes()
 
             # プッシュ操作のテスト
             if hasattr(git_controller, "push_changes"):

@@ -122,7 +122,7 @@ def test_unified_analyzer_cache_incremental_update(sample_project_dir):
 
     # 1回目の解析
     result1 = analyzer.run()
-    initial_analyzed = result1["stats"]["analyzed_files"]
+    result1["stats"]["analyzed_files"]
 
     # 1つのファイルを変更
     module_a = sample_project_dir / "module_a.py"
@@ -156,13 +156,13 @@ def test_unified_analyzer_cache_performance(sample_project_dir):
 
     # 1回目の解析（時間測定）
     start1 = time.time()
-    result1 = analyzer.run()
-    time1 = time.time() - start1
+    analyzer.run()
+    time.time() - start1
 
     # 2回目の解析（時間測定）
     start2 = time.time()
     result2 = analyzer.run()
-    time2 = time.time() - start2
+    time.time() - start2
 
     # 2回目はキャッシュが使用されるため、1回目より高速であることを確認
     # （ただし、ファイル数が少ない場合は差が小さい可能性がある）

@@ -59,7 +59,7 @@ try:
     from nexuscore.agents.policy_agent import PolicyAgent
 except ImportError:
 
-    class PolicyAgent:
+    class PolicyAgent:  # type: ignore[no-redef]
         def __init__(self, *args, **kwargs):
             pass
 
@@ -84,7 +84,7 @@ logger = get_logger(__name__)
 logger.info("API server initialized with standard logging")
 
 
-def require_auth(f):
+def require_auth(f):  # type: ignore[no-redef]
     """
     認証デコレータ: Authorization: Bearer <TOKEN> ヘッダを検証する。
     Mainブランチのセキュリティ機能を採用。

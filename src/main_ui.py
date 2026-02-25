@@ -14,7 +14,7 @@ try:
     HAS_UNIFIED_UI = True
 except ImportError:
     HAS_UNIFIED_UI = False
-    launch_unified_ui = None  # type: ignore
+    launch_unified_ui = None
 
 # 既存のUIタブ（フォールバック用）
 try:

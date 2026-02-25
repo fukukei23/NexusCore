@@ -21,7 +21,7 @@ def test_git_controller_init_success(tmp_path, monkeypatch):
 def test_git_controller_init_invalid_repo(tmp_path):
     """無効なGitリポジトリでの初期化テスト"""
     # Gitリポジトリとして初期化していないディレクトリ
-    with pytest.raises(Exception):  # git.InvalidGitRepositoryError
+    with pytest.raises(Exception):  # git.InvalidGitRepositoryError  # noqa: B017
         vcs.GitController(repo_path=str(tmp_path))
 
 
@@ -183,7 +183,7 @@ def test_git_controller_repo_initialization_message(tmp_path, capsys):
 
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
 
-    controller = vcs.GitController(repo_path=str(tmp_path))
+    vcs.GitController(repo_path=str(tmp_path))
 
     captured = capsys.readouterr()
     assert "✅ Gitリポジトリを正常に読み込みました" in captured.out
@@ -390,7 +390,7 @@ def test_git_controller_error_message_format(tmp_path, capsys):
 def test_git_controller_repo_initialization_error_handling(tmp_path):
     """リポジトリ初期化エラーの処理テスト"""
     # Gitリポジトリとして初期化していないディレクトリ
-    with pytest.raises(Exception):  # git.InvalidGitRepositoryError
+    with pytest.raises(Exception):  # git.InvalidGitRepositoryError  # noqa: B017
         vcs.GitController(repo_path=str(tmp_path))
 
 

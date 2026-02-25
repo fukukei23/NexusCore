@@ -52,7 +52,7 @@ except ImportError:
 # ==============================================================================
 
 # 環境変数から設定を読み込み
-CONFIG = {
+CONFIG: dict[str, Any] = {
     "supported_languages": {
         ".py": "python",
         ".js": "javascript",
@@ -118,7 +118,7 @@ class SemanticAnalyzer:
         self._cache_enabled = enable_cache if enable_cache is not None else CONFIG["enable_cache"]
         self._cache: dict[str, AnalysisResult] = {}
         # TODO: プロファイリング統計 - 解析時間の集計
-        self._profiling_stats = {
+        self._profiling_stats: dict[str, Any] = {
             "total_files": 0,
             "cache_hits": 0,
             "cache_misses": 0,

@@ -798,7 +798,7 @@ def 日本語関数():
             encoding="utf-8",
         )
 
-        config = TestGenConfig(use_llm=False)
+        TestGenConfig(use_llm=False)
         result = generate_template_tests(module_file)
 
         assert "import pytest" in result
@@ -809,7 +809,7 @@ def 日本語関数():
         module_file = tmp_path / "long.py"
         module_file.write_text(f"def {long_name}(): pass")
 
-        config = TestGenConfig(use_llm=False)
+        TestGenConfig(use_llm=False)
         result = generate_template_tests(module_file)
 
         assert f"test_{long_name}" in result
@@ -826,7 +826,7 @@ class Outer:
 """
         )
 
-        config = TestGenConfig(use_llm=False)
+        TestGenConfig(use_llm=False)
         result = generate_template_tests(module_file)
 
         # Should generate tests for methods

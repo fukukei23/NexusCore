@@ -51,7 +51,7 @@ def test_parse_memo_validates_fields():
 
 def test_search_retry_and_summarize(monkeypatch):
     llm = DummyLLM("{}")
-    failing_search = DummySearch([Exception("fail"), [{"title": "t1", "snippet": "s1"}]])
+    DummySearch([Exception("fail"), [{"title": "t1", "snippet": "s1"}]])
 
     class RetrySearch:
         def __init__(self):

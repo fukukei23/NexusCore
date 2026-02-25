@@ -133,7 +133,7 @@ def test_llm_failure_falls_back_to_template(sample_project_dir, tmp_path):
         pytest.skip("module_b.py not found in sample project")
 
     # テンプレートを事前に生成
-    template = generate_template_tests(
+    generate_template_tests(
         module_b_path,
         max_functions=20,
         project_root=sample_project_dir,

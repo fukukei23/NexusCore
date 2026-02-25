@@ -95,7 +95,7 @@ async def project_success_rate_badge(project_id: int) -> BadgeResponse:
             schemaVersion=1,
             label="self-healing",
             message=f"{success_rate:.1f}% success",
-            color=color,
+            color=color,  # type: ignore[arg-type]
         )
 
     except Exception as e:
@@ -186,7 +186,7 @@ async def project_last_run_badge(project_id: int) -> BadgeResponse:
             schemaVersion=1,
             label="self-healing",
             message=message,
-            color=color,
+            color=color,  # type: ignore[arg-type]
         )
 
     except Exception as e:

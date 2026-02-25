@@ -488,7 +488,7 @@ class TestAnalyzeSourceCode:
         analyzer.languages["python"] = MagicMock()
 
         with patch.object(analyzer, "_extract_symbols", return_value={}):
-            result = analyzer.analyze_source_code("def test(): pass", "python")
+            analyzer.analyze_source_code("def test(): pass", "python")
 
         assert len(analyzer._profiling_stats["file_times"]) > 0
         assert analyzer._profiling_stats["total_time"] > 0
@@ -649,7 +649,7 @@ class TestAnalyzeProject:
             mock_result = AnalysisResult(success=True)
 
             with patch.object(analyzer, "analyze_file", return_value=mock_result):
-                results = analyzer.analyze_project(tmp_path)
+                analyzer.analyze_project(tmp_path)
 
             assert analyzer._profiling_stats["total_files"] == 1
 

@@ -285,7 +285,7 @@ def process_audio(audio_input: AudioInput) -> dict[str, int | float]:
         length = Path(audio_input).stat().st_size
     else:
         length = 0
-    return {"length": length, "sample_rate": _AUDIO_CONFIG["sample_rate"]}
+    return {"length": length, "sample_rate": _AUDIO_CONFIG["sample_rate"]}  # type: ignore[dict-item]
 
 
 def load_audio_file(path: str) -> bytes | None:
@@ -506,4 +506,4 @@ def multi_language_support(text: str, target_lang: str | None = None) -> str | N
     target = target_lang or _AUDIO_CONFIG["language"]
     if detected and detected == target:
         return text
-    return translate_text(text, target_lang=target)
+    return translate_text(text, target_lang=str(target))

@@ -199,7 +199,7 @@ def buggy_function():
             import ast
 
             mock_ast_parse.return_value = ast.parse(self.sample_code)
-        except:
+        except Exception:
             mock_ast_parse.return_value = MagicMock()
 
         static_functions = ["static_analysis", "check_syntax", "analyze_structure"]

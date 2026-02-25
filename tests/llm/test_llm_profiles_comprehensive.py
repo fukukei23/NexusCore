@@ -49,7 +49,7 @@ class TestLLMProfile:
         """frozenデータクラスのため変更不可"""
         profile = LLMProfile(name="test", provider="openai", model="gpt-4")
 
-        with pytest.raises(Exception):  # FrozenInstanceError
+        with pytest.raises(Exception):  # FrozenInstanceError  # noqa: B017
             profile.name = "new_name"  # type: ignore
 
     def test_profile_default_temperature(self):

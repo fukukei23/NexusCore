@@ -118,7 +118,7 @@ class TestGeminiProviderExecute:
             mock_model.generate_content.return_value = mock_response
 
             with patch("google.generativeai.GenerativeModel", return_value=mock_model):
-                result = provider.execute("prompt", "system", temperature=0.7)
+                provider.execute("prompt", "system", temperature=0.7)
 
                 call_args = mock_model.generate_content.call_args
                 assert call_args[1]["generation_config"]["temperature"] == 0.7
@@ -148,7 +148,7 @@ class TestGeminiProviderExecute:
             mock_model.generate_content.return_value = mock_response
 
             with patch("google.generativeai.GenerativeModel", return_value=mock_model):
-                result = provider.execute("prompt", "system")
+                provider.execute("prompt", "system")
 
                 call_args = mock_model.generate_content.call_args
                 assert call_args[1]["generation_config"]["max_output_tokens"] == 2000
@@ -174,7 +174,7 @@ class TestGeminiProviderExecute:
             mock_model.generate_content.return_value = mock_response
 
             with patch("google.generativeai.GenerativeModel", return_value=mock_model):
-                result = provider.execute("prompt", "system", as_json=True)
+                provider.execute("prompt", "system", as_json=True)
 
                 call_args = mock_model.generate_content.call_args
                 assert call_args[1]["generation_config"]["response_mime_type"] == "application/json"

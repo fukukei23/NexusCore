@@ -117,7 +117,7 @@ class NexusCoreLogger:
     @classmethod
     def _add_audit_handler(cls, logger: logging.Logger):
         """監査ログ用の追加ハンドラーを設定"""
-        audit_file = cls._log_dir / "audit.jsonl"
+        audit_file = cls._log_dir / "audit.jsonl"  # type: ignore[operator]
         audit_handler = RotatingFileHandler(
             audit_file, maxBytes=50 * 1024 * 1024, backupCount=10  # 50MB
         )

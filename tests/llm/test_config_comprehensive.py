@@ -145,7 +145,7 @@ class TestEnsureEnvLoaded:
         monkeypatch.delenv("NEXUSCORE_ENV_LOADED", raising=False)
 
         # 1回目
-        result1 = ensure_env_loaded()
+        ensure_env_loaded()
 
         # 2回目（_ENV_LOADEDがTrueになっているはず）
         config_module._ENV_LOADED = True
@@ -279,7 +279,7 @@ class TestLLMRouterConfig:
             real_calls_enabled=False,
         )
 
-        with pytest.raises(Exception):  # FrozenInstanceError
+        with pytest.raises(Exception):  # FrozenInstanceError  # noqa: B017
             config.openai_api_key = "new_key"  # type: ignore
 
     def test_config_from_env_timeout_empty_string(self, monkeypatch):
@@ -295,7 +295,7 @@ class TestLLMRouterConfig:
         """環境変数にタイムアウトをセットする"""
         monkeypatch.delenv("NEXUS_REQUEST_TIMEOUT_SEC", raising=False)
 
-        config = LLMRouterConfig.from_env()
+        LLMRouterConfig.from_env()
 
         # 環境変数に設定される
         assert os.getenv("NEXUS_REQUEST_TIMEOUT_SEC") is not None

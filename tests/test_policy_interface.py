@@ -208,8 +208,8 @@ def test_policy_interface_queue_timeout():
     import queue
 
     try:
-        result = pi.result_queue.get(timeout=0.01)
-        assert False, "Should have raised queue.Empty"
+        pi.result_queue.get(timeout=0.01)
+        raise AssertionError("Should have raised queue.Empty")
     except queue.Empty:
         pass  # 期待される動作
 
@@ -247,7 +247,6 @@ def test_launch_and_wait_for_input_keyboard_interrupt(mock_gr):
     with patch.object(pi, "create_gradio_interface", return_value=mock_interface):
         # KeyboardInterruptをシミュレート
 
-        original_get = pi.result_queue.get
 
         def mock_get(timeout=None):
             raise KeyboardInterrupt()
@@ -292,7 +291,7 @@ def test_policy_interface_queue_operations_stress(tmp_path):
         try:
             result = pi.result_queue.get(timeout=0.1)
             results.append(result)
-        except:
+        except Exception:
             break
 
     assert len(results) == 100
@@ -328,7 +327,6 @@ def test_launch_and_wait_for_input_exception_handling(mock_gr):
     with patch.object(pi, "create_gradio_interface", return_value=mock_interface):
         # 一般的な例外をシミュレート
 
-        original_get = pi.result_queue.get
 
         def mock_get(timeout=None):
             raise Exception("General error")
@@ -358,7 +356,7 @@ def test_policy_interface_result_queue_thread_safety():
             try:
                 result = pi.result_queue.get(timeout=1)
                 results.append(result)
-            except:
+            except Exception:
                 break
 
     # 複数のスレッドで同時にput/get

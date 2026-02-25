@@ -182,7 +182,7 @@ def assemble_policy_payload(
             "max_tokens": _safe_int(max_tokens, 2000),
         },
     }
-    return assembled, assembled["meta"]
+    return assembled, assembled["meta"]  # type: ignore[return-value]
 
 
 def validation_summary(policy: dict) -> str:
@@ -391,8 +391,8 @@ def build_ui():
                 policy = _assemble(*vals)[0]
                 # Agent にポリシーを渡して評価（エージェントのAPI仕様に合わせて調整）
                 try:
-                    agent = ConstitutionalCouncilAgent(policy=policy)  # 仮のコンストラクタ
-                    verdict = agent.evaluate_prompt(prompt_text)  # 仮のメソッド
+                    agent = ConstitutionalCouncilAgent(policy=policy)  # type: ignore[call-arg]
+                    verdict = agent.evaluate_prompt(prompt_text)  # type: ignore[attr-defined]
                     return f"🧪 Agent verdict: {verdict}"
                 except Exception as e:
                     return f"⚠️ Agent連携に失敗: {e}"

@@ -121,7 +121,7 @@ class TestDesignProjectStructure:
         mock_router_class.return_value = mock_router
 
         agent = ArchitectAgent()
-        result = agent.design_project_structure("Test requirement")
+        agent.design_project_structure("Test requirement")
 
         # as_json=Trueで呼ばれることを確認
         call_kwargs = mock_llm.execute.call_args[1]

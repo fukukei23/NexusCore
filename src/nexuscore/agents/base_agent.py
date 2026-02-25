@@ -23,7 +23,7 @@ except Exception:
 try:
     from ..llm.llm_router import LLMRouter
 except Exception:
-    LLMRouter = None
+    LLMRouter = None  # type: ignore[assignment, misc]
 
 # 4.4: Retry と例外分類
 try:
