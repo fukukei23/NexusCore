@@ -63,7 +63,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     # Celery 初期化（Flask アプリコンテキストで Celery を初期化）
     from nexuscore.webapp.celery_app import make_celery
 
-    celery_instance = make_celery(app)  # Flask アプリと Celery を連携（タスクも自動登録される）
+    make_celery(app)  # Flask アプリと Celery を連携（タスクも自動登録される）
 
     # Blueprint登録
     from nexuscore.webapp import views_api_test, views_dashboard, views_logs, views_projects

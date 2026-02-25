@@ -132,7 +132,7 @@ class OpenAILLM(BaseLLM):
             except RequestsHTTPError as e:
                 body = ""
                 try:
-                    body = e.response.text  # type: ignore[attr-defined]
+                    body = e.response.text
                 except Exception:
                     pass
                 self.log_error("REAL-CALL HTTP error (after retries)", e, body)

@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 try:
     from openai import OpenAI
 except Exception:  # pragma: no cover - openai missing
-    OpenAI = None  # type: ignore
+    OpenAI = None
 
 # ====== 設定・クライアント =====================================================
 
@@ -92,8 +92,7 @@ def run_pytest() -> str:
     try:
         result = subprocess.run(
             ["pytest", str(TEST_FILE)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             cwd=str(ROOT),  # ルートで実行（相対 import を安定させる）
         )

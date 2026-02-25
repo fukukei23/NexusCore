@@ -30,10 +30,10 @@ try:
 except ImportError:
     HAS_EXTRAS = False
 
-    class Fore:
+    class Fore:  # type: ignore[no-redef]
         RED = GREEN = YELLOW = BLUE = MAGENTA = CYAN = WHITE = ""
 
-    class Style:
+    class Style:  # type: ignore[no-redef]
         BRIGHT = RESET_ALL = ""
 
 
@@ -107,13 +107,13 @@ class SemanticAnalyzer:
     - プロファイリング: 解析時間の統計（環境変数 NEXUS_TREESITTER_ENABLE_PROFILING で有効化）
     """
 
-    def __init__(self, enable_cache: bool = None):
+    def __init__(self, enable_cache: bool | None = None):
         """
         Args:
             enable_cache: キャッシュを有効にするか（None の場合は CONFIG から読み込み）
         """
-        self.parsers = {}
-        self.languages = {}
+        self.parsers: dict[str, Any] = {}
+        self.languages: dict[str, Any] = {}
         # TODO: キャッシュ機能 - ファイルパス × 内容ハッシュをキーに解析結果をキャッシュ
         self._cache_enabled = enable_cache if enable_cache is not None else CONFIG["enable_cache"]
         self._cache: dict[str, AnalysisResult] = {}
@@ -136,7 +136,7 @@ class SemanticAnalyzer:
         except Exception as e:
             return False, f"Setup error: {e}"
 
-    def setup_parsers(self, languages: list[str] = None) -> bool:
+    def setup_parsers(self, languages: list[str] | None = None) -> bool:
         """パーサーセットアップ"""
         if not languages:
             languages = list(set(CONFIG["supported_languages"].values()))
@@ -188,7 +188,7 @@ class SemanticAnalyzer:
         if not lang_queries:
             return {}
 
-        symbols = defaultdict(list)
+        symbols: dict[str, list[dict]] = defaultdict(list)
         language_obj = self.languages[language]
 
         for symbol_type, query_string in lang_queries.items():
@@ -196,7 +196,7 @@ class SemanticAnalyzer:
                 query = language_obj.query(query_string)
                 captures = query.captures(root_node)
 
-                for node, capture_name in captures:
+                for node, _capture_name in captures:
                     symbol_name = node.text.decode("utf8")
                     # 重複除去
                     if not any(s["name"] == symbol_name for s in symbols[symbol_type]):
@@ -221,7 +221,7 @@ class SemanticAnalyzer:
         return f"{file_path}:{content_hash}"
 
     def analyze_source_code(
-        self, source_code: str, language: str, file_path: str = None
+        self, source_code: str, language: str, file_path: str | None = None
     ) -> AnalysisResult:
         """
         ソースコード解析（セマンティック機能付き）
@@ -416,7 +416,7 @@ class ReportGenerator:
         successful = [r for r in results.values() if r.success]
 
         # ★★★ セマンティック統計 ★★★
-        symbol_stats = Counter()
+        symbol_stats: Counter[str] = Counter()
         for result in successful:
             if symbols := result["semantic_symbols"]:
                 for symbol_type, symbol_list in symbols.items():

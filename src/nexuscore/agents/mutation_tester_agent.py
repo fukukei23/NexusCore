@@ -203,14 +203,6 @@ class MutationTesterAgent(BaseAgent):
         try:
             # pyproject.toml生成
             pyproject_path = Path(temp_dir) / "pyproject.toml"
-            config = {
-                "tool": {
-                    "mutmut": {
-                        "paths_to_mutate": [source_path],
-                        "runner": f"python -m pytest {test_path} -x --tb=no -q",
-                    }
-                }
-            }
 
             with open(pyproject_path, "w", encoding="utf-8") as f:
                 # TOMLフォーマットで書き込み

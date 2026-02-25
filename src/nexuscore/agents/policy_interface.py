@@ -13,7 +13,7 @@ try:
     GRADIO_AVAILABLE = True
 except ImportError:
     GRADIO_AVAILABLE = False
-    gr = None  # type: ignore
+    gr = None
     print("⚠️ Gradio未インストール：コマンドライン版を使用します")
 
 import queue
@@ -26,7 +26,7 @@ class PolicyInterface:
         self.result_queue = queue.Queue()
         self.interface = None
 
-    def create_gradio_interface(self) -> gr.Blocks:  # type: ignore
+    def create_gradio_interface(self) -> gr.Blocks:
         """Gradio UIインターフェースを作成"""
         if not GRADIO_AVAILABLE:
             raise ImportError("Gradio がインストールされていません")

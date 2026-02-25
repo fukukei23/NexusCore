@@ -11,6 +11,7 @@ WebApp HTML UI view.
 
 from __future__ import annotations
 
+import json
 import os
 import uuid
 from collections.abc import Sequence
@@ -523,7 +524,7 @@ def project_detail(project_id: int):
 
     # フラッシュメッセージの表示
     if flash_messages:
-        for category, message in flash_messages:
+        for _category, message in flash_messages:
             html += f'<div class="flash-message">{message}</div>'
 
     # Run 一覧テーブルをヘルパー関数で生成
@@ -640,7 +641,7 @@ def trigger_run(project_id: int):
         # ========================================================================
         from nexuscore.webapp.celery_app import run_orchestrator_task
 
-        async_result = run_orchestrator_task.delay(run.id)
+        run_orchestrator_task.delay(run.id)
 
         # 必要なら Run に task_id を保存してもよい（進捗トラッキング用）
         # run.celery_task_id = async_result.id
