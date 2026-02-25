@@ -18,7 +18,7 @@ from typing import Any
 
 # --- サードパーティライブラリ ---
 try:
-    from tqdm import tqdm
+    import tqdm as _tqdm  # noqa: F401
 
     HAS_TQDM = True
 except ImportError:
@@ -40,7 +40,7 @@ except ImportError:
 
 
 try:
-    import speech_recognition as sr
+    import speech_recognition as _sr  # noqa: F401
 
     HAS_SPEECH = True
 except ImportError:
@@ -58,7 +58,7 @@ except ImportError:
 # ==============================================================================
 # グローバル設定とロギング
 # ==============================================================================
-CONFIG = {
+CONFIG: dict[str, Any] = {
     "cache_dir": Path.home() / ".nexuscore" / "cache",
     "log_level": logging.INFO,
     "supported_languages": {
@@ -159,7 +159,7 @@ class TreeSitterEngine:
 
         Query 失敗時（言語 pack 不整合やクエリ構文エラーなど）は manual パスにフォールバックする。
         """
-        info = defaultdict(list)
+        info: defaultdict[str, Any] = defaultdict(list)
 
         query_string = """
             (function_definition name: (identifier) @function.name) @function.definition
@@ -511,7 +511,7 @@ class UnifiedAnalyzer:
     キャッシュ機能付きで、変更のないファイルは再解析をスキップする。
     """
 
-    def __init__(self, project_root: Path, use_cache: bool = None, config: dict[str, Any] = None):
+    def __init__(self, project_root: Path, use_cache: bool | None = None, config: dict[str, Any] | None = None):
         """
         Args:
             project_root: プロジェクトのルートディレクトリ
@@ -539,11 +539,11 @@ class UnifiedAnalyzer:
         # 統計情報
         self.stats = {"total_files": 0, "cached_files": 0, "analyzed_files": 0, "failed_files": 0}
 
-    def setup(self, languages: list[str] = None) -> bool:
+    def setup(self, languages: list[str] | None = None) -> bool:
         """パーサーをセットアップ"""
         return self.engine.setup_parsers(languages)
 
-    def _get_target_files(self, exclude_patterns: list[str] = None) -> list[Path]:
+    def _get_target_files(self, exclude_patterns: list[str] | None = None) -> list[Path]:
         """
         解析対象のファイルリストを取得
 
@@ -576,7 +576,7 @@ class UnifiedAnalyzer:
 
         return target_files
 
-    def run(self, exclude_patterns: list[str] = None) -> dict[str, Any]:
+    def run(self, exclude_patterns: list[str] | None = None) -> dict[str, Any]:
         """
         プロジェクト全体を解析するメインメソッド
 
@@ -617,7 +617,7 @@ class UnifiedAnalyzer:
 
                 if not should_analyze:
                     # キャッシュから結果を取得
-                    cached_result = self.cache.get_cached_result(file_path, file_hash)
+                    cached_result = self.cache.get_cached_result(file_path, file_hash or "")
                     if cached_result:
                         # AnalysisResult オブジェクトを再構築
                         result = AnalysisResult(**cached_result)

@@ -13,6 +13,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+try:
+    import gradio as gr
+except ImportError:
+    gr = None  # type: ignore[assignment]
+
 import pytest
 
 # Mock gradio before importing repair_timeline

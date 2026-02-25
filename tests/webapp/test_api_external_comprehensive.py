@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 webapp/api_external.py の高品質なテスト
 

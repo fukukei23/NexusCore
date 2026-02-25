@@ -38,7 +38,7 @@ def handle_github_webhook() -> dict[str, Any]:
     try:
         payload = request.get_json()
         if not payload:
-            return {
+            return {  # type: ignore[return-value]
                 "accepted": False,
                 "reason": "Invalid payload: JSON is required",
             }, 400
@@ -64,7 +64,7 @@ def handle_github_webhook() -> dict[str, Any]:
 
     except Exception as e:
         logger.error(f"GitHub webhook handling failed: {e}", exc_info=True)
-        return {
+        return {  # type: ignore[return-value]
             "accepted": False,
             "error": str(e),
         }, 500

@@ -74,8 +74,6 @@ def test_evaluate_text_invalid_json():
 
 def test_new_from_template_handles_missing_name(monkeypatch):
     # simulate UI handler branch
-    update = policy_console.gr.update
-    text = policy_console.build_ui  # ensure module has gr for monkeypatching
     # direct call to render_template_profile already tested; here just ensure ValueError path returns updates
     res = policy_console.render_template_profile("name", "general")
     assert isinstance(res[0], str)

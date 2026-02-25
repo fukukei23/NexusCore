@@ -59,7 +59,7 @@ class TestHttpClientFactory:
         """requests が利用可能な場合の session 作成"""
         # requests が利用可能な環境でテスト
         try:
-            import requests
+            import requests  # noqa: F401
 
             HAS_REQUESTS = True
         except ImportError:
@@ -95,9 +95,9 @@ class TestHttpClientFactory:
         """retry 戦略が正しく設定される"""
         # requests と urllib3 が利用可能な場合のみ
         try:
-            import requests
+            import requests  # noqa: F401
             from requests.adapters import HTTPAdapter
-            from urllib3.util.retry import Retry
+            from urllib3.util.retry import Retry  # noqa: F401
 
             HAS_DEPS = True
         except ImportError:
@@ -124,9 +124,9 @@ class TestHttpClientFactory:
         """retry 対象のステータスコードが正しく設定される"""
         # requests と urllib3 が利用可能な場合のみ
         try:
-            import requests
-            from requests.adapters import HTTPAdapter
-            from urllib3.util.retry import Retry
+            import requests  # noqa: F401
+            from requests.adapters import HTTPAdapter  # noqa: F401
+            from urllib3.util.retry import Retry  # noqa: F401
 
             HAS_DEPS = True
         except ImportError:
@@ -160,8 +160,8 @@ class TestHttpClientFactory:
     def test_create_session_retry_total(self):
         """retry 回数が正しく設定される"""
         try:
-            import requests
-            from requests.adapters import HTTPAdapter
+            import requests  # noqa: F401
+            from requests.adapters import HTTPAdapter  # noqa: F401
 
             HAS_DEPS = True
         except ImportError:
@@ -186,8 +186,8 @@ class TestHttpClientFactory:
     def test_create_session_backoff_factor(self):
         """backoff_factor が正しく設定される"""
         try:
-            import requests
-            from requests.adapters import HTTPAdapter
+            import requests  # noqa: F401
+            from requests.adapters import HTTPAdapter  # noqa: F401
 
             HAS_DEPS = True
         except ImportError:
@@ -212,8 +212,8 @@ class TestHttpClientFactory:
     def test_create_session_allowed_methods(self):
         """retry 対象の HTTP メソッドが正しく設定される"""
         try:
-            import requests
-            from requests.adapters import HTTPAdapter
+            import requests  # noqa: F401
+            from requests.adapters import HTTPAdapter  # noqa: F401
 
             HAS_DEPS = True
         except ImportError:
@@ -239,7 +239,7 @@ class TestHttpClientFactory:
     def test_create_session_multiple_calls(self):
         """複数回の session 作成が独立している"""
         try:
-            import requests
+            import requests  # noqa: F401
 
             HAS_REQUESTS = True
         except ImportError:
@@ -341,7 +341,7 @@ class TestEdgeCases:
     def test_session_closed_properly(self):
         """Session が適切にクローズされる（リソース管理）"""
         try:
-            import requests
+            import requests  # noqa: F401
 
             HAS_REQUESTS = True
         except ImportError:

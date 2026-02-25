@@ -280,7 +280,7 @@ class TestAnalyzeRequirement:
         )
 
         agent = RequirementAgent()
-        result = agent.analyze_requirement("")
+        agent.analyze_requirement("")
 
         # LLMが呼ばれる
         mock_execute.assert_called_once()

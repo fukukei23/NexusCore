@@ -55,7 +55,7 @@ def test_refresh_extends_expires_at(monkeypatch: Any, tmp_path: Any) -> None:
     with open(lock_path) as f:
         refreshed_data = json.load(f)
     refreshed_expires_at = refreshed_data["expires_at"]
-    refreshed_acquired_at = refreshed_data["acquired_at"]
+    refreshed_data["acquired_at"]
 
     # expires_at should be refreshed (now + TTL), which should be later than initial
     # (Note: initial was acquired_at + TTL, so refreshed should be later)
@@ -141,7 +141,7 @@ def test_lock_held_during_running(monkeypatch: Any, tmp_path: Any) -> None:
         result = authority_runner.resume_run(run_id)
 
         # Verify that lock exists (was held during RUNNING)
-        lock_path = _lock_file_path(run_id)
+        _lock_file_path(run_id)
         # Note: After context manager exits, lock is released, so it should not exist
         # But during execution, it should have existed
         # We check by attempting to acquire - if it was held, we can now acquire it

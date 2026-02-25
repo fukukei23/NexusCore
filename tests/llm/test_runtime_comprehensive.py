@@ -65,7 +65,7 @@ class TestLLMRuntimeDiagnostics:
             real_calls_enabled=True,
         )
 
-        with pytest.raises(Exception):  # FrozenInstanceError
+        with pytest.raises(Exception):  # FrozenInstanceError  # noqa: B017
             diag.request_timeout = 60.0  # type: ignore
 
     def test_to_dict_conversion(self):
@@ -236,7 +236,7 @@ class TestCurrentDiagnostics:
         """NEXUSCORE_ENV_LOADED環境変数からenv_fileを取得"""
         monkeypatch.setenv("NEXUSCORE_ENV_LOADED", "/custom/.env")
 
-        diag = current_diagnostics()
+        current_diagnostics()
 
         # env_fileが設定される（実装による）
         # 環境変数がセットされている場合は反映される可能性がある
@@ -266,7 +266,7 @@ class TestLogRuntimeStatus:
     def test_log_runtime_status_logs_output(self, caplog):
         """ログを出力する"""
         with caplog.at_level(logging.INFO):
-            diag = log_runtime_status()
+            log_runtime_status()
 
         # ログ出力が行われる
         assert len(caplog.records) > 0
@@ -277,7 +277,7 @@ class TestLogRuntimeStatus:
         custom_logger = logging.getLogger("CustomRuntime")
 
         with caplog.at_level(logging.INFO, logger="CustomRuntime"):
-            diag = log_runtime_status(custom_logger)
+            log_runtime_status(custom_logger)
 
         # カスタムロガーでログが出力される
         assert any(r.name == "CustomRuntime" for r in caplog.records)

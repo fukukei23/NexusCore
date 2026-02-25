@@ -18,7 +18,7 @@ import pytest
 
 try:
     from nexuscore.agents.guardian_auto_reviewer import (
-        FileChange,
+        FileChange,  # noqa: F401
         GuardianAutoReviewer,
         Hunk,
         ProjectType,
@@ -355,7 +355,7 @@ class TestCheckNexuscoreSpecific:
 """
         reviewer = GuardianAutoReviewer("other-project")
         files = reviewer._parse_unified_diff(diff_text)
-        issues = reviewer._check_nexuscore_specific(files)
+        reviewer._check_nexuscore_specific(files)
 
         # NexusCore固有チェックは実行されない
         # (review_unified_diffがproject_typeをチェックするため)

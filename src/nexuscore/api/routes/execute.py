@@ -45,7 +45,7 @@ try:
     from nexuscore.agents.policy_agent import PolicyAgent
 except ImportError:
 
-    class PolicyAgent:
+    class PolicyAgent:  # type: ignore[no-redef]
         def __init__(self, *args, **kwargs):
             pass
 

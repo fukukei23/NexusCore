@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 logging_service.py の包括的なテスト
 

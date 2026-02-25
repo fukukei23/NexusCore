@@ -23,8 +23,8 @@ from nexuscore.core.session_control import SessionController
 
 # webapp モジュールが利用可能かどうかを確認
 try:
-    from nexuscore.webapp import create_app, db
-    from nexuscore.webapp.models import Project, Run
+    from nexuscore.webapp import create_app, db  # noqa: F401
+    from nexuscore.webapp.models import Project, Run  # noqa: F401
 
     HAS_WEBAPP = True
 except ImportError:
@@ -192,7 +192,7 @@ class TestCeleryTaskWithJobStateMachine:
         # db は `from nexuscore.webapp import db` でインポートされているため、nexuscore.webapp.db をパッチ
         with (
             patch.object(nexuscore.webapp.models, "Run") as mock_run_class,
-            patch.object(nexuscore.webapp.models, "Project") as mock_project_class,
+            patch.object(nexuscore.webapp.models, "Project"),
             patch("nexuscore.webapp.celery_app.db") as mock_db,
         ):
 

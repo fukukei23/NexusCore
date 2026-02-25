@@ -27,7 +27,7 @@ try:
     from tools.prompt_batcher import build_batch_prompt
 except Exception:
 
-    def build_batch_prompt(task_title, code_snippets, **_):
+    def build_batch_prompt(task_title, code_snippets, **_):  # type: ignore[misc]
         blocks = []
         for i, it in enumerate(code_snippets or [], 1):
             blocks.append(

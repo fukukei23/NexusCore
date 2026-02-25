@@ -143,7 +143,7 @@ class TestOpenAIProviderExecute:
         mock_factory.create_session.return_value = mock_session
 
         provider = OpenAILLM("gpt-5.1")
-        result = provider.execute("test prompt", "test system", as_json=True)
+        provider.execute("test prompt", "test system", as_json=True)
 
         # Check that payload includes response_format
         call_args = mock_session.post.call_args
@@ -168,7 +168,7 @@ class TestOpenAIProviderExecute:
         mock_factory.create_session.return_value = mock_session
 
         provider = OpenAILLM("gpt-4")  # Non-GPT-5 model
-        result = provider.execute("test prompt", "test system", temperature=0.8)
+        provider.execute("test prompt", "test system", temperature=0.8)
 
         call_args = mock_session.post.call_args
         payload = call_args[1]["json"]

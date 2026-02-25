@@ -46,7 +46,7 @@ def _get_user_id_from_auth(current_user: AuthenticatedUser) -> int:
         return user_id
     except (ValueError, TypeError):
         logger.error(f"Invalid user_id in AuthenticatedUser: {current_user.user_id}")
-        raise make_internal_error("Invalid user ID in authentication token")
+        raise make_internal_error("Invalid user ID in authentication token") from None
 
 
 @router.get(
@@ -99,7 +99,6 @@ async def list_runs(
         HTTPException: 内部エラー時（500）
     """
     try:
-        from nexuscore.webapp import db
         from nexuscore.webapp.models import Project, Run
 
         user_id = _get_user_id_from_auth(current_user)
@@ -129,10 +128,10 @@ async def list_runs(
 
     except ImportError:
         logger.error("webapp models not available")
-        raise make_internal_error("Database models not available")
+        raise make_internal_error("Database models not available") from None
     except Exception as e:
         logger.error(f"Failed to list runs: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to list runs: {str(e)}")
+        raise make_internal_error(f"Failed to list runs: {str(e)}") from e
 
 
 @router.get(
@@ -216,4 +215,4 @@ async def get_run(
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise
         logger.error(f"Failed to get run: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to get run: {str(e)}")
+        raise make_internal_error(f"Failed to get run: {str(e)}") from e

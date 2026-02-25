@@ -49,7 +49,7 @@ class TestTaskModelConfig:
         """frozenデータクラスのため変更不可"""
         config = TaskModelConfig(primary="test", secondary=[], fallback="test")
 
-        with pytest.raises(Exception):  # FrozenInstanceError
+        with pytest.raises(Exception):  # FrozenInstanceError  # noqa: B017
             config.primary = "new_value"  # type: ignore
 
     def test_config_secondary_can_be_empty(self):
@@ -130,7 +130,7 @@ class TestTaskModelConfigs:
 
     def test_all_configs_have_required_fields(self):
         """全設定が必須フィールドを持つ"""
-        for task, config in TASK_MODEL_CONFIGS.items():
+        for _task, config in TASK_MODEL_CONFIGS.items():
             assert isinstance(config.primary, str)
             assert len(config.primary) > 0
             assert isinstance(config.secondary, list)
@@ -260,7 +260,7 @@ class TestBuildTaskModelMapDict:
         """各エントリの構造を検証"""
         result = build_task_model_map_dict()
 
-        for task, entry in result.items():
+        for _task, entry in result.items():
             assert "primary" in entry
             assert "fallbacks" in entry
             assert isinstance(entry["primary"], str)
@@ -326,7 +326,7 @@ class TestBuildTaskModelMapDict:
 
     def test_build_temperature_omitted_when_none(self):
         """temperatureがNoneの場合、エントリに含まれない可能性"""
-        result = build_task_model_map_dict()
+        build_task_model_map_dict()
 
         # 少なくとも一つのタスクでtemperatureがNone
         has_none_temp = any(config.temperature is None for config in TASK_MODEL_CONFIGS.values())
@@ -458,7 +458,7 @@ class TestTaskModelMapIntegration:
 
         # 実際には、primary==fallbackは許容される設計
         # 例: routing_classify は gpt5_nano を primary と fallback の両方に使用
-        for task, config in TASK_MODEL_CONFIGS.items():
+        for _task, _config in TASK_MODEL_CONFIGS.items():
             # 同じプロファイルを使うことは許容される
             # 循環参照はタスク間の参照なので、ここではチェック不要
             pass

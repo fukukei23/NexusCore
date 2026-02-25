@@ -16,6 +16,7 @@ import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from nexuscore.guard.policy_engine import GuardDecision, GuardInput, GuardResult
 
@@ -108,7 +109,7 @@ def _build_trace_event(
     event["artifacts"] = artifacts
 
     # code_identity（取得可能な範囲で埋める）
-    code_identity = {}
+    code_identity: dict[str, Any] = {}
     git_commit = _get_git_commit()
     if git_commit:
         code_identity["git_commit"] = git_commit

@@ -92,7 +92,7 @@ class SlackNotifier:
         status_text = status_jp.get(status, status.upper())
 
         # Slackのメッセージ形式（Attachments形式）
-        payload = {
+        payload: dict[str, Any] = {
             "text": title,
             "attachments": [
                 {
@@ -127,7 +127,7 @@ class SlackNotifier:
 
         try:
             response = requests.post(
-                self.webhook_url,
+                self.webhook_url,  # type: ignore[arg-type]
                 json=payload,
                 timeout=10,
             )

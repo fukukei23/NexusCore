@@ -540,7 +540,7 @@ def test_generate_code_from_text_prompt_injection_prevention(monkeypatch):
     mock_client.chat.completions.create.return_value = mock_response
 
     with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
-        result = code_generator.generate_code_from_text(malicious_text)
+        code_generator.generate_code_from_text(malicious_text)
 
         # プロンプトが正しく処理されることを確認
         call_args = mock_client.chat.completions.create.call_args
@@ -846,7 +846,7 @@ def test_generate_code_from_text_model_parameter_consistency(monkeypatch):
         assert "model" in call_args.kwargs
 
 
-def test_generate_code_from_text_temperature_setting(monkeypatch):
+def test_generate_code_from_text_temperature_setting_v2(monkeypatch):
     """温度設定のテスト"""
     monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
 

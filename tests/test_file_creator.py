@@ -351,7 +351,7 @@ def test_create_code_file_with_newlines_variations(tmp_path):
         ("line1\rline2\rline3", "\r"),  # Old Mac
     ]
 
-    for code, expected_newline in test_cases:
+    for code, _expected_newline in test_cases:
         result_path = create_code_file(filename, code, folder)
         with open(result_path, encoding="utf-8", newline="") as f:
             content = f.read()

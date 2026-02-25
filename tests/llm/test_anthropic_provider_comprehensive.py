@@ -122,7 +122,7 @@ class TestAnthropicProviderExecute:
         mock_factory.create_session.return_value = mock_session
 
         provider = AnthropicLLM("claude-sonnet-4.5")
-        result = provider.execute("prompt", "system", temperature=0.7)
+        provider.execute("prompt", "system", temperature=0.7)
 
         call_args = mock_session.post.call_args
         assert call_args[1]["json"]["temperature"] == 0.7
@@ -148,7 +148,7 @@ class TestAnthropicProviderExecute:
         mock_factory.create_session.return_value = mock_session
 
         provider = AnthropicLLM("claude-sonnet-4.5")
-        result = provider.execute("prompt", "system")
+        provider.execute("prompt", "system")
 
         call_args = mock_session.post.call_args
         assert call_args[1]["json"]["max_tokens"] == 2000
@@ -236,7 +236,7 @@ class TestAnthropicProviderHeaders:
         mock_factory.create_session.return_value = mock_session
 
         provider = AnthropicLLM("claude-sonnet-4.5")
-        result = provider.execute("prompt", "system")
+        provider.execute("prompt", "system")
 
         call_args = mock_session.post.call_args
         headers = call_args[1]["headers"]
@@ -260,7 +260,7 @@ class TestAnthropicProviderHeaders:
         mock_factory.create_session.return_value = mock_session
 
         provider = AnthropicLLM("claude-sonnet-4.5")
-        result = provider.execute("prompt", "system")
+        provider.execute("prompt", "system")
 
         call_args = mock_session.post.call_args
         headers = call_args[1]["headers"]

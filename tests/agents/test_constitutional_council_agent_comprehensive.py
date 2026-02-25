@@ -102,7 +102,7 @@ class TestConstitutionalCouncilAgentInit:
         # ポリシーファイルを作成
         policy_path.write_text("[]")
 
-        agent = ConstitutionalCouncilAgent(
+        ConstitutionalCouncilAgent(
             policy_path=str(policy_path),
             amendments_dir=str(amendments_dir),
         )
@@ -705,7 +705,7 @@ class TestAdvancedEdgeCases:
     def test_archive_amendment_with_special_characters_in_filename(self, agent, temp_policy_dir):
         """ファイル名に特殊文字を含む修正案のアーカイブ"""
         amendments_dir = Path(temp_policy_dir["amendments_dir"])
-        archived_dir = amendments_dir / "archived"
+        amendments_dir / "archived"
 
         # pending_* 形式のファイル名で特殊文字を含むファイルを作成
         special_file = amendments_dir / "pending_特殊文字.json"

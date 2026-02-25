@@ -406,8 +406,8 @@ class TestBootstrapApikeyMainBasic:
         )
 
         assert code == 0
-        lines = [l for l in out.splitlines() if l.strip()]
-        assert any(l.startswith("export NEXUSCORE_API_KEY=") for l in lines)
+        lines = [line_ for line_ in out.splitlines() if line_.strip()]
+        assert any(line_.startswith("export NEXUSCORE_API_KEY=") for line_ in lines)
 
     def test_outputs_info_to_stderr(self, app, monkeypatch):
         """メタ情報が stderr に出力されること"""

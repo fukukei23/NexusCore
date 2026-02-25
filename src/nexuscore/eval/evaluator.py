@@ -309,7 +309,7 @@ def measure_stability(cases: list[EvaluationCase]) -> StabilityResult:
     normalized_strings = []
     for case in parsed_cases:
         try:
-            normalized = normalize_json(case.parse_result.data)
+            normalized = normalize_json(case.parse_result.data)  # type: ignore[union-attr, arg-type]
             normalized_strings.append(normalized)
         except Exception as e:
             return StabilityResult(

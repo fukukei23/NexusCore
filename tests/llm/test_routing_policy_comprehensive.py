@@ -265,7 +265,7 @@ class TestTaskModelMapDefault:
 
     def test_task_model_map_entry_structure(self):
         """各エントリが正しい構造を持つ"""
-        for task, config in TASK_MODEL_MAP_DEFAULT.items():
+        for _task, config in TASK_MODEL_MAP_DEFAULT.items():
             assert "primary" in config
             assert "fallbacks" in config
             assert isinstance(config["primary"], str)

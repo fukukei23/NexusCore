@@ -27,7 +27,7 @@ from typing import Any
 try:
     from .base_agent import BaseAgent
 except ImportError:
-    BaseAgent = None
+    BaseAgent = None  # type: ignore[misc, assignment]
 
 # knowledge_base: プロジェクトルートの database/knowledge_base を参照。CWD に依存しないようリトライする。
 knowledge_base = None
@@ -56,19 +56,19 @@ def _find_project_root_for_database() -> str | None:
 
 
 try:
-    from database.knowledge_base import knowledge_base
+    from database.knowledge_base import knowledge_base  # type: ignore[assignment]
 except ImportError:
     _root = _find_project_root_for_database()
     if _root and _root not in sys.path:
         sys.path.insert(0, _root)
     try:
-        from database.knowledge_base import knowledge_base
+        from database.knowledge_base import knowledge_base  # type: ignore[assignment]
     except ImportError:
         pass
 
 if BaseAgent is None:
 
-    class BaseAgent:
+    class BaseAgent:  # type: ignore[no-redef]
         def __init__(self, *args, **kwargs):
             self.logger = logging.getLogger(self.__class__.__name__)
 

@@ -155,5 +155,5 @@ def test_bootstrap_apikey_main_outputs_export_command(app, monkeypatch):
 
     assert code == 0
     # stdout: export 行のみ（複数行あっても先頭に export が含まれていることを確認）
-    lines = [l for l in out.splitlines() if l.strip()]
-    assert any(l.startswith("export NEXUSCORE_API_KEY=") for l in lines)
+    lines = [line_ for line_ in out.splitlines() if line_.strip()]
+    assert any(line_.startswith("export NEXUSCORE_API_KEY=") for line_ in lines)

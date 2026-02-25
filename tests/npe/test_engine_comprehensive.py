@@ -634,7 +634,7 @@ class TestEdgeCases:
                             }
                         )
 
-                        result = guarded_llm_call(
+                        guarded_llm_call(
                             model="gpt-5",
                             task="partial_usage",
                             system_prompt="system",
@@ -695,7 +695,7 @@ class TestEdgeCases:
                     with patch.object(engine, "log_transaction"):
                         llm_fn = Mock(return_value={"ok": True, "content": ""})
 
-                        result = guarded_llm_call(
+                        guarded_llm_call(
                             model="gpt-5",
                             task="empty_content",
                             system_prompt="system",

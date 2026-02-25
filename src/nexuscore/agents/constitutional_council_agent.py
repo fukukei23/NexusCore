@@ -59,7 +59,7 @@ class ConstitutionalCouncilAgent(BaseAgent):
                 return json.load(f)
         except Exception as e:
             logger.error(f"Failed to load or parse current policies from {self.policy_path}: {e}")
-            raise RuntimeError(f"Failed to load current policies: {e}")
+            raise RuntimeError(f"Failed to load current policies: {e}") from e
 
     def _save_policies(self, policies: list[dict]) -> None:
         """
@@ -80,7 +80,7 @@ class ConstitutionalCouncilAgent(BaseAgent):
             logger.info(f"[Council] Policies updated and saved: {self.policy_path}")
         except Exception as e:
             logger.error(f"Failed to save policies to {self.policy_path}: {e}")
-            raise RuntimeError(f"Failed to save policies: {e}")
+            raise RuntimeError(f"Failed to save policies: {e}") from e
 
     # -------------------------------
     # Validation

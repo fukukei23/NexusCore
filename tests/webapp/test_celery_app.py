@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 webapp/celery_app.py の高品質なテスト
 
@@ -93,7 +94,7 @@ class TestMakeCelery:
         celery_module.celery = None
         celery_module.run_orchestrator_task = None
 
-        celery_instance = celery_module.make_celery(app)
+        celery_module.make_celery(app)
 
         # run_orchestrator_task が登録されている
         assert celery_module.run_orchestrator_task is not None
@@ -148,7 +149,7 @@ class TestRunOrchestratorTask:
 
         celery_module.celery = None
 
-        celery_instance = celery_module.make_celery(app)
+        celery_module.make_celery(app)
 
         # 存在しない run_db_id を指定
         with patch("nexuscore.webapp.celery_app.Run.query") as mock_query:

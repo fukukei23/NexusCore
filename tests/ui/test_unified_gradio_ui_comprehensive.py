@@ -478,8 +478,7 @@ class TestCodePromptHandlers:
 
         # generate_code_handlerのロジックを再現
         prompt = ""
-        filename = ""
-        state = AppState()
+        AppState()
 
         if not prompt.strip():
             result = "💡 プロンプトを入力してください。"
@@ -512,8 +511,7 @@ def placeholder_function():
     def test_save_code_handler_empty_code(self):
         """空のコードで保存"""
         code = ""
-        filename = "test.py"
-        state = AppState()
+        AppState()
 
         if not code.strip():
             result = "💡 コードが空です。"
@@ -547,7 +545,7 @@ def placeholder_function():
 
         code = "print('test')"
         filename = "subdir/test.py"
-        state = AppState()
+        AppState()
 
         file_path = filename
         save_path = Path("sandbox_output") / file_path
@@ -563,7 +561,7 @@ def placeholder_function():
 
         code = "def default(): pass"
         filename = ""
-        state = AppState()
+        AppState()
 
         file_path = filename or "generated_code.py"
         save_path = Path("sandbox_output") / file_path
@@ -575,7 +573,6 @@ def placeholder_function():
     def test_generate_code_handler_without_filename(self):
         """ファイル名なしでコード生成"""
         prompt = "Test prompt"
-        filename = ""
         state = AppState()
 
         if prompt.strip():
@@ -591,7 +588,7 @@ def placeholder_function():
 
         code = "def test():\n    print('こんにちは')"
         filename = "unicode_test.py"
-        state = AppState()
+        AppState()
 
         save_path = Path("sandbox_output") / filename
         save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -609,7 +606,7 @@ class TestAIRevisionHandlers:
         """空の入力でパッチ生成"""
         code = ""
         prompt = ""
-        state = AppState()
+        AppState()
 
         if not code.strip() or not prompt.strip():
             result = "💡 コードと修正指示を入力してください。"
@@ -650,7 +647,7 @@ class TestAIRevisionHandlers:
     def test_apply_patch_handler_empty_patch(self):
         """空のパッチで適用"""
         patch = ""
-        state = AppState()
+        AppState()
 
         if not patch.strip():
             result = "💡 パッチが空です。"
@@ -675,7 +672,6 @@ class TestAIRevisionHandlers:
 
     def test_apply_patch_handler_file_not_found(self):
         """ファイルが見つからない場合"""
-        patch = "some patch"
         state = AppState()
         state.current_file_path = "/nonexistent/file.py"
 
@@ -713,9 +709,8 @@ class TestAIRevisionHandlers:
 
     def test_generate_patch_handler_special_characters(self):
         """特殊文字を含むパッチ生成"""
-        code = "print('特殊文字: \\n\\t')"
         prompt = "Fix escaping"
-        state = AppState()
+        AppState()
 
         patch = f"# Modified by AI: {prompt}"
         assert prompt in patch
@@ -728,7 +723,7 @@ class TestHistoryDiffHandlers:
     def test_load_run_handler_empty_run_id(self):
         """空のRun IDで読み込み"""
         run_id = ""
-        state = AppState()
+        AppState()
 
         if not run_id.strip():
             result = "💡 Run ID を入力してください。"
@@ -754,7 +749,6 @@ class TestHistoryDiffHandlers:
 
     def test_load_run_handler_no_current_file(self):
         """現在のファイルがない場合"""
-        run_id = "sh-test"
         state = AppState()
 
         file_path = state.current_file_path
@@ -769,7 +763,7 @@ class TestHistoryDiffHandlers:
         repo_full_name = ""
         pr_number = 0
         head_sha = ""
-        state = AppState()
+        AppState()
 
         if not repo_full_name.strip() or not head_sha.strip() or pr_number <= 0:
             result = "💡 Repository、PR Number、Head SHA を入力してください。"
@@ -777,10 +771,8 @@ class TestHistoryDiffHandlers:
 
     def test_trigger_self_healing_handler_invalid_pr_number(self):
         """無効なPR番号"""
-        repo_full_name = "owner/repo"
         pr_number = -1
-        head_sha = "abc123"
-        state = AppState()
+        AppState()
 
         if pr_number <= 0:
             result = "💡 Repository、PR Number、Head SHA を入力してください。"
@@ -793,9 +785,6 @@ class TestHistoryDiffHandlers:
         original = unified_gradio_ui.HAS_SELF_HEALING
         unified_gradio_ui.HAS_SELF_HEALING = False
 
-        repo_full_name = "owner/repo"
-        pr_number = 123
-        head_sha = "abc123"
 
         if not unified_gradio_ui.HAS_SELF_HEALING:
             result = "❌ Self-Healing Service が利用できません。"
@@ -810,10 +799,7 @@ class TestHistoryDiffHandlers:
         original = unified_gradio_ui.HAS_SELF_HEALING
         unified_gradio_ui.HAS_SELF_HEALING = True
 
-        repo_full_name = "owner/repo"
-        pr_number = 123
-        head_sha = "abc123"
-        state = AppState()
+        AppState()
 
         # モック結果
         result_dict = {
@@ -881,7 +867,7 @@ class TestUIBuilders:
         mock_gr.State.return_value = Mock()
         mock_gr.themes.Soft.return_value = Mock()
 
-        demo = build_unified_ui()
+        build_unified_ui()
 
         # Blocksが呼ばれたことを確認
         mock_gr.Blocks.assert_called_once()
@@ -1084,7 +1070,6 @@ class TestIntegration:
         state.before_code[str(save_path)] = state.generated_code
 
         # Step 3: パッチ生成
-        diff_patch = "--- a/test.py\n+++ b/test.py\n@@ -1,1 +1,2 @@\n+# improved"
 
         # Step 4: パッチ適用
         state.after_code[str(save_path)] = "improved code"
@@ -1133,6 +1118,6 @@ class TestIntegration:
         assert len(state.before_code) == 3
         assert len(state.after_code) == 3
 
-        for i, filename in enumerate(files):
+        for _, filename in enumerate(files):
             assert filename in state.before_code
             assert filename in state.after_code

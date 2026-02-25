@@ -300,7 +300,7 @@ class TestFormatPrComment:
         """Guardian レビュー付きPRコメント"""
         mock_build.return_value = "Comment with guardian review"
 
-        comment = format_pr_comment(self_healing_result)
+        format_pr_comment(self_healing_result)
 
         # PRCommentContext が Guardian 情報を受け取る
         context_call = mock_context_class.call_args[1]
@@ -321,7 +321,7 @@ class TestFormatPrComment:
 
         mock_build.return_value = "Comment without guardian"
 
-        comment = format_pr_comment(result)
+        format_pr_comment(result)
 
         context_call = mock_context_class.call_args[1]
         assert "guardian_review_markdown" in context_call
@@ -335,7 +335,7 @@ class TestFormatPrComment:
         """リポジトリとPR情報付きでフォーマット"""
         mock_build.return_value = "Comment"
 
-        comment = format_pr_comment(
+        format_pr_comment(
             self_healing_result,
             repo_full_name="owner/repo",
             pr_number=456,
@@ -359,7 +359,7 @@ class TestFormatPrComment:
 
         mock_build.return_value = "Comment with diff"
 
-        comment = format_pr_comment(result)
+        format_pr_comment(result)
 
         context_call = mock_context_class.call_args[1]
         assert context_call["diff_summary"] == "Changed 3 files"
@@ -378,7 +378,7 @@ class TestFormatPrComment:
 
         mock_build.return_value = "Comment with semantic diffs"
 
-        comment = format_pr_comment(result)
+        format_pr_comment(result)
 
         context_call = mock_context_class.call_args[1]
         assert context_call["semantic_diffs"] is not None
@@ -400,7 +400,7 @@ class TestInitSelfHealingService:
         config = SelfHealingConfig(label="self-healing")
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            service = _init_self_healing_service(tmpdir, config)
+            _init_self_healing_service(tmpdir, config)
 
             # SelfHealingService が初期化される
             mock_service_class.assert_called_once()
@@ -420,7 +420,7 @@ class TestInitSelfHealingService:
         config = SelfHealingConfig(label="self-healing")
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            service = _init_self_healing_service(tmpdir, config)
+            _init_self_healing_service(tmpdir, config)
 
             # SelfHealingService は初期化される（debugger=None）
             mock_service_class.assert_called_once()
@@ -436,7 +436,7 @@ class TestInitSelfHealingService:
         config = SelfHealingConfig(label="self-healing")
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            service = _init_self_healing_service(tmpdir, config)
+            _init_self_healing_service(tmpdir, config)
 
             # SelfHealingService は初期化される（guardian=None）
             mock_service_class.assert_called_once()

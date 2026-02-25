@@ -28,7 +28,7 @@ def mock_api_key(monkeypatch):
     # get_current_user 内で使用される webapp.models をモック
     with (
         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
-        patch("nexuscore.webapp.models.User") as mock_user_model,
+        patch("nexuscore.webapp.models.User"),
     ):
         mock_user = MagicMock()
         mock_user.id = 1
@@ -61,7 +61,7 @@ def test_auth_invalid_api_key_returns_401(client: TestClient, mock_api_key):
     # 不正なAPI Keyの場合、モックが None を返すようにする
     with (
         patch("nexuscore.webapp.models.ApiKey") as MockApiKey,
-        patch("nexuscore.webapp.models.User") as MockUser,
+        patch("nexuscore.webapp.models.User"),
     ):
         MockApiKey.hash_token.return_value = "hashed_invalid_key"
         MockApiKey.query.filter_by.return_value.first.return_value = (
@@ -119,7 +119,7 @@ def test_execute_api_requires_authentication(client: TestClient, mock_api_key):
         # 不正な API Key でリクエスト
         with (
             patch("nexuscore.webapp.models.ApiKey") as MockApiKey,
-            patch("nexuscore.webapp.models.User") as MockUser,
+            patch("nexuscore.webapp.models.User"),
         ):
             MockApiKey.hash_token.return_value = "hashed_wrong_key"
             MockApiKey.query.filter_by.return_value.first.return_value = (
@@ -156,7 +156,7 @@ def test_status_api_requires_authentication(client: TestClient, mock_api_key):
         # 不正な API Key でリクエスト
         with (
             patch("nexuscore.webapp.models.ApiKey") as MockApiKey,
-            patch("nexuscore.webapp.models.User") as MockUser,
+            patch("nexuscore.webapp.models.User"),
         ):
             MockApiKey.hash_token.return_value = "hashed_wrong_key"
             MockApiKey.query.filter_by.return_value.first.return_value = (
@@ -249,13 +249,12 @@ def test_auth_api_key_from_secrets_json(client: TestClient, tmp_path, monkeypatc
     auth._cached_api_key = None
 
     # load_api_key 関数をモックして secrets.json のパスを変更
-    original_load_api_key = auth.load_api_key
 
     def mock_load_api_key():
         # プロジェクトルートを tmp_path に変更
         from pathlib import Path
 
-        current_file = Path(__file__).resolve()
+        Path(__file__).resolve()
         # secrets.json のパスを tmp_path に変更
         secrets_path = tmp_path / "secrets.json"
         if secrets_path.exists():
@@ -335,7 +334,7 @@ def test_auth_invalid_api_key_returns_401_not_500(client: TestClient, mock_api_k
     # 無効なAPI Keyの場合、モックが None を返すようにする
     with (
         patch("nexuscore.webapp.models.ApiKey") as MockApiKey,
-        patch("nexuscore.webapp.models.User") as MockUser,
+        patch("nexuscore.webapp.models.User"),
     ):
         MockApiKey.hash_token.return_value = "hashed_invalid_key"
         MockApiKey.query.filter_by.return_value.first.return_value = (
