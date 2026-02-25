@@ -157,7 +157,7 @@ def _calculate_backoff_delay(attempt: int, error_class: str, config: RetryConfig
         return config.base_delay * (config.backoff_multiplier**attempt)
 
 
-def retry_with_context[T](
+def retry_with_context(
     func: Callable[..., T],
     *,
     max_retries: int = 3,
@@ -309,7 +309,7 @@ def retry_with_context[T](
     return wrapper
 
 
-def retry[T](
+def retry(
     func: Callable[..., T] | None = None,
     *,
     max_retries: int = 3,
