@@ -14,6 +14,7 @@ import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
+from typing import TypeAlias
 
 import numpy as np
 import openai
@@ -35,8 +36,8 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-AudioInput = str | bytes | np.ndarray
-StreamFactory = Callable[[Callable[[np.ndarray, int, float, object], None]], AbstractContextManager[object]]
+AudioInput: TypeAlias = str | bytes | np.ndarray
+StreamFactory: TypeAlias = Callable[[Callable[[np.ndarray, int, float, object], None]], AbstractContextManager[object]]
 
 _DEFAULT_CONFIG: dict[str, str | int] = {
     "language": os.getenv("VOICE_TO_TEXT_TARGET_LANG", "en"),
