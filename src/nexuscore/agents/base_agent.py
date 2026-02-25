@@ -39,13 +39,13 @@ try:
     HAS_RETRY = True
 except ImportError:
     HAS_RETRY = False
-    retry_with_context = None  # type: ignore
-    RetryContext = None  # type: ignore
-    ModelRateLimitError = Exception  # type: ignore
-    ModelTimeoutError = Exception  # type: ignore
-    ModelConnectionError = Exception  # type: ignore
-    InvalidModelOutputError = Exception  # type: ignore
-    convert_http_error_to_nexus_error = None  # type: ignore
+    retry_with_context = None
+    RetryContext = None
+    ModelRateLimitError = Exception
+    ModelTimeoutError = Exception
+    ModelConnectionError = Exception
+    InvalidModelOutputError = Exception
+    convert_http_error_to_nexus_error = None
 
 
 class BaseAgent:

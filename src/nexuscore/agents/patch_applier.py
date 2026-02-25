@@ -12,7 +12,7 @@ try:
     HAS_PATCH = True
 except ImportError:
     HAS_PATCH = False
-    patch = None  # type: ignore
+    patch = None
 
 
 class PatchApplier:

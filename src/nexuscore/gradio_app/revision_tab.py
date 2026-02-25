@@ -104,8 +104,7 @@ def run_pytest() -> tuple[bool, str]:
     try:
         result = subprocess.run(
             ["pytest", TEST_FILE],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             cwd=str(SANDBOX_DIR),
         )

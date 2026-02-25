@@ -91,7 +91,7 @@ def create_nexus_dashboard(
 
                     try:
                         if DebuggerAgent and PatchApplier:
-                            debugger = DebuggerAgent(project_root=proj_path)
+                            DebuggerAgent(project_root=proj_path)
                             # 簡易版：実際の実装では、より詳細な処理が必要
                             patch_text = f"# Generated patch for: {proj_path}\n# Error: {error_log_text[:100]}"
                             return patch_text, "Patch generated (preview mode)"

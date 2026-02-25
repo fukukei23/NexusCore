@@ -25,17 +25,17 @@ logger = logging.getLogger(__name__)
 try:
     from nexuscore.agents.debugger_agent import DebuggerAgent
 except ImportError:
-    DebuggerAgent = None  # type: ignore
+    DebuggerAgent = None
 
 try:
     from nexuscore.agents.guardian_agent import GuardianAgent
 except ImportError:
-    GuardianAgent = None  # type: ignore
+    GuardianAgent = None
 
 try:
     from nexuscore.services.self_healing_service import SelfHealingService
 except ImportError:
-    SelfHealingService = None  # type: ignore
+    SelfHealingService = None
 
 
 def parse_pull_request_event(
@@ -261,7 +261,7 @@ def _init_self_healing_service(
         history_logger=history_logger,
         config=config,
     )
-    service._guardian_agent = guardian  # type: ignore[attr-defined]
+    service._guardian_agent = guardian
 
     return service
 

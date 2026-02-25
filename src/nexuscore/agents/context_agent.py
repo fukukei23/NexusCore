@@ -151,7 +151,7 @@ class ContextAgent:
         """安全なファイル数カウント"""
         count = 0
         try:
-            for root, dirs, files in os.walk(self.project_root):
+            for _root, dirs, files in os.walk(self.project_root):
                 dirs[:] = [
                     d for d in dirs if d not in [".git", "__pycache__", ".venv", "node_modules"]
                 ]
@@ -166,7 +166,7 @@ class ContextAgent:
         """安全なPythonファイル数カウント"""
         count = 0
         try:
-            for root, dirs, files in os.walk(self.project_root):
+            for _root, dirs, files in os.walk(self.project_root):
                 dirs[:] = [
                     d for d in dirs if d not in [".git", "__pycache__", ".venv", "node_modules"]
                 ]

@@ -18,10 +18,10 @@ try:
     HAS_WEBAPP = True
 except ImportError:
     HAS_WEBAPP = False
-    Run = None  # type: ignore
-    PatchRecord = None  # type: ignore
-    ExecutionLog = None  # type: ignore
-    db = None  # type: ignore
+    Run = None
+    PatchRecord = None
+    ExecutionLog = None
+    db = None
 
 # LLM 呼び出し用
 try:
@@ -31,8 +31,8 @@ try:
     HAS_LLM = True
 except ImportError:
     HAS_LLM = False
-    guarded_llm_call = None  # type: ignore
-    LLMRouter = None  # type: ignore
+    guarded_llm_call = None
+    LLMRouter = None
 
 
 def generate_pr_change_summary(
@@ -61,12 +61,12 @@ def generate_pr_change_summary(
         # パッチ情報を収集
         patches = []
         if hasattr(run, "id") and PatchRecord:
-            patches = PatchRecord.query.filter_by(run_id=run.id).all()  # type: ignore
+            patches = PatchRecord.query.filter_by(run_id=run.id).all()
 
         diff_snippets = []
         for p in patches[:10]:  # 最大10ファイル
-            file_path = p.file_path if hasattr(p, "file_path") else "unknown"  # type: ignore
-            diff_text = p.diff_text if hasattr(p, "diff_text") else ""  # type: ignore
+            file_path = p.file_path if hasattr(p, "file_path") else "unknown"
+            diff_text = p.diff_text if hasattr(p, "diff_text") else ""
 
             # 1ファイルあたり80行まで
             lines = diff_text.splitlines()[:80] if diff_text else []
@@ -79,18 +79,18 @@ def generate_pr_change_summary(
         log_entries = []
         if hasattr(run, "id") and ExecutionLog:
             log_entries = (
-                ExecutionLog.query.filter(  # type: ignore
+                ExecutionLog.query.filter(
                     ExecutionLog.run_id == run.id
-                )  # type: ignore
-                .order_by(ExecutionLog.created_at.asc())  # type: ignore
+                )
+                .order_by(ExecutionLog.created_at.asc())
                 .all()
             )
 
         log_text_lines: list[str] = []
         for lg in log_entries[:100]:  # 最大100エントリ
-            source = lg.source if hasattr(lg, "source") else "unknown"  # type: ignore
-            level = lg.level if hasattr(lg, "level") else "INFO"  # type: ignore
-            message = lg.message if hasattr(lg, "message") else ""  # type: ignore
+            source = lg.source if hasattr(lg, "source") else "unknown"
+            level = lg.level if hasattr(lg, "level") else "INFO"
+            message = lg.message if hasattr(lg, "message") else ""
 
             if level in ("ERROR", "WARNING"):
                 log_text_lines.append(f"[{source}][{level}] {message}")
@@ -147,7 +147,7 @@ Write the summary in Japanese, 5 bullets or fewer.
         # LLMRouter の complete メソッドをラップ
         def llm_complete_fn(model: str, system_prompt: str, user_prompt: str) -> dict:
             if hasattr(llm_router, "complete"):
-                return llm_router.complete(  # type: ignore
+                return llm_router.complete(
                     model=model,
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,

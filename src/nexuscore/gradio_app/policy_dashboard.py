@@ -34,7 +34,7 @@ POLICY_FILE = POLICY_DIR / "constitution.json"
 AGENT_AVAILABLE = False
 try:
     # 例: from nexuscore.agents.constitutional_council_agent import ConstitutionalCouncilAgent
-    from ..agents.constitutional_council_agent import ConstitutionalCouncilAgent  # type: ignore
+    from ..agents.constitutional_council_agent import ConstitutionalCouncilAgent
 
     AGENT_AVAILABLE = True
 except Exception:
@@ -249,7 +249,7 @@ def build_ui():
                     ],
                     wrap=True,
                 )
-                rl_help = gr.Markdown(
+                gr.Markdown(
                     "例: `RL-FIN-001 | 無許可の投資助言の禁止（免責表記なし） | high`<br>"
                     "severity: low / medium / high"
                 )

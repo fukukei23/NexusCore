@@ -17,7 +17,11 @@ from fastapi import APIRouter, Header, Request, status
 
 from ..schemas.error import ErrorResponse
 from ..schemas.github_webhook import GitHubWebhookPayload, GitHubWebhookResponse
-from ..utils.errors import make_bad_request_error, make_unauthorized_error
+from ..utils.errors import (
+    make_bad_request_error,
+    make_internal_error,
+    make_unauthorized_error,
+)
 
 router = APIRouter(
     prefix="/api/v1/github",
@@ -146,7 +150,7 @@ async def github_webhook_endpoint(
         import json
 
         payload_dict = json.loads(payload_body.decode("utf-8"))
-        payload = GitHubWebhookPayload(**payload_dict)
+        GitHubWebhookPayload(**payload_dict)
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON payload: {e}", exc_info=True)
         return GitHubWebhookResponse(

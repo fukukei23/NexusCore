@@ -67,7 +67,7 @@ def require_auth(f):
 
         try:
             # トークンを検証
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])  # type: ignore
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             # デコードされたペイロードを request にアタッチ（必要に応じて使用可能）
             request.auth_payload = payload
         except Exception as e:
@@ -106,7 +106,7 @@ def generate_token(user_id: str, expires_in_hours: int = 24) -> str:
         "exp": datetime.utcnow() + timedelta(hours=expires_in_hours),
         "iat": datetime.utcnow(),
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)  # type: ignore
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def verify_token(token: str) -> dict | None:
@@ -125,7 +125,7 @@ def verify_token(token: str) -> dict | None:
         return None
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])  # type: ignore
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
     except Exception:
         # jwt.InvalidTokenError など

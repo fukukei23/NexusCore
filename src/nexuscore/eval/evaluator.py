@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 try:
@@ -25,7 +25,7 @@ except ImportError:
     ValidationError = None
 
 
-class Verdict(str, Enum):
+class Verdict(StrEnum):
     """評価結果の判定"""
 
     GO = "GO"
