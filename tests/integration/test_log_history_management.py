@@ -164,7 +164,7 @@ class TestSessionControllerIntegration:
             )
 
             # 新しいセッションコントローラーで状態を読み込む（再開をシミュレート）
-            resumed_controller = SessionController(
+            SessionController(
                 session_id="test-session-005",
                 root_dir=tmpdir,
             )

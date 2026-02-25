@@ -32,10 +32,10 @@ try:
     from .base_agent import BaseAgent
 except ImportError:
     # --- フォールバック ---
-    def sanitize_json_like(payload: Any) -> Any:
+    def sanitize_json_like(payload: Any) -> Any:  # type: ignore[misc]
         return payload
 
-    class BaseAgent:
+    class BaseAgent:  # type: ignore[no-redef]
         def __init__(self, *args, **kwargs):
             print("警告: BaseAgentが見つかりません。")
 
@@ -148,8 +148,8 @@ Ensure the response is strictly valid JSON with filled arrays (no empty strings)
                 "constraints": [],
                 "acceptance_criteria": [],
             }
-        self.final_requirements = data
-        return data
+        self.final_requirements = data  # type: ignore[assignment]
+        return data  # type: ignore[return-value]
 
     def launch_gradio_ui(self, share: bool = False) -> dict[str, Any]:
         """
@@ -195,7 +195,7 @@ Ensure the response is strictly valid JSON with filled arrays (no empty strings)
                 fsm.state["history"].append({"role": "assistant", "content": initial_message})
                 # ★★★★★ ここからが v8.3 修正の核心 ★★★★★
                 # Chatbotが期待する messages 形式（辞書のリスト）で返すように修正
-                return [[{"role": "assistant", "content": initial_message}]], self.text[
+                return [[{"role": "assistant", "content": initial_message}]], self.text[  # type: ignore[return-value]
                     "status_ready"
                 ]
                 # ★★★★★ ここまで ★★★★★
@@ -204,7 +204,7 @@ Ensure the response is strictly valid JSON with filled arrays (no empty strings)
                 user_message: str, history: list[dict]
             ) -> Generator[list[Any], None, None]:
                 if not user_message:
-                    yield history, self.text["status_ready"], gr.update(), gr.update(), gr.update(
+                    yield history, self.text["status_ready"], gr.update(), gr.update(), gr.update(  # type: ignore[misc]
                         visible=False
                     ), gr.update(visible=False), gr.update(visible=False)
                     return
@@ -212,7 +212,7 @@ Ensure the response is strictly valid JSON with filled arrays (no empty strings)
                 history.append({"role": "user", "content": user_message})
                 fsm.state["history"].append({"role": "user", "content": user_message})
 
-                yield (
+                yield (  # type: ignore[misc]
                     history,
                     self.text["status_thinking"],
                     gr.update(interactive=False, value=""),
@@ -230,7 +230,7 @@ Ensure the response is strictly valid JSON with filled arrays (no empty strings)
                     fsm.state["history"].append({"role": "assistant", "content": assistant_a})
 
                 suggestion_buttons_update = gr.update(visible=(fsm.state["state"] == "SUGGESTING"))
-                yield (
+                yield (  # type: ignore[misc]
                     history,
                     self.text["status_ready"],
                     gr.update(interactive=True),
@@ -246,7 +246,7 @@ Ensure the response is strictly valid JSON with filled arrays (no empty strings)
                 # UIを閉じるには、Gradioサーバーを停止するなどの追加処理が必要
                 # ここでは完了ステータスを表示し、手動で閉じることを想定
                 # demo.close() # この呼び出しはバックエンドのイベントハンドラからは直接機能しない
-                return final_json_str, self.text["status_finished"]
+                return final_json_str, self.text["status_finished"]  # type: ignore[return-value]
 
             demo.load(on_ui_load, outputs=[chatbot, status_bar])
 

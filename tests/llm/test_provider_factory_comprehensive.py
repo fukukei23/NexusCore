@@ -294,7 +294,7 @@ class TestProviderFactoryIntegration:
         assert isinstance(provider2, OpenAILLM)
 
         # 両方とも同じプロバイダー型
-        assert type(provider1) == type(provider2)
+        assert type(provider1) is type(provider2)
 
     def test_error_handling_consistency(self):
         """エラーハンドリングの一貫性"""

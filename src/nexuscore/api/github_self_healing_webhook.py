@@ -95,7 +95,7 @@ def parse_pull_request_event(
         logger.warning("PR event missing required fields.")
         return None
 
-    return str(repo_full_name), int(pr_number), str(head_sha)
+    return str(repo_full_name), int(pr_number), str(head_sha)  # type: ignore[arg-type]
 
 
 def format_pr_comment(

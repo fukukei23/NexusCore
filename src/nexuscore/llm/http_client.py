@@ -16,8 +16,8 @@ try:  # pragma: no cover - exercised indirectly via providers
     from urllib3.util.retry import Retry
 except ImportError:  # pragma: no cover - fallback when requests isn't installed
     requests = None  # type: ignore[assignment]
-    HTTPAdapter = None  # type: ignore[assignment]
-    Retry = None  # type: ignore[assignment]
+    HTTPAdapter = None  # type: ignore[assignment, misc]
+    Retry = None  # type: ignore[assignment, misc]
 
 logger = logging.getLogger("LLMHttpClient")
 
@@ -41,7 +41,7 @@ class HttpClientFactory:
             return None
 
         session = requests.Session()
-        if Retry and HTTPAdapter:
+        if Retry is not None and HTTPAdapter is not None:
             # 429/5xx を 3 回まで指数バックオフするデフォルト戦略
             retry_strategy = Retry(
                 total=3,
@@ -59,7 +59,7 @@ if requests:
     RequestsHTTPError = requests.exceptions.HTTPError
 else:  # pragma: no cover - requests absent
 
-    class RequestsHTTPError(Exception):
+    class RequestsHTTPError(Exception):  # type: ignore[no-redef]
         """Fallback HTTPError used when requests is unavailable."""
 
         pass

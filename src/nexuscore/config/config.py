@@ -75,12 +75,12 @@ class AppConfig:
             "hard_stop_on_exceed": True,  # False への緩和は不可
         },
         "scope": {
-            "include_globs": _split_csv.__func__("NEXUS_SCOPE_INCLUDE", "src/**,tools/**,tests/**"),
-            "exclude_globs": _split_csv.__func__(
+            "include_globs": _split_csv.__func__("NEXUS_SCOPE_INCLUDE", "src/**,tools/**,tests/**"),  # type: ignore[attr-defined]
+            "exclude_globs": _split_csv.__func__(  # type: ignore[attr-defined]
                 "NEXUS_SCOPE_EXCLUDE",
                 "**/.venv/**,**/openenv/**,exports/**,archive/**,sandbox_repo/**",
             ),
-            "protected_paths": _split_csv.__func__(
+            "protected_paths": _split_csv.__func__(  # type: ignore[attr-defined]
                 "NEXUS_SCOPE_PROTECTED", "src/nexuscore/core/**,src/nexuscore/llm/**"
             ),
             "max_diff_lines": int(os.getenv("NEXUS_MAX_DIFF_LINES", "200")),

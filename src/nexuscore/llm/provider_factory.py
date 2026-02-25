@@ -29,7 +29,7 @@ def get_provider_class(family: str) -> type[BaseLLM]:
     try:
         return PROVIDER_CLASSES[family]
     except KeyError:
-        raise ValueError(f"Unsupported model family '{family}'")
+        raise ValueError(f"Unsupported model family '{family}'") from None
 
 
 def create_provider(model_name: str) -> BaseLLM:

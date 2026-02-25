@@ -14,6 +14,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
+try:
+    import gradio as gr
+except ImportError:
+    gr = None  # type: ignore[assignment]
+
 import pytest
 
 # Mock gradio before importing revision_tab

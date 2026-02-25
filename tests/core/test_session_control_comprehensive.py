@@ -50,7 +50,7 @@ class TestSessionControllerInit:
         """Test initialization creates root directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
             nested_dir = Path(tmpdir) / "nested" / "sessions"
-            controller = SessionController("test", root_dir=str(nested_dir))
+            SessionController("test", root_dir=str(nested_dir))
 
             assert nested_dir.exists()
 

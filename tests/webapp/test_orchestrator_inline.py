@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 webapp/orchestrator_inline.py の高品質なテスト
 
@@ -236,7 +237,7 @@ class TestRunOrchestratorInline:
             mock_sync.side_effect = Exception("Orchestrator error")
 
             with patch("nexuscore.core.notifier.get_notifier", return_value=mock_notifier):
-                with pytest.raises(Exception):
+                with pytest.raises(Exception):  # noqa: B017
                     run_orchestrator_inline(
                         run=run,
                         project=project,

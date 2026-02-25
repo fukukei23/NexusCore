@@ -118,7 +118,6 @@ class TestRotateIfNeeded:
         log_file.write_text("x" * 100)
 
         # rename がエラーを投げるようにモック
-        original_rename = Path.rename
 
         def mock_rename(self, target):
             raise PermissionError("Cannot rename")

@@ -41,7 +41,7 @@ INVESTMENT_MEMO_KEYS = {
 class VentureCapitalistAgent:
     def __init__(self, llm_client: LLMClient, tools: dict[str, Any]):
         self.llm_client = llm_client
-        self.market_scanner: SearchTool = tools.get("Google Search")
+        self.market_scanner: SearchTool = tools.get("Google Search")  # type: ignore[assignment]
         if self.market_scanner is None:
             raise ValueError("Google Search tool is required")
         self.run_id = str(uuid.uuid4())

@@ -9,22 +9,18 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "./modules"))
 
 # 4.5: 統合 Gradio UI を優先的に使用
 try:
-    from nexuscore.ui.unified_gradio_ui import build_unified_ui, launch_unified_ui
+    from nexuscore.ui.unified_gradio_ui import launch_unified_ui
 
     HAS_UNIFIED_UI = True
 except ImportError:
     HAS_UNIFIED_UI = False
-    launch_unified_ui = None  # type: ignore
+    launch_unified_ui = None
 
 # 既存のUIタブ（フォールバック用）
 try:
     from app_ui import launch_app_ui
     from revision_loop import launch_revision_ui
     from streamlit_migrated_tab import tab_streamlit_port
-
-    from nexuscore.modules.whisper_handler import (
-        transcribe_audio,
-    )  # Whisper処理（明示的なインポート）
 
     HAS_LEGACY_UI = True
 except ImportError:

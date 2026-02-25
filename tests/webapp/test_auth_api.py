@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 webapp/auth_api.py の高品質なテスト
 

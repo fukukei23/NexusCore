@@ -12,7 +12,7 @@ import pytest
 
 # PyYAMLのモック化（必要に応じて）
 try:
-    import yaml
+    import yaml  # noqa: F401
 
     HAS_YAML = True
 except ImportError:
@@ -435,7 +435,7 @@ class TestFindProjectRoot:
         project_root.mkdir()
         (project_root / "pyproject.toml").touch()
 
-        loader = ConstitutionLoader()
+        ConstitutionLoader()
 
         # 検索ロジックのシミュレーション
         current = project_root / "src"
@@ -631,7 +631,7 @@ class TestGlobalFunctions:
     def test_reload_constitution_resets_state(self):
         """reload_constitution()が状態をリセット"""
         # 最初の読み込み
-        const1 = get_constitution()
+        get_constitution()
 
         # 再読み込み
         const2 = reload_constitution()

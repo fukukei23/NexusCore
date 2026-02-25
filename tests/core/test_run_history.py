@@ -173,10 +173,10 @@ def test_log_run_different_kinds(tmp_path):
 
     # それぞれ1行ずつあることを確認
     with healing_file.open("r", encoding="utf-8") as f:
-        assert len([l for l in f if l.strip()]) == 1
+        assert len([line_ for line_ in f if line_.strip()]) == 1
 
     with project_file.open("r", encoding="utf-8") as f:
-        assert len([l for l in f if l.strip()]) == 1
+        assert len([line_ for line_ in f if line_.strip()]) == 1
 
 
 def test_new_self_healing_record(tmp_path):

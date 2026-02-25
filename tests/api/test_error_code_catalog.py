@@ -96,7 +96,7 @@ def get_openapi_error_responses(openapi_schema: dict) -> dict[str, set[int]]:
 
                     # ErrorResponse が含まれているか確認
                     content = response_spec.get("content", {})
-                    for content_type, media_type_spec in content.items():
+                    for _content_type, media_type_spec in content.items():
                         schema_ref = media_type_spec.get("schema", {}).get("$ref", "")
                         if "ErrorResponse" in schema_ref or "ErrorResponse" in str(response_spec):
                             status_codes.add(status_code)

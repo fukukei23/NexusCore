@@ -58,7 +58,7 @@ except Exception:
 
         BUDGET_API = "v2"
 
-        class BudgetManager:  # v1互換の薄ラッパ
+        class BudgetManager:  # type: ignore[no-redef]  # v1互換の薄ラッパ
             def __init__(self, daily_limit_usd: float | None = None, log_dir=None):
                 self._b = _budget_v2
 
@@ -86,7 +86,7 @@ except Exception:
         # どちらも無い → No-Op で警告
         BUDGET_API = "none"
 
-        class BudgetManager:
+        class BudgetManager:  # type: ignore[no-redef]
             def __init__(self, daily_limit_usd: float | None = None, log_dir=None):
                 logging.getLogger("LLMRouter").warning(
                     "[Budget] No BudgetManager found (v1/v2). Running with NO budget guard!"
@@ -272,7 +272,7 @@ class LLMRouter:
 
         # モデル振り分けテーブル
         self.task_model_map = task_model_map or TASK_MODEL_MAP_DEFAULT.copy()
-        self.default_model = (self.task_model_map.get("general") or {}).get("primary")
+        self.default_model = (self.task_model_map.get("general") or {}).get("primary")  # type: ignore[union-attr]
         self.task_temperature_overrides = {
             "code_generate": float(os.getenv("NEXUS_CODEGEN_TEMP", "0.1")),
         }
@@ -306,7 +306,7 @@ class LLMRouter:
         # "タスク分類用" モデル（デフォルト: openai:gpt-4o-mini）
         classifier_model_name = (
             self.env.get("NEXUS_CLASSIFIER_MODEL")
-            or (self.task_model_map.get("routing_classify") or {}).get("primary")
+            or (self.task_model_map.get("routing_classify") or {}).get("primary")  # type: ignore[union-attr]
             or self.CLASSIFIER_MODEL_DEFAULT
         )
         LLMRouter.CLASSIFIER_MODEL = classifier_model_name
@@ -354,7 +354,7 @@ class LLMRouter:
         起動時に利用可能なモデルを検出し、task model mapを更新する。
         ネットワーク失敗時は既存設定にフォールバック（警告ログのみ）。
         """
-        detected_models = {"openai": [], "gemini": []}
+        detected_models: dict[str, list[Any]] = {"openai": [], "gemini": []}
 
         # OpenAI モデル検出
         openai_key = os.getenv("OPENAI_API_KEY")
@@ -542,7 +542,7 @@ class LLMRouter:
 
         # 更新を適用
         for task, new_config in updates.items():
-            self.task_model_map[task] = new_config
+            self.task_model_map[task] = new_config  # type: ignore[assignment]
             self.logger.info(f"[Model Detection] Updated {task}: {new_config.get('primary')}")
 
         if updates:
@@ -610,7 +610,7 @@ class LLMRouter:
             else:
                 primary = entry
                 fb = []
-            return primary, fb
+            return primary, fb  # type: ignore[return-value]
 
         if llm_mode == "cheap":
             cheap_map = {
@@ -620,7 +620,7 @@ class LLMRouter:
             }
             cheap_model = cheap_map.get(task_type)
             if cheap_model:
-                model_name, fallbacks = cheap_model, []
+                model_name, fallbacks = cheap_model, []  # type: ignore[var-annotated]
             else:
                 model_name, fallbacks = _resolve(task_type)
         else:

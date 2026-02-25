@@ -422,7 +422,7 @@ class TestWriteRunReportFile:
                 with patch("pathlib.Path.write_text") as mock_write:
                     mock_run_cls.query = mock_query
 
-                    result = write_run_report_file(1)
+                    write_run_report_file(1)
 
         # write_text が呼ばれたことを確認
         mock_write.assert_called_once_with(mock_markdown, encoding="utf-8")

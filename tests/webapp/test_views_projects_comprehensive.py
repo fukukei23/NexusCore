@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 views_projects.py の包括的なテスト
 
@@ -508,7 +509,7 @@ class TestTriggerRun:
         """Celery使用時はタスクをキューに入れる"""
         mock_task.delay.return_value = Mock(id="task-123")
 
-        response = authenticated_client.post(
+        authenticated_client.post(
             f"/projects/{test_project.id}/run", json={"requirement": "Fix bugs"}
         )
 
@@ -525,7 +526,7 @@ class TestTriggerRun:
     @patch("nexuscore.webapp.orchestrator_inline.run_orchestrator_inline")
     def test_trigger_run_without_celery(self, mock_inline, authenticated_client, test_project):
         """Celery未使用時は同期実行"""
-        response = authenticated_client.post(
+        authenticated_client.post(
             f"/projects/{test_project.id}/run", json={"requirement": "Run tests"}
         )
 
@@ -542,7 +543,7 @@ class TestTriggerRun:
             with patch("nexuscore.webapp.celery_app.run_orchestrator_task") as mock_task:
                 mock_task.delay.return_value = Mock(id="task-123")
 
-                response = authenticated_client.post(
+                authenticated_client.post(
                     f"/projects/{test_project.id}/run",
                     json={"requirement": "Test", "autonomy_level": 2},
                 )
@@ -556,7 +557,7 @@ class TestTriggerRun:
             with patch("nexuscore.webapp.celery_app.run_orchestrator_task") as mock_task:
                 mock_task.delay.return_value = Mock(id="task-123")
 
-                response = authenticated_client.post(
+                authenticated_client.post(
                     f"/projects/{test_project.id}/run",
                     json={"requirement": "Test", "fast_lane": True},
                 )

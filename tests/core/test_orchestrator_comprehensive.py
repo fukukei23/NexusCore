@@ -756,7 +756,7 @@ class TestAssembleAgentTeam:
         ]:
             mock.return_value = Mock()
 
-        result = assemble_agent_team(str(tmp_path))
+        assemble_agent_team(str(tmp_path))
 
         # カスタムモデルで初期化されることを確認
         mock_curator.assert_called_once_with(

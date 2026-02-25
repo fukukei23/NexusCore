@@ -24,10 +24,10 @@ try:
     from .base_agent import BaseAgent
 except ImportError:
     # --- フォールバック定義 ---
-    def sanitize_json_like(payload: Any) -> Any:
+    def sanitize_json_like(payload: Any) -> Any:  # type: ignore[misc]
         return payload
 
-    class BaseAgent:
+    class BaseAgent:  # type: ignore[no-redef]
         def __init__(self, *args, **kwargs):
             self.logger = logging.getLogger(self.__class__.__name__)
             print("警告: BaseAgentが見つかりません。（フォールバック）")
@@ -124,16 +124,16 @@ class PlannerAgent(BaseAgent):
                     f"Generated plan is invalid or empty. Raw response: {response_str}"
                 )
                 return self._fallback_plan(user_requirement, context)
-            if len(sanitized.get("functions_to_implement", [])) < 3:
+            if len(sanitized.get("functions_to_implement", [])) < 3:  # type: ignore[union-attr]
                 self.logger.info("Plan contained fewer than 3 tasks; merging with fallback tasks.")
                 fb = self._fallback_plan(user_requirement, context)
-                existing = sanitized["functions_to_implement"]
+                existing = sanitized["functions_to_implement"]  # type: ignore[call-overload]
                 names = {entry["name"] for entry in existing}
                 for fb_task in fb["functions_to_implement"]:
                     if fb_task["name"] not in names:
                         existing.append(fb_task)
-                sanitized["functions_to_implement"] = existing
-            return sanitized
+                sanitized["functions_to_implement"] = existing  # type: ignore[call-overload]
+            return sanitized  # type: ignore[return-value]
         except Exception:
             self.logger.error(
                 f"Failed to decode or validate JSON plan. Raw response: {response_str}",
@@ -194,7 +194,7 @@ class PlannerAgent(BaseAgent):
             ("testing_and_docs", "pytest用のテストとREADME/使用手順を整備する"),
         ]
 
-        functions = []
+        functions: list[dict[str, Any]] = []
         for idx, (suffix, description) in enumerate(core_steps, start=1):
             functions.append(
                 {

@@ -35,7 +35,7 @@ if SDK_PYTHON_DIR.exists() and (SDK_PYTHON_DIR / "nexuscore_sdk").exists():
         except ImportError:
             # タグごとの API クラスを試みる
             try:
-                from nexuscore_sdk.api import ExecuteApi, HealthApi, ProjectsApi
+                from nexuscore_sdk.api import ExecuteApi, HealthApi, ProjectsApi  # noqa: F401
 
                 DefaultApi = None  # DefaultApi が存在しない場合は None
             except ImportError:

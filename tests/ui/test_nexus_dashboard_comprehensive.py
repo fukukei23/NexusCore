@@ -63,7 +63,7 @@ class TestCreateNexusDashboard:
         mock_blocks = MagicMock()
         mock_gr.Blocks.return_value.__enter__.return_value = mock_blocks
 
-        result = create_nexus_dashboard(project_id=456, project_path="/another/path")
+        create_nexus_dashboard(project_id=456, project_path="/another/path")
 
         mock_gr.Blocks.assert_called_once()
 
@@ -217,7 +217,7 @@ class TestNexusDashboardIntegration:
         mock_gr.Column.return_value.__enter__.return_value = MagicMock()
         mock_gr.Row.return_value.__enter__.return_value = MagicMock()
 
-        result = create_nexus_dashboard(project_id=1, project_path="/test")
+        create_nexus_dashboard(project_id=1, project_path="/test")
 
         # Blocksが作成される
         assert mock_gr.Blocks.called

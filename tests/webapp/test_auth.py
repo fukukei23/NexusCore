@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 webapp/auth.py の高品質なテスト
 
@@ -200,7 +201,7 @@ class TestGitHubCallback:
             with patch("nexuscore.webapp.auth.requests.get") as mock_get:
                 mock_get.side_effect = [mock_user_response, mock_email_response]
 
-                response = client.get("/auth/github/callback?code=test_code")
+                client.get("/auth/github/callback?code=test_code")
 
                 # User が更新されている
                 user = User.query.filter_by(github_id="12345").first()
@@ -233,7 +234,7 @@ class TestGitHubCallback:
             with patch("nexuscore.webapp.auth.requests.get") as mock_get:
                 mock_get.side_effect = [mock_user_response, mock_email_response]
 
-                response = client.get("/auth/github/callback?code=test_code")
+                client.get("/auth/github/callback?code=test_code")
 
                 # User が作成されている（メールなし）
                 user = User.query.filter_by(github_id="12345").first()
@@ -267,7 +268,7 @@ class TestGitHubCallback:
             with patch("nexuscore.webapp.auth.requests.get") as mock_get:
                 mock_get.side_effect = [mock_user_response, mock_email_response]
 
-                response = client.get("/auth/github/callback?code=test_code")
+                client.get("/auth/github/callback?code=test_code")
 
                 # プライマリかつ検証済みのメールが選択されている
                 user = User.query.filter_by(github_id="12345").first()
@@ -299,7 +300,7 @@ class TestGitHubCallback:
             with patch("nexuscore.webapp.auth.requests.get") as mock_get:
                 mock_get.side_effect = [mock_user_response, mock_email_response]
 
-                response = client.get("/auth/github/callback?code=test_code")
+                client.get("/auth/github/callback?code=test_code")
 
                 # 最初の検証済みメールが選択されている
                 user = User.query.filter_by(github_id="12345").first()
@@ -354,7 +355,7 @@ class TestGitHubCallback:
             with patch("nexuscore.webapp.auth.requests.get") as mock_get:
                 mock_get.side_effect = [mock_user_response, mock_email_response]
 
-                response = client.get("/auth/github/callback?code=test_code")
+                client.get("/auth/github/callback?code=test_code")
 
                 # セッションに user_id が保存されている
                 with client.session_transaction() as sess:
@@ -409,7 +410,7 @@ class TestGetCurrentUser:
                 sess["user_id"] = user.id
 
             # リクエストコンテキスト内で get_current_user を呼ぶ
-            response = client.get("/")  # ダミーリクエスト
+            client.get("/")  # ダミーリクエスト
             # リクエストコンテキスト内で get_current_user を実行
             with app.test_request_context():
                 session["user_id"] = user.id

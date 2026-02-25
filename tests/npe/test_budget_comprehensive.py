@@ -399,7 +399,7 @@ class TestPreflightCheck:
         """日次ハード上限を超えるとブロック"""
         # 既に1400円使っている
         today = _day_key()
-        for i in range(14):
+        for _i in range(14):
             entry = {"day": today, "cost_jpy": 100.0}
             with temp_ledger.open("a") as f:
                 f.write(json.dumps(entry) + "\n")

@@ -136,7 +136,7 @@ async def github_webhook_endpoint(
             )
     except Exception as e:
         logger.error(f"Failed to read request body: {e}", exc_info=True)
-        raise make_bad_request_error("Failed to read request body")
+        raise make_bad_request_error("Failed to read request body") from e
 
     # 署名検証（オプション）
     webhook_secret = os.getenv("GITHUB_WEBHOOK_SECRET")
@@ -191,7 +191,7 @@ async def github_webhook_endpoint(
 
     except ImportError as e:
         logger.error(f"GitHub webhook handler is not available: {e}", exc_info=True)
-        raise make_internal_error("GitHub webhook handler not available")
+        raise make_internal_error("GitHub webhook handler not available") from e
     except Exception as e:
         logger.error(f"GitHub webhook handling failed: {e}", exc_info=True)
         return GitHubWebhookResponse(

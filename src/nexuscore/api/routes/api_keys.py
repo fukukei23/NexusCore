@@ -50,7 +50,7 @@ def _get_user_id_from_auth(current_user: AuthenticatedUser) -> int:
         return user_id
     except (ValueError, TypeError):
         logger.error(f"Invalid user_id in AuthenticatedUser: {current_user.user_id}")
-        raise make_internal_error("Invalid user ID in authentication token")
+        raise make_internal_error("Invalid user ID in authentication token") from None
 
 
 @router.post(
@@ -151,14 +151,14 @@ async def issue_api_key(
         except SQLAlchemyError as e:
             db.session.rollback()
             logger.error(f"Database error during API key creation: {e}", exc_info=True)
-            raise make_internal_error("Failed to create API key")
+            raise make_internal_error("Failed to create API key") from e
 
     except Exception as e:
         # HTTPException はそのまま再発生
         if hasattr(e, "status_code"):
             raise
         logger.error(f"Unexpected error during API key creation: {e}", exc_info=True)
-        raise make_internal_error("Unexpected error during API key creation")
+        raise make_internal_error("Unexpected error during API key creation") from e
 
 
 @router.get(
@@ -217,14 +217,14 @@ async def list_api_keys(
 
     except SQLAlchemyError as e:
         logger.error(f"Database error during API key list: {e}", exc_info=True)
-        raise make_internal_error("Failed to retrieve API keys")
+        raise make_internal_error("Failed to retrieve API keys") from e
 
     except Exception as e:
         # HTTPException はそのまま再発生
         if hasattr(e, "status_code"):
             raise
         logger.error(f"Unexpected error during API key list: {e}", exc_info=True)
-        raise make_internal_error("Unexpected error during API key list")
+        raise make_internal_error("Unexpected error during API key list") from e
 
 
 @router.delete(
@@ -291,11 +291,11 @@ async def revoke_api_key(
     except SQLAlchemyError as e:
         db.session.rollback()
         logger.error(f"Database error during API key revocation: {e}", exc_info=True)
-        raise make_internal_error("Failed to revoke API key")
+        raise make_internal_error("Failed to revoke API key") from e
 
     except Exception as e:
         # HTTPException はそのまま再発生
         if hasattr(e, "status_code"):
             raise
         logger.error(f"Unexpected error during API key revocation: {e}", exc_info=True)
-        raise make_internal_error("Unexpected error during API key revocation")
+        raise make_internal_error("Unexpected error during API key revocation") from e

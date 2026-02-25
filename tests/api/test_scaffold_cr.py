@@ -164,7 +164,7 @@ def test_scaffold_readme_entry_insertion_order(tmp_path):
     readme_path.write_text(dummy_readme, encoding="utf-8")
 
     # 既存エントリを抽出
-    entries = extract_existing_cr_entries(dummy_readme)
+    extract_existing_cr_entries(dummy_readme)
 
     # CR-FASTAPI-003 を挿入する場合、位置は CR-FASTAPI-001 の後、CR-FASTAPI-005 の前になる
     insert_pos = find_insert_position(dummy_readme, "CR-FASTAPI-003")

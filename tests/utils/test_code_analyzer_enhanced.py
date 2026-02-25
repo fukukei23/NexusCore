@@ -89,7 +89,7 @@ if __name__ == "__main__":
         # AST解析のモック設定
         try:
             mock_ast_parse.return_value = ast.parse(self.complex_code)
-        except:
+        except Exception:
             mock_ast_parse.return_value = MagicMock()
 
         ast_functions = [

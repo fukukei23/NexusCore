@@ -353,7 +353,7 @@ class TestStripJsonish:
         """Noneは空文字列として扱われる"""
         # Note: 実装では if not text で空文字列チェックしているが、
         # Noneは Falsy なので空文字列を返す
-        assert _strip_jsonish(None) == None
+        assert _strip_jsonish(None) is None
 
     def test_strip_jsonish_whitespace_only(self):
         """空白のみ"""

@@ -242,7 +242,7 @@ def test_get_changed_files_with_base_and_head(tmp_path, mock_subprocess):
     project_path = tmp_path / "test_project"
     project_path.mkdir()
 
-    files = service._get_changed_files(
+    service._get_changed_files(
         project_path=project_path,
         base_ref="main",
         head_ref="feature-branch",

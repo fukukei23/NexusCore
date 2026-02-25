@@ -23,7 +23,7 @@ except Exception:
 try:
     from ..llm.llm_router import LLMRouter
 except Exception:
-    LLMRouter = None
+    LLMRouter = None  # type: ignore[assignment, misc]
 
 # 4.4: Retry と例外分類
 try:
@@ -121,7 +121,7 @@ class BaseAgent:
                 self.logger.error(f"LLM クライアント取得に失敗: {e}", exc_info=True)
                 # HTTP エラーを NexusCore 例外に変換
                 if HAS_RETRY and convert_http_error_to_nexus_error:
-                    raise convert_http_error_to_nexus_error(e)
+                    raise convert_http_error_to_nexus_error(e) from None
                 raise
 
             # 実行
@@ -138,13 +138,13 @@ class BaseAgent:
                             json.loads(result)
                         except json.JSONDecodeError as e:
                             if HAS_RETRY:
-                                raise InvalidModelOutputError(f"Invalid JSON output: {e}")
+                                raise InvalidModelOutputError(f"Invalid JSON output: {e}") from None
                             raise
                     return result
                 except Exception as e:
                     # HTTP エラーを NexusCore 例外に変換
                     if HAS_RETRY and convert_http_error_to_nexus_error:
-                        raise convert_http_error_to_nexus_error(e)
+                        raise convert_http_error_to_nexus_error(e) from None
                     raise
             else:
                 self.logger.warning("有効な LLM クライアントが見つからず、空レスポンスを返します。")

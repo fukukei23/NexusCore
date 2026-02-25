@@ -119,7 +119,7 @@ class TestConstitutionLoader:
     def test_reload_constitution(self):
         """憲法の再読み込みをテスト"""
         # 初回読み込み
-        constitution1 = get_constitution()
+        get_constitution()
 
         # 再読み込み
         constitution2 = reload_constitution()

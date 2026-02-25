@@ -110,7 +110,7 @@ def test_cache_invalidated_when_file_changes(sample_project_dir):
 
     # 1回目の解析
     result1 = analyzer.run()
-    initial_analyzed = result1["stats"]["analyzed_files"]
+    result1["stats"]["analyzed_files"]
 
     # 1つのファイルを変更
     module_a = sample_project_dir / "module_a.py"
@@ -152,11 +152,11 @@ def test_cache_disabled_by_env(sample_project_dir):
 
         # 1回目の解析
         result1 = analyzer.run()
-        analyze_count_1 = result1["stats"]["analyzed_files"]
+        result1["stats"]["analyzed_files"]
 
         # 2回目の解析（同じインスタンスで再実行）
         result2 = analyzer.run()
-        analyze_count_2 = result2["stats"]["analyzed_files"]
+        result2["stats"]["analyzed_files"]
 
         # キャッシュが無効なので、毎回解析される
         # （ただし、同じインスタンスを使用している場合は、内部状態により異なる可能性がある）
@@ -194,7 +194,7 @@ def test_cache_reset_env_flag(sample_project_dir):
     if not analyzer1.setup(["python"]):
         pytest.skip("Tree-sitter parser not available")
 
-    result1 = analyzer1.run()
+    analyzer1.run()
 
     # キャッシュファイルが生成されることを確認
     assert cache_file.exists(), "Cache file should be created"
@@ -204,7 +204,7 @@ def test_cache_reset_env_flag(sample_project_dir):
 
     with open(cache_file, encoding="utf-8") as f:
         cache_data_1 = json.load(f)
-    created_at_1 = cache_data_1.get("created_at")
+    cache_data_1.get("created_at")
 
     # 少し待ってから RESET_CACHE を設定して再実行
     time.sleep(0.1)
@@ -234,7 +234,7 @@ def test_cache_reset_env_flag(sample_project_dir):
         # キャッシュファイルの内容を確認（created_at が更新されている）
         with open(cache_file, encoding="utf-8") as f:
             cache_data_2 = json.load(f)
-        created_at_2 = cache_data_2.get("created_at")
+        cache_data_2.get("created_at")
 
         # created_at が更新されていることを確認（または、クリア後に再生成されている）
         assert (

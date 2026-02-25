@@ -21,7 +21,7 @@ class TestGitControllerInit:
     def test_init_with_valid_repo(self, tmp_path):
         """Initialize with valid git repository"""
         # Create a git repo
-        repo = git.Repo.init(tmp_path)
+        git.Repo.init(tmp_path)
 
         # Initialize GitController
         controller = GitController(str(tmp_path))
@@ -32,7 +32,7 @@ class TestGitControllerInit:
     def test_init_searches_parent_directories(self, tmp_path):
         """Initialize searches parent directories for .git"""
         # Create git repo in parent
-        repo = git.Repo.init(tmp_path)
+        git.Repo.init(tmp_path)
 
         # Create subdirectory
         subdir = tmp_path / "subdir"
@@ -211,7 +211,7 @@ with multiple lines.
     def test_commit_in_subdirectory(self, tmp_path):
         """Commit files in subdirectory"""
         # Setup git repo
-        repo = git.Repo.init(tmp_path)
+        git.Repo.init(tmp_path)
 
         # Create subdirectory and file
         subdir = tmp_path / "src"
@@ -229,7 +229,7 @@ with multiple lines.
     def test_commit_with_special_characters_in_filename(self, tmp_path):
         """Commit file with special characters in name"""
         # Setup git repo
-        repo = git.Repo.init(tmp_path)
+        git.Repo.init(tmp_path)
 
         # Create file with special chars
         test_file = tmp_path / "test file (1).txt"
@@ -254,7 +254,7 @@ class TestGitControllerErrorHandling:
     def test_commit_nonexistent_file_returns_none(self, tmp_path):
         """Commit nonexistent file returns None"""
         # Setup git repo
-        repo = git.Repo.init(tmp_path)
+        git.Repo.init(tmp_path)
         controller = GitController(str(tmp_path))
 
         # Try to commit nonexistent file
@@ -359,7 +359,7 @@ class TestGitControllerIntegration:
     def test_commit_binary_file(self, tmp_path):
         """Commit binary file"""
         # Setup git repo
-        repo = git.Repo.init(tmp_path)
+        git.Repo.init(tmp_path)
         controller = GitController(str(tmp_path))
 
         # Create binary file
@@ -375,7 +375,7 @@ class TestGitControllerIntegration:
     def test_commit_empty_file(self, tmp_path):
         """Commit empty file"""
         # Setup git repo
-        repo = git.Repo.init(tmp_path)
+        git.Repo.init(tmp_path)
         controller = GitController(str(tmp_path))
 
         # Create empty file
@@ -416,7 +416,7 @@ class TestGitControllerEdgeCases:
     def test_commit_empty_file_list(self, tmp_path):
         """Commit with empty file list"""
         # Setup git repo
-        repo = git.Repo.init(tmp_path)
+        git.Repo.init(tmp_path)
         controller = GitController(str(tmp_path))
 
         # Try to commit empty list
@@ -428,7 +428,7 @@ class TestGitControllerEdgeCases:
     def test_commit_same_file_twice(self, tmp_path):
         """Commit same file listed twice"""
         # Setup git repo
-        repo = git.Repo.init(tmp_path)
+        git.Repo.init(tmp_path)
         controller = GitController(str(tmp_path))
 
         # Create file

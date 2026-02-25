@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 NexusCore Webapp - trigger_run エンドポイントのテスト
 

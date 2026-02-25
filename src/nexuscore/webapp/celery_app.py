@@ -42,7 +42,7 @@ def make_celery(flask_app) -> Celery:
     celery_app.conf.update(flask_app.config)
 
     # Flask アプリコンテキスト内でタスクを実行するためのカスタムタスククラス
-    class ContextTask(celery_app.Task):
+    class ContextTask(celery_app.Task):  # type: ignore[name-defined]
         """Flask アプリコンテキスト内でタスクを実行するカスタムタスククラス"""
 
         def __call__(self, *args, **kwargs):

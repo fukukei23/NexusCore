@@ -53,7 +53,6 @@ def test_diff_viewer_simple():
 
 def test_history_viewer_loads_and_formats(tmp_path, monkeypatch):
     (tmp_path / "patch_history").mkdir()
-    data = {"timestamp": "20250101", "test_log": "failed", "reason": "something bad"}
     (tmp_path / "patch_history" / "patch_1.json").write_text(
         '{"timestamp":"20250101","test_log":"failed","reason":"reason text"}', encoding="utf-8"
     )

@@ -149,7 +149,7 @@ class TestSetupFileLogging:
     def test_setup_file_logging_removes_duplicate_handlers(self):
         """Removes existing FileHandlers to prevent duplicates"""
         # Call twice with same logger
-        logger1 = setup_file_logging("test.log", logger_name="duplicate_test")
+        setup_file_logging("test.log", logger_name="duplicate_test")
         logger2 = setup_file_logging("test.log", logger_name="duplicate_test")
 
         # Should only have one FileHandler

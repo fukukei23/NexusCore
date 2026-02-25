@@ -346,7 +346,7 @@ class TestIntegrationScenarios:
         # 異なるプロンプトで複数回使用
         prompts = ["Help with coding", "Explain this concept", "Debug this issue"]
 
-        for i, prompt in enumerate(prompts):
+        for _i, prompt in enumerate(prompts):
             mock_client.execute.return_value = '{"task_type": "general"}'
             result = classifier.classify(prompt, task_types)
             assert result == "general"

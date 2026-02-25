@@ -55,7 +55,7 @@ class RetryConfig:
     base_delay: float = 1.0
     fixed_delay: float = 1.0
     backoff_multiplier: float = 2.0
-    strategy_map: dict[str, BackoffStrategy] = None
+    strategy_map: dict[str, BackoffStrategy] | None = None
 
     def __post_init__(self):
         """デフォルトの戦略マッピングを設定"""
@@ -136,7 +136,7 @@ def _calculate_backoff_delay(attempt: int, error_class: str, config: RetryConfig
     Returns:
         待機時間（秒）
     """
-    strategy = config.strategy_map.get(error_class, BackoffStrategy.INCREASING_MEDIUM)
+    strategy = config.strategy_map.get(error_class, BackoffStrategy.INCREASING_MEDIUM)  # type: ignore[union-attr]
 
     if strategy == BackoffStrategy.NO_WAIT:
         # 待機なし再試行（初回のみ、attempt=0 の場合は待機なし）
@@ -200,13 +200,9 @@ def retry_with_context(
         if base_delay != 1.0:  # デフォルト値以外が指定された場合
             retry_config.base_delay = base_delay
 
-    # 後方互換性のため、retry_on の型を tuple に固定
-    retry_on_tuple: tuple[type[Exception], ...]
-    if retry_on is None:
-        pass
-
-    else:
-        # Iterable を tuple に変換
+    # 後方互換性のため、retry_on の型を tuple に固定（未使用変数を除去）
+    if retry_on is not None:
+        # Iterable を tuple に変換（将来の拡張のための変換ロジック）
         tuple(retry_on) if not isinstance(retry_on, tuple) else retry_on
 
     @wraps(func)
@@ -230,7 +226,7 @@ def retry_with_context(
                 # 3.3.1: リトライ可否の判断ルール
                 should_retry = False
                 try:
-                    if isinstance(e, retry_on):
+                    if isinstance(e, retry_on):  # type: ignore[arg-type]
                         should_retry = True
                     elif isinstance(e, NexusCoreError):
                         # NexusCore カスタム例外の場合は classify_error で判定

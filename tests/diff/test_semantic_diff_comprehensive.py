@@ -697,7 +697,7 @@ async def fetch_data():
     pass
 """
         tree = ast.parse(code)
-        functions = _extract_functions_from_ast(tree)
+        _extract_functions_from_ast(tree)
 
         # async def も ast.FunctionDef として扱われる (Python 3.5+)
         # 実際には ast.AsyncFunctionDef という別のノードタイプだが、

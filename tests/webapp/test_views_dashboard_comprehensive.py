@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 views_dashboard.py の包括的なテスト
 

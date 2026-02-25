@@ -347,7 +347,7 @@ class TestRunConsensusReview:
         monkeypatch.setattr(workflow, "_run_one_model", fake_run_one)
 
         items = [workflow.ReviewItem(path="f.py", content="code")]
-        result = asyncio.run(
+        asyncio.run(
             workflow.run_consensus_review(
                 task="test",
                 items=items,

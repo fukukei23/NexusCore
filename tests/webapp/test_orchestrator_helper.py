@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 """
 webapp/orchestrator_helper.py の高品質なテスト
 

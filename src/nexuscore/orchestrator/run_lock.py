@@ -225,7 +225,7 @@ def refresh_run_lock(run_id: str) -> tuple[bool, str | None, dict[str, Any] | No
         # Atomic rename
         temp_path.replace(lock_path)
         return True, None, None
-    except (OSError, json.JSONEncodeError) as e:
+    except (OSError, json.JSONDecodeError) as e:
         # Clean up temp file if it exists
         try:
             if temp_path.exists():

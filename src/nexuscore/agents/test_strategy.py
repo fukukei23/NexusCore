@@ -53,7 +53,7 @@ class TestStrategyConfig:
     default_risk: str = "B"
     default_strategy: str = "ai_first_only"
     default_min_coverage: int = 60
-    critical_test_markers: list[str] = None
+    critical_test_markers: list[str] | None = None
 
     def __post_init__(self) -> None:
         if self.critical_test_markers is None:
@@ -155,7 +155,7 @@ class TestStrategyManager:
         if self.config is None:
             self._load_config()
 
-        return self.config.get_strategy(module_name)
+        return self.config.get_strategy(module_name)  # type: ignore[union-attr]
 
     def should_generate_tests_automatically(self, module_name: str) -> bool:
         """
@@ -191,10 +191,10 @@ class TestStrategyManager:
         """クリティカルなモジュール（ランクS）一覧を取得"""
         if self.config is None:
             self._load_config()
-        return self.config.get_critical_modules()
+        return self.config.get_critical_modules()  # type: ignore[union-attr]
 
     def get_modules_by_risk(self, risk: str) -> list[str]:
         """指定されたリスクランクのモジュール一覧を取得"""
         if self.config is None:
             self._load_config()
-        return self.config.get_modules_by_risk(risk)
+        return self.config.get_modules_by_risk(risk)  # type: ignore[union-attr]

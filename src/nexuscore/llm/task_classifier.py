@@ -5,6 +5,7 @@ Utility for LLM task classification prompts.
 from __future__ import annotations
 
 import json
+from typing import Any
 
 
 def build_classify_prompt(prompt: str, allowed_task_types: dict[str, object]) -> tuple[str, str]:
@@ -24,7 +25,7 @@ def build_classify_prompt(prompt: str, allowed_task_types: dict[str, object]) ->
 class TaskClassifier:
     """Wrapper around an LLM client used for task classification."""
 
-    def __init__(self, model_name: str, client: object):
+    def __init__(self, model_name: str, client: Any):
         self.model_name = model_name
         self.client = client
 

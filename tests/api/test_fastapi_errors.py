@@ -41,9 +41,9 @@ def test_not_found_error_format(client: TestClient, mock_api_key, monkeypatch):
     with (
         patch("nexuscore.webapp.models.Project") as mock_project_model,
         patch("nexuscore.webapp.models.Run") as mock_run_model,
-        patch("nexuscore.webapp.db") as mock_db,
+        patch("nexuscore.webapp.db"),
         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
-        patch("nexuscore.webapp.models.User") as mock_auth_user,
+        patch("nexuscore.webapp.models.User"),
     ):
         # Project と Run のクエリをモック
         mock_query = MagicMock()
@@ -108,9 +108,9 @@ def test_validation_error_format(client: TestClient, mock_api_key, monkeypatch):
     with (
         patch("nexuscore.webapp.models.Project") as mock_project_model,
         patch("nexuscore.webapp.models.Run") as mock_run_model,
-        patch("nexuscore.webapp.db") as mock_db,
+        patch("nexuscore.webapp.db"),
         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
-        patch("nexuscore.webapp.models.User") as mock_auth_user,
+        patch("nexuscore.webapp.models.User"),
     ):
         # Project と Run のクエリをモック
         mock_query = MagicMock()
@@ -156,9 +156,9 @@ def test_internal_error_format(client: TestClient, mock_api_key, monkeypatch):
     with (
         patch("nexuscore.webapp.models.Project") as mock_project_model,
         patch("nexuscore.webapp.models.Run") as mock_run_model,
-        patch("nexuscore.webapp.db") as mock_db,
+        patch("nexuscore.webapp.db"),
         patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
-        patch("nexuscore.webapp.models.User") as mock_auth_user,
+        patch("nexuscore.webapp.models.User"),
     ):
         # データベースエラーをシミュレート
         mock_query = MagicMock()

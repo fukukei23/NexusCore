@@ -185,7 +185,7 @@ class ApiKey(db.Model):
         """
         トークンが一致するか検証
         """
-        return self.token_hash == self.hash_token(token)
+        return self.token_hash == self.hash_token(token)  # type: ignore[return-value]
 
     def __repr__(self) -> str:
         return f"<ApiKey(id={self.id}, user_id={self.user_id}, name='{self.name}')>"

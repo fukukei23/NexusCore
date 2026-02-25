@@ -73,11 +73,11 @@ def debug_api_key():
             client = OpenAI(api_key=api_key)
 
             # モデル一覧取得（軽いAPI呼び出し）
-            response = client.models.list()
+            client.models.list()
             print("  ✅ API接続成功")
 
             # 実際のチャット呼び出し
-            chat_response = client.chat.completions.create(
+            client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": "テスト"}],
                 max_tokens=5,
