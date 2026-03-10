@@ -192,5 +192,14 @@
     "onCoverageDecrease": true
   },
   "autoSave": true,
-  "confirmBeforeExit": true
+  "confirmBeforeExit": true,
+  "permissions": {
+    "allow": [
+      "mcp__Desktop_Commander__get_file_info",
+      "mcp__Desktop_Commander__write_file",
+      "Bash(if exist \"C:\\\\Users\\\\USER\\\\OpenClaw-Handover.zip\" del \"C:\\\\Users\\\\USER\\\\OpenClaw-Handover.zip\")",
+      "mcp__Desktop_Commander__list_directory",
+      "Bash(powershell -Command \"if \\(Test-Path ''C:\\\\Users\\\\USER\\\\OpenClaw-Handover.zip''\\) { Remove-Item ''C:\\\\Users\\\\USER\\\\OpenClaw-Handover.zip'' }\")"
+    ]
+  }
 }
