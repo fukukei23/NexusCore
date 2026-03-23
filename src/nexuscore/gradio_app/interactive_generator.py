@@ -5,15 +5,18 @@ import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import gradio as gr
 from dotenv import load_dotenv
 
-try:
+if TYPE_CHECKING:
     from openai import OpenAI
-except Exception:  # pragma: no cover - openai missing
-    OpenAI = None
+else:
+    try:
+        from openai import OpenAI
+    except Exception:  # pragma: no cover - openai missing
+        OpenAI = None  # type: ignore[assignment,misc]
 
 # パスはプロジェクトルート基準に統一（他UIと同様の sandbox/logs を想定）
 HERE = Path(__file__).resolve()
@@ -53,7 +56,7 @@ def call_gpt(prompt: str) -> str:
     response = client.chat.completions.create(
         model="gpt-4", messages=[{"role": "user", "content": prompt}], temperature=0
     )
-    return response.choices[0].message.content.strip()
+    return (response.choices[0].message.content or "").strip()
 
 
 # === コードと理由の抽出 ===

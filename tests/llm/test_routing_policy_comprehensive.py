@@ -4,7 +4,6 @@ Comprehensive tests for llm/routing_policy.py
 ルーティングポリシーとモデルファミリー識別のテスト
 """
 
-
 from nexuscore.llm.routing_policy import (
     LEGACY_TO_TASK,
     TASK_MODEL_MAP_DEFAULT,

@@ -1,4 +1,3 @@
-
 import pytest
 
 from dev_tools.fast_lane_check import (

@@ -254,9 +254,7 @@ def _compute_recent_success_rate(project_id: int, limit: int = 30) -> float:
 
     try:
         q = (
-            Run.query.filter(
-                Run.project_id == project_id
-            )
+            Run.query.filter(Run.project_id == project_id)
             .order_by(Run.started_at.desc().nullslast())
             .limit(limit)
         )

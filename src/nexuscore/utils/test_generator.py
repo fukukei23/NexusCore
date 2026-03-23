@@ -23,16 +23,21 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dotenv import load_dotenv
 
-try:
-    from openai import OpenAI
+HAS_OPENAI = True
 
-    HAS_OPENAI = True
-except ImportError:
-    HAS_OPENAI = False
-    OpenAI = None
+if TYPE_CHECKING:
+    from openai import OpenAI
+else:
+    try:
+        from openai import OpenAI as _OpenAI
+        from openai import OpenAI
+    except ImportError:
+        HAS_OPENAI = False
+        OpenAI = None  # type: ignore[assignment,misc]
 
 from nexuscore.utils.test_utils import (
     create_fallback_test_file,

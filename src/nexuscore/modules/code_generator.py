@@ -1,14 +1,17 @@
 # modules/code_generator.py
 
 import os
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from dotenv import load_dotenv
 
-try:
+if TYPE_CHECKING:
     from openai import OpenAI
-except Exception:  # pragma: no cover - fallback when openai is missing
-    OpenAI = None
+else:
+    try:
+        from openai import OpenAI
+    except Exception:  # pragma: no cover - fallback when openai is missing
+        OpenAI = None  # type: ignore[assignment,misc]
 
 # .env 読み込みのみ先に済ませ、クライアント生成は遅延させる
 load_dotenv()
@@ -57,6 +60,6 @@ def generate_code_from_text(natural_text: str) -> str:
         response = client.chat.completions.create(
             model="gpt-4", messages=[{"role": "user", "content": prompt}], temperature=0.2
         )
-        return response.choices[0].message.content.strip()
+        return (response.choices[0].message.content or "").strip()
     except Exception as e:  # pragma: no cover - error path for runtime failures
         return f"⚠️ GPT code generation failed: {e}"

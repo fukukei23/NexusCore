@@ -5,15 +5,18 @@ import os
 import re
 import subprocess
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import gradio as gr
 from dotenv import load_dotenv
 
-try:
+if TYPE_CHECKING:
     from openai import OpenAI
-except Exception:  # pragma: no cover - when openai is missing
-    OpenAI = None
+else:
+    try:
+        from openai import OpenAI
+    except Exception:  # pragma: no cover - when openai is missing
+        OpenAI = None  # type: ignore[assignment,misc]
 
 # === 設定と初期化 ===
 load_dotenv()
@@ -57,9 +60,7 @@ def read_file(path):
 # === テスト実行 ===
 def run_pytest():
     try:
-        result = subprocess.run(
-            ["pytest", TEST_FILE], capture_output=True, text=True
-        )
+        result = subprocess.run(["pytest", TEST_FILE], capture_output=True, text=True)
         output = result.stdout + "\n" + result.stderr
         save_file(RESULT_LOG, output)
         return output

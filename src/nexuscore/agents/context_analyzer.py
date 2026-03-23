@@ -212,7 +212,12 @@ class ContextAnalyzer:
 
     def parse_dependencies(self) -> dict:
         """安全な依存関係解析"""
-        dependencies: dict[str, Any] = {"internal": [], "external": [], "standard": [], "relative": []}
+        dependencies: dict[str, Any] = {
+            "internal": [],
+            "external": [],
+            "standard": [],
+            "relative": [],
+        }
 
         try:
             # 基本的な依存関係を設定（AST解析回避）
