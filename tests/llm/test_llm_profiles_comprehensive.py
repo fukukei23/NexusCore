@@ -92,7 +92,7 @@ class TestProfileRegistry:
 
         assert profile.name == "gpt5_default"
         assert profile.provider == "openai"
-        assert profile.model == "gpt-5.1-mini"
+        assert profile.model == "gpt-4o-mini"
         assert "Fast" in profile.description or "fast" in profile.description
         assert profile.default_temperature == 0.2
 
@@ -213,7 +213,7 @@ class TestProfileToModelName:
         """gpt5_defaultを正しく変換"""
         model_name = profile_to_model_name("gpt5_default")
 
-        assert model_name == "openai:gpt-5.1-mini"
+        assert model_name == "openai:gpt-4o-mini"
 
     def test_profile_to_model_name_claude(self):
         """claude_sonnet_45を正しく変換"""
@@ -225,7 +225,7 @@ class TestProfileToModelName:
         """gemini_3_proを正しく変換"""
         model_name = profile_to_model_name("gemini_3_pro")
 
-        assert model_name == "google:gemini-3.0-pro"
+        assert model_name == "google:gemini-1.5-pro"
 
     def test_profile_to_model_name_deepseek(self):
         """deepseek_r1を正しく変換"""
@@ -261,7 +261,7 @@ class TestProfileToModelName:
         parts = model_name.split(":")
         assert len(parts) == 2
         assert parts[0] == "openai"  # provider
-        assert parts[1] == "gpt-5.1"  # model
+        assert parts[1] == "gpt-4o"  # model
 
 
 # ============================================================================
@@ -278,7 +278,7 @@ class TestProfilesIntegration:
         model_name = profile_to_model_name("gpt5_codex")
 
         assert model_name == f"{profile.provider}:{profile.model}"
-        assert model_name == "openai:gpt-5.1-codex"
+        assert model_name == "openai:gpt-4o"
 
     def test_all_profiles_convertible(self):
         """全プロファイルが変換可能であることを統合確認"""

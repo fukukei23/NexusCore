@@ -1,4 +1,3 @@
-
 import pytest
 
 tsc = pytest.importorskip("nexuscore.utils.tree_sitter_checker")

@@ -1,7 +1,5 @@
 """SelfHealingService と SelfHealingConfig の統合テスト"""
 
-
-
 from nexuscore.config.self_healing_config import SelfHealingConfig
 from nexuscore.services.self_healing_service import SelfHealingService
 

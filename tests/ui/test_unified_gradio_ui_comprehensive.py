@@ -785,7 +785,6 @@ class TestHistoryDiffHandlers:
         original = unified_gradio_ui.HAS_SELF_HEALING
         unified_gradio_ui.HAS_SELF_HEALING = False
 
-
         if not unified_gradio_ui.HAS_SELF_HEALING:
             result = "❌ Self-Healing Service が利用できません。"
             assert "利用できません" in result

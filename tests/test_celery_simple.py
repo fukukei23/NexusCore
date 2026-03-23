@@ -16,9 +16,7 @@ def test_imports():
 
         print("✅ JobStateMachine のインポート成功")
 
-
         print("✅ SessionController のインポート成功")
-
 
         print("✅ RunHistoryLogger のインポート成功")
 

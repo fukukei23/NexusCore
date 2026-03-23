@@ -8,14 +8,18 @@ import os
 import re
 import subprocess
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import gradio as gr
 from dotenv import load_dotenv
 
-try:
+if TYPE_CHECKING:
     from openai import OpenAI
-except Exception:  # pragma: no cover - openai missing
-    OpenAI = None
+else:
+    try:
+        from openai import OpenAI
+    except Exception:  # pragma: no cover - openai missing
+        OpenAI = None  # type: ignore[assignment,misc]
 
 # ====== 設定・クライアント =====================================================
 

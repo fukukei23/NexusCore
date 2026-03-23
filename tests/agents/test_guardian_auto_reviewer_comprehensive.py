@@ -13,7 +13,6 @@ guardian_auto_reviewer.py の包括的テスト
   - _check_atelier_specific: Atelier固有チェック
 """
 
-
 import pytest
 
 try:

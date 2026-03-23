@@ -511,7 +511,12 @@ class UnifiedAnalyzer:
     キャッシュ機能付きで、変更のないファイルは再解析をスキップする。
     """
 
-    def __init__(self, project_root: Path, use_cache: bool | None = None, config: dict[str, Any] | None = None):
+    def __init__(
+        self,
+        project_root: Path,
+        use_cache: bool | None = None,
+        config: dict[str, Any] | None = None,
+    ):
         """
         Args:
             project_root: プロジェクトのルートディレクトリ

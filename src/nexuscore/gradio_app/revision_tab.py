@@ -194,7 +194,7 @@ def call_gpt(prompt: str) -> str:
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
             )
-            return rsp.choices[0].message.content.strip()
+            return (rsp.choices[0].message.content or "").strip()
         except Exception:
             # API失敗時はフォールバック
             pass

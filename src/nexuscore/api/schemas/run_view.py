@@ -38,9 +38,7 @@ class RunViewResponse(BaseModel):
         ..., description="Run status (RUNNING, PAUSED, COMPLETED, CONFLICT, FAILED, ABORTED)"
     )
     phase: str | None = Field(None, description="Current phase (if paused)")
-    authority_level: str | None = Field(
-        None, description="Authority level (human, partial, full)"
-    )
+    authority_level: str | None = Field(None, description="Authority level (human, partial, full)")
     updated_at: str | None = Field(None, description="Last update timestamp (ISO8601)")
     explainability: ExplainabilityModel | None = Field(
         None,
@@ -64,9 +62,7 @@ class RunCreateRequest(BaseModel):
     """Request model for creating a new run."""
 
     requirement: str = Field(..., description="User requirement")
-    authority_level: str | None = Field(
-        None, description="Authority level (human, partial, full)"
-    )
+    authority_level: str | None = Field(None, description="Authority level (human, partial, full)")
     language: str = Field("ja", description="Language (ja, en)")
 
     class Config:
