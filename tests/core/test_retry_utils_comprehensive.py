@@ -14,6 +14,7 @@ from nexuscore.core.errors import (
     ModelConnectionError,
     ModelRateLimitError,
     ModelTimeoutError,
+    SandboxExecutionError,
 )
 from nexuscore.core.retry_utils import (
     RetryContext,
@@ -159,14 +160,14 @@ class TestRetryWithContext:
         assert mock_func.call_count == 2
 
     def test_does_not_retry_on_non_retryable_error(self):
-        """Test does not retry on non-retryable errors."""
+        """Test does not retry on non-retryable errors (sandbox, patch_apply)."""
         mock_func = Mock(
-            __name__="test_func", side_effect=InvalidModelOutputError("Invalid output")
+            __name__="test_func", side_effect=SandboxExecutionError("Sandbox execution failed")
         )
 
         wrapped = retry_with_context(mock_func, max_retries=2)
 
-        with pytest.raises(InvalidModelOutputError):
+        with pytest.raises(SandboxExecutionError):
             wrapped()
 
         assert mock_func.call_count == 1

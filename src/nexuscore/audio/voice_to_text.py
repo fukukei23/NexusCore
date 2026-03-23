@@ -145,7 +145,7 @@ class WhisperClient:
         lang = language or self.default_language
         try:
             with open(audio_path, "rb") as audio_file:
-                response = openai.audio.transcriptions.create(
+                response = openai.audio.transcriptions.create(  # type: ignore[call-overload]
                     model=self.model,
                     file=audio_file,
                     language=lang,
