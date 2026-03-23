@@ -1,12 +1,13 @@
 # src/modules/chat_handler.py
 
 import os
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from dotenv import load_dotenv
 
 if TYPE_CHECKING:
     from openai import OpenAI
+    from openai.types.chat import ChatCompletionMessageParam
 else:
     try:
         from openai import OpenAI
@@ -43,7 +44,9 @@ def handle_chat(message: str, history: list[dict[str, Any]]) -> tuple[str | None
     try:
         client = get_client()
         history.append({"role": "user", "content": message})
-        response = client.chat.completions.create(model="gpt-4", messages=history)
+        # Cast to satisfy OpenAI API type requirements
+        messages = cast("list[ChatCompletionMessageParam]", history)
+        response = client.chat.completions.create(model="gpt-4", messages=messages)
         assistant_msg = (response.choices[0].message.content or "").strip()
         history.append({"role": "assistant", "content": assistant_msg})
         return assistant_msg, history

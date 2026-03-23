@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any
 
 import gradio as gr
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
 plt.ioff()  # 対話モードOFF（描画はFigure返却ベース）
@@ -216,12 +217,14 @@ def _make_daily_plot(by_day: dict[date, dict[str, int]]):
         ax.text(0.5, 0.5, "日次データなし", ha="center", va="center")
         return fig
     days = list(by_day.keys())
+    days_num = mdates.date2num(days)  # Convert date to matplotlib numeric format
     succ = [by_day[d]["success"] for d in days]
     attm = [by_day[d]["attempt"] for d in days]
-    init = [by_day[d]["initial"] for d in days]
-    ax.plot(days, succ, marker="o", label="success")
-    ax.plot(days, attm, marker="o", label="attempt")
-    ax.plot(days, init, marker="o", label="initial")
+    init_v = [by_day[d]["initial"] for d in days]
+    ax.plot(days_num, succ, marker="o", label="success")
+    ax.plot(days_num, attm, marker="o", label="attempt")
+    ax.plot(days_num, init_v, marker="o", label="initial")
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
     ax.legend()
     ax.set_title("日次イベント推移")
     ax.set_xlabel("date")

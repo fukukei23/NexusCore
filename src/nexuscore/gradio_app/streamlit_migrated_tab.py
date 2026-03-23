@@ -180,7 +180,7 @@ async def call_gpt_async(prompt: str, temperature: float = 0.1) -> str:
             max_tokens=MAX_TOKENS,
         )
         logger.info("GPT API呼び出し成功")
-        return response.choices[0].message.content
+        return response.choices[0].message.content or ""
 
     except ImportError:
         msg = '❌ エラー: `openai`ライブラリが見つかりません。`pip install --upgrade openai "openai[http_x]"`を実行してください。'
