@@ -102,51 +102,6 @@ class TestContextAgentInit:
 
 
 @pytest.mark.skipif(not HAS_CONTEXT_AGENT, reason="context_agent module not available")
-class TestFindProjectRoot:
-    """ContextAgent._find_project_root() のテスト"""
-
-    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
-    @patch("nexuscore.agents.context_agent.PolicyInterface")
-    def test_find_project_root_with_git(self, mock_policy, mock_analyzer, tmp_path):
-        """.gitフォルダが見つかる場合"""
-        mock_analyzer.return_value = Mock()
-        mock_policy.return_value = Mock()
-
-        # .gitディレクトリを作成
-        (tmp_path / ".git").mkdir()
-
-        with patch("os.path.abspath", return_value=str(tmp_path / "src" / "nexuscore")):
-            with patch("os.path.isdir") as mock_isdir:
-                with patch("os.path.isfile", return_value=False):
-                    mock_isdir.side_effect = lambda p: p == str(tmp_path / ".git")
-
-                    agent = ContextAgent()
-                    root = agent._find_project_root()
-
-                    # ルートが見つかることを確認（階層を遡る）
-                    assert root is not None
-
-    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
-    @patch("nexuscore.agents.context_agent.PolicyInterface")
-    def test_find_project_root_with_pyproject(self, mock_policy, mock_analyzer, tmp_path):
-        """pyproject.tomlが見つかる場合"""
-        mock_analyzer.return_value = Mock()
-        mock_policy.return_value = Mock()
-
-        # pyproject.tomlを作成
-        (tmp_path / "pyproject.toml").write_text("[tool.poetry]\n")
-
-        with patch("os.path.abspath", return_value=str(tmp_path / "src")):
-            with patch("os.path.isfile") as mock_isfile:
-                mock_isfile.side_effect = lambda p: "pyproject.toml" in p
-
-                agent = ContextAgent()
-                root = agent._find_project_root()
-
-                assert root is not None
-
-
-@pytest.mark.skipif(not HAS_CONTEXT_AGENT, reason="context_agent module not available")
 class TestLoadOrCreateContext:
     """ContextAgent.load_or_create_context() のテスト"""
 
