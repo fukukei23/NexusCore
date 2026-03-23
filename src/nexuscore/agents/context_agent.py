@@ -28,7 +28,9 @@ except ImportError:
 
 class ContextAgent:
     def __init__(self, project_root: str | None = None):
-        self.project_root: str = project_root or os.getenv("NEXUS_PROJECT_ROOT", os.getcwd()) or os.getcwd()
+        self.project_root: str = (
+            project_root or os.getenv("NEXUS_PROJECT_ROOT", os.getcwd()) or os.getcwd()
+        )
         self.context_cache_file = os.path.join(self.project_root, ".nexus_context.json")
 
         # 安全な初期化（simple版の安定性を採用）
@@ -244,7 +246,9 @@ class ContextAgent:
             except ValueError:
                 print("数字を入力してください")
 
-    def _ask_multiple_choice(self, question: str, choices: list, default: list | None = None) -> list:
+    def _ask_multiple_choice(
+        self, question: str, choices: list, default: list | None = None
+    ) -> list:
         """複数選択の質問"""
         print(f"\n{question}")
         for i, choice in enumerate(choices):

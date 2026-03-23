@@ -247,7 +247,6 @@ def test_launch_and_wait_for_input_keyboard_interrupt(mock_gr):
     with patch.object(pi, "create_gradio_interface", return_value=mock_interface):
         # KeyboardInterruptをシミュレート
 
-
         def mock_get(timeout=None):
             raise KeyboardInterrupt()
 
@@ -326,7 +325,6 @@ def test_launch_and_wait_for_input_exception_handling(mock_gr):
 
     with patch.object(pi, "create_gradio_interface", return_value=mock_interface):
         # 一般的な例外をシミュレート
-
 
         def mock_get(timeout=None):
             raise Exception("General error")

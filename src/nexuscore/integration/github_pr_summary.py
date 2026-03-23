@@ -79,9 +79,7 @@ def generate_pr_change_summary(
         log_entries = []
         if hasattr(run, "id") and ExecutionLog:
             log_entries = (
-                ExecutionLog.query.filter(
-                    ExecutionLog.run_id == run.id
-                )
+                ExecutionLog.query.filter(ExecutionLog.run_id == run.id)
                 .order_by(ExecutionLog.created_at.asc())
                 .all()
             )

@@ -27,9 +27,7 @@ def test_dummy():
             )
 
     try:
-        result = subprocess.run(
-            ["pytest", TEST_FILE], capture_output=True, text=True
-        )
+        result = subprocess.run(["pytest", TEST_FILE], capture_output=True, text=True)
         output = result.stdout + "\n" + result.stderr
         with open(RESULT_LOG, "w", encoding="utf-8") as f:
             f.write(output)

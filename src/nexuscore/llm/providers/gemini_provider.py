@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+from typing import Any, cast
 
+from google.generativeai.types import GenerationConfigDict
 from nexuscore.llm.helpers import DEFAULT_STUB_CONTENT, _real_call_enabled, _strip_jsonish
 
 from .base import BaseLLM
@@ -70,7 +72,7 @@ class GeminiLLM(BaseLLM):
             try:
                 resp = model.generate_content(
                     prompt,
-                    generation_config=gen_cfg,
+                    generation_config=cast(GenerationConfigDict, gen_cfg),
                 )
 
                 text = ""

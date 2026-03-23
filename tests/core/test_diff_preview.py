@@ -1,6 +1,5 @@
 """diff_preview.py のテスト"""
 
-
 from nexuscore.core.diff_preview import (
     summarize_diff_files,
     truncate_diff,

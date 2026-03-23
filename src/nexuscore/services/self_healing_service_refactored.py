@@ -738,9 +738,7 @@ class SelfHealingService:
     # ヘルパーメソッド
     # ------------------------------------------------------------------
 
-    def _extract_retry_info(
-        self, retry_context: RetryContext | None
-    ) -> tuple[int, str | None]:
+    def _extract_retry_info(self, retry_context: RetryContext | None) -> tuple[int, str | None]:
         """RetryContext から retry_count と last_error_class を抽出"""
         if not retry_context:
             return 0, None

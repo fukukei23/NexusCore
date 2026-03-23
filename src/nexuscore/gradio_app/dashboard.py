@@ -247,9 +247,7 @@ def build_ui():
                     label="対象期間 / 件数",
                 )
                 reload_btn = gr.Button("🔁 再集計", variant="secondary")
-                gr.Markdown(
-                    "[➡ Repair Timeline を開く](http://127.0.0.1:7861)", visible=True
-                )
+                gr.Markdown("[➡ Repair Timeline を開く](http://127.0.0.1:7861)", visible=True)
                 srcs = gr.Markdown("")
 
             with gr.Column(scale=2):

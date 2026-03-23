@@ -206,7 +206,11 @@ Ensure the response is strictly valid JSON with filled arrays (no empty strings)
                 if not user_message:
                     yield history, self.text["status_ready"], gr.update(), gr.update(), gr.update(  # type: ignore[misc]
                         visible=False
-                    ), gr.update(visible=False), gr.update(visible=False)
+                    ), gr.update(
+                        visible=False
+                    ), gr.update(
+                        visible=False
+                    )
                     return
 
                 history.append({"role": "user", "content": user_message})
