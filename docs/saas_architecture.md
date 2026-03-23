@@ -8,7 +8,7 @@ NexusCore 本体（Orchestrator / Agents / Sandbox）を SaaS 化レイヤー（
 
 ### 主な特徴
 
-- **既存アーキテクチャの保護**: Orchestrator v8.1 / NPE / BaseAgent / LLMRouter を壊さない
+- **既存アーキテクチャの保護**: Orchestrator v8.2 / NPE / BaseAgent / LLMRouter を壊さない
 - **段階的な拡張**: 最小実装から始めて、必要に応じて機能を追加
 - **マルチユーザー対応**: GitHub OAuth による認証とプロジェクト管理
 - **観測性**: 構造化ログと実行履歴の一元管理
@@ -21,22 +21,31 @@ NexusCore 本体（Orchestrator / Agents / Sandbox）を SaaS 化レイヤー（
 ┌─────────────────┐
 │  Browser /      │
 │  Gradio UI      │
+│  (port: 7860)   │
 └────────┬────────┘
          │
          ▼
-┌─────────────────┐
-│  Flask Web API  │
-│  (webapp/)      │
-└────────┬────────┘
-         │
-         ├─────────────────┐
-         ▼                 ▼
-┌─────────────────┐  ┌──────────────┐
-│  Orchestrator   │  │  Database    │
-│  + Agents       │  │  (SQLite/    │
-│  + Sandbox      │  │   Postgres)  │
-└─────────────────┘  └──────────────┘
+┌─────────────────┐     ┌─────────────────┐
+│  Flask WebApp   │     │  FastAPI REST   │
+│  (port: 5000)   │     │  (port: 8000)   │
+└────────┬────────┘     └────────┬────────┘
+         │                      │
+         └──────────┬───────────┘
+                    ▼
+         ┌─────────────────┐
+         │  Orchestrator   │
+         │  + Agents        │
+         │  + Sandbox       │
+         └────────┬────────┘
+                  │
+                  ▼
+         ┌─────────────────┐
+         │  Database       │
+         │  (SQLite/PG)    │
+         └─────────────────┘
 ```
+
+**注意**: FastAPI は内部で Flask の DB モデルを共有（ Flask アプリコンテキストを共用）
 
 ### データフロー
 
@@ -88,6 +97,20 @@ Flask ベースの Web API レイヤー。
 
 - **用途**: 読み取り専用 API キー（ユーザーが自身のラン履歴やログを読むため）
 - **セキュリティ**: ハッシュ化して保存（SHA-256）
+
+### API Layer (FastAPI)
+
+FastAPI REST API（`src/nexuscore/api/`）は外部連携用。
+
+- **ポート**: 8000
+- **主なエンドポイント**:
+  - `POST /api/v1/execute` - 自我修復ジョブをバックグラウンド実行
+  - `GET /api/v1/status/{task_id}` - タスクステータス取得
+  - `POST /api/v1/github/webhook` - GitHub PR Webhook
+  - `GET /api/v1/projects` - プロジェクト一覧
+  - `POST /api/v1/projects/{id}/run` - 実行トリガー
+- **認証**: `X-API-Key` ヘッダーによる API キー認証
+- **DB共用**: FastAPI は内部で Flask の DB モデルを共有（アプリコンテキストを共用）
 
 ### Core Engine
 
