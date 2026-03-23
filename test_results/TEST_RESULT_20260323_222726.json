@@ -1,0 +1,18 @@
+{
+  "timestamp": "20260323_222726",
+  "executed_at": "2026-03-23T22:27:26.215364",
+  "test_target": "tests/",
+  "result": {
+    "total": 27,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 26,
+    "errors": 1,
+    "failed_tests": [],
+    "error_tests": [
+      "collecting tests/npe/test_policies.py __________________",
+      "tests/npe/test_policies.py"
+    ],
+    "execution_time": 16.67
+  }
+}
