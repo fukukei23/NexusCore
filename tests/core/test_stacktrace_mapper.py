@@ -1,6 +1,5 @@
 """stacktrace_mapper.py のテスト"""
 
-
 from nexuscore.core.stacktrace_mapper import extract_candidate_files
 
 

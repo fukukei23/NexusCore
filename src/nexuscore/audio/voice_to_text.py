@@ -37,7 +37,9 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 AudioInput: TypeAlias = str | bytes | np.ndarray
-StreamFactory: TypeAlias = Callable[[Callable[[np.ndarray, int, float, object], None]], AbstractContextManager[object]]
+StreamFactory: TypeAlias = Callable[
+    [Callable[[np.ndarray, int, float, object], None]], AbstractContextManager[object]
+]
 
 _DEFAULT_CONFIG: dict[str, str | int] = {
     "language": os.getenv("VOICE_TO_TEXT_TARGET_LANG", "en"),
@@ -254,9 +256,7 @@ def _wait_for_stream(stream_ctx: AbstractContextManager[object], event: threadin
         event.wait()
 
 
-def transcribe_with_whisper(
-    audio_input: AudioInput, *, language: str | None = None
-) -> str | None:
+def transcribe_with_whisper(audio_input: AudioInput, *, language: str | None = None) -> str | None:
     """Transcribe the provided audio input via Whisper."""
     client = _get_whisper_client()
     sample_rate = int(_AUDIO_CONFIG["sample_rate"])

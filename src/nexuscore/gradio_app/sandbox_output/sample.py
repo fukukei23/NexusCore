@@ -1,5 +1,3 @@
-
-
 def add_two_integers(a, b):
     """
     2つの整数を加算して返す。

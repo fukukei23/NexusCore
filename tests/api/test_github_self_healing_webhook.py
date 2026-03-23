@@ -1,7 +1,5 @@
 """github_self_healing_webhook.py のテスト"""
 
-
-
 from nexuscore.api.github_self_healing_webhook import (
     format_pr_comment,
     parse_pull_request_event,

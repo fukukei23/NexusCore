@@ -225,9 +225,11 @@ def retry_with_context(
 
                 # 3.3.1: リトライ可否の判断ルール
                 should_retry = False
+                error_class = "unknown"  # Initialize to avoid UnboundLocalError
                 try:
-                    if isinstance(e, retry_on):  # type: ignore[arg-type]
+                    if retry_on is not None and isinstance(e, retry_on):  # type: ignore[arg-type]
                         should_retry = True
+                        error_class = "user_specified"
                     elif isinstance(e, NexusCoreError):
                         # NexusCore カスタム例外の場合は classify_error で判定
                         error_class = classify_error(e)

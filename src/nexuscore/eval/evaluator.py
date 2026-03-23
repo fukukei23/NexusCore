@@ -187,9 +187,7 @@ def normalize_json(data: dict[str, Any]) -> str:
     return json.dumps(normalized, ensure_ascii=False, sort_keys=True)
 
 
-def validate_schema(
-    data: dict[str, Any], schema: dict[str, Any] | None
-) -> SchemaValidationResult:
+def validate_schema(data: dict[str, Any], schema: dict[str, Any] | None) -> SchemaValidationResult:
     """
     JSON Schema検証を実行する。
 

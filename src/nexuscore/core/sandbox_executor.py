@@ -151,7 +151,11 @@ def load_sandbox_policy(policy_path: str | None = None) -> dict[str, Any]:
         logger.warning("PyYAML is not installed. Using default sandbox policy.")
         return default
 
-    path = policy_path or os.getenv("NEXUSCORE_SANDBOX_POLICY", "sandbox_policy.yml") or "sandbox_policy.yml"
+    path = (
+        policy_path
+        or os.getenv("NEXUSCORE_SANDBOX_POLICY", "sandbox_policy.yml")
+        or "sandbox_policy.yml"
+    )
     policy_file = Path(path)
 
     if not policy_file.exists():

@@ -64,7 +64,6 @@ class TestAppImport:
             if "nexuscore.utils.app" in sys.modules:
                 del sys.modules["nexuscore.utils.app"]
 
-
             # Verify blueprint was registered
             mock_flask.register_blueprint.assert_called_once_with(mock_blueprint)
 
@@ -88,7 +87,6 @@ class TestAppImport:
         ):
             if "nexuscore.utils.app" in sys.modules:
                 del sys.modules["nexuscore.utils.app"]
-
 
             # Verify thread was created with gradio_launch as target
             mock_thread_cls.assert_called_once_with(target=mock_gradio_launch, daemon=True)
@@ -116,7 +114,6 @@ class TestAppImport:
         ):
             if "nexuscore.utils.app" in sys.modules:
                 del sys.modules["nexuscore.utils.app"]
-
 
             # Verify daemon=True was passed
             call_kwargs = mock_thread_cls.call_args[1]
@@ -217,7 +214,6 @@ class TestAppIntegration:
         ):
             if "nexuscore.utils.app" in sys.modules:
                 del sys.modules["nexuscore.utils.app"]
-
 
             # Verify all initialization steps occurred in order
             assert mock_flask.register_blueprint.called
@@ -337,7 +333,6 @@ class TestAppEdgeCases:
         ):
             if "nexuscore.utils.app" in sys.modules:
                 del sys.modules["nexuscore.utils.app"]
-
 
             # Verify thread start was called (non-blocking)
             mock_thread.start.assert_called_once()
