@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from google.generativeai.types import GenerationConfigDict
 from nexuscore.llm.helpers import DEFAULT_STUB_CONTENT, _real_call_enabled, _strip_jsonish
 
 from .base import BaseLLM
+
+if TYPE_CHECKING:
+    # google-generativeai のバージョン差で types が存在しない環境があるため、実行時importは避ける
+    from google.generativeai.types import GenerationConfigDict  # pragma: no cover
 
 
 class GeminiLLM(BaseLLM):
@@ -72,7 +75,7 @@ class GeminiLLM(BaseLLM):
             try:
                 resp = model.generate_content(
                     prompt,
-                    generation_config=cast(GenerationConfigDict, gen_cfg),
+                    generation_config=cast("GenerationConfigDict", gen_cfg),
                 )
 
                 text = ""

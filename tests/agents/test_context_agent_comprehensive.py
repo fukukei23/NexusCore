@@ -73,12 +73,15 @@ class TestContextAgentInit:
             assert agent.policy_interface is not None
             assert agent.context_profile is not None
 
-    @patch("builtins.input", side_effect=["0", "0", "", ""])
-    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
-    @patch("nexuscore.agents.context_agent.PolicyInterface", None)
-    def test_init_without_policy_interface(self, mock_analyzer_class, mock_input):
-        """PolicyInterfaceが利用できない場合でも初期化成功"""
-        mock_analyzer_class.return_value = Mock()
+    def test_init_without_policy_interface(self, monkeypatch):
+        """PolicyInterfaceが利用できない場合でも初期化成功（import経路の揺れに依存しない）"""
+        import importlib
+
+        mod = importlib.import_module(ContextAgent.__module__)
+        # テストがどのimport経路でContextAgentを読んだ場合でも確実に差し替える
+        monkeypatch.setattr(mod, "PolicyInterface", None, raising=False)
+        monkeypatch.setattr(mod, "ContextAnalyzer", Mock(return_value=Mock()), raising=False)
+        monkeypatch.setattr(mod.ContextAgent, "load_or_create_context", lambda self: {}, raising=False)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             agent = ContextAgent(project_root=tmpdir)
@@ -86,13 +89,18 @@ class TestContextAgentInit:
             assert agent.analyzer is not None
             assert agent.policy_interface is None
 
-    @patch("builtins.input", side_effect=["0", "0", "", ""])
-    @patch("nexuscore.agents.context_agent.ContextAnalyzer")
-    @patch("nexuscore.agents.context_agent.PolicyInterface")
-    def test_init_analyzer_failure(self, mock_policy_class, mock_analyzer_class, mock_input):
-        """ContextAnalyzer初期化失敗時でも継続"""
-        mock_analyzer_class.side_effect = Exception("Analyzer init failed")
-        mock_policy_class.return_value = Mock()
+    def test_init_analyzer_failure(self, monkeypatch):
+        """ContextAnalyzer初期化失敗時でも継続（import経路の揺れに依存しない）"""
+        import importlib
+
+        mod = importlib.import_module(ContextAgent.__module__)
+
+        def _raise(*_args, **_kwargs):
+            raise Exception("Analyzer init failed")
+
+        monkeypatch.setattr(mod, "ContextAnalyzer", _raise, raising=False)
+        monkeypatch.setattr(mod, "PolicyInterface", Mock(return_value=Mock()), raising=False)
+        monkeypatch.setattr(mod.ContextAgent, "load_or_create_context", lambda self: {}, raising=False)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             agent = ContextAgent(project_root=tmpdir)
