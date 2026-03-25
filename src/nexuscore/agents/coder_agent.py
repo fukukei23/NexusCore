@@ -129,7 +129,10 @@ class CoderAgent(BaseAgent):
             if code_started or stripped.startswith("#") or stripped.startswith('"""'):
                 cleaned_lines.append(line)
 
-        return "\n".join(cleaned_lines).strip()
+        cleaned = "\n".join(cleaned_lines).strip()
+        # コードらしい行が一切検出できない場合は、レスポンス全体を返す
+        # （テストや短いコード片の生成で、単一行が返るケースを想定）
+        return cleaned if cleaned else response.strip()
 
     def _validate_code(self, language: str, code: str) -> tuple[bool, str]:
         lang = (language or "python").lower()

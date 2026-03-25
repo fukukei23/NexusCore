@@ -51,4 +51,4 @@ def handle_chat(message: str, history: list[dict[str, Any]]) -> tuple[str | None
         history.append({"role": "assistant", "content": assistant_msg})
         return assistant_msg, history
     except Exception as e:  # pragma: no cover - error path for runtime failures
-        return f"エラー: {e}", history
+        return f"❌ エラー: {e}", history
