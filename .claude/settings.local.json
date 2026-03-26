@@ -199,7 +199,8 @@
       "mcp__Desktop_Commander__write_file",
       "Bash(if exist \"C:\\\\Users\\\\USER\\\\OpenClaw-Handover.zip\" del \"C:\\\\Users\\\\USER\\\\OpenClaw-Handover.zip\")",
       "mcp__Desktop_Commander__list_directory",
-      "Bash(powershell -Command \"if \\(Test-Path ''C:\\\\Users\\\\USER\\\\OpenClaw-Handover.zip''\\) { Remove-Item ''C:\\\\Users\\\\USER\\\\OpenClaw-Handover.zip'' }\")"
+      "Bash(powershell -Command \"if \\(Test-Path ''C:\\\\Users\\\\USER\\\\OpenClaw-Handover.zip''\\) { Remove-Item ''C:\\\\Users\\\\USER\\\\OpenClaw-Handover.zip'' }\")",
+      "Bash(PYTHONPATH=src pytest tests/ -x --tb=short)"
     ]
   }
 }
