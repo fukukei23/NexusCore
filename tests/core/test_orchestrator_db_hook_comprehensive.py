@@ -26,6 +26,9 @@ def reset_webapp_module():
     webapp_module = sys.modules.get("nexuscore.webapp")
     logging_service_module = sys.modules.get("nexuscore.webapp.logging_service")
 
+    # テスト前に orchestrator_db_hook を削除し、再インポート時に新規モジュールが使われるようにする
+    sys.modules.pop("nexuscore.core.orchestrator_db_hook", None)
+
     yield
 
     # テスト後に復元
