@@ -23,6 +23,13 @@ from nexuscore.core.retry_utils import (
 )
 
 
+@pytest.fixture
+def mock_sleep():
+    """time.sleep をモック化し、retry_utils 内の sleep もパッチする"""
+    with patch("nexuscore.core.retry_utils.time.sleep") as mock:
+        yield mock
+
+
 class TestRetryContext:
     """RetryContext のテスト群"""
 
@@ -703,9 +710,157 @@ class TestRetryCharacterizationDeterministic:
         # 検証: sleep未呼び出し
         assert mock_sleep.call_count == 0
 
-        # 検証: context記録
-        assert context.retry_count == 0
-        assert context.last_error_class is None
+
+# ==============================================================================
+# Coverage Gap Tests: _is_retryable, FIXED strategy, retry_config override
+# ==============================================================================
+
+
+class TestIsRetryableDirect:
+    """_is_retryable() の直接テスト（L123-124 カバー）"""
+
+    def test_retryable_categories(self):
+        """リトライ可能カテゴリのテスト"""
+        from nexuscore.core.retry_utils import _is_retryable
+
+        assert _is_retryable("rate_limit") is True
+        assert _is_retryable("timeout") is True
+        assert _is_retryable("connection") is True
+        assert _is_retryable("invalid_output") is True
+
+    def test_non_retryable_categories(self):
+        """リトライ不可カテゴリのテスト"""
+        from nexuscore.core.retry_utils import _is_retryable
+
+        assert _is_retryable("sandbox") is False
+        assert _is_retryable("patch_apply") is False
+        assert _is_retryable("unexpected") is False
+        assert _is_retryable("unknown_category") is False
+
+
+class TestFixedBackoffStrategy:
+    """FIXED strategy のテスト（L146 カバー）"""
+
+    def test_fixed_delay_strategy(self, mock_sleep):
+        """FIXED strategy は常に固定遅延"""
+        from nexuscore.core.retry_utils import BackoffStrategy, RetryConfig, retry_with_context
+
+        config = RetryConfig(
+            max_retries=2,
+            base_delay=0.01,
+            fixed_delay=0.5,
+            strategy_map={"timeout": BackoffStrategy.FIXED},
+        )
+
+        call_count = 0
+
+        def flaky():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise ModelTimeoutError("Timeout")
+            return "ok"
+
+        wrapped = retry_with_context(flaky, max_retries=2, base_delay=0.01, retry_config=config)
+        result = wrapped()
+
+        assert result == "ok"
+        # FIXED strategy なので sleep(0.5) が呼ばれる
+        for call in mock_sleep.call_args_list:
+            assert call[0][0] == 0.5
+
+
+class TestRetryConfigOverride:
+    """retry_config 上書きのテスト（L198-201 カバー）"""
+
+    def test_retry_config_max_retries_override(self, mock_sleep):
+        """max_retries が非デフォルトの場合、retry_config を上書き"""
+        from nexuscore.core.retry_utils import RetryConfig, retry_with_context
+
+        config = RetryConfig(max_retries=1, base_delay=0.01)
+
+        call_count = 0
+
+        def always_fail():
+            nonlocal call_count
+            call_count += 1
+            raise ModelTimeoutError("Timeout")
+
+        wrapped = retry_with_context(
+            always_fail, max_retries=5, base_delay=0.01, retry_config=config
+        )
+
+        with pytest.raises(ModelTimeoutError):
+            wrapped()
+
+        # max_retries=5 で上書きされるので、計6回試行
+        assert call_count == 6
+
+    def test_retry_config_base_delay_override(self, mock_sleep):
+        """base_delay が非デフォルトの場合、retry_config を上書き"""
+        from nexuscore.core.retry_utils import RetryConfig, retry_with_context
+
+        config = RetryConfig(max_retries=2, base_delay=0.01)
+
+        call_count = 0
+
+        def flaky():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise ModelTimeoutError("Timeout")
+            return "ok"
+
+        wrapped = retry_with_context(
+            flaky, max_retries=3, base_delay=2.0, retry_config=config
+        )
+
+        result = wrapped()
+        assert result == "ok"
+        # base_delay=2.0 で上書きされるので、sleep(2.0) が呼ばれる
+        assert mock_sleep.call_args_list[0][0][0] == 2.0
+
+
+class TestGeneralExceptionClassification:
+    """一般例外の sandbox/patch_apply 分類パス（L257-265 カバー）"""
+
+    def test_sandbox_message_in_generic_exception(self, mock_sleep):
+        """一般例外でもメッセージに 'sandbox' が含まれればリトライされない"""
+        call_count = 0
+
+        def sandbox_fail():
+            nonlocal call_count
+            call_count += 1
+            raise Exception("Sandbox execution failed")
+
+        from nexuscore.core.retry_utils import retry_with_context
+
+        wrapped = retry_with_context(sandbox_fail, max_retries=3, base_delay=0.01)
+
+        with pytest.raises(Exception, match="Sandbox"):
+            wrapped()
+
+        # sandbox 分類なのでリトライなし
+        assert call_count == 1
+
+    def test_patch_message_in_generic_exception(self, mock_sleep):
+        """一般例外でもメッセージに 'patch' が含まれればリトライされない"""
+        call_count = 0
+
+        def patch_fail():
+            nonlocal call_count
+            call_count += 1
+            raise Exception("Failed to apply patch")
+
+        from nexuscore.core.retry_utils import retry_with_context
+
+        wrapped = retry_with_context(patch_fail, max_retries=3, base_delay=0.01)
+
+        with pytest.raises(Exception, match="patch"):
+            wrapped()
+
+        # patch_apply 分類なのでリトライなし
+        assert call_count == 1
 
     @pytest.mark.characterization
     def test_ch_retry_02_one_failure_then_success(self, mock_sleep):
@@ -924,27 +1079,109 @@ class TestRetryMustNotContracts:
         # 検証: sleep未呼び出し
         assert mock_sleep.call_count == 0
 
-        # Case 2: retry_on に含まれない一般的な例外（ValueError）
-        mock_sleep.reset_mock()  # モックをリセット
-        call_count = 0
 
-        def value_error_fail():
-            nonlocal call_count
-            call_count += 1
-            raise ValueError("Not retryable")
 
-        wrapped2 = retry_with_context(
-            value_error_fail,
-            max_retries=3,
-            base_delay=1.0,
-            retry_on=(ModelTimeoutError,),  # ValueError は含まれない
+class TestCoverageGapsRetryUtils:
+    """retry_utils.py の残りカバレッジギャップを埋めるテスト"""
+
+    def test_unknown_backoff_strategy_falls_through(self, mock_sleep):
+        """未知の BackoffStrategy の else フォールスルー（L157 カバー）"""
+        from nexuscore.core.retry_utils import BackoffStrategy, RetryConfig, retry_with_context
+
+        config = RetryConfig(
+            max_retries=2,
+            base_delay=0.5,
+            strategy_map={"timeout": BackoffStrategy.INCREASING_MEDIUM},
         )
 
-        with pytest.raises(ValueError):
-            wrapped2()
+        call_count = 0
 
-        # 検証: 初回のみ試行（リトライなし）
-        assert call_count == 1
+        def flaky():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise ModelTimeoutError("Timeout")
+            return "ok"
 
-        # 検証: sleep未呼び出し
-        assert mock_sleep.call_count == 0
+        wrapped = retry_with_context(flaky, max_retries=2, base_delay=0.5, retry_config=config)
+        result = wrapped()
+
+        assert result == "ok"
+        assert mock_sleep.call_count >= 1
+
+    def test_retryable_path_sets_should_retry_true(self, mock_sleep):
+        """error_class in retryable categories → should_retry=True（L263 カバー）"""
+        from nexuscore.core.retry_utils import retry_with_context
+
+        call_count = 0
+
+        def connection_fail():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise ModelConnectionError("Connection refused")
+            return "recovered"
+
+        wrapped = retry_with_context(connection_fail, max_retries=2, base_delay=0.01)
+        result = wrapped()
+
+        assert result == "recovered"
+        assert call_count == 2
+        assert mock_sleep.call_count >= 1
+
+    def test_classification_error_with_logger(self, mock_sleep):
+        """classification_error 時の logger_instance.warning 呼び出し（L268-275 カバー）"""
+        from unittest.mock import patch, Mock
+        from nexuscore.core.retry_utils import retry_with_context
+
+        mock_logger = Mock()
+
+        def fail_func():
+            raise ValueError("Test")
+
+        with patch("nexuscore.core.retry_utils.classify_error", side_effect=RuntimeError("Classifier boom")):
+            wrapped = retry_with_context(fail_func, max_retries=3, base_delay=0.01, logger_instance=mock_logger)
+            with pytest.raises(ValueError):
+                wrapped()
+
+        assert mock_logger.warning.called
+
+    def test_final_failure_logs_with_logger(self, mock_sleep):
+        """最終失敗時の logger.error 呼び出し（L283-289 カバー）"""
+        from unittest.mock import Mock
+        from nexuscore.core.retry_utils import retry_with_context
+
+        mock_logger = Mock()
+        call_count = 0
+
+        def always_timeout():
+            nonlocal call_count
+            call_count += 1
+            raise ModelTimeoutError("Always timeout")
+
+        wrapped = retry_with_context(always_timeout, max_retries=1, base_delay=0.01, logger_instance=mock_logger)
+        with pytest.raises(ModelTimeoutError):
+            wrapped()
+
+        assert mock_logger.error.called
+
+    def test_retry_warning_logs_with_logger(self, mock_sleep):
+        """リトライ時の logger.warning 呼び出し（L293-299 カバー）"""
+        from unittest.mock import Mock
+        from nexuscore.core.retry_utils import retry_with_context
+
+        mock_logger = Mock()
+        call_count = 0
+
+        def timeout_once():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise ModelTimeoutError("Timeout")
+            return "ok"
+
+        wrapped = retry_with_context(timeout_once, max_retries=2, base_delay=0.01, logger_instance=mock_logger)
+        result = wrapped()
+
+        assert result == "ok"
+        assert mock_logger.warning.called

@@ -322,7 +322,8 @@ class TestRunFullProject:
         assert "plan" in orchestrator.last_fastlane_outputs
 
     def test_run_full_project_requirement_failure(self, temp_project, mock_agents):
-        """要件分析フェーズの失敗（例外が発生してもクラッシュしない）"""
+        """要件分析フェーズの失敗（例外が伝播される）"""
+        mock_agents["requirement_agent"].use_ui = False
         mock_agents["requirement_agent"].analyze_requirement = MagicMock(
             side_effect=Exception("Requirement error")
         )
@@ -331,11 +332,12 @@ class TestRunFullProject:
             project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
-        # 例外が発生してもクラッシュしない
-        orchestrator.run_full_project("Test requirement")
+        # 例外が伝播される
+        with pytest.raises(Exception, match="Requirement error"):
+            orchestrator.run_full_project("Test requirement")
 
     def test_run_full_project_empty_specs_aborts(self, temp_project, mock_agents):
-        """空のspecsが返された場合は処理を中止"""
+        """空のspecsが返された場合はValueErrorがraiseされる"""
         mock_agents["requirement_agent"].use_ui = False
         mock_agents["requirement_agent"].analyze_requirement = MagicMock(return_value={})
 
@@ -343,13 +345,11 @@ class TestRunFullProject:
             project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
-        orchestrator.run_full_project("Test requirement")
-
-        # Planning phase には進まない（specsが空なので）
-        mock_agents["planner_agent"].generate_plan.assert_not_called()
+        with pytest.raises(ValueError, match="empty specs"):
+            orchestrator.run_full_project("Test requirement")
 
     def test_run_full_project_planning_failure(self, temp_project, mock_agents):
-        """計画フェーズの失敗"""
+        """計画フェーズの失敗（例外が伝播される）"""
         mock_agents["requirement_agent"].use_ui = False
         mock_agents["requirement_agent"].analyze_requirement = MagicMock(
             return_value={"req": "test"}
@@ -362,8 +362,9 @@ class TestRunFullProject:
             project_path=temp_project, constitution={"test": "constitution"}, **mock_agents
         )
 
-        # 例外が発生してもクラッシュしない
-        orchestrator.run_full_project("Test requirement")
+        # 例外が伝播される
+        with pytest.raises(Exception, match="Planning error"):
+            orchestrator.run_full_project("Test requirement")
 
     def test_run_full_project_with_session_stopped(self, temp_project, mock_agents):
         """SessionStoppedが発生した場合の処理"""
