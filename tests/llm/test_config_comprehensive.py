@@ -211,13 +211,18 @@ class TestLLMRouterConfig:
 
     def test_config_from_env_no_keys(self, monkeypatch):
         """APIキーが一切ない場合"""
-        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-        monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
-        monkeypatch.delenv("KIMI_API_KEY", raising=False)
+        # 正規名とエイリアスの両方をクリア
+        for key in [
+            "OPENAI_API_KEY",
+            "GEMINI_API_KEY", "GEMINI_API_KEY_AGENT_A", "GEMINI_API_KEY_AGENT_B",
+            "DEEPSEEK_API_KEY", "DEEPSEEK_KEY", "DEEPSEEK",
+            "KIMI_API_KEY",
+        ]:
+            monkeypatch.delenv(key, raising=False)
         monkeypatch.setenv("NEXUS_REAL_CALLS", "0")
 
-        config = LLMRouterConfig.from_env()
+        with patch("nexuscore.llm.config.ensure_env_loaded"):
+            config = LLMRouterConfig.from_env()
 
         assert config.openai_api_key is None
         assert config.gemini_api_key is None
@@ -322,18 +327,19 @@ class TestConfigIntegration:
 
     def test_config_with_minimal_env(self, monkeypatch):
         """最小限の環境変数でconfig作成"""
-        # 全てのAPIキーをクリア
+        # 全てのAPIキーとエイリアスをクリア
         for key in [
             "OPENAI_API_KEY",
-            "GEMINI_API_KEY",
-            "DEEPSEEK_API_KEY",
+            "GEMINI_API_KEY", "GEMINI_API_KEY_AGENT_A", "GEMINI_API_KEY_AGENT_B",
+            "DEEPSEEK_API_KEY", "DEEPSEEK_KEY", "DEEPSEEK",
             "KIMI_API_KEY",
             "NEXUS_REAL_CALLS",
             "LLM_DRY_RUN",
         ]:
             monkeypatch.delenv(key, raising=False)
 
-        config = LLMRouterConfig.from_env()
+        with patch("nexuscore.llm.config.ensure_env_loaded"):
+            config = LLMRouterConfig.from_env()
 
         assert config.openai_api_key is None
         assert config.gemini_api_key is None
