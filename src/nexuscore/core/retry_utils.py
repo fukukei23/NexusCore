@@ -153,7 +153,7 @@ def _calculate_backoff_delay(attempt: int, error_class: str, config: RetryConfig
         # 意味論レベル: リトライ回数の増加に応じて、待機時間を段階的に延長
         return config.base_delay * (config.backoff_multiplier**attempt)
     else:
-        # フォールバック: 増加型（中）
+        # フォールバック: 増加型（中）— L152-154 と同一のため到達不能
         return config.base_delay * (config.backoff_multiplier**attempt)
 
 
@@ -299,10 +299,9 @@ def retry_with_context(
                 if delay > 0:
                     time.sleep(delay)
 
-        # 3.3.2: ここには到達しないはずだが、型チェッカーのために追加
-        if last_exception:
-            raise last_exception
-        raise RuntimeError("Unexpected retry loop exit")
+        # 到達不能: for loopは必ずreturnまたはraiseで終了する
+        if last_exception:  # type: ignore[unreachable]
+            raise last_exception  # type: ignore[unreachable]
 
     return wrapper
 
