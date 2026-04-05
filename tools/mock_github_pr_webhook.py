@@ -23,11 +23,7 @@ import json
 import os
 from typing import Any, Dict
 
-try:
-    import requests
-except ImportError:
-    print("Error: requests library is required. Install with: pip install requests")
-    exit(1)
+import requests  # noqa: E402 — CLI ツールとして直接実行時に必要
 
 
 def build_sample_payload(
