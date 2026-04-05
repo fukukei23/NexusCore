@@ -9,10 +9,14 @@ Comprehensive Tests for test_metrics.py
 ============================================================================
 """
 
+import builtins
 import json
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
+
+# P4: monkeypatch で builtins.__import__ を置換後も元の import を呼ぶため保存
+_real_import = builtins.__import__
 
 import pytest
 
@@ -327,7 +331,7 @@ class TestGetMetrics:
                 mock_module = MagicMock()
                 mock_module.TestStrategyManager = mock_strategy_class
                 return mock_module
-            return __import__(name, *args, **kwargs)
+            return _real_import(name, *args, **kwargs)
 
         monkeypatch.setattr("builtins.__import__", mock_import)
 
@@ -367,7 +371,7 @@ class TestGetMetrics:
                 mock_module = MagicMock()
                 mock_module.TestStrategyManager = mock_strategy_class
                 return mock_module
-            return __import__(name, *args, **kwargs)
+            return _real_import(name, *args, **kwargs)
 
         monkeypatch.setattr("builtins.__import__", mock_import)
 
@@ -399,7 +403,7 @@ class TestGetMetrics:
                 mock_module = MagicMock()
                 mock_module.TestStrategyManager = mock_strategy_class
                 return mock_module
-            return __import__(name, *args, **kwargs)
+            return _real_import(name, *args, **kwargs)
 
         monkeypatch.setattr("builtins.__import__", mock_import)
 
@@ -433,7 +437,7 @@ class TestGetMetrics:
                 mock_module = MagicMock()
                 mock_module.TestStrategyManager = mock_strategy_class
                 return mock_module
-            return __import__(name, *args, **kwargs)
+            return _real_import(name, *args, **kwargs)
 
         monkeypatch.setattr("builtins.__import__", mock_import)
 
@@ -670,9 +674,10 @@ class TestHistoryManagement:
 
 
 class TestEdgeCases:
-    def test_collector_with_nonexistent_project(self):
+    def test_collector_with_nonexistent_project(self, tmp_path):
         """存在しないプロジェクトパスでも動作"""
-        collector = TestMetricsCollector("/nonexistent/path")
+        nonexistent = tmp_path / "nonexistent" / "path"
+        collector = TestMetricsCollector(str(nonexistent))
         # ディレクトリが作成される
         assert collector.metrics_dir.exists()
 
@@ -716,7 +721,7 @@ class TestEdgeCases:
                 mock_module = MagicMock()
                 mock_module.TestStrategyManager = mock_strategy_class
                 return mock_module
-            return __import__(name, *args, **kwargs)
+            return _real_import(name, *args, **kwargs)
 
         monkeypatch.setattr("builtins.__import__", mock_import)
 

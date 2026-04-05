@@ -1,8 +1,19 @@
 """
-NexusCore カスタム例外クラス
+NexusCore カスタム例外クラス（CR-NEXUS-051-A: Error Taxonomy）
 
 Self-Healing 実行中の LLM 呼び出し & sandbox 実行で発生する例外を分類し、
 Retry 戦略を決定するために使用する。
+
+例外階層:
+    NexusCoreError
+    ├── ModelRateLimitError      (429)   → retry, exponential backoff
+    ├── ModelTimeoutError        (timeout) → retry, linear backoff
+    ├── ModelConnectionError     (conn)   → retry, exponential backoff
+    ├── InvalidModelOutputError  (output) → retry, linear backoff
+    ├── SandboxExecutionError    (exec)   → abort
+    ├── SandboxSecurityError     (sec)    → abort
+    ├── PatchApplyError          (patch)  → abort
+    └── UnexpectedSystemError    (??? )   → abort
 """
 
 from __future__ import annotations
@@ -13,55 +24,82 @@ logger = logging.getLogger(__name__)
 
 
 class NexusCoreError(Exception):
-    """Base class for NexusCore-specific errors."""
+    """NexusCore 全例外の基底クラス。
+
+    全てのカスタム例外はこのクラスを継承する。
+    """
 
     pass
 
 
 class ModelRateLimitError(NexusCoreError):
-    """LLM API のレートリミット（429）"""
+    """LLM API レートリミット（HTTP 429）。
+
+    一時的エラー。Exponential backoff で最大5回リトライ。
+    """
 
     pass
 
 
 class ModelTimeoutError(NexusCoreError):
-    """LLM 応答タイムアウト"""
+    """LLM 応答タイムアウト。
+
+    一時的エラー。Linear backoff（10秒固定）で最大3回リトライ。
+    """
 
     pass
 
 
 class ModelConnectionError(NexusCoreError):
-    """ネットワーク系の一時的なエラー"""
+    """ネットワーク接続の一時的エラー。
+
+    一時的エラー。Exponential backoff で最大3回リトライ。
+    """
 
     pass
 
 
 class InvalidModelOutputError(NexusCoreError):
-    """LLM 出力が期待する JSON/構造になっていない"""
+    """LLM 出力が期待する JSON/構造になっていない。
+
+    一時的エラー。Linear backoff（5秒固定）で最大3回リトライ。
+    """
 
     pass
 
 
 class SandboxExecutionError(NexusCoreError):
-    """テスト実行・コード実行系のエラー"""
+    """テスト実行・コード実行系のエラー。
+
+    非リトライ可能。即座に abort。
+    """
 
     pass
 
 
 class SandboxSecurityError(NexusCoreError):
-    """サンドボックスセキュリティ違反（禁止モジュールの利用など）"""
+    """サンドボックスセキュリティ違反。
+
+    禁止モジュールの利用など。非リトライ可能。即座に abort。
+    """
 
     pass
 
 
 class PatchApplyError(NexusCoreError):
-    """patch_applier の適用失敗"""
+    """パッチ適用失敗。
+
+    非リトライ可能。即座に abort。
+    """
 
     pass
 
 
 class UnexpectedSystemError(NexusCoreError):
-    """想定外の例外ラッパ"""
+    """想定外の例外ラッパ。
+
+    非リトライ可能。即座に abort。
+    """
 
     pass
 
