@@ -111,7 +111,7 @@ def test_slack_notifier_send_with_details(mock_requests):
     assert "attachments" in payload
     # Detailsフィールドが含まれることを確認
     fields = payload["attachments"][0]["fields"]
-    detail_field = next((f for f in fields if f.get("title") == "Details"), None)
+    detail_field = next((f for f in fields if f.get("title") == "詳細"), None)
     assert detail_field is not None
 
 
@@ -188,7 +188,7 @@ def test_slack_notifier_notify_orchestrator_complete(mock_requests):
     assert result is True
     call_args = mock_requests.post.call_args
     payload = call_args[1]["json"]
-    assert "Orchestrator Complete" in payload["text"]
+    assert "Orchestrator 完了" in payload["text"]
     assert "✅" in payload["text"]
 
 

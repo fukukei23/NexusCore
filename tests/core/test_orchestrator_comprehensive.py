@@ -147,8 +147,10 @@ class TestOrchestratorInit:
     @staticmethod
     def _create_mock_agents() -> dict[str, Any]:
         """モックエージェント群を作成"""
+        requirement_agent = Mock()
+        requirement_agent.use_ui = False  # Mockのtruthy属性でGradio UIパスに入らないようにする
         return {
-            "requirement_agent": Mock(),
+            "requirement_agent": requirement_agent,
             "architect_agent": Mock(),
             "planner_agent": Mock(),
             "coder_agent": Mock(),
@@ -422,7 +424,10 @@ class TestOrchestratorRunFullProject:
 
     @patch("nexuscore.core.orchestrator.guarded_llm_call")
     def test_run_full_project_requirement_failure(self, mock_guarded_call, tmp_path):
-        """要件定義フェーズ失敗時の動作"""
+        """要件定義フェーズ失敗時に例外が発生することを確認"""
+        # guarded_llm_callがserializableなdictを返すように設定
+        mock_guarded_call.return_value = {"functions_to_implement": []}
+
         llm_router = Mock(spec=LLMRouter)
         agents = TestOrchestratorInit._create_mock_agents()
 
@@ -430,6 +435,8 @@ class TestOrchestratorRunFullProject:
         agents["requirement_agent"].analyze_requirement = Mock(
             side_effect=Exception("Requirement failed")
         )
+        # Mockのuse_uiがtruthyになるのを防ぐ
+        agents["requirement_agent"].use_ui = False
 
         orchestrator = Orchestrator(
             project_path=str(tmp_path),
@@ -438,21 +445,24 @@ class TestOrchestratorRunFullProject:
             **agents,
         )
 
-        # 例外が発生せず、正常に終了することを確認
-        orchestrator.run_full_project(
-            user_requirement="Test requirement",
-            language="ja",
-            fast_lane=False,
-        )
+        # 要件定義フェーズで例外が発生することを確認
+        with pytest.raises(Exception, match="Requirement failed"):
+            orchestrator.run_full_project(
+                user_requirement="Test requirement",
+                language="ja",
+                fast_lane=False,
+            )
 
     @patch("nexuscore.core.orchestrator.guarded_llm_call")
     def test_run_full_project_empty_specs(self, mock_guarded_call, tmp_path):
-        """要件定義が空の場合の動作"""
+        """要件定義が空の場合、ValueErrorが発生することを確認"""
         llm_router = Mock(spec=LLMRouter)
         agents = TestOrchestratorInit._create_mock_agents()
 
         # requirement_agentが空の辞書を返す
         agents["requirement_agent"].analyze_requirement = Mock(return_value={})
+        # Mockのuse_uiがtruthyになるのを防ぐ
+        agents["requirement_agent"].use_ui = False
 
         orchestrator = Orchestrator(
             project_path=str(tmp_path),
@@ -461,17 +471,13 @@ class TestOrchestratorRunFullProject:
             **agents,
         )
 
-        orchestrator.run_full_project(
-            user_requirement="Test requirement",
-            language="ja",
-            fast_lane=False,
-        )
-
-        # planner_agentが呼ばれないことを確認
-        assert (
-            not hasattr(agents["planner_agent"], "generate_plan")
-            or not agents["planner_agent"].generate_plan.called
-        )
+        # 空specsでValueErrorが発生することを確認
+        with pytest.raises(ValueError, match="empty specs"):
+            orchestrator.run_full_project(
+                user_requirement="Test requirement",
+                language="ja",
+                fast_lane=False,
+            )
 
     @patch("nexuscore.core.orchestrator.guarded_llm_call")
     def test_run_full_project_fast_lane(self, mock_guarded_call, tmp_path):
