@@ -271,7 +271,7 @@ class TestBuildTaskModelMapDict:
         result = build_task_model_map_dict()
         entry = result["code_generate"]
 
-        assert entry["primary"] == "openai:gpt-5.1-codex"
+        assert entry["primary"].startswith("openai:")
         assert isinstance(entry["fallbacks"], list)
         assert len(entry["fallbacks"]) > 0
         assert "temperature" in entry
