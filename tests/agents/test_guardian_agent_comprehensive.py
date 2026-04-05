@@ -114,16 +114,16 @@ class TestGuardianAgentInit:
             assert agent.api_key == "env-key"
             assert agent.model == ""
 
-    @patch("nexuscore.agents.guardian_agent.GitController")
-    def test_init_with_git_error(self, mock_git):
+    @patch("nexuscore.agents.guardian_agent.git")
+    def test_init_with_git_error(self, mock_git_module):
         """Git初期化エラー時の処理"""
-        import git
-
-        mock_git.side_effect = git.InvalidGitRepositoryError("Not a git repo")
-
-        agent = GuardianAgent()
-
-        assert agent.vcs is None
+        mock_git_module.InvalidGitRepositoryError = type(
+            "InvalidGitRepositoryError", (Exception,), {}
+        )
+        with patch("nexuscore.agents.guardian_agent.GitController") as mock_gc:
+            mock_gc.side_effect = mock_git_module.InvalidGitRepositoryError("Not a git repo")
+            agent = GuardianAgent()
+            assert agent.vcs is None
 
     def test_init_budget_callback(self):
         """バジェットコールバックの設定"""
