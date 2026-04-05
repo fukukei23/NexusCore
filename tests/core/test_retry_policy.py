@@ -242,3 +242,70 @@ def test_decide_retry_without_context():
     decision = decide_retry(error, 1)
     assert decision.action == "retry"
     assert decision.should_retry
+
+
+# ===== Unknown 例外タイプの検証（L143-147 カバー） =====
+
+
+def test_unknown_exception_type_aborts():
+    """Decision Table にない例外タイプは即座に Abort"""
+    error = ValueError("Not in decision table")
+    decision = decide_retry(error, 1)
+
+    assert decision.action == "abort"
+    assert not decision.should_retry
+    assert decision.wait_seconds == 0.0
+    assert "Unknown exception type" in decision.reason
+
+
+def test_generic_exception_aborts():
+    """一般的な Exception も Decision Table にないため Abort"""
+    error = Exception("Generic error")
+    decision = decide_retry(error, 1)
+
+    assert decision.action == "abort"
+    assert not decision.should_retry
+
+
+# ===== max_attempts==0 の即時 Abort 検証（L172-173 カバー） =====
+
+
+def test_retryable_error_max_zero_immediate_abort():
+    """max_attempts=0 のエラー (SandboxExecutionError) で attempt=0 の場合、Step 2 (0>0=False) を通過し Step 3 (L171-178) で即時 Abort"""
+    error = SandboxExecutionError("Sandbox failed")
+    decision = decide_retry(error, 0)
+
+    assert decision.action == "abort"
+    assert not decision.should_retry
+    assert decision.wait_seconds == 0.0
+    assert "SandboxExecutionError" in decision.reason
+
+
+def test_patch_apply_immediate_abort_max_zero():
+    """PatchApplyError は max_attempts=0 で即時 Abort"""
+    error = PatchApplyError("Patch failed")
+    decision = decide_retry(error, 1)
+
+    assert decision.action == "abort"
+    assert not decision.should_retry
+    assert "Max attempts" in decision.reason and "0" in decision.reason
+
+
+def test_unexpected_system_error_immediate_abort():
+    """UnexpectedSystemError は max_attempts=0 で即時 Abort"""
+    error = UnexpectedSystemError("Unexpected")
+    decision = decide_retry(error, 1)
+
+    assert decision.action == "abort"
+    assert not decision.should_retry
+
+
+# ===== backoff_type="none" フォールスルー検証（L190 カバー） =====
+
+
+def test_sandbox_execution_no_wait():
+    """SandboxExecutionError は wait_seconds=0.0"""
+    error = SandboxExecutionError("Sandbox failed")
+    decision = decide_retry(error, 1)
+
+    assert decision.wait_seconds == 0.0
