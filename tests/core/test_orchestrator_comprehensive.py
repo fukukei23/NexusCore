@@ -24,18 +24,25 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 # orchestrator.py が依存する全モジュールをモック
-sys.modules["gradio"] = MagicMock()
-sys.modules["nexuscore.agents.requirement_agent"] = MagicMock()
-sys.modules["nexuscore.agents.architect_agent"] = MagicMock()
-sys.modules["nexuscore.agents.planner_agent"] = MagicMock()
-sys.modules["nexuscore.agents.coder_agent"] = MagicMock()
-sys.modules["nexuscore.agents.tester_agent"] = MagicMock()
-sys.modules["nexuscore.agents.debugger_agent"] = MagicMock()
-sys.modules["nexuscore.agents.guardian_agent"] = MagicMock()
-sys.modules["nexuscore.agents.policy_agent"] = MagicMock()
-sys.modules["nexuscore.agents.postmortem_agent"] = MagicMock()
-sys.modules["nexuscore.agents.knowledge_curator_agent"] = MagicMock()
-sys.modules["nexuscore.agents.patch_applier"] = MagicMock()
+# Note: save originals and restore after import to avoid leaking into other test modules
+_AGENT_MOCK_KEYS = [
+    "gradio",
+    "nexuscore.agents.requirement_agent",
+    "nexuscore.agents.architect_agent",
+    "nexuscore.agents.planner_agent",
+    "nexuscore.agents.coder_agent",
+    "nexuscore.agents.tester_agent",
+    "nexuscore.agents.debugger_agent",
+    "nexuscore.agents.guardian_agent",
+    "nexuscore.agents.policy_agent",
+    "nexuscore.agents.postmortem_agent",
+    "nexuscore.agents.knowledge_curator_agent",
+    "nexuscore.agents.patch_applier",
+]
+_agent_sys_modules_saved: dict[str, object] = {}
+for _key in _AGENT_MOCK_KEYS:
+    _agent_sys_modules_saved[_key] = sys.modules.get(_key)
+    sys.modules[_key] = MagicMock()
 
 try:
     from nexuscore.core.orchestrator import (
@@ -54,6 +61,14 @@ except ImportError:
     _build_arg_parser = None
     SessionController = None
     LLMRouter = None
+
+# Restore sys.modules so other test files see real modules (not MagicMock)
+for _key in _AGENT_MOCK_KEYS:
+    _original = _agent_sys_modules_saved[_key]
+    if _original is None:
+        sys.modules.pop(_key, None)
+    else:
+        sys.modules[_key] = _original
 
 
 @pytest.mark.skipif(not HAS_ORCHESTRATOR, reason="orchestrator module not available")
