@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import enum
+import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 
 
 class ReviewDecision(enum.StrEnum):
@@ -128,8 +130,24 @@ class GuardianAutoReviewer:
         re.compile(r'"https?://(?:www\.)?yahoo\.co\.jp'),
     ]
 
-    def __init__(self, project_name: str):
+    def __init__(self, project_name: str, policy_rules_path: str = "config/policy_rules.json"):
         self.project_type = self._detect_project_type(project_name)
+        self.policy_rules: list[dict] = []
+        self._load_policy_rules(policy_rules_path)
+
+    def _load_policy_rules(self, path: str) -> None:
+        """policy_rules.jsonを読み込み、enabled=trueのルールのみ保持"""
+        try:
+            p = Path(path)
+            if not p.exists():
+                return
+            with p.open("r", encoding="utf-8") as f:
+                all_rules = json.load(f)
+            self.policy_rules = [
+                r for r in all_rules if r.get("enabled", True)
+            ]
+        except Exception:
+            self.policy_rules = []
 
     @staticmethod
     def _detect_project_type(project_name: str) -> ProjectType:
@@ -156,6 +174,7 @@ class GuardianAutoReviewer:
         issues.extend(self._check_sandbox_violations(files))
         issues.extend(self._check_testing_rules(files))
         issues.extend(self._check_code_safety_rules(files))
+        issues.extend(self._check_policy_rules(files))
 
         if self.project_type == ProjectType.NEXUSCORE:
             issues.extend(self._check_nexuscore_specific(files))
@@ -466,5 +485,77 @@ class GuardianAutoReviewer:
                         )
 
                     line_no += 1
+
+        return issues
+
+    # =============================
+    # policy_rules.json 連動チェック（新スキーマ対応）
+    # =============================
+
+    @staticmethod
+    def _severity_to_level(severity: str) -> str:
+        """policy severity → ReviewIssue level マッピング"""
+        mapping = {"CRITICAL": "error", "MAJOR": "warning", "MINOR": "info"}
+        return mapping.get(severity, "warning")
+
+    def _check_policy_rules(self, files: Sequence[FileChange]) -> list[ReviewIssue]:
+        """policy_rules.json のルールをdiff追加行に対して適用"""
+        issues: list[ReviewIssue] = []
+
+        for rule in self.policy_rules:
+            detection = rule.get("detection_pattern")
+            if not detection:
+                continue
+            target_pattern = rule.get("target_file_pattern", ".*")
+            exception_rules = rule.get("exception_rules", {})
+            level = self._severity_to_level(rule.get("severity", "MAJOR"))
+
+            for fc in files:
+                # allowlisted_files 除外
+                file_excluded = False
+                for pat in exception_rules.get("allowlisted_files", []):
+                    if re.search(pat, fc.path):
+                        file_excluded = True
+                        break
+                if file_excluded:
+                    continue
+
+                # target_file_pattern チェック
+                if not re.search(target_pattern, fc.path):
+                    continue
+
+                for h in fc.hunks:
+                    line_no = h.new_start
+                    for line in h.lines:
+                        if not line.startswith("+"):
+                            if line.startswith("-"):
+                                line_no += 1
+                            continue
+                        content = line[1:]
+
+                        if re.search(detection, content):
+                            # allowed_patterns 除外
+                            line_excluded = False
+                            for allowed in exception_rules.get("allowed_patterns", []):
+                                if allowed in content:
+                                    line_excluded = True
+                                    break
+                            if line_excluded:
+                                line_no += 1
+                                continue
+
+                            issues.append(
+                                ReviewIssue(
+                                    level=level,
+                                    code=rule.get("policy_id", "POLICY-???"),
+                                    message=rule.get(
+                                        "description",
+                                        f"ポリシー違反: {rule.get('policy_id', 'N/A')}",
+                                    ),
+                                    file_path=fc.path,
+                                    line_no=line_no,
+                                )
+                            )
+                        line_no += 1
 
         return issues
