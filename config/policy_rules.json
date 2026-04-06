@@ -1,34 +1,306 @@
 [
   {
     "policy_id": "POLICY_SEC_001",
-    "description": "Prohibit hard-coded API keys or secrets.",
+    "category": "SECURITY",
+    "tags": ["security", "credentials", "hardcoded-secret"],
+    "priority": 1,
+    "enabled": true,
+    "description": "ハードコードAPIキー検出",
     "target_file_pattern": "\\.py$",
-    "detection_pattern": "(api_key|secret|password)\\s*=\\s*['\"](?!env\\(|os\\.getenv)[a-zA-Z0-9_]{16,}['\"]",
+    "detection_pattern": "(api_key|secret|password)\\s*=\\s*['\"][a-zA-Z0-9_]{16,}['\"]",
     "severity": "CRITICAL",
-    "suggestion": "Use environment variables (e.g., os.getenv('API_KEY')) to manage secrets instead of hard-coding them."
+    "suggestion": "APIキーやシークレットをソースコードに直接記述せず、環境変数やシークレットマネージャーを使用してください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
+  },
+  {
+    "policy_id": "POLICY_SEC_002",
+    "category": "SECURITY",
+    "tags": ["security", "credentials", "sensitive-data"],
+    "priority": 1,
+    "enabled": true,
+    "description": "ハードコード機密情報検出",
+    "target_file_pattern": "\\.py$",
+    "detection_pattern": "(?i)(password|token|private_key)\\s*[:=]\\s*['\"][^'\"]{8,}",
+    "severity": "CRITICAL",
+    "suggestion": "パスワードやトークンなどの機密情報をソースコードに直接書き込まないでください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
+  },
+  {
+    "policy_id": "POLICY_SEC_003",
+    "category": "SECURITY",
+    "tags": ["security", "exception-handling"],
+    "priority": 2,
+    "enabled": true,
+    "description": "bare except禁止",
+    "target_file_pattern": "\\.py$",
+    "detection_pattern": "except\\s*:",
+    "severity": "MAJOR",
+    "suggestion": "すべての例外を無条件にキャッチするbare exceptは避け、具体的な例外クラスを指定してください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
+  },
+  {
+    "policy_id": "POLICY_SEC_004",
+    "category": "SECURITY",
+    "tags": ["security", "input-validation", "injection"],
+    "priority": 2,
+    "enabled": true,
+    "description": "入力検証欠如の検出",
+    "target_file_pattern": "\\.py$",
+    "detection_pattern": "request\\.(args|form|values)\\[.*(?!validate)",
+    "severity": "MAJOR",
+    "suggestion": "ユーザーからの入力を直接利用せず、必ず適切なバリデーションとサニタイズを実施してください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
+  },
+  {
+    "policy_id": "POLICY_PERF_001",
+    "category": "PERFORMANCE",
+    "tags": ["performance", "database", "n-plus-1"],
+    "priority": 2,
+    "enabled": true,
+    "description": "ループ内DBクエリ（N+1問題）",
+    "target_file_pattern": "\\.py$",
+    "detection_pattern": "for\\s+\\w+\\s+in.*:\\s*\\n\\s*.*\\.(filter|get|all|first)\\(",
+    "severity": "MAJOR",
+    "suggestion": "ループ内でのDBクエリはN+1問題を引き起こすため、prefetch_related/select_relatedや一括取得を検討してください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
+  },
+  {
+    "policy_id": "POLICY_PERF_002",
+    "category": "PERFORMANCE",
+    "tags": ["performance", "string-concatenation"],
+    "priority": 3,
+    "enabled": true,
+    "description": "非効率な文字列+=結合",
+    "target_file_pattern": "\\.py$",
+    "detection_pattern": "\\w+\\s*\\+=\\s*['\"]",
+    "severity": "MINOR",
+    "suggestion": "ループ内での文字列の+=による結合は非効率です。リストのappendとjoin、またはf-stringを使用してください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
+  },
+  {
+    "policy_id": "POLICY_MAINTAIN_001",
+    "category": "MAINTAINABILITY",
+    "tags": ["maintainability", "complexity"],
+    "priority": 2,
+    "enabled": true,
+    "description": "高循環的複雑度の検出",
+    "target_file_pattern": "\\.py$",
+    "detection_pattern": "(if|elif|for|while|except|and|or|\\?.*:){11,}",
+    "severity": "MAJOR",
+    "suggestion": "関数のサイクロマティック複雑度が高すぎます。処理を小さな関数に分割し、可読性と保守性を向上させてください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
+  },
+  {
+    "policy_id": "POLICY_MAINTAIN_002",
+    "category": "MAINTAINABILITY",
+    "tags": ["maintainability", "imports"],
+    "priority": 3,
+    "enabled": true,
+    "description": "未使用importの検出",
+    "target_file_pattern": "\\.py$",
+    "detection_pattern": "^\\s*import\\s+(?!.*\\buse\\b)",
+    "severity": "MINOR",
+    "suggestion": "使用されていないモジュールのインポートはコードを煩雑にするため、削除してください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
+  },
+  {
+    "policy_id": "POLICY_MAINTAIN_003",
+    "category": "MAINTAINABILITY",
+    "tags": ["maintainability", "typing"],
+    "priority": 3,
+    "enabled": false,
+    "description": "型ヒント欠如の検出",
+    "target_file_pattern": "\\.py$",
+    "detection_pattern": "def\\s+\\w+\\([^)]*\\)\\s*:(?!.*->)",
+    "severity": "MINOR",
+    "suggestion": "関数の戻り値の型ヒントを追加し、静的解析ツールによるチェックを可能にしてください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
   },
   {
     "policy_id": "POLICY_STYLE_001",
-    "description": "Discourage direct use of the 'os' module for path manipulation.",
+    "category": "STYLE",
+    "tags": ["style", "pathlib", "os"],
+    "priority": 2,
+    "enabled": true,
+    "description": "os.path使用の検出（pathlib推奨）",
     "target_file_pattern": "\\.py$",
-    "detection_pattern": "^\\s*import\\s+os\\b|^\\s*from\\s+os\\s+import\\s+(path|system)",
+    "detection_pattern": "^\\s*(import\\s+os\\b|from\\s+os\\s+import\\s+(path|system))",
     "severity": "MAJOR",
-    "suggestion": "Consider using the object-oriented 'pathlib' module for OS-agnostic path manipulations."
+    "suggestion": "パス操作にos.pathを使用せず、モダンな標準ライブラリであるpathlibの使用を推奨します。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
   },
   {
     "policy_id": "POLICY_STYLE_002",
-    "description": "Ensure all public functions have a docstring.",
+    "category": "STYLE",
+    "tags": ["style", "docstring"],
+    "priority": 3,
+    "enabled": true,
+    "description": "パブリック関数のdocstring欠如",
     "target_file_pattern": "\\.py$",
     "detection_pattern": "^def\\s+((?!_)[a-zA-Z0-9_]+)\\s*\\([^)]*\\):\\s*$",
     "severity": "MINOR",
-    "suggestion": "Add a docstring to explain the function's purpose, arguments, and return value."
+    "suggestion": "パブリック関数にはその目的と引数・戻り値を説明するdocstringを追加してください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
   },
   {
     "policy_id": "POLICY_LINT_001",
-    "description": "Detect 'print()' statements that may have been left for debugging.",
+    "category": "LINT",
+    "tags": ["lint", "logging", "debugging"],
+    "priority": 3,
+    "enabled": true,
+    "description": "print文の検出",
     "target_file_pattern": "\\.py$",
     "detection_pattern": "\\bprint\\s*\\(",
     "severity": "MINOR",
-    "suggestion": "Use the 'logging' module for debug output instead of 'print()' statements."
+    "suggestion": "デバッグ用のprint文を残さず、ログ出力（loggingモジュールなど）を使用してください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
+  },
+  {
+    "policy_id": "POLICY_TEST_001",
+    "category": "TEST_QUALITY",
+    "tags": ["testing", "assertions"],
+    "priority": 2,
+    "enabled": true,
+    "description": "テスト内アサーション欠如",
+    "target_file_pattern": "test_.*\\.py$",
+    "detection_pattern": "def\\s+test_\\w+.*:\\s*\\n(?!.*assert)",
+    "severity": "MAJOR",
+    "suggestion": "テスト関数内にassert文がありません。テスト対象の振る舞いを検証するアサーションを追加してください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
+  },
+  {
+    "policy_id": "POLICY_TEST_002",
+    "category": "TEST_QUALITY",
+    "tags": ["testing", "naming-conventions"],
+    "priority": 3,
+    "enabled": true,
+    "description": "テストメソッド命名規則違反",
+    "target_file_pattern": "test_.*\\.py$",
+    "detection_pattern": "def\\s+(?!test_)\\w+\\(self\\):",
+    "severity": "MINOR",
+    "suggestion": "テストメソッドはtest_プレフィックスから始まる名前にして、テストランナーに認識されるようにしてください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
+  },
+  {
+    "policy_id": "POLICY_BP_001",
+    "category": "BEST_PRACTICES",
+    "tags": ["best-practices", "tech-debt"],
+    "priority": 3,
+    "enabled": true,
+    "description": "TODO/FIXME残存の検出",
+    "target_file_pattern": "\\.py$",
+    "detection_pattern": "(TODO|FIXME|HACK|XXX)\\b",
+    "severity": "MINOR",
+    "suggestion": "未解決のTODOやFIXMEが残っています。課題トラッカーに起票し、ソースコード上からは除去してください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
+  },
+  {
+    "policy_id": "POLICY_BP_002",
+    "category": "BEST_PRACTICES",
+    "tags": ["best-practices", "pitfalls"],
+    "priority": 2,
+    "enabled": true,
+    "description": "mutable default引数の検出",
+    "target_file_pattern": "\\.py$",
+    "detection_pattern": "def\\s+\\w+\\([^)]*=\\s*(\\[\\]|\\{\\}|set\\(\\))",
+    "severity": "MAJOR",
+    "suggestion": "関数のデフォルト引数にミュータブルなオブジェクトを使用しないでください。Noneを使用し、関数内で初期化してください。",
+    "exception_rules": {
+      "allowed_patterns": [],
+      "allowlisted_files": [],
+      "project_exclusions": []
+    },
+    "version": "1.0.0",
+    "owner": "nexuscore-team"
   }
 ]
