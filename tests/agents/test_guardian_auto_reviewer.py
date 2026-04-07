@@ -41,7 +41,10 @@ class TestGuardianAutoReviewer:
 +    return "world"
 +
 """
-        reviewer = GuardianAutoReviewer(project_name="nexuscore")
+        # policy_rules.jsonが存在しないパスを指定してビルトインルールのみテスト
+        reviewer = GuardianAutoReviewer(
+            project_name="nexuscore", policy_rules_path="/nonexistent/policy_rules.json"
+        )
         result = reviewer.review_unified_diff(diff)
 
         assert result.decision == ReviewDecision.APPROVE
