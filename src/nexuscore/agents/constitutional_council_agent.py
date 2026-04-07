@@ -94,7 +94,13 @@ class ConstitutionalCouncilAgent(BaseAgent):
         if not proposal:  # {} は「変更なし」として許可
             return True
 
-        allowed_keys = {"policy_id", "description", "rules", "delete_policy_id"}
+        allowed_keys = {
+            "policy_id", "description", "rules", "delete_policy_id",
+            "category", "tags", "priority", "enabled",
+            "target_file_pattern", "detection_pattern",
+            "severity", "suggestion", "exception_rules",
+            "version", "owner",
+        }
         unknown_keys = set(proposal.keys()) - allowed_keys
         if unknown_keys:
             logger.warning(f"[Council] Proposal contains unknown keys: {unknown_keys}")
@@ -187,7 +193,7 @@ class ConstitutionalCouncilAgent(BaseAgent):
 Analyze the case files in light of the current constitution and propose exactly ONE amendment.
 
 ## Response Format (strict JSON):
-- Add/Modify: {{"policy_id": "PID-XXX", "description": "...", "rules": ["..."]}}
+- Add/Modify: {{"policy_id": "PID-XXX", "description": "...", "category": "SECURITY", "tags": ["security"], "priority": 1, "severity": "CRITICAL", "target_file_pattern": ".*\\.py$", "detection_pattern": "...", "suggestion": "...", "exception_rules": {{"allowed_patterns": [], "allowlisted_files": [], "project_exclusions": []}}}}
 - Delete: {{"delete_policy_id": "PID-YYY"}}
 - No change: {{}}
 """
@@ -308,7 +314,9 @@ Analyze the case files in light of the current constitution and propose exactly 
             found = False
             for i, p in enumerate(new_policies):
                 if p.get("policy_id") == pid:
-                    new_policies[i] = proposal
+                    # 既存ポリシーに新フィールドをマージ（既存値を新値で上書き）
+                    merged = {**p, **proposal}
+                    new_policies[i] = merged
                     logger.info(f"[Council] Policy '{pid}' amended.")
                     found = True
                     break
