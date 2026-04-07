@@ -9,6 +9,13 @@ import unittest
 from unittest.mock import MagicMock, mock_open, patch
 
 try:
+    import sklearn  # noqa: F401
+
+    HAS_SKLEARN = True
+except ImportError:
+    HAS_SKLEARN = False
+
+try:
     from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
 except ImportError:
     KnowledgeCuratorAgent = None
@@ -179,6 +186,7 @@ class TestKnowledgeCuratorAgentUltimate(unittest.TestCase):
                     except Exception:
                         pass
 
+    @unittest.skipUnless(HAS_SKLEARN, "sklearn not installed")
     @patch("sklearn.feature_extraction.text.TfidfVectorizer")
     @patch("sklearn.metrics.pairwise.cosine_similarity")
     def test_intelligent_search_system(self, mock_cosine, mock_tfidf):

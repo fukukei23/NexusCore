@@ -1,3 +1,4 @@
+from nexuscore.agents import base_agent as base_agent_mod
 from nexuscore.agents.base_agent import BaseAgent
 
 
@@ -23,6 +24,7 @@ class DummyLLM:
 
 
 def test_execute_llm_task_with_json_guard(monkeypatch):
+    monkeypatch.setattr(base_agent_mod, "HAS_RETRY", False)
     llm = DummyLLM()
     router = DummyRouter(llm)
 
@@ -43,6 +45,8 @@ def test_execute_llm_task_with_json_guard(monkeypatch):
 
 
 def test_execute_llm_task_fallback_when_router_missing(monkeypatch):
+    monkeypatch.setattr(base_agent_mod, "HAS_RETRY", False)
+
     class FallbackAgent(BaseAgent):
         SYSTEM_PROMPT = "Test"
 

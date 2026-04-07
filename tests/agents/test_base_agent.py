@@ -32,6 +32,7 @@ def reload_base_agent():
 @pytest.fixture
 def base_agent_cls(monkeypatch):
     reload_base_agent()
+    monkeypatch.setattr(base_agent, "HAS_RETRY", False)
     yield base_agent.BaseAgent
     reload_base_agent()
 
@@ -40,6 +41,7 @@ def test_execute_llm_task_routes_and_appends_guard(monkeypatch, base_agent_cls):
     dummy_llm = DummyLLM(response='{"result": "structured"}')
     router = DummyRouter(dummy_llm)
     monkeypatch.setattr(base_agent, "LLMRouter", lambda: router)
+    monkeypatch.setattr(base_agent, "HAS_RETRY", False)
 
     class SampleAgent(base_agent_cls):
         SYSTEM_PROMPT = "Base prompt"
@@ -58,6 +60,7 @@ def test_execute_llm_task_routes_and_appends_guard(monkeypatch, base_agent_cls):
 
 def test_execute_llm_task_returns_empty_when_router_missing(monkeypatch, base_agent_cls):
     monkeypatch.setattr(base_agent, "LLMRouter", None)
+    monkeypatch.setattr(base_agent, "HAS_RETRY", False)
 
     class SampleAgent(base_agent_cls):
         pass
@@ -75,6 +78,7 @@ def test_execute_llm_task_handles_llm_errors(monkeypatch, base_agent_cls):
 
     router = DummyRouter(ExplodingLLM())
     monkeypatch.setattr(base_agent, "LLMRouter", lambda: router)
+    monkeypatch.setattr(base_agent, "HAS_RETRY", False)
 
     class SampleAgent(base_agent_cls):
         pass
