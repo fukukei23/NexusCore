@@ -112,6 +112,7 @@ def test_lock_held_during_running(monkeypatch: Any, tmp_path: Any) -> None:
     lock_dir = tmp_path / "locks"
     lock_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("NEXUSCORE_RUN_LOCK_DIR", str(lock_dir))
+    monkeypatch.setattr("nexuscore.orchestrator.run_lock._get_lock_refresh_seconds", lambda: 0.1)
 
     from nexuscore.orchestrator import authority_runner
     from nexuscore.orchestrator.run_state_store import save_state
@@ -162,8 +163,8 @@ def test_refresh_failure_triggers_safe_stop(monkeypatch: Any, tmp_path: Any) -> 
     lock_dir = tmp_path / "locks"
     lock_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("NEXUSCORE_RUN_LOCK_DIR", str(lock_dir))
-    # Set very short refresh interval (0.2 seconds) to trigger refresh quickly
-    monkeypatch.setenv("NEXUSCORE_RUN_LOCK_REFRESH_SECONDS", "0.2")
+    # Set very short refresh interval via direct patch (env var parsed as int, minimum 5)
+    monkeypatch.setattr("nexuscore.orchestrator.run_lock._get_lock_refresh_seconds", lambda: 0.1)
 
     from nexuscore.orchestrator import authority_runner
     from nexuscore.orchestrator.run_state_store import load_state, save_state
