@@ -59,6 +59,7 @@ def test_pause_saves_state_and_resume_continues_from_next_phase(
 ) -> None:
     monkeypatch.setenv("NEXUSCORE_RUN_STATE_DIR", str(tmp_path / "run_state"))
     monkeypatch.setenv("NEXUSCORE_RUNSTATE_HMAC_SECRET", "test-secret-key")
+    monkeypatch.setattr("nexuscore.orchestrator.run_lock._get_lock_refresh_seconds", lambda: 0.1)
 
     orch = FakeOrchestrator()
     result = authority_runner.run_with_authority(
