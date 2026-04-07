@@ -36,7 +36,7 @@ def test_run_bandit_reports_issue(monkeypatch):
     monkeypatch.setattr(code_analyzer.subprocess, "run", lambda *a, **k: FakeResult())
     ok, summary = code_analyzer.run_bandit(".")
     assert ok is False
-    assert "bad" in summary
+    assert any("bad" in issue.get("issue_text", "") for issue in summary)
 
 
 def test_run_pytest_cov_parses_total(monkeypatch):

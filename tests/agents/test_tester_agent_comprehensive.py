@@ -519,8 +519,8 @@ def test_async():
 
         coverage = agent._run_tests_and_get_coverage("example", test_file_path)
 
-        # テストが実行される
-        mock_subprocess.assert_called_once()
+        # テストが実行される（pytest + coverage json の2回呼ばれる）
+        mock_subprocess.assert_called()
         # カバレッジは現在 0.0（将来実装予定）
         assert coverage == 0.0
 
@@ -543,7 +543,7 @@ def test_async():
         coverage = agent._run_tests_and_get_coverage("example", test_file_path)
 
         # テストが実行される（失敗しても処理は継続）
-        mock_subprocess.assert_called_once()
+        mock_subprocess.assert_called()
         assert coverage == 0.0
 
     @patch("nexuscore.agents.tester_agent.TestStrategyManager", None)

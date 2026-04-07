@@ -333,18 +333,16 @@ class TestLaunchGradioUi:
             mock_analyze.assert_called_once_with("テスト要件")
             assert result == {"summary": "Test"}
 
-    @patch("nexuscore.agents.requirement_agent.gr")
-    def test_ui_mode_creates_gradio_blocks(self, mock_gr):
+    def test_ui_mode_creates_gradio_blocks(self):
         """UIモードではGradio Blocksを作成"""
-        agent = RequirementAgent(use_ui=True)
-
+        mock_gr = MagicMock()
         mock_blocks = MagicMock()
         mock_gr.Blocks.return_value.__enter__.return_value = mock_blocks
-
-        # launch()を呼ばないようにモック
         mock_blocks.queue.return_value.launch.return_value = None
 
-        agent.launch_gradio_ui(share=False)
+        with patch.dict("sys.modules", {"gradio": mock_gr}):
+            agent = RequirementAgent(use_ui=True)
+            agent.launch_gradio_ui(share=False)
 
         # Gradio Blocksが作成される
         mock_gr.Blocks.assert_called_once()

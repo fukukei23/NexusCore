@@ -29,6 +29,7 @@ def test_apply_success(monkeypatch, tmp_path):
     fake_fromstring.received = None
     fake_patch = types.SimpleNamespace(fromstring=fake_fromstring)
     monkeypatch.setattr(pa_module, "patch", fake_patch)
+    monkeypatch.setattr(pa_module, "HAS_PATCH", True)
 
     applier = PatchApplier()
     assert applier.apply("--- diff", str(tmp_path)) is True
@@ -39,6 +40,7 @@ def test_apply_success(monkeypatch, tmp_path):
 def test_apply_handles_parse_failure(monkeypatch):
     fake_patch = types.SimpleNamespace(fromstring=lambda data: None)
     monkeypatch.setattr(pa_module, "patch", fake_patch)
+    monkeypatch.setattr(pa_module, "HAS_PATCH", True)
 
     applier = PatchApplier()
     assert applier.apply("bad", "/tmp") is False
