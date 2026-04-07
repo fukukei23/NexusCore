@@ -1,0 +1,67 @@
+# ==============================================================================
+# NexusCore .dockerignore
+# ==============================================================================
+
+# Version Control
+.git
+.gitignore
+.gitattributes
+
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Type Checking
+.mypy_cache/
+
+# Environment & Secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Application Specific
+logs/
+src/logs/
+.nexus/
+chroma_db/
+vector_store/
+*.db
+*.sqlite
+
+# Documentation & Reports
+docs/reports/
+
+# Evaluation & History
+test_history/
+evaluation/
+
+# IDE & Editor
+.claude/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Data & Temp
+data/
+tmp/
+
+# K8s secrets (managed externally)
+k8s/secrets-*.yaml
+
+# Docker files (avoid recursion)
+docker-compose*.yml
+Dockerfile*
