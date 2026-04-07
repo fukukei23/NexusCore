@@ -8,6 +8,7 @@ import json
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
 
 # 安全なインポート
 try:
@@ -27,9 +28,17 @@ except ImportError:
 
 
 class ContextAgent:
+    def _find_project_root(self) -> str:
+        """Walk up from cwd looking for .git or pyproject.toml."""
+        current = Path.cwd()
+        for parent in [current, *current.parents]:
+            if (parent / ".git").exists() or (parent / "pyproject.toml").exists():
+                return str(parent)
+        return str(current)
+
     def __init__(self, project_root: str | None = None):
         self.project_root: str = (
-            project_root or os.getenv("NEXUS_PROJECT_ROOT", os.getcwd()) or os.getcwd()
+            project_root or os.getenv("NEXUS_PROJECT_ROOT") or self._find_project_root()
         )
         self.context_cache_file = os.path.join(self.project_root, ".nexus_context.json")
 

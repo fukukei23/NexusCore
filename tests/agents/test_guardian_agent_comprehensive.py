@@ -945,16 +945,19 @@ diff --git a/script.js b/script.js
 
     def test_generate_diff_summary_with_empty_code(self, guardian):
         """空のコードでのdiff要約生成"""
-        result = guardian.generate_diff_summary(
-            before_code="",
-            after_code="def new_func():\n    pass",
-            file_diffs={},
-            semantic_diffs={},
-            model="test-model",
-        )
+        from unittest.mock import patch
 
-        # 空のbeforeでも処理できる
-        assert "summary" in result or isinstance(result, str)
+        with patch.object(GuardianAgent, "execute_llm_task", return_value="summary: new function added"):
+            result = guardian.generate_diff_summary(
+                before_code="",
+                after_code="def new_func():\n    pass",
+                file_diffs={},
+                semantic_diffs={},
+                model="test-model",
+            )
+
+        # 空のbeforeでも処理できる（結果は文字列または辞書）
+        assert isinstance(result, (str, dict))
 
     @patch.object(GuardianAgent, "execute_llm_task")
     def test_review_with_llm_error_handling(self, mock_execute, guardian):

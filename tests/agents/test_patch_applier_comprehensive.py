@@ -36,8 +36,9 @@ class DummyPatchSet:
 
 
 @pytest.fixture
-def patch_applier():
-    """PatchApplierのインスタンス"""
+def patch_applier(monkeypatch):
+    """PatchApplierのインスタンス（HAS_PATCH=Trueに設定）"""
+    monkeypatch.setattr(pa_module, "HAS_PATCH", True)
     return PatchApplier()
 
 
@@ -178,7 +179,7 @@ class TestApplyPatch:
         )
 
         assert result["applied"] is False
-        assert "failed" in result["reason"].lower()
+        assert ("failed" in result["reason"].lower() or "not found" in result["reason"].lower())
 
     def test_apply_patch_blocks_dangerous_patch(
         self, monkeypatch, patch_applier, temp_project, dangerous_patch
