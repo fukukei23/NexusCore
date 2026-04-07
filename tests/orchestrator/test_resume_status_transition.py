@@ -9,6 +9,7 @@ from nexuscore.orchestrator.run_state_store import load_state, save_state
 def test_resume_status_transition_and_orchestrator_rebuild(monkeypatch: Any, tmp_path: Any) -> None:
     monkeypatch.setenv("NEXUSCORE_RUN_STATE_DIR", str(tmp_path / "run_state"))
     monkeypatch.setenv("NEXUSCORE_RUNSTATE_HMAC_SECRET", "test-secret-key")
+    monkeypatch.setattr("nexuscore.orchestrator.run_lock._get_lock_refresh_seconds", lambda: 0.1)
 
     # Arrange: a valid PAUSED RunState (with an unknown field to verify RMW preservation)
     state: dict[str, Any] = {
