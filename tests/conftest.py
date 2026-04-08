@@ -14,27 +14,37 @@ from typing import Any
 
 import pytest
 
-# webapp 関連のインポートは条件付き（Gradio/analyzer テストでは不要）
-try:
-    from nexuscore.webapp import create_app, db
-    from nexuscore.webapp.models import ApiKey, ExecutionLog, PatchRecord, Project, Run, User
+# webapp 関連のインポートは lazy（トップレベル import の副作用回避）
+HAS_WEBAPP = None  # type: ignore
 
-    HAS_WEBAPP = True
-except ImportError:
-    HAS_WEBAPP = False
-    create_app = None  # type: ignore
-    db = None  # type: ignore
-    Project = None  # type: ignore
-    Run = None  # type: ignore
-    User = None  # type: ignore
-    ExecutionLog = None  # type: ignore
-    PatchRecord = None  # type: ignore
-    ApiKey = None  # type: ignore
+
+def _ensure_webapp():
+    """webapp モジュールを遅延インポートする"""
+    global HAS_WEBAPP, create_app, db, Project, Run, User, ExecutionLog, PatchRecord, ApiKey
+    if HAS_WEBAPP is not None:
+        return HAS_WEBAPP
+    try:
+        from nexuscore.webapp import create_app, db
+        from nexuscore.webapp.models import ApiKey, ExecutionLog, PatchRecord, Project, Run, User
+
+        HAS_WEBAPP = True
+    except ImportError:
+        HAS_WEBAPP = False
+        create_app = None  # type: ignore
+        db = None  # type: ignore
+        Project = None  # type: ignore
+        Run = None  # type: ignore
+        User = None  # type: ignore
+        ExecutionLog = None  # type: ignore
+        PatchRecord = None  # type: ignore
+        ApiKey = None  # type: ignore
+    return HAS_WEBAPP
 
 
 @pytest.fixture
 def app():
     """テスト用 Flask アプリ"""
+    _ensure_webapp()
     if not HAS_WEBAPP:
         pytest.skip("webapp modules not available")
     app = create_app(
@@ -50,6 +60,7 @@ def app():
 @pytest.fixture
 def client(app):
     """テスト用クライアント"""
+    _ensure_webapp()
     if not HAS_WEBAPP:
         pytest.skip("webapp modules not available")
     with app.app_context():
@@ -61,6 +72,7 @@ def client(app):
 @pytest.fixture
 def test_user(app):
     """テスト用ユーザー"""
+    _ensure_webapp()
     if not HAS_WEBAPP:
         pytest.skip("webapp modules not available")
     with app.app_context():
@@ -83,6 +95,7 @@ def test_user_id(app):
 
     test_user fixture とは独立して User を作成し、id のみを返す。
     """
+    _ensure_webapp()
     if not HAS_WEBAPP:
         pytest.skip("webapp modules not available")
     with app.app_context():
@@ -106,6 +119,7 @@ def test_user_id(app):
 @pytest.fixture
 def test_project(app, test_user_id):
     """テスト用プロジェクト"""
+    _ensure_webapp()
     if not HAS_WEBAPP:
         pytest.skip("webapp modules not available")
     with app.app_context():
@@ -128,6 +142,7 @@ def test_project_id(app, test_user_id):
     CR-NEXUS-035: DetachedInstanceError を回避するため、ORM インスタンスではなく
     安定した int の project_id を返す。test_run_with_metrics などで使用する。
     """
+    _ensure_webapp()
     if not HAS_WEBAPP:
         pytest.skip("webapp modules not available")
     with app.app_context():
@@ -155,6 +170,7 @@ def test_project_id(app, test_user_id):
 @pytest.fixture
 def test_run_with_metrics(app, test_project_id, test_user_id):
     """テスト用 Run（メトリクス付き）"""
+    _ensure_webapp()
     if not HAS_WEBAPP:
         pytest.skip("webapp modules not available")
     with app.app_context():
@@ -209,6 +225,7 @@ def test_run_with_self_healing_metrics(app, test_project_id, test_user_id):
     テスト用 Run（Self-Healing メトリクス付き）
     ExecutionLog に retry_count, last_error_class, model を含める
     """
+    _ensure_webapp()
     if not HAS_WEBAPP:
         pytest.skip("webapp modules not available")
     with app.app_context():
@@ -280,6 +297,7 @@ def test_run_with_self_healing_metrics(app, test_project_id, test_user_id):
 @pytest.fixture
 def test_api_key(app, test_user_id):
     """テスト用 API Key"""
+    _ensure_webapp()
     if not HAS_WEBAPP:
         pytest.skip("webapp modules not available")
     with app.app_context():
