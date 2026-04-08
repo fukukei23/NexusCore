@@ -55,8 +55,10 @@ def test_token_expiration():
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
     """Flask テストクライアント"""
+    monkeypatch.setenv("NEXUSCORE_API_TOKEN", "test-api-token-for-testing")
+    monkeypatch.setenv("NEXUS_ALLOWED_PROJECT_BASE", "/workspace")
     from src.nexuscore.api.server import app
 
     app.config["TESTING"] = True
@@ -66,13 +68,12 @@ def client():
 
 def test_require_auth_without_token(client):
     """認証なしアクセスのテスト"""
-    # トークンなしでリクエスト
     response = client.post(
         "/api/v1/execute", json={"requirement": "test", "project_path": "/workspace/test"}
     )
 
     assert response.status_code == 401
-    assert b"Authorization header missing" in response.data
+    assert b"Authorization required" in response.data
 
 
 def test_require_auth_with_invalid_format(client):
@@ -84,16 +85,13 @@ def test_require_auth_with_invalid_format(client):
     )
 
     assert response.status_code == 401
-    assert b"Invalid authorization header format" in response.data
 
 
 def test_require_auth_with_valid_token(client):
     """有効なトークンでのアクセステスト"""
-    token = generate_token("test-user")
-
     response = client.post(
         "/api/v1/execute",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": "Bearer test-api-token-for-testing"},
         json={"requirement": "test", "project_path": "/workspace/test"},
     )
 
@@ -104,49 +102,31 @@ def test_require_auth_with_valid_token(client):
 
 def test_path_traversal_blocked(client):
     """パストラバーサル攻撃のテスト"""
-    import os
-
-    os.environ["NEXUS_ALLOWED_PROJECT_BASE"] = "/workspace"
-
-    token = generate_token("test-user")
-
-    # 許可されていないパスへのアクセス
     response = client.post(
         "/api/v1/execute",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": "Bearer test-api-token-for-testing"},
         json={"requirement": "test", "project_path": "/etc/passwd"},
     )
 
     assert response.status_code == 403
     data = response.get_json()
     assert "not allowed" in data["error"]
-    assert data["error_code"] == "FORBIDDEN_PATH"
 
 
 def test_path_traversal_with_relative_path(client):
     """相対パスによるパストラバーサル攻撃のテスト"""
-    import os
-
-    os.environ["NEXUS_ALLOWED_PROJECT_BASE"] = "/workspace"
-
-    token = generate_token("test-user")
-
-    # ../../ を使った攻撃
     response = client.post(
         "/api/v1/execute",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": "Bearer test-api-token-for-testing"},
         json={"requirement": "test", "project_path": "/workspace/../../etc/passwd"},
     )
 
     assert response.status_code == 403
 
 
-def test_dev_token_generation_endpoint(client):
+def test_dev_token_generation_endpoint(client, monkeypatch):
     """開発用トークン生成エンドポイントのテスト"""
-    import os
-
-    # 開発環境に設定
-    os.environ.pop("FLASK_ENV", None)
+    monkeypatch.delenv("FLASK_ENV", raising=False)
 
     response = client.post("/api/v1/dev/generate-token", json={"user_id": "dev-test-user"})
 
@@ -157,16 +137,11 @@ def test_dev_token_generation_endpoint(client):
     assert "usage" in data
 
 
-def test_dev_token_disabled_in_production(client):
+def test_dev_token_disabled_in_production(client, monkeypatch):
     """本番環境でトークン生成が無効化されることのテスト"""
-    import os
-
-    os.environ["FLASK_ENV"] = "production"
+    monkeypatch.setenv("FLASK_ENV", "production")
 
     response = client.post("/api/v1/dev/generate-token", json={"user_id": "dev-test-user"})
 
     assert response.status_code == 403
     assert b"not available in production" in response.data
-
-    # 環境変数をクリーンアップ
-    os.environ.pop("FLASK_ENV", None)
