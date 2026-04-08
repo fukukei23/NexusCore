@@ -345,7 +345,7 @@ class SemanticAnalyzer:
             logger.info(f"Analyzing {len(target_files)} files with {CONFIG['max_workers']} workers")
 
         results = {}
-        progress = tqdm(target_files, desc="Analyzing", disable=not HAS_EXTRAS)
+        progress = tqdm(target_files, desc="Analyzing", disable=not HAS_EXTRAS) if HAS_EXTRAS else target_files
 
         # TODO: 並列処理 - ThreadPoolExecutor のオーバーヘッドとワーカー数の最適化
         with ThreadPoolExecutor(max_workers=CONFIG["max_workers"]) as executor:
@@ -368,9 +368,11 @@ class SemanticAnalyzer:
                     results[str(file_path)] = AnalysisResult(
                         success=False, error=str(e), file_path=str(file_path)
                     )
-                progress.update(1)
+                if HAS_EXTRAS:
+                    progress.update(1)
 
-        progress.close()
+        if HAS_EXTRAS:
+            progress.close()
 
         # TODO: プロファイリング統計 - 解析完了後の統計をログ出力
         if CONFIG["enable_profiling"]:
