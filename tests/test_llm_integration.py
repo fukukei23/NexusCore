@@ -52,7 +52,8 @@ def test_llm_router_initialization():
 
 def test_base_agent_initialization():
     """BaseAgentがLLMRouterを持って正しく初期化されることをテストする。"""
-    with patch("nexuscore.llm.llm_router.LLMRouter.__init__", return_value=None):
+    with patch("nexuscore.llm.llm_router.LLMRouter") as MockLLMRouter:
+        MockLLMRouter.return_value = MagicMock()
         agent = DummyAgent()
         assert agent is not None
         assert hasattr(agent, "llm_router")
