@@ -12,8 +12,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from flask import request
-
 from nexuscore.api.github_self_healing_webhook import github_webhook
 
 logger = logging.getLogger(__name__)
@@ -25,6 +23,8 @@ def handle_github_webhook() -> dict[str, Any]:
 
     GitHub Webhook のペイロードを受け取り、Self-Healing を実行する。
     """
+    from flask import request
+
     event = request.headers.get("X-GitHub-Event", "unknown")
     delivery = request.headers.get("X-GitHub-Delivery", "unknown")
 

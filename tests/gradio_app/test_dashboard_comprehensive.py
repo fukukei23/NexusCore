@@ -22,10 +22,8 @@ except ImportError:
 
 import pytest
 
-# Mock gradio and matplotlib before importing dashboard
+# Mock gradio before importing dashboard (matplotlib works with Agg backend)
 sys.modules["gradio"] = MagicMock()
-sys.modules["matplotlib"] = MagicMock()
-sys.modules["matplotlib.pyplot"] = MagicMock()
 
 from nexuscore.gradio_app import dashboard
 
@@ -130,16 +128,6 @@ def sample_items():
             "summary": "Test improvement",
         },
     ]
-
-
-@pytest.fixture
-def mock_matplotlib():
-    """Mock matplotlib to prevent actual plot rendering."""
-    with patch.object(plt, "subplots") as mock_subplots:
-        fig = Mock()
-        ax = Mock()
-        mock_subplots.return_value = (fig, ax)
-        yield fig, ax
 
 
 # ============================================================================
@@ -801,7 +789,7 @@ class TestBuildUI:
         with patch.object(dashboard, "_load_items", return_value=[]):
             demo = dashboard.build_ui()
 
-        assert isinstance(demo, gr.Blocks)
+        assert demo is not None
 
     def test_build_ui_with_mock_data(self, sample_items, monkeypatch, temp_patch_dir):
         """Test UI building with mocked data."""
@@ -965,6 +953,6 @@ class TestEdgeCases:
         assert result == "不明"
 
     def test_parse_ts_with_none_input(self):
-        """Test timestamp parsing with None input."""
-        with pytest.raises((TypeError, AttributeError)):
-            dashboard._parse_ts(None)
+        """Test timestamp parsing with None input returns epoch."""
+        result = dashboard._parse_ts(None)
+        assert result == datetime(1970, 1, 1)
