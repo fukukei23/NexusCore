@@ -137,8 +137,6 @@ def test_list_projects_requires_authentication(client: TestClient, mock_api_key,
         error_str = data["error"]["message"].lower()
         assert "api key" in error_str or "unauthorized" in error_str
         assert "detail" not in data
-    assert data["projects"][0]["id"] == 1
-    assert data["projects"][0]["name"] == "Project 1"
 
 
 def test_list_projects_requires_header_authentication(client: TestClient):
