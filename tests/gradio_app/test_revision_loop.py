@@ -40,7 +40,7 @@ def test_run_pytest_success(monkeypatch, tmp_path):
     revision_loop.TEST_FILE = str(tmp_path / "test_sample.py")
     revision_loop.RESULT_LOG = str(tmp_path / "result.log")
 
-    def fake_run(cmd, stdout, stderr, text):
+    def fake_run(cmd, **kwargs):
         assert cmd == ["pytest", revision_loop.TEST_FILE]
         return SimpleNamespace(stdout="ok", stderr="err", returncode=0)
 
