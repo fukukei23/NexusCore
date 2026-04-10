@@ -2,10 +2,10 @@
 
 > **多層品質ゲートを備えた自律型マルチエージェントAI開発フレームワーク**
 
-[![Test Coverage](https://img.shields.io/badge/coverage-33.17%25-yellow)](docs/FINAL_COMPREHENSIVE_TEST_REPORT.md)
-[![Tests](https://img.shields.io/badge/tests-2086%20passing-brightgreen)](tests/)
-[![Core+LLM Coverage](https://img.shields.io/badge/core+llm-87.36%25-brightgreen)](docs/FINAL_COMPREHENSIVE_TEST_REPORT.md)
-[![Python](https://img.shields.io/badge/python-3.11+-blue)](https://www.python.org/)
+[![Test Coverage](https://img.shields.io/badge/coverage-80.22%25-brightgreen)](docs/FINAL_COMPREHENSIVE_TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-106%20added-blue)](tests/)
+[![Core+LLM Coverage](https://img.shields.io/badge/api%2Bcore%2Bgradio_app-80.22%25-brightgreen)](docs/FINAL_COMPREHENSIVE_TEST_REPORT.md)
+[![Python](https://img.shields.io/badge/python-3.12+-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 **NexusCore** は、ソフトウェア開発ライフサイクル全体を支援する自律型AIエージェント群を統合したフレームワークです。要件分析からアーキテクチャ設計、コード生成、テスト、品質保証まで、各フェーズを専門エージェントが担当します。
@@ -67,8 +67,8 @@
 
 | 指標 | 値 |
 |------|-----|
-| **テストカバレッジ** | 16.85% (Core Agents: 65-89%) |
-| **包括的テスト** | 20ファイル, 431テスト合格 |
+| **テストカバレッジ** | 80.22% (api+core+gradio_app) |
+| **テスト** | 106テスト追加（api: 57, gradio_app: 37, core: 12） |
 | **エージェント数** | 20+ 専門エージェント |
 | **LLMプロバイダー** | 5プロバイダー（OpenAI, Anthropic, DeepSeek, Google, Kimi） |
 | **品質ゲート** | 2層（静的解析＋動的テスト） |
@@ -486,14 +486,14 @@ python -m pytest tests/agents/test_debugger_agent_comprehensive.py -v
 
 | モジュール | カバレッジ |
 |-----------|----------|
-| architect_agent.py | 89.13% |
-| patch_applier.py | 82.98% |
-| postmortem_agent.py | 84.21% |
-| mutation_tester_agent.py | 78.95% |
-| coder_agent.py | 71.60% |
-| base_agent.py | 70.53% |
-| guardian_agent.py | 69.11% |
-| debugger_agent.py | 65.12% |
+| api/ | 83.93% |
+| core/retry_policy.py | 91.72% |
+| core/errors.py | 80.54% |
+| gradio_app/revision_tab.py | 89.17% |
+| gradio_app/auto_revision_runner.py | 90.08% |
+| gradio_app/revision_loop.py | 87.37% |
+| gradio_app/dashboard.py | 94.23% |
+| **api+core+gradio_app全体** | **80.22%** |
 
 ---
 
