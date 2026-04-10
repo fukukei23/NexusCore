@@ -1,5 +1,9 @@
 import json
+import os
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from nexuscore.gradio_app import revision_loop
 
@@ -63,3 +67,68 @@ def test_save_patch_history(tmp_path, monkeypatch):
     data = json.loads(files[0].read_text(encoding="utf-8"))
     assert data["code"] == "print('ok')"
     assert data["reason"] == "reason"
+
+
+class TestGetClient:
+    def test_returns_cached_client(self, monkeypatch):
+        mock_client = MagicMock()
+        monkeypatch.setattr(revision_loop, "_client", mock_client)
+        result = revision_loop.get_client()
+        assert result is mock_client
+
+    def test_raises_when_openai_missing(self, monkeypatch):
+        monkeypatch.setattr(revision_loop, "_client", None)
+        monkeypatch.setattr(revision_loop, "OpenAI", None)
+        with pytest.raises(RuntimeError, match="openai SDK"):
+            revision_loop.get_client()
+
+    def test_raises_when_no_api_key(self, monkeypatch):
+        monkeypatch.setattr(revision_loop, "_client", None)
+        monkeypatch.setattr(revision_loop, "OpenAI", MagicMock)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+            revision_loop.get_client()
+
+    def test_creates_client_with_api_key(self, monkeypatch):
+        mock_openai = MagicMock()
+        mock_instance = MagicMock()
+        mock_openai.return_value = mock_instance
+        monkeypatch.setattr(revision_loop, "_client", None)
+        monkeypatch.setattr(revision_loop, "OpenAI", mock_openai)
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        result = revision_loop.get_client()
+        assert result is mock_instance
+        mock_openai.assert_called_once_with(api_key="test-key")
+        monkeypatch.setattr(revision_loop, "_client", None)  # cleanup
+
+
+class TestRunPytestException:
+    def test_subprocess_error(self, monkeypatch):
+        def raise_fn(*args, **kwargs):
+            raise FileNotFoundError("no pytest")
+        monkeypatch.setattr(revision_loop.subprocess, "run", raise_fn)
+        output = revision_loop.run_pytest()
+        assert "failed" in output
+
+
+class TestCallGpt:
+    def test_call_gpt_success(self, monkeypatch):
+        mock_client = MagicMock()
+        mock_msg = MagicMock()
+        mock_msg.content = "  response text  "
+        mock_choice = MagicMock()
+        mock_choice.message = mock_msg
+        mock_rsp = MagicMock()
+        mock_rsp.choices = [mock_choice]
+        mock_client.chat.completions.create.return_value = mock_rsp
+        monkeypatch.setattr(revision_loop, "_client", mock_client)
+        result = revision_loop.call_gpt("test prompt")
+        assert result == "response text"
+
+
+class TestLaunchRevisionUi:
+    def test_launch_revision_ui_creates_row(self):
+        gr = pytest.importorskip("gradio")
+        result = revision_loop.launch_revision_ui()
+        # Returns None (gr.Row context manager), but should not raise
+        assert result is None or isinstance(result, gr.Row)
