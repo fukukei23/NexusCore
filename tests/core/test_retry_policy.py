@@ -309,3 +309,91 @@ def test_sandbox_execution_no_wait():
     decision = decide_retry(error, 1)
 
     assert decision.wait_seconds == 0.0
+
+
+class TestEnvHelpers:
+    def test_env_float_invalid_returns_default(self, monkeypatch):
+        from nexuscore.core import retry_policy
+        monkeypatch.setenv("NEXUS_TEST_BAD_FLOAT", "not_a_number")
+        result = retry_policy._env_float("NEXUS_TEST_BAD_FLOAT", 3.14)
+        assert result == 3.14
+
+    def test_env_int_invalid_returns_default(self, monkeypatch):
+        from nexuscore.core import retry_policy
+        monkeypatch.setenv("NEXUS_TEST_BAD_INT", "abc")
+        result = retry_policy._env_int("NEXUS_TEST_BAD_INT", 42)
+        assert result == 42
+
+    def test_env_float_valid_value(self, monkeypatch):
+        from nexuscore.core import retry_policy
+        monkeypatch.setenv("NEXUS_TEST_GOOD_FLOAT", "7.5")
+        result = retry_policy._env_float("NEXUS_TEST_GOOD_FLOAT", 1.0)
+        assert result == 7.5
+
+    def test_env_int_valid_value(self, monkeypatch):
+        from nexuscore.core import retry_policy
+        monkeypatch.setenv("NEXUS_TEST_GOOD_INT", "99")
+        result = retry_policy._env_int("NEXUS_TEST_GOOD_INT", 1)
+        assert result == 99
+
+    def test_env_float_missing_returns_default(self):
+        from nexuscore.core import retry_policy
+        result = retry_policy._env_float("NEXUS_NONEXISTENT_VAR_XYZ", 2.71)
+        assert result == 2.71
+
+    def test_env_int_missing_returns_default(self):
+        from nexuscore.core import retry_policy
+        result = retry_policy._env_int("NEXUS_NONEXISTENT_VAR_XYZ", 10)
+        assert result == 10
+
+
+class TestValidateDecisionTable:
+    def test_validate_passes(self):
+        from nexuscore.core.retry_policy import validate_decision_table
+        errors = validate_decision_table()
+        assert errors == []
+
+    def test_validate_with_missing_type(self, monkeypatch):
+        from nexuscore.core import retry_policy
+        original = dict(retry_policy.DECISION_TABLE)
+        removed_key = list(original.keys())[0]
+        monkeypatch.setattr(retry_policy, "DECISION_TABLE", {k: v for k, v in original.items() if k != removed_key})
+        errors = retry_policy.validate_decision_table()
+        assert any("Missing" in e for e in errors)
+
+    def test_validate_with_invalid_backoff(self, monkeypatch):
+        from nexuscore.core import retry_policy
+        original = dict(retry_policy.DECISION_TABLE)
+        first_key = list(original.keys())[0]
+        bad_table = dict(original)
+        bad_table[first_key] = {**original[first_key], "backoff": "invalid_type"}
+        monkeypatch.setattr(retry_policy, "DECISION_TABLE", bad_table)
+        errors = retry_policy.validate_decision_table()
+        assert any("invalid backoff" in e for e in errors)
+
+    def test_validate_exponential_missing_base(self, monkeypatch):
+        from nexuscore.core import retry_policy
+        from nexuscore.core.errors import ModelRateLimitError
+        bad_table = dict(retry_policy.DECISION_TABLE)
+        bad_table[ModelRateLimitError] = {"max_attempts": 5, "backoff": "exponential"}
+        monkeypatch.setattr(retry_policy, "DECISION_TABLE", bad_table)
+        errors = retry_policy.validate_decision_table()
+        assert any("base" in e for e in errors)
+
+    def test_validate_linear_missing_interval(self, monkeypatch):
+        from nexuscore.core import retry_policy
+        from nexuscore.core.errors import ModelTimeoutError
+        bad_table = dict(retry_policy.DECISION_TABLE)
+        bad_table[ModelTimeoutError] = {"max_attempts": 3, "backoff": "linear"}
+        monkeypatch.setattr(retry_policy, "DECISION_TABLE", bad_table)
+        errors = retry_policy.validate_decision_table()
+        assert any("base_interval" in e for e in errors)
+
+    def test_validate_negative_max_attempts(self, monkeypatch):
+        from nexuscore.core import retry_policy
+        first_key = list(retry_policy.DECISION_TABLE.keys())[0]
+        bad_table = dict(retry_policy.DECISION_TABLE)
+        bad_table[first_key] = {**retry_policy.DECISION_TABLE[first_key], "max_attempts": -1}
+        monkeypatch.setattr(retry_policy, "DECISION_TABLE", bad_table)
+        errors = retry_policy.validate_decision_table()
+        assert any("non-negative" in e for e in errors)
