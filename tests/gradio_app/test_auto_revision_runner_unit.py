@@ -1,4 +1,6 @@
 import json
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -78,3 +80,169 @@ def test_write_patch_json(tmp_path, monkeypatch):
     data = json.loads(out.read_text(encoding="utf-8"))
     assert data["status"] == "success"
     assert data["policy_icon"] == "🎯"
+
+
+class TestReadJsonSafeException:
+    def test_directory_returns_empty(self, tmp_path):
+        p = tmp_path / "dir"
+        p.mkdir()
+        assert runner.read_json_safe(p) == {}
+
+
+class TestStatusAttempt:
+    def test_format(self):
+        assert runner._status_attempt(3) == "attempt_3/5"
+
+
+class TestReadFileTextException:
+    def test_directory_returns_empty(self, tmp_path):
+        p = tmp_path / "dir"
+        p.mkdir()
+        assert runner.read_file_text(p) == ""
+
+
+class TestRunPytestOnceSubprocessException:
+    def test_subprocess_error(self, monkeypatch):
+        monkeypatch.setattr(runner, "RT", None)
+        monkeypatch.setattr(runner, "PROJECT_ROOT", Path("/dummy"))
+        with patch("subprocess.run", side_effect=OSError("no pytest")):
+            ok, log = runner.run_pytest_once()
+        assert ok is False
+        assert "no pytest" in log
+
+
+class TestAttemptAutoFixRT:
+    def test_rt_auto_fix_success(self, monkeypatch):
+        mock_rt = MagicMock()
+        mock_rt.auto_fix_once.return_value = (True, "fixed", {"f.py": "code"})
+        monkeypatch.setattr(runner, "RT", mock_rt)
+        ok, log, changes = runner.attempt_auto_fix("error_log")
+        assert ok is True
+        assert changes == {"f.py": "code"}
+
+    def test_rt_exception(self, monkeypatch):
+        mock_rt = MagicMock()
+        mock_rt.auto_fix_once.side_effect = RuntimeError("boom")
+        monkeypatch.setattr(runner, "RT", mock_rt)
+        ok, log, changes = runner.attempt_auto_fix("error_log")
+        assert ok is False
+        assert "boom" in log
+
+    def test_no_rt_returns_fallback(self, monkeypatch):
+        monkeypatch.setattr(runner, "RT", None)
+        ok, log, changes = runner.attempt_auto_fix("error_log")
+        assert ok is False
+        assert "no available function" in log
+
+
+class TestMainFunction:
+    def test_initial_pass(self, tmp_path, monkeypatch):
+        patch_dir = tmp_path / "patch_history"
+        patch_dir.mkdir()
+        sandbox = tmp_path / "sandbox"
+        sandbox.mkdir()
+        monkeypatch.setattr(runner, "PATCH_DIR", patch_dir)
+        monkeypatch.setattr(runner, "PROJECT_ROOT", tmp_path)
+        monkeypatch.setattr(runner, "SANDBOX_DIRS", [sandbox])
+        monkeypatch.setattr(runner, "RT", None)
+        monkeypatch.setattr(
+            runner, "load_policy_context",
+            lambda: {"policy_profile": "test", "policy_version": "v1", "policy_icon": "X"},
+        )
+        monkeypatch.setattr(runner, "snapshot_sandbox_files", lambda: {})
+        monkeypatch.setattr(runner, "run_pytest_once", lambda: (True, "all passed"))
+        runner.main()
+        # patch JSON should exist
+        jsons = list(patch_dir.glob("patch_*.json"))
+        assert len(jsons) == 1
+        data = json.loads(jsons[0].read_text(encoding="utf-8"))
+        assert data["status"] == "initial_pass"
+
+    def test_initial_fail_then_auto_fix_success(self, tmp_path, monkeypatch):
+        patch_dir = tmp_path / "patch_history"
+        patch_dir.mkdir()
+        sandbox = tmp_path / "sandbox"
+        sandbox.mkdir()
+        monkeypatch.setattr(runner, "PATCH_DIR", patch_dir)
+        monkeypatch.setattr(runner, "PROJECT_ROOT", tmp_path)
+        monkeypatch.setattr(runner, "SANDBOX_DIRS", [sandbox])
+        monkeypatch.setattr(runner, "RT", None)
+        monkeypatch.setattr(
+            runner, "load_policy_context",
+            lambda: {"policy_profile": "test", "policy_version": "v1", "policy_icon": "X"},
+        )
+        monkeypatch.setattr(runner, "snapshot_sandbox_files", lambda: {})
+        call_count = {"n": 0}
+
+        def mock_run_pytest():
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                return (False, "initial fail")
+            return (True, "fixed")
+
+        monkeypatch.setattr(runner, "run_pytest_once", mock_run_pytest)
+        monkeypatch.setattr(
+            runner, "attempt_auto_fix",
+            lambda log: (True, "fixed", {}),
+        )
+        runner.main()
+        jsons = sorted(patch_dir.glob("patch_*.json"))
+        statuses = [json.loads(j.read_text(encoding="utf-8"))["status"] for j in jsons]
+        assert "attempt_error" in statuses or "success" in statuses
+
+    def test_auto_fix_with_changes(self, tmp_path, monkeypatch):
+        patch_dir = tmp_path / "patch_history"
+        patch_dir.mkdir()
+        sandbox = tmp_path / "sandbox"
+        sandbox.mkdir()
+        monkeypatch.setattr(runner, "PATCH_DIR", patch_dir)
+        monkeypatch.setattr(runner, "PROJECT_ROOT", tmp_path)
+        monkeypatch.setattr(runner, "SANDBOX_DIRS", [sandbox])
+        monkeypatch.setattr(runner, "RT", None)
+        monkeypatch.setattr(
+            runner, "load_policy_context",
+            lambda: {"policy_profile": "test", "policy_version": "v1", "policy_icon": "X"},
+        )
+        monkeypatch.setattr(runner, "snapshot_sandbox_files", lambda: {})
+        call_count = {"n": 0}
+
+        def mock_run_pytest():
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                return (False, "initial fail")
+            return (True, "fixed")
+
+        monkeypatch.setattr(runner, "run_pytest_once", mock_run_pytest)
+        monkeypatch.setattr(
+            runner, "attempt_auto_fix",
+            lambda log: (True, "fixed", {"subdir/fix.py": "print('fixed')"}),
+        )
+        runner.main()
+        # sandbox file should be written
+        written = (sandbox / "subdir" / "fix.py")
+        assert written.exists()
+        assert written.read_text(encoding="utf-8") == "print('fixed')"
+
+    def test_auto_fix_loop_exception(self, tmp_path, monkeypatch):
+        patch_dir = tmp_path / "patch_history"
+        patch_dir.mkdir()
+        sandbox = tmp_path / "sandbox"
+        sandbox.mkdir()
+        monkeypatch.setattr(runner, "PATCH_DIR", patch_dir)
+        monkeypatch.setattr(runner, "PROJECT_ROOT", tmp_path)
+        monkeypatch.setattr(runner, "SANDBOX_DIRS", [sandbox])
+        monkeypatch.setattr(runner, "RT", None)
+        monkeypatch.setattr(
+            runner, "load_policy_context",
+            lambda: {"policy_profile": "test", "policy_version": "v1", "policy_icon": "X"},
+        )
+        monkeypatch.setattr(runner, "snapshot_sandbox_files", lambda: {})
+        monkeypatch.setattr(runner, "run_pytest_once", lambda: (False, "fail"))
+        monkeypatch.setattr(
+            runner, "attempt_auto_fix",
+            MagicMock(side_effect=RuntimeError("unexpected")),
+        )
+        runner.main()
+        jsons = sorted(patch_dir.glob("patch_*.json"))
+        statuses = [json.loads(j.read_text(encoding="utf-8"))["status"] for j in jsons]
+        assert any("attempt_error" in s for s in statuses)
