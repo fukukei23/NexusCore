@@ -155,7 +155,7 @@ class TestCollectRunMetrics:
 
     def test_collect_run_metrics_with_patches(self, enable_webapp):
         """パッチ情報を収集"""
-        mock_run = Mock(id=1)
+        mock_run = Mock(id=1, started_at=datetime(2025, 1, 1, 10, 0, 0), finished_at=datetime(2025, 1, 1, 10, 5, 0))
 
         mock_patch1 = Mock(file_path="file1.py", diff_text="+line1\n+line2")
         mock_patch2 = Mock(file_path="file2.py", diff_text="+line3\n-line4\n-line5")
@@ -281,7 +281,7 @@ class TestLoadRunMarkdown:
         """ファイルが存在する場合"""
         report_content = "# Run Report\n\nTest content"
 
-        with patch("nexuscore.integration.github_pr_comment.get_markdown_report_path") as mock_path:
+        with patch("nexuscore.integration.run_report_generator.get_markdown_report_path") as mock_path:
             mock_file = tmp_path / "RUN_test.md"
             mock_file.write_text(report_content, encoding="utf-8")
             mock_path.return_value = mock_file
@@ -292,7 +292,7 @@ class TestLoadRunMarkdown:
 
     def test_load_run_markdown_file_not_exists(self, tmp_path):
         """ファイルが存在しない場合"""
-        with patch("nexuscore.integration.github_pr_comment.get_markdown_report_path") as mock_path:
+        with patch("nexuscore.integration.run_report_generator.get_markdown_report_path") as mock_path:
             mock_file = tmp_path / "nonexistent.md"
             mock_path.return_value = mock_file
 
@@ -302,7 +302,7 @@ class TestLoadRunMarkdown:
 
     def test_load_run_markdown_exception_handled(self):
         """例外が発生した場合"""
-        with patch("nexuscore.integration.github_pr_comment.get_markdown_report_path") as mock_path:
+        with patch("nexuscore.integration.run_report_generator.get_markdown_report_path") as mock_path:
             mock_path.side_effect = Exception("Import error")
 
             result = load_run_markdown("RUN-test")

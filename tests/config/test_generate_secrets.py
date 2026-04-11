@@ -44,7 +44,7 @@ def test_generate_secrets_creates_files(env_setup, monkeypatch):
     }
 
     # dotenv_valuesをモック
-    with patch("dotenv_values") as mock_dotenv:
+    with patch("dotenv.dotenv_values") as mock_dotenv:
         mock_dotenv.return_value = {"API_KEY": "123", "EMPTY": "", "SECRET_KEY": "test-secret"}
 
         # スクリプトを実行
