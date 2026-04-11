@@ -39,7 +39,7 @@ def test_patch_blocked_when_modifies_tests_dir(tmp_path):
     assert result["status"] == "not_fixed"
     assert "modifies test files" in result["summary"].lower()
     assert "blocked_test_paths" in result["details"]
-    assert "tests/test_example.py" in result["details"]["blocked_test_paths"]
+    assert "b/tests/test_example.py" in result["details"]["blocked_test_paths"]
 
 
 def test_patch_blocked_when_modifies_test_file(tmp_path):
@@ -74,7 +74,7 @@ def test_patch_blocked_when_modifies_test_file(tmp_path):
     assert result["status"] == "not_fixed"
     assert "modifies test files" in result["summary"].lower()
     assert "blocked_test_paths" in result["details"]
-    assert "src/test_helper.py" in result["details"]["blocked_test_paths"]
+    assert "b/src/test_helper.py" in result["details"]["blocked_test_paths"]
 
 
 def test_patch_allowed_when_no_test_files(tmp_path):
@@ -154,5 +154,5 @@ def test_patch_blocked_with_multiple_test_files(tmp_path):
     assert result["status"] == "not_fixed"
     blocked_paths = result["details"]["blocked_test_paths"]
     assert len(blocked_paths) == 2
-    assert "tests/test_a.py" in blocked_paths
-    assert "tests/test_b.py" in blocked_paths
+    assert "b/tests/test_a.py" in blocked_paths
+    assert "b/tests/test_b.py" in blocked_paths
