@@ -40,7 +40,8 @@ def test_semantic_diff_detects_added_function(tmp_path: Path) -> None:
     # 関数の変更を確認
     names_kinds = {(f.name, f.kind) for f in result.functions}
     assert ("bar", "added") in names_kinds
-    assert ("foo", "added") in names_kinds or ("foo", "modified") in names_kinds
+    # fooは変更されていないのでunchanged、または差分結果に含まれない
+    assert ("foo", "added") not in names_kinds
 
 
 @pytest.mark.skipif(not HAS_SEMANTIC_DIFF, reason="semantic_diff module not available")

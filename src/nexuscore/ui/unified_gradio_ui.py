@@ -215,7 +215,7 @@ def build_ai_revision_tab(state: gr.State) -> None:
             with gr.Column():
                 patch_output = gr.Code(
                     label="📋 生成されたパッチ（Unified Diff）",
-                    language="diff",
+                    language=None,
                     lines=20,
                     interactive=False,
                 )
