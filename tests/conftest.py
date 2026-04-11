@@ -8,11 +8,90 @@ Flask SaaS UI のスモークテストで使用する共通フィクスチャを
 from __future__ import annotations
 
 import json
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
+
+
+# ============================================================================
+# sys.modules 隔離: テスト間のモック汚染を防止
+# 多数のテストファイルがモジュールレベルで sys.modules に MagicMock を注入し、
+# 後続テストを汚染する問題を解決する。
+#
+# 戦略:
+# 1. pytest_collectstart: 各モジュール収集前に sys.modules をスナップショット
+# 2. pytest_collectreport: 各モジュール収集後に Mock を元のモジュールに復元
+#    （削除ではなく復元することで、@patch が正しいモジュールオブジェクトを
+#     参照できるようにする）
+# 3. autouse fixture: テスト実行前後の安全網として Mock を削除
+# ============================================================================
+
+
+def _is_mock_instance(obj: object) -> bool:
+    """値が Mock/MagicMock 等のインスタンスかどうかを判定"""
+    type_name = type(obj).__name__
+    return type_name in ("Mock", "MagicMock", "AsyncMock", "NonCallableMock", "NonCallableMagicMock")
+
+
+# モジュール収集前の sys.modules スナップショット（元のモジュールオブジェクトを保持）
+_saved_modules: dict[str, object] = {}
+
+
+def pytest_collectstart(collector):
+    """各モジュール収集前に、Mock ではないモジュールを保存"""
+    for key, value in list(sys.modules.items()):
+        if key not in _saved_modules and not _is_mock_instance(value):
+            _saved_modules[key] = value
+
+
+def pytest_collectreport(report):
+    """
+    テスト収集時のエラーも記録
+    各モジュール収集後に sys.modules 内の Mock インスタンスを元のモジュールに復元
+    """
+    global _test_results
+
+    # sys.modules 内の Mock を元のモジュールに復元（削除ではない）
+    mock_keys = [key for key, value in list(sys.modules.items()) if _is_mock_instance(value)]
+    for key in mock_keys:
+        if key in _saved_modules:
+            sys.modules[key] = _saved_modules[key]
+        else:
+            sys.modules.pop(key, None)
+
+    # 収集エラーを記録
+    if report.failed:
+        test_result = {
+            "nodeid": report.nodeid or "collection",
+            "outcome": "error",
+            "duration": 0.0,
+            "longrepr": (
+                str(report.longrepr) if hasattr(report, "longrepr") and report.longrepr else None
+            ),
+        }
+        _test_results.append(test_result)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_sys_modules():
+    """各テストの前後で sys.modules 内の Mock を元のモジュールに復元（安全網）"""
+    mock_keys = [key for key, value in list(sys.modules.items()) if _is_mock_instance(value)]
+    for key in mock_keys:
+        if key in _saved_modules:
+            sys.modules[key] = _saved_modules[key]
+        else:
+            sys.modules.pop(key, None)
+    yield
+    mock_keys = [key for key, value in list(sys.modules.items()) if _is_mock_instance(value)]
+    for key in mock_keys:
+        if key in _saved_modules:
+            sys.modules[key] = _saved_modules[key]
+        else:
+            sys.modules.pop(key, None)
+
 
 # webapp 関連のインポートは lazy（トップレベル import の副作用回避）
 HAS_WEBAPP = None  # type: ignore
@@ -356,25 +435,6 @@ def pytest_runtest_logreport(report):
             "nodeid": report.nodeid,
             "outcome": report.outcome,  # "passed", "failed", "skipped"
             "duration": getattr(report, "duration", 0.0),
-            "longrepr": (
-                str(report.longrepr) if hasattr(report, "longrepr") and report.longrepr else None
-            ),
-        }
-        _test_results.append(test_result)
-
-
-def pytest_collectreport(report):
-    """
-    テスト収集時のエラーも記録
-    """
-    global _test_results
-
-    # 収集エラーを記録
-    if report.failed:
-        test_result = {
-            "nodeid": report.nodeid or "collection",
-            "outcome": "error",
-            "duration": 0.0,
             "longrepr": (
                 str(report.longrepr) if hasattr(report, "longrepr") and report.longrepr else None
             ),
