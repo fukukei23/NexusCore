@@ -448,11 +448,15 @@ class TestErrorHandlingAndEdgeCases:
         # log_run が呼ばれたかチェック（実装による）
         # assert mock_logger.log_run.called or True
 
-    def test_service_handles_missing_project_root(self):
+    def test_service_handles_missing_project_root(self, tmp_path):
         """存在しないproject_rootでの初期化"""
-        # 存在しないパスでも初期化可能
-        service = SelfHealingService(project_root="/nonexistent/path")
-        assert service.project_root.name == "path"
+        # history_loggerを注入してmkdirエラーを回避
+        mock_logger = MagicMock()
+        service = SelfHealingService(
+            project_root=str(tmp_path / "nonexistent"),
+            history_logger=mock_logger,
+        )
+        assert service.project_root.name == "nonexistent"
 
     def test_config_load_fallback(self, tmp_path):
         """設定ファイルが存在しない場合のフォールバック"""
