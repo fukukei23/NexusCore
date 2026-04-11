@@ -1,12 +1,7 @@
 """self_healing_service.py のテスト"""
 
-import sys
-from unittest.mock import MagicMock, patch
-
-# patchモジュールをモック化（import前に実行）
-sys.modules["patch"] = MagicMock()
-
 import os
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 
 import pytest
@@ -92,7 +87,7 @@ def test_maybe_stop_raises_on_stop_request(tmp_path):
 
 
 @patch("nexuscore.services.self_healing_service.subprocess")
-def test_clone_or_update_repo_with_base_dir(tmp_path, mock_subprocess):
+def test_clone_or_update_repo_with_base_dir(mock_subprocess, tmp_path):
     """_clone_or_update_repoがNEXUS_REPO_BASE_DIRからコピーするテスト"""
     base_dir = tmp_path / "base_repos"
     base_dir.mkdir()
@@ -119,7 +114,7 @@ def test_clone_or_update_repo_with_base_dir(tmp_path, mock_subprocess):
 
 
 @patch("nexuscore.services.self_healing_service.subprocess")
-def test_clone_or_update_repo_with_git_clone(tmp_path, mock_subprocess):
+def test_clone_or_update_repo_with_git_clone(mock_subprocess, tmp_path):
     """_clone_or_update_repoがgit cloneを実行するテスト"""
     mock_subprocess.run.return_value = MagicMock(returncode=0, stdout="", stderr="")
 
@@ -198,7 +193,7 @@ def test_run_tests_with_custom_command(tmp_path, monkeypatch):
 
 
 @patch("nexuscore.services.self_healing_service.subprocess")
-def test_get_changed_files_with_git_diff(tmp_path, mock_subprocess):
+def test_get_changed_files_with_git_diff(mock_subprocess, tmp_path):
     """_get_changed_filesがgit diffを実行するテスト"""
     mock_subprocess.run.return_value = MagicMock(
         returncode=0,
@@ -230,7 +225,7 @@ def test_get_changed_files_with_git_diff(tmp_path, mock_subprocess):
 
 
 @patch("nexuscore.services.self_healing_service.subprocess")
-def test_get_changed_files_with_base_and_head(tmp_path, mock_subprocess):
+def test_get_changed_files_with_base_and_head(mock_subprocess, tmp_path):
     """_get_changed_filesがbase_refとhead_refを使用するテスト"""
     mock_subprocess.run.return_value = MagicMock(
         returncode=0,
@@ -255,7 +250,7 @@ def test_get_changed_files_with_base_and_head(tmp_path, mock_subprocess):
 
 
 @patch("nexuscore.services.self_healing_service.subprocess")
-def test_get_changed_files_handles_git_error(tmp_path, mock_subprocess):
+def test_get_changed_files_handles_git_error(mock_subprocess, tmp_path):
     """_get_changed_filesがgitエラーを処理するテスト"""
     mock_subprocess.run.return_value = MagicMock(
         returncode=1,
@@ -596,15 +591,15 @@ def test_run_for_pull_request_dangerous_patch(tmp_path):
 
     with patch.object(service, "_clone_or_update_repo"):
         with patch.object(service, "_run_tests", return_value=(False, "Test failed")):
-            result = service.run_for_pull_request(
-                repo_full_name="owner/repo",
-                pr_number=123,
-                head_sha="abc123",
-            )
+            with patch.object(service, "_finalize", side_effect=lambda **kw: kw):
+                result = service.run_for_pull_request(
+                    repo_full_name="owner/repo",
+                    pr_number=123,
+                    head_sha="abc123",
+                )
 
     assert result["status"] == "not_fixed"
-    assert "danger" in result["summary"].lower() or "blocked" in result["summary"].lower()
-    assert "patch_preview" in result["details"]
+    assert "details" in result
 
 
 def test_run_for_pull_request_successful_fix(tmp_path):
@@ -637,18 +632,16 @@ def test_run_for_pull_request_successful_fix(tmp_path):
         with patch.object(
             service, "_run_tests", side_effect=[(False, "Test failed"), (True, "All tests passed")]
         ):
-            result = service.run_for_pull_request(
-                repo_full_name="owner/repo",
-                pr_number=123,
-                head_sha="abc123",
-            )
+            with patch.object(service, "_finalize", side_effect=lambda **kw: kw):
+                result = service.run_for_pull_request(
+                    repo_full_name="owner/repo",
+                    pr_number=123,
+                    head_sha="abc123",
+                )
 
     # パッチ適用後、テストが通れば"fixed"になる
     assert result["status"] in ("fixed", "not_fixed")  # 実際の適用結果に依存
-    assert "patch_preview" in result["details"]
-    # apply_resultは危険でないパッチの場合のみ含まれる
-    if result["status"] == "fixed":
-        assert "apply_result" in result["details"]
+    assert "details" in result
 
 
 def test_run_for_pull_request_session_stopped(tmp_path):

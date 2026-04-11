@@ -48,6 +48,7 @@ def test_execute_unauthorized_invalid_token(client, monkeypatch):
 def test_execute_authorized_success(client, monkeypatch):
     """正しいトークンで /api/v1/execute を叩く"""
     monkeypatch.setenv("NEXUSCORE_API_TOKEN", "secret-token")
+    monkeypatch.setenv("NEXUS_ALLOWED_PROJECT_BASE", "/tmp")
 
     response = client.post(
         "/api/v1/execute",

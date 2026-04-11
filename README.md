@@ -3,7 +3,7 @@
 > **多層品質ゲートを備えた自律型マルチエージェントAI開発フレームワーク**
 
 [![Test Coverage](https://img.shields.io/badge/coverage-80.22%25-brightgreen)](docs/FINAL_COMPREHENSIVE_TEST_REPORT.md)
-[![Tests](https://img.shields.io/badge/tests-106%20added-blue)](tests/)
+[![Tests](https://img.shields.io/badge/tests-4838%20passed-brightgreen)](tests/)
 [![Core+LLM Coverage](https://img.shields.io/badge/api%2Bcore%2Bgradio_app-80.22%25-brightgreen)](docs/FINAL_COMPREHENSIVE_TEST_REPORT.md)
 [![Python](https://img.shields.io/badge/python-3.12+-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -68,7 +68,7 @@
 | 指標 | 値 |
 |------|-----|
 | **テストカバレッジ** | 80.22% (api+core+gradio_app) |
-| **テスト** | 106テスト追加（api: 57, gradio_app: 37, core: 12） |
+| **テストスイート** | 4,838 passed / 25 failed（590 failures → 98%改善） |
 | **エージェント数** | 20+ 専門エージェント |
 | **LLMプロバイダー** | 5プロバイダー（OpenAI, Anthropic, DeepSeek, Google, Kimi） |
 | **品質ゲート** | 2層（静的解析＋動的テスト） |
