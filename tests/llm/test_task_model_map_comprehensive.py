@@ -21,28 +21,28 @@ class TestTaskModelConfig:
     def test_config_creation_minimal(self):
         """最小限のパラメータで設定作成"""
         config = TaskModelConfig(
-            primary="gpt5_default",
-            secondary=["claude_sonnet_45"],
-            fallback="gpt5_nano",
+            primary="glm_default",
+            secondary=["minimax_default"],
+            fallback="glm_nano",
         )
 
-        assert config.primary == "gpt5_default"
-        assert config.secondary == ["claude_sonnet_45"]
-        assert config.fallback == "gpt5_nano"
+        assert config.primary == "glm_default"
+        assert config.secondary == ["minimax_default"]
+        assert config.fallback == "glm_nano"
         assert config.temperature is None
 
     def test_config_creation_with_temperature(self):
         """temperature指定で設定作成"""
         config = TaskModelConfig(
-            primary="gpt5_codex",
-            secondary=["deepseek_r1"],
-            fallback="gpt5_default",
+            primary="glm_codex",
+            secondary=["minimax_analytical"],
+            fallback="glm_default",
             temperature=0.5,
         )
 
-        assert config.primary == "gpt5_codex"
-        assert config.secondary == ["deepseek_r1"]
-        assert config.fallback == "gpt5_default"
+        assert config.primary == "glm_codex"
+        assert config.secondary == ["minimax_analytical"]
+        assert config.fallback == "glm_default"
         assert config.temperature == 0.5
 
     def test_config_is_frozen(self):
@@ -54,20 +54,20 @@ class TestTaskModelConfig:
 
     def test_config_secondary_can_be_empty(self):
         """secondaryは空リスト可能"""
-        config = TaskModelConfig(primary="gpt5_default", secondary=[], fallback="gpt5_nano")
+        config = TaskModelConfig(primary="glm_default", secondary=[], fallback="glm_nano")
 
         assert config.secondary == []
 
     def test_config_secondary_can_be_multiple(self):
         """複数のsecondaryモデル指定可能"""
         config = TaskModelConfig(
-            primary="gpt5_strict",
-            secondary=["claude_sonnet_45", "gemini_3_pro", "deepseek_r1"],
-            fallback="gpt5_default",
+            primary="glm_strict",
+            secondary=["minimax_analytical", "glm_default", "minimax_default"],
+            fallback="glm_default",
         )
 
         assert len(config.secondary) == 3
-        assert "claude_sonnet_45" in config.secondary
+        assert "minimax_analytical" in config.secondary
 
 
 # ============================================================================
@@ -142,7 +142,7 @@ class TestTaskModelConfigs:
         config = TASK_MODEL_CONFIGS["code_generate"]
 
         assert config.primary == "glm_codex"
-        assert "deepseek_r1" in config.secondary
+        assert "minimax_analytical" in config.secondary
         assert config.fallback == "glm_default"
         assert config.temperature == 0.2
 
@@ -151,7 +151,7 @@ class TestTaskModelConfigs:
         config = TASK_MODEL_CONFIGS["code_review"]
 
         assert config.primary == "glm_strict"
-        assert "deepseek_r1" in config.secondary
+        assert "minimax_analytical" in config.secondary
         assert config.fallback == "glm_default"
 
     def test_self_heal_config(self):
@@ -159,7 +159,7 @@ class TestTaskModelConfigs:
         config = TASK_MODEL_CONFIGS["self_heal"]
 
         assert config.primary == "glm_codex"
-        assert "deepseek_r1" in config.secondary
+        assert "minimax_analytical" in config.secondary
         assert config.fallback == "glm_default"
 
     def test_routing_classify_config(self):
@@ -175,7 +175,7 @@ class TestTaskModelConfigs:
         for config in TASK_MODEL_CONFIGS.values():
             assert isinstance(config.primary, str)
             # プロファイル名の形式チェック
-            assert "_" in config.primary or config.primary.startswith("gpt")
+            assert "_" in config.primary or config.primary.startswith("glm")
 
     def test_all_fallbacks_are_strings(self):
         """全fallbackがプロファイルID文字列"""

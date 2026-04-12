@@ -11,9 +11,11 @@ def clear_env(monkeypatch):
     env_keys = [
         "LLM_DRY_RUN",
         "NEXUS_REAL_CALLS",
-        "OPENAI_API_KEY",
-        "GEMINI_API_KEY",
-        "GEMINI_API_KEY_AGENT_A",
+        "GLM_API_KEY",
+        "ZHIPU_API_KEY",
+        "GLM_KEY",
+        "MINIMAX_API_KEY",
+        "MINIMAX_KEY",
     ]
     for key in env_keys:
         monkeypatch.delenv(key, raising=False)
@@ -30,7 +32,7 @@ def test_stub_response_returns_json():
 
 
 def test_alias_sync_uses_first_available(monkeypatch):
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    monkeypatch.setenv("GEMINI_API_KEY_AGENT_A", "value")
+    monkeypatch.delenv("GLM_API_KEY", raising=False)
+    monkeypatch.setenv("ZHIPU_API_KEY", "value")
     synchronize_aliases()
-    assert os.getenv("GEMINI_API_KEY") == "value"
+    assert os.getenv("GLM_API_KEY") == "value"

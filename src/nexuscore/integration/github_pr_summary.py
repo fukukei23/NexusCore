@@ -155,7 +155,7 @@ Write the summary in Japanese, 5 bullets or fewer.
                 return {"ok": False, "reason": "LLMRouter.complete not available", "content": ""}
 
         result = guarded_llm_call(
-            model="gpt-5.1-mini",  # 軽量モデルを使用
+            model="glm-4-flash",  # 軽量モデルを使用
             task="code_review",
             system_prompt="You summarize code changes for pull requests. Return concise bullet points in Japanese.",
             user_prompt=prompt,

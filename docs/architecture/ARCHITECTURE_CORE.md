@@ -130,14 +130,14 @@ Routes tasks to optimal LLM based on:
 **Supported Task Types:**
 ```python
 {
-    'code_generate': 'openai:gpt-5.1-codex',
-    'code_review': 'anthropic:claude-4.5-sonnet',
-    'debug': 'openai:gpt-5.1-codex',
-    'test_generate': 'openai:gpt-5.1-codex',
-    'architect': 'openai:gpt-5.1',
-    'policy_check': 'anthropic:claude-4.5-sonnet',
-    'postmortem_analyze': 'openai:gpt-5.1',
-    'knowledge_curate': 'google:gemini-3.0-pro',
+    'code_generate': 'glm:glm-4-plus',
+    'code_review': 'glm:glm-4-plus',
+    'debug': 'glm:glm-4-plus',
+    'test_generate': 'glm:glm-4-plus',
+    'architect': 'glm:glm-4-plus',
+    'policy_check': 'glm:glm-4-plus',
+    'postmortem_analyze': 'glm:glm-4-plus',
+    'knowledge_curate': 'minimax:minimax-m2.7',
     # ... and more
 }
 ```

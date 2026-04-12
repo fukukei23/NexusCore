@@ -4,6 +4,8 @@ Configuration helpers for LLMRouter.
 This module centralizes .env loading, environment-variable synchronization,
 and typed access to runtime settings so that the router itself can focus on
 provider logic.
+
+NexusCore uses GLM (Zhipu AI) and MiniMax as the sole LLM providers.
 """
 
 from __future__ import annotations
@@ -91,17 +93,14 @@ def _sync_env_var(target: str, aliases: Iterable[str]) -> None:
 
 def synchronize_aliases() -> None:
     """Align legacy/custom environment variables with canonical names."""
-    _sync_env_var("GEMINI_API_KEY", ["GEMINI_API_KEY_AGENT_A", "GEMINI_API_KEY_AGENT_B"])
-    _sync_env_var("DEEPSEEK_API_KEY", ["DEEPSEEK_KEY", "DEEPSEEK"])
-    _sync_env_var("KIMI_API_KEY", ["MOONSHOT_API_KEY", "MOONSHOT"])
+    _sync_env_var("GLM_API_KEY", ["ZHIPU_API_KEY", "GLM_KEY"])
+    _sync_env_var("MINIMAX_API_KEY", ["MINIMAX_KEY"])
 
 
 @dataclass(frozen=True)
 class LLMRouterConfig:
-    openai_api_key: str | None
-    gemini_api_key: str | None
-    deepseek_api_key: str | None
-    kimi_api_key: str | None
+    glm_api_key: str | None
+    minimax_api_key: str | None
     request_timeout: float
     dry_run: bool
     real_calls_enabled: bool
@@ -111,16 +110,14 @@ class LLMRouterConfig:
         ensure_env_loaded()
         synchronize_aliases()
 
-        openai_key = os.getenv("OPENAI_API_KEY")
-        gemini_key = os.getenv("GEMINI_API_KEY")
-        deepseek_key = os.getenv("DEEPSEEK_API_KEY")
-        kimi_key = os.getenv("KIMI_API_KEY")
+        glm_key = os.getenv("GLM_API_KEY")
+        minimax_key = os.getenv("MINIMAX_API_KEY")
 
         timeout = float(os.getenv("NEXUS_REQUEST_TIMEOUT_SEC", "120") or 120)
         dry_run = _bool_from_env(os.getenv("LLM_DRY_RUN"), False)
         real_calls = _bool_from_env(os.getenv("NEXUS_REAL_CALLS"), False)
 
-        if not real_calls and any([openai_key, gemini_key, deepseek_key, kimi_key]):
+        if not real_calls and any([glm_key, minimax_key]):
             # Auto-enable real calls if API keys are present.
             os.environ["NEXUS_REAL_CALLS"] = "1"
             real_calls = True
@@ -128,10 +125,8 @@ class LLMRouterConfig:
         os.environ.setdefault("NEXUS_REQUEST_TIMEOUT_SEC", str(timeout))
 
         return cls(
-            openai_api_key=openai_key,
-            gemini_api_key=gemini_key,
-            deepseek_api_key=deepseek_key,
-            kimi_api_key=kimi_key,
+            glm_api_key=glm_key,
+            minimax_api_key=minimax_key,
             request_timeout=timeout,
             dry_run=dry_run,
             real_calls_enabled=real_calls,

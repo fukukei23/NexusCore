@@ -143,7 +143,7 @@ def load_sandbox_policy(policy_path: str | None = None) -> dict[str, Any]:
         },
         "logging": {
             "level": "INFO",
-            "redact_env_vars": ["OPENAI_API_KEY", "GITHUB_TOKEN"],
+            "redact_env_vars": ["GLM_API_KEY", "MINIMAX_API_KEY", "GITHUB_TOKEN"],
         },
     }
 

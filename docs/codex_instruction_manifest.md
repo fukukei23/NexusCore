@@ -48,13 +48,13 @@ NexusCore はマルチエージェント開発 OS です。Codex が作業を引
 ## 3. .env / API キーの扱い
 
 - `.env.template` を `.env` にコピーして編集。
-- 主なキー: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `KIMI_API_KEY`（使わない場合は空で可）, `NEXUS_REAL_CALLS=1`
+- 主なキー: `GLM_API_KEY`, `MINIMAX_API_KEY`, `NEXUS_REAL_CALLS=1`
 - `.env` 自体は Git に含めない。必要なら値の取得方法を README に追記。
 - 実コール確認ショートカット:
-  - OpenAI/Gemini: `curl` で `/v1/models` (要 BASE_URL 設定)
-  - Claude: `curl -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" https://api.anthropic.com/v1/models`
+  - GLM: `curl -H "Authorization: Bearer $GLM_API_KEY" $GLM_API_BASE/chat/completions`
+  - MiniMax: `curl -H "Authorization: Bearer $MINIMAX_API_KEY" $MINIMAX_API_BASE/chat/completions`
 - 実コールしたいときは `NEXUS_REAL_CALLS=1` を明示。スタブにしたいときは `0` を明示。
-- LLM利用方針: 旧モデル (例: gpt-4o, gemini-1.5-pro/flash, llama3-local-8b など) は使用しない。現行は gpt-5.1 系 / gemini-2.5 系 / claude-3.5-sonnet を基本ラインとする。
+- LLM利用方針: NexusCoreはGLM (Zhipu AI) / MiniMax のみを使用。OpenAI/Gemini/Claude/DeepSeekは使用しない。
 - SaaS展開を見据え、環境変数はデフォルト値として扱いつつ、テナント/プロジェクト/リクエスト単位で安全に上書きできる設計方針で進める。
 
 ---
@@ -84,16 +84,16 @@ NexusCore はマルチエージェント開発 OS です。Codex が作業を引
 
 ---
 
-## 7. LLM ルーティング（2025-11 三枚看板版）
+## 7. LLM ルーティング（GLM/MiniMax デュアルプロバイダー版）
 
 - モデル役割:
-  - OpenAI: `gpt-5.1-*`（コード生成/修復/ポリシー高推論）
-  - Gemini: `gemini-2.5-pro/flash`（要件・設計・大量軽量処理）
-  - Claude: `claude-3.5-sonnet`（レビュー/ポリシー/セカンドオピニオン）
-- タスクマップは `src/nexuscore/llm/llm_router.py` の `TASK_MODEL_MAP_DEFAULT`。cheap モード時もタスクごとに軽量モデルへ自動アサイン。
+  - GLM (Zhipu AI): `glm_codex` / `glm_strict` / `glm_default` / `glm_nano`（コード生成/修復/推論/軽量タスク）
+  - MiniMax: `minimax_analytical` / `minimax_default`（分析/計画/チャット/創作タスク）
+- タスクマップは `src/nexuscore/llm/task_model_map.py` の `TASK_MODEL_CONFIGS`。cheap モード時もタスクごとに軽量モデルへ自動アサイン。
 - 環境変数:
-  - `NEXUS_LLM_MODE=cheap` で安価系優先
-  - `NEXUS_CLASSIFIER_MODEL` でタスク分類モデルを上書き可能（デフォルト `openai:gpt-5.1-instant`）
+  - `GLM_API_KEY`, `GLM_API_BASE`, `GLM_MODEL` でGLM設定
+  - `MINIMAX_API_KEY`, `MINIMAX_API_BASE`, `MINIMAX_MODEL` でMiniMax設定
+  - `NEXUS_CLASSIFIER_MODEL` でタスク分類モデルを上書き可能（デフォルト `glm:glm-4-flash`）
 
 ---
 
