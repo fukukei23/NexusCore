@@ -17,7 +17,8 @@ class GLMLLM(BaseLLM):
     """
 
     def __init__(self, model_name: str):
-        super().__init__(model_name)
+        env_model = os.getenv("GLM_MODEL")
+        super().__init__(env_model or model_name)
         self.api_key = os.getenv("GLM_API_KEY")
         http_available = HTTP_CLIENT_FACTORY.available
         self.real_calls = _real_call_enabled(self.api_key) and http_available
@@ -26,7 +27,7 @@ class GLMLLM(BaseLLM):
             self.real_calls = False
 
         self.base_url = (
-            os.getenv("GLM_BASE_URL") or "https://open.bigmodel.cn/api/paas/v4"
+            os.getenv("GLM_API_BASE") or os.getenv("GLM_BASE_URL") or "https://open.bigmodel.cn/api/paas/v4"
         ).rstrip("/")
 
         if self.real_calls:
