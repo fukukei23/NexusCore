@@ -141,34 +141,34 @@ class TestTaskModelConfigs:
         """code_generateタスクの設定を検証"""
         config = TASK_MODEL_CONFIGS["code_generate"]
 
-        assert config.primary == "gpt5_codex"
+        assert config.primary == "glm_codex"
         assert "deepseek_r1" in config.secondary
-        assert config.fallback == "gpt5_default"
+        assert config.fallback == "glm_default"
         assert config.temperature == 0.2
 
     def test_code_review_config(self):
         """code_reviewタスクの設定を検証"""
         config = TASK_MODEL_CONFIGS["code_review"]
 
-        assert config.primary == "claude_sonnet_45"
-        assert "gpt5_strict" in config.secondary
-        assert config.fallback == "gpt5_default"
+        assert config.primary == "glm_strict"
+        assert "deepseek_r1" in config.secondary
+        assert config.fallback == "glm_default"
 
     def test_self_heal_config(self):
         """self_healタスクの設定を検証"""
         config = TASK_MODEL_CONFIGS["self_heal"]
 
-        assert config.primary == "gpt5_codex"
+        assert config.primary == "glm_codex"
         assert "deepseek_r1" in config.secondary
-        assert config.fallback == "gpt5_default"
+        assert config.fallback == "glm_default"
 
     def test_routing_classify_config(self):
         """routing_classifyタスクの設定を検証"""
         config = TASK_MODEL_CONFIGS["routing_classify"]
 
-        assert config.primary == "gpt5_nano"
-        assert "gpt5_default" in config.secondary
-        assert config.fallback == "gpt5_nano"
+        assert config.primary == "glm_nano"
+        assert "glm_default" in config.secondary
+        assert config.fallback == "glm_nano"
 
     def test_all_primary_profiles_are_strings(self):
         """全primaryがプロファイルID文字列"""
@@ -271,7 +271,7 @@ class TestBuildTaskModelMapDict:
         result = build_task_model_map_dict()
         entry = result["code_generate"]
 
-        assert entry["primary"].startswith("openai:")
+        assert entry["primary"].startswith("glm:")
         assert isinstance(entry["fallbacks"], list)
         assert len(entry["fallbacks"]) > 0
         assert "temperature" in entry
