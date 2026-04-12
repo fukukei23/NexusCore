@@ -646,7 +646,7 @@ class SelfHealingService:
                     diff_summary = self._guardian_agent.generate_diff_summary(
                         file_diffs=file_diffs,
                         semantic_diffs=semantic_diffs if semantic_diffs else None,
-                        model="gpt-4.1",
+                        model="glm-4-plus",
                     )
                     self.logger.info(
                         f"Generated diff summary for {len(file_diffs)} files via GuardianAgent"

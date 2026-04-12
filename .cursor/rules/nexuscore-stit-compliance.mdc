@@ -180,7 +180,7 @@ alwaysApply: true
 
 | 接頭辞 | 用途 | 命名規則 | 例 |
 |--------|------|----------|-----|
-| `claude/` | AI開発ブランチ | `{接頭辞}/{cr-XXX}-{説明}` | `claude/cr-051-retry-policy` |
+| `glm/` | AI開発ブランチ | `{接頭辞}/{cr-XXX}-{説明}` | `glm/cr-051-retry-policy` |
 | `rescue/` | 救出用・再試行ブランチ | `{接頭辞}/{cr-XXX}_{日付}` | `rescue/cr-051-wip_20260112` |
 | `feature/` | 機能開発（通常） | `{接頭辞}/{機能名}` | `feature/user-authentication` |
 | `hotfix/` | 緊急修正 | `{接頭辞}/{修正内容}` | `hotfix/security-fix` |
@@ -216,7 +216,7 @@ python tools/stit_branch.py create -t cr-051 -d retry-policy
 python tools/stit_branch.py create -t cr-051 -d retry-policy --push
 
 # ブランチ名検証のみ
-python tools/stit_branch.py validate -b claude/cr-051-retry-policy
+python tools/stit_branch.py validate -b glm/cr-051-retry-policy
 ```
 
 ### 9.2 リスク緩和機能
@@ -236,8 +236,8 @@ CLI ツールを使用しない場合：
 
 ```bash
 # 正しい例
-git checkout -b claude/cr-051-retry-policy
-git push -u origin claude/cr-051-retry-policy
+git checkout -b glm/cr-051-retry-policy
+git push -u origin glm/cr-051-retry-policy
 
 # 避けるべき例
 git checkout -b feature/user-authentication-2  # 番号付与は避ける

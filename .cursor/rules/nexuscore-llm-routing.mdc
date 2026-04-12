@@ -2,69 +2,79 @@
 alwaysApply: true
 ---
 
-# NexusCore Multi-LLM Routing Rules
+# NexusCore LLM Routing Rules
 
-## 1. モデル分類（2025年11月版）
+## 1. モデル分類
 Primary:
-- gpt-5.1
-- gpt-5.1-codex
+- glm-4-plus (GLM via Zhipu AI)
+- glm-5.1 (GLM via Zhipu AI)
 
 Secondary:
-- claude-4.5-sonnet
-- gemini-3.0-pro
-- deepseek-r1
+- minimax-m2.7 (MiniMax)
 
-Fallback:
-- gpt-5.1-mini
-- gpt-5-nano
+Lightweight:
+- glm-4-flash (GLM via Zhipu AI)
 
-## 2. タスク別マッピング
+## 2. プロファイルマッピング
 code_generate:
-  - primary: gpt-5.1-codex
-  - secondary: deepseek-r1
-  - fallback: gpt-5.1-mini
+  - primary: glm_codex (glm-4-plus)
+  - secondary: minimax_analytical
+  - fallback: glm_default
 
 test_generate:
-  - primary: gpt-5.1-codex
-  - secondary: claude-4.5-sonnet
-  - fallback: gpt-5.1-mini
+  - primary: glm_codex (glm-4-plus)
+  - secondary: minimax_analytical
+  - fallback: glm_default
 
 code_review:
-  - primary: claude-4.5-sonnet
-  - secondary: gpt-5.1
-  - fallback: gpt-5.1-mini
+  - primary: glm_strict (glm-4-plus)
+  - secondary: minimax_analytical
+  - fallback: glm_default
 
 debug:
-  - primary: gpt-5.1-codex
-  - secondary: deepseek-r1
-  - fallback: gpt-5.1-mini
+  - primary: glm_codex (glm-4-plus)
+  - secondary: minimax_analytical
+  - fallback: glm_default
 
 self_heal:
-  - primary: gpt-5.1-codex
-  - secondary: deepseek-r1
-  - fallback: gpt-5.1-mini
+  - primary: glm_codex (glm-4-plus)
+  - secondary: minimax_analytical
+  - fallback: glm_default
 
 architect:
-  - primary: gpt-5.1
-  - secondary: gemini-3.0-pro
-  - fallback: gpt-5.1-mini
+  - primary: glm_strict (glm-4-plus)
+  - secondary: minimax_analytical
+  - fallback: glm_default
 
 plan_generate:
-  - primary: gemini-3.0-pro
-  - secondary: gpt-5.1
-  - fallback: gpt-5.1-mini
+  - primary: minimax_analytical
+  - secondary: glm_strict
+  - fallback: glm_default
 
 requirement:
-  - primary: gpt-5.1
-  - secondary: claude-4.5-sonnet
-  - fallback: gpt-5.1-mini
+  - primary: glm_strict (glm-4-plus)
+  - secondary: minimax_analytical
+  - fallback: glm_default
 
 general:
-  - primary: gpt-5.1-mini
-  - secondary: claude-4.5-sonnet
-  - fallback: gpt-5-nano
+  - primary: glm_default (glm-4-plus)
+  - secondary: minimax_default
+  - fallback: glm_nano
 
-## 3. Consensus Algorithm
+routing_classify:
+  - primary: glm_nano (glm-4-flash)
+  - secondary: glm_default
+  - fallback: glm_nano
+
+## 3. 環境変数
+- GLM_API_KEY: Zhipu AI API key
+- GLM_API_BASE: GLM base URL (default: https://open.bigmodel.cn/api/paas/v4)
+- GLM_MODEL: Model override (default: glm-4-plus)
+- MINIMAX_API_KEY: MiniMax API key
+- MINIMAX_API_BASE: MiniMax base URL (default: https://api.minimax.chat/v1)
+- MINIMAX_MODEL: Model override (default: minimax-m2.7)
+
+## 4. Consensus Algorithm
 - signature: normalized hash
 - weight: model trust score
 - vote: weighted majority

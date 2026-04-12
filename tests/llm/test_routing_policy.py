@@ -8,15 +8,16 @@ from nexuscore.llm.routing_policy import (
 )
 
 
-def test_model_family_detects_openai():
-    assert model_family("openai:gpt-5") == "openai"
-    assert model_family("google:gemini-2.5-flash") == "gemini"
-    assert model_family("local-fallback") == "local"
+def test_model_family_detects_glm_and_minimax():
+    assert model_family("glm:glm-4-plus") == "glm"
+    assert model_family("minimax:minimax-m2.7") == "minimax"
+    assert model_family("unknown-fallback") == "glm"
 
 
 def test_split_provider_handles_vendorless():
-    assert split_provider("anthropic:claude-3") == ("anthropic", "claude-3")
-    assert split_provider("gpt-5.1")[0] == "openai"
+    assert split_provider("glm:glm-4-plus") == ("glm", "glm-4-plus")
+    assert split_provider("glm-4-plus")[0] == "glm"
+    assert split_provider("minimax-m2.7")[0] == "minimax"
 
 
 def test_task_map_has_general_entry():

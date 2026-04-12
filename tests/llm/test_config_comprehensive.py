@@ -2,6 +2,7 @@
 Comprehensive tests for llm/config.py
 
 環境変数ロード、同期、設定クラスのテスト
+NexusCore uses GLM (Zhipu AI) and MiniMax as the sole LLM providers.
 """
 
 import os
@@ -93,43 +94,44 @@ class TestSyncEnvVar:
 # synchronize_aliases テスト
 # ============================================================================
 class TestSynchronizeAliases:
-    def test_synchronize_aliases_gemini(self, monkeypatch):
-        """Gemini APIキーのエイリアス同期"""
-        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-        monkeypatch.setenv("GEMINI_API_KEY_AGENT_A", "gemini_key_a")
+    def test_synchronize_aliases_glm_from_zhipu(self, monkeypatch):
+        """GLM APIキーのエイリアス同期（ZHIPU_API_KEY）"""
+        monkeypatch.delenv("GLM_API_KEY", raising=False)
+        monkeypatch.setenv("ZHIPU_API_KEY", "zhipu_key_value")
 
         synchronize_aliases()
 
-        assert os.getenv("GEMINI_API_KEY") == "gemini_key_a"
+        assert os.getenv("GLM_API_KEY") == "zhipu_key_value"
 
-    def test_synchronize_aliases_deepseek(self, monkeypatch):
-        """DeepSeek APIキーのエイリアス同期"""
-        monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
-        monkeypatch.setenv("DEEPSEEK_KEY", "deepseek_value")
-
-        synchronize_aliases()
-
-        assert os.getenv("DEEPSEEK_API_KEY") == "deepseek_value"
-
-    def test_synchronize_aliases_kimi(self, monkeypatch):
-        """Kimi APIキーのエイリアス同期"""
-        monkeypatch.delenv("KIMI_API_KEY", raising=False)
-        monkeypatch.setenv("MOONSHOT_API_KEY", "moonshot_value")
+    def test_synchronize_aliases_glm_from_glm_key(self, monkeypatch):
+        """GLM APIキーのエイリアス同期（GLM_KEY）"""
+        monkeypatch.delenv("GLM_API_KEY", raising=False)
+        monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
+        monkeypatch.setenv("GLM_KEY", "glm_key_value")
 
         synchronize_aliases()
 
-        assert os.getenv("KIMI_API_KEY") == "moonshot_value"
+        assert os.getenv("GLM_API_KEY") == "glm_key_value"
+
+    def test_synchronize_aliases_minimax(self, monkeypatch):
+        """MiniMax APIキーのエイリアス同期"""
+        monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
+        monkeypatch.setenv("MINIMAX_KEY", "minimax_key_value")
+
+        synchronize_aliases()
+
+        assert os.getenv("MINIMAX_API_KEY") == "minimax_key_value"
 
     def test_synchronize_aliases_priority_order(self, monkeypatch):
         """エイリアスの優先順位テスト"""
-        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-        monkeypatch.setenv("GEMINI_API_KEY_AGENT_A", "key_a")
-        monkeypatch.setenv("GEMINI_API_KEY_AGENT_B", "key_b")
+        monkeypatch.delenv("GLM_API_KEY", raising=False)
+        monkeypatch.setenv("ZHIPU_API_KEY", "key_a")
+        monkeypatch.setenv("GLM_KEY", "key_b")
 
         synchronize_aliases()
 
-        # 最初のエイリアスが優先される
-        assert os.getenv("GEMINI_API_KEY") == "key_a"
+        # 最初のエイリアス（ZHIPU_API_KEY）が優先される
+        assert os.getenv("GLM_API_KEY") == "key_a"
 
 
 # ============================================================================
@@ -192,19 +194,15 @@ class TestEnsureEnvLoaded:
 class TestLLMRouterConfig:
     def test_config_from_env_with_all_keys(self, monkeypatch):
         """全APIキーが設定されている場合"""
-        monkeypatch.setenv("OPENAI_API_KEY", "openai_key")
-        monkeypatch.setenv("GEMINI_API_KEY", "gemini_key")
-        monkeypatch.setenv("DEEPSEEK_API_KEY", "deepseek_key")
-        monkeypatch.setenv("KIMI_API_KEY", "kimi_key")
+        monkeypatch.setenv("GLM_API_KEY", "glm_key")
+        monkeypatch.setenv("MINIMAX_API_KEY", "minimax_key")
         monkeypatch.setenv("NEXUS_REQUEST_TIMEOUT_SEC", "60")
         monkeypatch.setenv("NEXUS_REAL_CALLS", "0")
 
         config = LLMRouterConfig.from_env()
 
-        assert config.openai_api_key == "openai_key"
-        assert config.gemini_api_key == "gemini_key"
-        assert config.deepseek_api_key == "deepseek_key"
-        assert config.kimi_api_key == "kimi_key"
+        assert config.glm_api_key == "glm_key"
+        assert config.minimax_api_key == "minimax_key"
         assert config.request_timeout == 60.0
         # APIキーが存在するため、real_calls_enabledは自動的にTrueになる
         assert config.real_calls_enabled is True
@@ -213,10 +211,8 @@ class TestLLMRouterConfig:
         """APIキーが一切ない場合"""
         # 正規名とエイリアスの両方をクリア
         for key in [
-            "OPENAI_API_KEY",
-            "GEMINI_API_KEY", "GEMINI_API_KEY_AGENT_A", "GEMINI_API_KEY_AGENT_B",
-            "DEEPSEEK_API_KEY", "DEEPSEEK_KEY", "DEEPSEEK",
-            "KIMI_API_KEY",
+            "GLM_API_KEY", "ZHIPU_API_KEY", "GLM_KEY",
+            "MINIMAX_API_KEY", "MINIMAX_KEY",
         ]:
             monkeypatch.delenv(key, raising=False)
         monkeypatch.setenv("NEXUS_REAL_CALLS", "0")
@@ -224,15 +220,13 @@ class TestLLMRouterConfig:
         with patch("nexuscore.llm.config.ensure_env_loaded"):
             config = LLMRouterConfig.from_env()
 
-        assert config.openai_api_key is None
-        assert config.gemini_api_key is None
-        assert config.deepseek_api_key is None
-        assert config.kimi_api_key is None
+        assert config.glm_api_key is None
+        assert config.minimax_api_key is None
         assert config.real_calls_enabled is False
 
     def test_config_from_env_auto_enable_real_calls(self, monkeypatch):
         """APIキーが存在する場合、real_callsを自動有効化"""
-        monkeypatch.setenv("OPENAI_API_KEY", "test_key")
+        monkeypatch.setenv("GLM_API_KEY", "test_key")
         monkeypatch.delenv("NEXUS_REAL_CALLS", raising=False)
 
         config = LLMRouterConfig.from_env()
@@ -275,17 +269,15 @@ class TestLLMRouterConfig:
     def test_config_frozen_dataclass(self):
         """frozenデータクラスのため変更不可"""
         config = LLMRouterConfig(
-            openai_api_key="test",
-            gemini_api_key=None,
-            deepseek_api_key=None,
-            kimi_api_key=None,
+            glm_api_key="test",
+            minimax_api_key=None,
             request_timeout=120.0,
             dry_run=False,
             real_calls_enabled=False,
         )
 
         with pytest.raises(Exception):  # FrozenInstanceError  # noqa: B017
-            config.openai_api_key = "new_key"  # type: ignore
+            config.glm_api_key = "new_key"  # type: ignore
 
     def test_config_from_env_timeout_empty_string(self, monkeypatch):
         """タイムアウトが空文字列の場合"""
@@ -313,26 +305,24 @@ class TestConfigIntegration:
     def test_full_workflow_with_aliases(self, monkeypatch):
         """エイリアス同期からconfig作成までの完全ワークフロー"""
         # エイリアスを設定
-        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-        monkeypatch.setenv("GEMINI_API_KEY_AGENT_A", "gemini_via_alias")
-        monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
-        monkeypatch.setenv("DEEPSEEK", "deepseek_via_alias")
+        monkeypatch.delenv("GLM_API_KEY", raising=False)
+        monkeypatch.setenv("ZHIPU_API_KEY", "glm_via_alias")
+        monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
+        monkeypatch.setenv("MINIMAX_KEY", "minimax_via_alias")
 
         # Configを作成（内部でsynchronize_aliasesが呼ばれる）
         config = LLMRouterConfig.from_env()
 
         # エイリアスから同期されたキーが使われる
-        assert config.gemini_api_key == "gemini_via_alias"
-        assert config.deepseek_api_key == "deepseek_via_alias"
+        assert config.glm_api_key == "glm_via_alias"
+        assert config.minimax_api_key == "minimax_via_alias"
 
     def test_config_with_minimal_env(self, monkeypatch):
         """最小限の環境変数でconfig作成"""
         # 全てのAPIキーとエイリアスをクリア
         for key in [
-            "OPENAI_API_KEY",
-            "GEMINI_API_KEY", "GEMINI_API_KEY_AGENT_A", "GEMINI_API_KEY_AGENT_B",
-            "DEEPSEEK_API_KEY", "DEEPSEEK_KEY", "DEEPSEEK",
-            "KIMI_API_KEY",
+            "GLM_API_KEY", "ZHIPU_API_KEY", "GLM_KEY",
+            "MINIMAX_API_KEY", "MINIMAX_KEY",
             "NEXUS_REAL_CALLS",
             "LLM_DRY_RUN",
         ]:
@@ -341,20 +331,18 @@ class TestConfigIntegration:
         with patch("nexuscore.llm.config.ensure_env_loaded"):
             config = LLMRouterConfig.from_env()
 
-        assert config.openai_api_key is None
-        assert config.gemini_api_key is None
-        assert config.deepseek_api_key is None
-        assert config.kimi_api_key is None
+        assert config.glm_api_key is None
+        assert config.minimax_api_key is None
         assert config.request_timeout == 120.0
         assert config.dry_run is False
         assert config.real_calls_enabled is False
 
     def test_config_priority_original_over_alias(self, monkeypatch):
         """オリジナルキーがエイリアスより優先される"""
-        monkeypatch.setenv("GEMINI_API_KEY", "original_key")
-        monkeypatch.setenv("GEMINI_API_KEY_AGENT_A", "alias_key")
+        monkeypatch.setenv("GLM_API_KEY", "original_key")
+        monkeypatch.setenv("ZHIPU_API_KEY", "alias_key")
 
         config = LLMRouterConfig.from_env()
 
         # オリジナルが優先される
-        assert config.gemini_api_key == "original_key"
+        assert config.glm_api_key == "original_key"
