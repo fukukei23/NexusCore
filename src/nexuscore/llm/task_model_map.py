@@ -23,18 +23,18 @@ TASK_MODEL_CONFIGS: dict[str, TaskModelConfig] = {
     # --- Core coding tasks ---
     "code_generate": TaskModelConfig(
         primary="glm_codex",
-        secondary=["deepseek_r1"],
+        secondary=["minimax_analytical"],
         fallback="glm_default",
         temperature=0.2,
     ),
     "code_refactor": TaskModelConfig(
         primary="glm_codex",
-        secondary=["deepseek_r1"],
+        secondary=["minimax_analytical"],
         fallback="glm_default",
     ),
     "code_review": TaskModelConfig(
         primary="glm_strict",
-        secondary=["deepseek_r1"],
+        secondary=["minimax_analytical"],
         fallback="glm_default",
     ),
     "code_explain": TaskModelConfig(
@@ -44,12 +44,12 @@ TASK_MODEL_CONFIGS: dict[str, TaskModelConfig] = {
     ),
     "test_generate": TaskModelConfig(
         primary="glm_codex",
-        secondary=["deepseek_r1"],
+        secondary=["minimax_analytical"],
         fallback="glm_default",
     ),
     "debug": TaskModelConfig(
         primary="glm_codex",
-        secondary=["deepseek_r1"],
+        secondary=["minimax_analytical"],
         fallback="glm_default",
     ),
     # --- Planning / architecture / requirements ---
@@ -81,7 +81,7 @@ TASK_MODEL_CONFIGS: dict[str, TaskModelConfig] = {
     # --- Maintenance / governance ---
     "self_heal": TaskModelConfig(
         primary="glm_codex",
-        secondary=["deepseek_r1"],
+        secondary=["minimax_analytical"],
         fallback="glm_default",
     ),
     "routing_classify": TaskModelConfig(
@@ -143,7 +143,7 @@ TASK_MODEL_CONFIGS: dict[str, TaskModelConfig] = {
     ),
     "secure": TaskModelConfig(
         primary="glm_strict",
-        secondary=["deepseek_r1"],
+        secondary=["minimax_analytical"],
         fallback="glm_default",
     ),
     "general": TaskModelConfig(

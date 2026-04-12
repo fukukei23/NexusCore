@@ -20,7 +20,7 @@ AIエージェントが AI エージェントを作るための開発基盤
 
 既存の挙動を壊さずにコード改善
 
-マルチLLM（GPT-5 / Claude / Gemini / DeepSeek / Llama / Qwen）を活かした構造提案
+GLM (Zhipu AI) / MiniMax を活かした構造提案
 
 Orchestrator / Agents の負荷分散設計を行う
 
@@ -36,21 +36,20 @@ Orchestrator / Agents の負荷分散設計を行う
 
 詳細は `nexuscore-llm-routing.mdc` を参照。
 
-▼ GPT-5 系が "司令塔（primary）"
-- gpt-5.1（中核・推論）
-- gpt-5.1-codex（コード最適化・エージェントタスク）
+▼ GLM系が "司令塔（primary）"
+- glm_codex (glm-4-plus)（コード最適化・エージェントタスク）
+- glm_strict (glm-4-plus)（推論・レビュー・品質保証）
+- glm_default (glm-4-plus)（汎用タスク）
 
-▼ Secondary
-- claude-4.5-sonnet（構造化・レビュー・品質保証が強み）
-- gemini-3.0-pro（高速推論と読み込み量）
-- deepseek-r1（推論深度・リズム）
+▼ MiniMax系
+- minimax_analytical (M2.7)（分析・計画・構造化タスク）
+- minimax_default (M2.7)（一般チャット・創作タスク）
 
-▼ Fallback
-- gpt-5.1-mini（高速ユーティリティ）
-- gpt-5-nano
+▼ 軽量タスク用
+- glm_nano (glm-4-flash)（高速ユーティリティ・ルーティング分類）
 
 → 単一LLMへの依存禁止
-→ 複数LLMによる相互レビュー・合議・比較を推奨
+→ GLM/MiniMaxの相互レビュー・合議・比較を推奨
 
 2. 優先方針（重要度順）
 ① 既存挙動を壊さない（後方互換100%）
@@ -59,7 +58,7 @@ Orchestrator / Agents の負荷分散設計を行う
 
 Gradio UI のボタン動作も変更しない
 
-② “まずリファクタ → 次に改良”
+② "まずリファクタ → 次に改良"
 
 機能追加は必ずリファクタ完了後
 
@@ -73,7 +72,7 @@ Gradio UI のボタン動作も変更しない
 - api/server.py
 - npe/engine.py
 
-④ マルチLLMを前提に設計する
+④ GLM/MiniMaxデュアルプロバイダー前提で設計する
 
 詳細は `nexuscore-llm-routing.mdc` を参照。
 
@@ -82,7 +81,7 @@ Gradio UI のボタン動作も変更しない
 
 新しいLLM呼び出しコードは Router を使用
 
-どうしても直接 SDK が必要なら“薄い wrapper”に閉じ込める
+どうしても直接 SDK が必要なら"薄い wrapper"に閉じ込める
 
 🔹 ファイル構造は段階的に改善
 
@@ -100,13 +99,13 @@ build_ui() / launch_ui() パターン統一
 
 小さく安全な差分になっているか
 
-マルチLLM利用方針に沿っているか
+GLM/MiniMax利用方針に沿っているか
 
 Orchestrator / Agents / Router の責務が混じっていないか
 
 5. 禁止事項
 
-GPT-4 / GPT-3.5 の使用
+OpenAI/Gemini/Claude/DeepSeekの直接使用
 
 Router をバイパスする LLM 直叩き（必要時以外）
 

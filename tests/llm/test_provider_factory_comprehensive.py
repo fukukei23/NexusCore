@@ -2,6 +2,7 @@
 Comprehensive tests for llm/provider_factory.py
 
 プロバイダーファクトリーとクラスマッピングのテスト
+NexusCore uses GLM (Zhipu AI) and MiniMax as the sole LLM providers.
 """
 
 import pytest
@@ -12,13 +13,9 @@ from nexuscore.llm.provider_factory import (
     get_provider_class,
 )
 from nexuscore.llm.providers import (
-    AnthropicLLM,
     BaseLLM,
-    DeepSeekLLM,
-    GeminiLLM,
-    LocalLLM,
-    MoonshotLLM,
-    OpenAILLM,
+    GLMLLM,
+    MiniMaxLLM,
 )
 
 
@@ -30,39 +27,19 @@ class TestProviderClasses:
         """PROVIDER_CLASSESが辞書"""
         assert isinstance(PROVIDER_CLASSES, dict)
 
-    def test_provider_classes_contains_openai(self):
-        """OpenAIプロバイダーが登録されている"""
-        assert "openai" in PROVIDER_CLASSES
-        assert PROVIDER_CLASSES["openai"] == OpenAILLM
+    def test_provider_classes_contains_glm(self):
+        """GLMプロバイダーが登録されている"""
+        assert "glm" in PROVIDER_CLASSES
+        assert PROVIDER_CLASSES["glm"] == GLMLLM
 
-    def test_provider_classes_contains_gemini(self):
-        """Geminiプロバイダーが登録されている"""
-        assert "gemini" in PROVIDER_CLASSES
-        assert PROVIDER_CLASSES["gemini"] == GeminiLLM
-
-    def test_provider_classes_contains_kimi(self):
-        """Kimiプロバイダーが登録されている"""
-        assert "kimi" in PROVIDER_CLASSES
-        assert PROVIDER_CLASSES["kimi"] == MoonshotLLM
-
-    def test_provider_classes_contains_anthropic(self):
-        """Anthropicプロバイダーが登録されている"""
-        assert "anthropic" in PROVIDER_CLASSES
-        assert PROVIDER_CLASSES["anthropic"] == AnthropicLLM
-
-    def test_provider_classes_contains_deepseek(self):
-        """DeepSeekプロバイダーが登録されている"""
-        assert "deepseek" in PROVIDER_CLASSES
-        assert PROVIDER_CLASSES["deepseek"] == DeepSeekLLM
-
-    def test_provider_classes_contains_local(self):
-        """Localプロバイダーが登録されている"""
-        assert "local" in PROVIDER_CLASSES
-        assert PROVIDER_CLASSES["local"] == LocalLLM
+    def test_provider_classes_contains_minimax(self):
+        """MiniMaxプロバイダーが登録されている"""
+        assert "minimax" in PROVIDER_CLASSES
+        assert PROVIDER_CLASSES["minimax"] == MiniMaxLLM
 
     def test_provider_classes_minimum_count(self):
         """最低限のプロバイダー数が登録されている"""
-        assert len(PROVIDER_CLASSES) >= 6
+        assert len(PROVIDER_CLASSES) >= 2
 
     def test_all_provider_classes_are_types(self):
         """全プロバイダークラスが型である"""
@@ -84,41 +61,17 @@ class TestProviderClasses:
 # get_provider_class テスト
 # ============================================================================
 class TestGetProviderClass:
-    def test_get_provider_class_openai(self):
-        """OpenAIプロバイダークラスを取得"""
-        provider_cls = get_provider_class("openai")
+    def test_get_provider_class_glm(self):
+        """GLMプロバイダークラスを取得"""
+        provider_cls = get_provider_class("glm")
 
-        assert provider_cls == OpenAILLM
+        assert provider_cls == GLMLLM
 
-    def test_get_provider_class_gemini(self):
-        """Geminiプロバイダークラスを取得"""
-        provider_cls = get_provider_class("gemini")
+    def test_get_provider_class_minimax(self):
+        """MiniMaxプロバイダークラスを取得"""
+        provider_cls = get_provider_class("minimax")
 
-        assert provider_cls == GeminiLLM
-
-    def test_get_provider_class_kimi(self):
-        """Kimiプロバイダークラスを取得"""
-        provider_cls = get_provider_class("kimi")
-
-        assert provider_cls == MoonshotLLM
-
-    def test_get_provider_class_anthropic(self):
-        """Anthropicプロバイダークラスを取得"""
-        provider_cls = get_provider_class("anthropic")
-
-        assert provider_cls == AnthropicLLM
-
-    def test_get_provider_class_deepseek(self):
-        """DeepSeekプロバイダークラスを取得"""
-        provider_cls = get_provider_class("deepseek")
-
-        assert provider_cls == DeepSeekLLM
-
-    def test_get_provider_class_local(self):
-        """Localプロバイダークラスを取得"""
-        provider_cls = get_provider_class("local")
-
-        assert provider_cls == LocalLLM
+        assert provider_cls == MiniMaxLLM
 
     def test_get_provider_class_unknown_raises_error(self):
         """存在しないプロバイダーはValueError"""
@@ -133,15 +86,15 @@ class TestGetProviderClass:
     def test_get_provider_class_case_sensitive(self):
         """大文字小文字を区別する"""
         # 小文字は成功
-        assert get_provider_class("openai") == OpenAILLM
+        assert get_provider_class("glm") == GLMLLM
 
         # 大文字は失敗
         with pytest.raises(ValueError):
-            get_provider_class("OpenAI")
+            get_provider_class("GLM")
 
     def test_get_provider_class_returns_class_not_instance(self):
         """インスタンスではなくクラスを返す"""
-        provider_cls = get_provider_class("openai")
+        provider_cls = get_provider_class("glm")
 
         assert isinstance(provider_cls, type)
         assert issubclass(provider_cls, BaseLLM)
@@ -151,90 +104,48 @@ class TestGetProviderClass:
 # create_provider テスト
 # ============================================================================
 class TestCreateProvider:
-    def test_create_provider_openai_with_colon(self):
-        """OpenAI プロバイダーをコロン形式で作成"""
-        provider = create_provider("openai:gpt-4")
+    def test_create_provider_glm_with_colon(self):
+        """GLMプロバイダーをコロン形式で作成"""
+        provider = create_provider("glm:glm-4-plus")
 
-        assert isinstance(provider, OpenAILLM)
+        assert isinstance(provider, GLMLLM)
         assert isinstance(provider, BaseLLM)
 
-    def test_create_provider_gemini_with_colon(self):
-        """Gemini プロバイダーをコロン形式で作成"""
-        provider = create_provider("gemini:gemini-pro")
+    def test_create_provider_minimax_with_colon(self):
+        """MiniMaxプロバイダーをコロン形式で作成"""
+        provider = create_provider("minimax:minimax-m2.7")
 
-        assert isinstance(provider, GeminiLLM)
+        assert isinstance(provider, MiniMaxLLM)
 
-    def test_create_provider_anthropic_with_colon(self):
-        """Anthropic プロバイダーをコロン形式で作成"""
-        provider = create_provider("anthropic:claude-3")
+    def test_create_provider_without_colon_glm(self):
+        """コロンなし（glm接頭辞）でGLMプロバイダー作成"""
+        provider = create_provider("glm-4-plus")
 
-        assert isinstance(provider, AnthropicLLM)
+        assert isinstance(provider, GLMLLM)
 
-    def test_create_provider_deepseek_with_colon(self):
-        """DeepSeek プロバイダーをコロン形式で作成"""
-        provider = create_provider("deepseek:deepseek-coder")
+    def test_create_provider_without_colon_minimax(self):
+        """コロンなし（minimax接頭辞）でMiniMaxプロバイダー作成"""
+        provider = create_provider("minimax-m2.7")
 
-        assert isinstance(provider, DeepSeekLLM)
+        assert isinstance(provider, MiniMaxLLM)
 
-    def test_create_provider_kimi_with_colon(self):
-        """Kimi プロバイダーをコロン形式で作成"""
-        provider = create_provider("kimi:moonshot-v1")
+    def test_create_provider_without_colon_chatglm(self):
+        """コロンなし（chatglm接頭辞）でGLMプロバイダー作成"""
+        provider = create_provider("chatglm-4")
 
-        assert isinstance(provider, MoonshotLLM)
+        assert isinstance(provider, GLMLLM)
 
-    def test_create_provider_without_colon_gpt(self):
-        """コロンなし（GPT接頭辞）でOpenAIプロバイダー作成"""
-        provider = create_provider("gpt-4")
-
-        assert isinstance(provider, OpenAILLM)
-
-    def test_create_provider_without_colon_gemini(self):
-        """コロンなし（gemini接頭辞）でGeminiプロバイダー作成"""
-        provider = create_provider("gemini-pro")
-
-        assert isinstance(provider, GeminiLLM)
-
-    def test_create_provider_without_colon_claude(self):
-        """コロンなし（claude接頭辞）でAnthropicプロバイダー作成"""
-        provider = create_provider("claude-3-opus")
-
-        assert isinstance(provider, AnthropicLLM)
-
-    def test_create_provider_without_colon_deepseek(self):
-        """コロンなし（deepseek接頭辞）でDeepSeekプロバイダー作成"""
-        provider = create_provider("deepseek-coder")
-
-        assert isinstance(provider, DeepSeekLLM)
-
-    def test_create_provider_without_colon_kimi(self):
-        """コロンなし（kimi接頭辞）でKimiプロバイダー作成"""
-        provider = create_provider("kimi-1")
-
-        assert isinstance(provider, MoonshotLLM)
-
-    def test_create_provider_without_colon_local(self):
-        """コロンなし（local接頭辞）でLocalプロバイダー作成"""
-        provider = create_provider("local-model")
-
-        assert isinstance(provider, LocalLLM)
-
-    def test_create_provider_unknown_model_fallback_local(self):
-        """未知のモデルはLocalプロバイダーにフォールバック"""
+    def test_create_provider_unknown_model_fallback_glm(self):
+        """未知のモデルはGLMプロバイダーにフォールバック"""
         provider = create_provider("unknown-model-xyz")
 
-        assert isinstance(provider, LocalLLM)
+        assert isinstance(provider, GLMLLM)
 
     def test_create_provider_returns_base_llm_instance(self):
         """BaseLLMインスタンスを返す"""
-        provider = create_provider("openai:gpt-4")
+        provider = create_provider("glm:glm-4-plus")
 
         assert isinstance(provider, BaseLLM)
-
-    def test_create_provider_google_alias(self):
-        """googleエイリアスがgeminiにマップされる"""
-        provider = create_provider("google:gemini-pro")
-
-        assert isinstance(provider, GeminiLLM)
 
 
 # ============================================================================
@@ -244,22 +155,18 @@ class TestProviderFactoryIntegration:
     def test_full_workflow_get_class_and_create(self):
         """クラス取得→インスタンス作成のワークフロー"""
         # クラス取得
-        provider_cls = get_provider_class("openai")
-        assert provider_cls == OpenAILLM
+        provider_cls = get_provider_class("glm")
+        assert provider_cls == GLMLLM
 
         # インスタンス作成
-        provider = create_provider("openai:gpt-4")
+        provider = create_provider("glm:glm-4-plus")
         assert isinstance(provider, provider_cls)
 
     def test_all_registered_providers_can_be_created(self):
         """全登録プロバイダーがインスタンス化可能"""
         test_models = {
-            "openai": "gpt-4",
-            "gemini": "gemini-pro",
-            "kimi": "moonshot-v1",
-            "anthropic": "claude-3",
-            "deepseek": "deepseek-coder",
-            "local": "llama-2",
+            "glm": "glm-4-plus",
+            "minimax": "minimax-m2.7",
         }
 
         for family, model in test_models.items():
@@ -286,12 +193,12 @@ class TestProviderFactoryIntegration:
     def test_create_provider_model_name_extraction(self):
         """モデル名抽出のテスト"""
         # コロン形式
-        provider1 = create_provider("openai:gpt-4-turbo")
-        assert isinstance(provider1, OpenAILLM)
+        provider1 = create_provider("glm:glm-4-plus")
+        assert isinstance(provider1, GLMLLM)
 
         # 接頭辞による推論
-        provider2 = create_provider("gpt-4-turbo")
-        assert isinstance(provider2, OpenAILLM)
+        provider2 = create_provider("glm-4-plus")
+        assert isinstance(provider2, GLMLLM)
 
         # 両方とも同じプロバイダー型
         assert type(provider1) is type(provider2)
@@ -302,28 +209,27 @@ class TestProviderFactoryIntegration:
         with pytest.raises(ValueError, match="Unsupported"):
             get_provider_class("nonexistent")
 
-        # create_providerでは未知モデルはlocalにフォールバック
+        # create_providerでは未知モデルはglmにフォールバック
         provider = create_provider("nonexistent:model")
-        assert isinstance(provider, LocalLLM)
+        assert isinstance(provider, GLMLLM)
 
     def test_case_sensitivity_consistency(self):
         """大文字小文字の一貫性"""
         # 小文字のみサポート
-        assert get_provider_class("openai") == OpenAILLM
+        assert get_provider_class("glm") == GLMLLM
 
         # 大文字は失敗
         with pytest.raises(ValueError):
-            get_provider_class("OPENAI")
+            get_provider_class("GLM")
 
     def test_provider_instantiation_with_different_models(self):
         """異なるモデル名でのインスタンス化"""
         models = [
-            "openai:gpt-4",
-            "openai:gpt-3.5-turbo",
-            "gemini:gemini-pro",
-            "gemini:gemini-ultra",
-            "claude-3-opus",
-            "claude-3-sonnet",
+            "glm:glm-4-plus",
+            "glm:glm-4-flash",
+            "glm:glm-5.1",
+            "minimax:minimax-m2.7",
+            "minimax:MiniMax-M2.7",
         ]
 
         for model in models:

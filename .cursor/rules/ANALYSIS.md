@@ -50,18 +50,15 @@
 
 #### LLM モデルの分類
 - **nexuscore-llm-routing.mdc**:
-  - Primary: gpt-5.1, gpt-5.1-codex
-  - Secondary: claude-4.5-sonnet, gemini-3.0-pro, deepseek-r1
-  - Fallback: gpt-5.1-mini, gpt-5-nano
+  - Primary: glm_codex (glm-4-plus), glm_strict (glm-4-plus)
+  - Secondary: minimax_analytical (M2.7), minimax_default (M2.7)
+  - Lightweight: glm_nano (glm-4-flash)
 - **nexuscore-starter-rules.mdc**:
-  - Primary: gpt-5.1, gpt-5.1-codex, gpt-5.1-mini, gpt-5-pro, gpt-5-nano
-  - Secondary: claude-3.5, gemini-pro, deepseek-r1, Qwen, Yi, Llama
+  - Primary: glm_codex, glm_strict, glm_default
+  - Secondary: minimax_analytical, minimax_default
+  - Lightweight: glm_nano
 
-**評価**: **矛盾あり**。モデル名が異なる：
-- `nexuscore-llm-routing.mdc`: claude-4.5-sonnet, gemini-3.0-pro
-- `nexuscore-starter-rules.mdc`: claude-3.5, gemini-pro
-
-**推奨**: `nexuscore-llm-routing.mdc` を基準に統一（より新しいバージョン）。
+**評価**: 一致。GLM/MiniMaxデュアルプロバイダー構成に統一済み。
 
 ### 5. コード生成ルールの重複
 
@@ -109,10 +106,7 @@
 
 ### 🔴 重大な矛盾
 
-1. **LLM モデル名の不一致**
-   - `nexuscore-llm-routing.mdc`: claude-4.5-sonnet, gemini-3.0-pro
-   - `nexuscore-starter-rules.mdc`: claude-3.5, gemini-pro
-   - **推奨**: `nexuscore-llm-routing.mdc` を基準に統一
+1. ~~**LLM モデル名の不一致**~~ → **解決済み**（GLM/MiniMaxに統一完了）
 
 ### ⚠️ 重複（統一推奨）
 

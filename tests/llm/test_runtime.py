@@ -13,10 +13,8 @@ def test_current_diagnostics_reflects_http_flag(monkeypatch):
 
 def test_log_runtime_status_emits_summary(monkeypatch, caplog):
     dummy_config = LLMRouterConfig(
-        openai_api_key=None,
-        gemini_api_key=None,
-        deepseek_api_key=None,
-        kimi_api_key=None,
+        glm_api_key=None,
+        minimax_api_key=None,
         request_timeout=42.0,
         dry_run=True,
         real_calls_enabled=False,

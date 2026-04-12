@@ -1,5 +1,7 @@
 """
 Routing policy utilities and task-model mappings for LLMRouter.
+
+NexusCore routes exclusively through GLM (Zhipu AI) and MiniMax providers.
 """
 
 from __future__ import annotations
@@ -14,30 +16,19 @@ TASK_MODEL_MAP_DEFAULT: dict[str, dict[str, Any]] = build_task_model_map_dict()
 def model_family(name: str) -> str:
     """Return provider family string based on a model identifier."""
     n = name.lower()
-    if n in {"openai", "google", "anthropic", "deepseek", "kimi", "gemini", "local", "glm", "minimax"}:
-        return {"google": "gemini"}.get(n, n)
+    if n in {"glm", "minimax"}:
+        return n
     if ":" in n:
         vendor, model = n.split(":", 1)
-        if vendor in {"openai", "google", "anthropic", "deepseek", "kimi", "local", "glm", "minimax"}:
-            return {"google": "gemini"}.get(vendor, vendor)
+        if vendor in {"glm", "minimax"}:
+            return vendor
         n = model
-    if n.startswith(("gpt-", "o", "openai-")):
-        return "openai"
-    if n.startswith("gemini"):
-        return "gemini"
-    if n.startswith("deepseek"):
-        return "deepseek"
-    if n.startswith("kimi"):
-        return "kimi"
-    if n.startswith(("claude", "anthropic")):
-        return "anthropic"
     if n.startswith(("glm-", "chatglm")):
         return "glm"
     if n.startswith("minimax"):
         return "minimax"
-    if n.startswith(("llama", "local")):
-        return "local"
-    return "local"
+    # Unknown providers are routed to glm as default
+    return "glm"
 
 
 def split_provider(model_name: str) -> tuple[str, str]:

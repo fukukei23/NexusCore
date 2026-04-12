@@ -20,14 +20,14 @@ from pathlib import Path
 from typing import Any
 
 # -------- コスト表（概算, JPY/1k tokens）--------------------------------------
-# 必要なら環境変数で上書き（例: NPE_COST_OPENAI_GPT5_PROMPT=1.5）
+# NexusCore uses GLM (Zhipu AI) and MiniMax as the sole LLM providers.
+# 必要なら環境変数で上書き（例: NPE_COST_GLM_4_PLUS_PROMPT=1.5）
 DEFAULT_COST_TABLE = {
-    "gpt-5": {"prompt": 1.6, "completion": 5.0},
-    "gpt-5-mini": {"prompt": 0.2, "completion": 0.6},
-    "gemini-2.5-pro": {"prompt": 1.2, "completion": 3.0},
-    "gemini-2.5-flash": {"prompt": 0.15, "completion": 0.30},
-    "kimi-k2-turbo-preview": {"prompt": 0.20, "completion": 0.40},
-    "deepseek-coder": {"prompt": 0.14, "completion": 0.28},
+    "glm-4-plus": {"prompt": 0.5, "completion": 0.5},
+    "glm-4-flash": {"prompt": 0.1, "completion": 0.1},
+    "glm-5.1": {"prompt": 0.5, "completion": 0.5},
+    "minimax-m2.7": {"prompt": 0.3, "completion": 0.3},
+    "MiniMax-M2.7": {"prompt": 0.3, "completion": 0.3},
 }
 
 
@@ -41,7 +41,7 @@ def _cost(model: str, kind: str) -> float:
             return float(os.environ[key])
         except Exception:
             pass
-    return DEFAULT_COST_TABLE.get(model, DEFAULT_COST_TABLE["gpt-5"]).get(kind, 1.0)
+    return DEFAULT_COST_TABLE.get(model, DEFAULT_COST_TABLE["glm-4-plus"]).get(kind, 1.0)
 
 
 # -------- 設定 ----------------------------------------------------------------
