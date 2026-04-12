@@ -1,53 +1,37 @@
 # src/modules/chat_handler.py
 
 import os
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import Any
 
+import requests
 from dotenv import load_dotenv
 
-if TYPE_CHECKING:
-    from openai import OpenAI
-    from openai.types.chat import ChatCompletionMessageParam
-else:
-    try:
-        from openai import OpenAI
-    except Exception:  # pragma: no cover - fallback when openai is not installed
-        OpenAI = None  # type: ignore[assignment,misc]
-
-# .env 読み込みは遅延のためここだけ（クライアント生成は関数内で行う）
 load_dotenv()
-_client: Optional["OpenAI"] = None
 
 
-def get_client() -> "OpenAI":
-    """
-    Instantiate OpenAI client lazily to avoid import-time failures when API key is absent.
-    Raises a clear error if key or library is missing.
-    """
-    global _client
-    if _client is not None:
-        return _client
-    if OpenAI is None:
-        raise RuntimeError("openai SDK is not installed. Please install `openai`.")
-    api_key = os.getenv("OPENAI_API_KEY")
+def _call_minimax(messages: list[dict], temperature: float = 0.2) -> str:
+    """Call MiniMax chat completions API via HTTP."""
+    api_key = os.getenv("MINIMAX_API_KEY")
+    api_base = os.getenv("MINIMAX_API_BASE", "https://api.minimax.chat/v1")
+    model = os.getenv("MINIMAX_MODEL", "MiniMax-M2.7")
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set. Provide it via env or .env file.")
-    _client = OpenAI(api_key=api_key)
-    return _client
+        raise RuntimeError("MINIMAX_API_KEY is not set. Provide it via env or .env file.")
+    response = requests.post(
+        f"{api_base}/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"model": model, "messages": messages, "temperature": temperature},
+        timeout=120,
+    )
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"].strip()
 
 
-# チャット履歴を元にGPT応答を取得（LLM Router 未統合版）
+# チャット履歴を元にMiniMax応答を取得
 def handle_chat(message: str, history: list[dict[str, Any]]) -> tuple[str | None, list[dict[str, Any]]]:
-    """
-    Keep lazy client creation so import時にAPIキーが無くてもテストを落とさない。
-    """
+    """チャット履歴を元にMiniMax応答を取得"""
     try:
-        client = get_client()
         history.append({"role": "user", "content": message})
-        # Cast to satisfy OpenAI API type requirements
-        messages = cast("list[ChatCompletionMessageParam]", history)
-        response = client.chat.completions.create(model="gpt-4", messages=messages)
-        assistant_msg = (response.choices[0].message.content or "").strip()
+        assistant_msg = _call_minimax(history)
         history.append({"role": "assistant", "content": assistant_msg})
         return assistant_msg, history
     except Exception as e:  # pragma: no cover - error path for runtime failures
