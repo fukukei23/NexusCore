@@ -17,7 +17,8 @@ class MiniMaxLLM(BaseLLM):
     """
 
     def __init__(self, model_name: str):
-        super().__init__(model_name)
+        env_model = os.getenv("MINIMAX_MODEL")
+        super().__init__(env_model or model_name)
         self.api_key = os.getenv("MINIMAX_API_KEY")
         http_available = HTTP_CLIENT_FACTORY.available
         self.real_calls = _real_call_enabled(self.api_key) and http_available
@@ -26,7 +27,7 @@ class MiniMaxLLM(BaseLLM):
             self.real_calls = False
 
         self.base_url = (
-            os.getenv("MINIMAX_BASE_URL") or "https://api.minimax.chat/v1"
+            os.getenv("MINIMAX_API_BASE") or os.getenv("MINIMAX_BASE_URL") or "https://api.minimax.chat/v1"
         ).rstrip("/")
 
         if self.real_calls:
