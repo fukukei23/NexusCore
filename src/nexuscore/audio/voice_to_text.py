@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import TypeAlias
 
 import numpy as np
-import openai
+import requests
 import sounddevice as sd
 from dotenv import load_dotenv
 from scipy.io.wavfile import write
@@ -34,7 +34,6 @@ except Exception:  # pragma: no cover - optional dependency
 
 logger = logging.getLogger(__name__)
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
 
 AudioInput: TypeAlias = str | bytes | np.ndarray
 StreamFactory: TypeAlias = Callable[
@@ -52,7 +51,7 @@ _MODEL_STATE = {"initialized": False, "loaded": False}
 
 
 def _update_audio_config(config: dict[str, str | int]) -> dict[str, str | int]:
-    """内部設定を書き換えてコピーを返す（直接の外部参照を避ける）。"""
+    """内部設定を書き換えてコピーを返す。"""
     _AUDIO_CONFIG.update(config)
     return dict(_AUDIO_CONFIG)
 
@@ -76,7 +75,6 @@ def _reset_model_state() -> None:
 _translate_client: google_translate.Client | None = None
 _whisper_client: WhisperClient | None = None
 
-# NOTE: 下記には内部ユーティリティも含まれるが、後方互換のため __all__ からは削除しない。
 __all__ = [
     "record_until_keypress",
     "transcribe",
@@ -124,14 +122,18 @@ __all__ = [
 
 
 class WhisperClient:
-    """Thin wrapper around the OpenAI Whisper API with graceful degradation."""
+    """Thin wrapper around audio transcription API with graceful degradation.
+
+    Uses HTTP requests to call the configured API endpoint for audio transcription.
+    Set WHISPER_API_BASE and WHISPER_API_KEY environment variables to configure.
+    Falls back gracefully when not configured.
+    """
 
     def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = api_key or os.getenv("WHISPER_API_KEY") or os.getenv("MINIMAX_API_KEY")
+        self.api_base = os.getenv("WHISPER_API_BASE", os.getenv("MINIMAX_API_BASE", "https://api.minimax.chat/v1"))
         self.model = model or os.getenv("WHISPER_MODEL", "whisper-1")
         self.default_language = os.getenv("WHISPER_LANGUAGE", "ja")
-        if self.api_key:
-            openai.api_key = self.api_key
 
     @property
     def ready(self) -> bool:
@@ -139,22 +141,28 @@ class WhisperClient:
         return bool(self.api_key)
 
     def transcribe_file(self, audio_path: str, *, language: str | None = None) -> str | None:
+        """Transcribe audio file via HTTP request to the configured API endpoint."""
         if not self.ready:
-            logger.warning("OpenAI API キーが設定されていないため、Whisper を利用できません。")
+            logger.warning("API キーが設定されていないため、音声認識を利用できません。")
             return None
         lang = language or self.default_language
         try:
             with open(audio_path, "rb") as audio_file:
-                response = openai.audio.transcriptions.create(  # type: ignore[call-overload]
-                    model=self.model,
-                    file=audio_file,
-                    language=lang,
-                    response_format="text",
+                response = requests.post(
+                    f"{self.api_base}/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    files={"file": (os.path.basename(audio_path), audio_file)},
+                    data={"model": self.model, "language": lang, "response_format": "text"},
+                    timeout=60,
                 )
+            if response.status_code == 404:
+                logger.warning("音声認識エンドポイントが見つかりません。GLM/MiniMaxではWhisper APIがサポートされていない可能性があります。")
+                return None
+            response.raise_for_status()
+            return response.text.strip()
         except Exception as exc:  # pragma: no cover - runtime failure path
-            logger.error("Whisper transcription に失敗しました: %s (%r)", exc, exc)
+            logger.error("音声認識に失敗しました: %s (%r)", exc, exc)
             return None
-        return response
 
 
 def _get_whisper_client() -> WhisperClient:
@@ -207,15 +215,7 @@ def record_until_keypress(
     input_func: Callable[[], str] = input,
     stream_factory: StreamFactory | None = None,
 ) -> tuple[np.ndarray | None, int]:
-    """Record audio until Enter is pressed or the timeout hits.
-
-    Parameters
-    ----------
-    max_duration: 秒数上限。
-    sample_rate: 録音レート。None の場合は設定から取得。
-    input_func: テスト時に置き換え可能な入力関数。
-    stream_factory: sounddevice.InputStream を差し替えるためのファクトリ。
-    """
+    """Record audio until Enter is pressed or the timeout hits."""
 
     sr = int(sample_rate or _AUDIO_CONFIG["sample_rate"])
     recording: list[np.ndarray] = []

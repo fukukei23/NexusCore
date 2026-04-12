@@ -5,37 +5,32 @@ import os
 import re
 import subprocess
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
 
 import gradio as gr
+import requests
 from dotenv import load_dotenv
 
-if TYPE_CHECKING:
-    from openai import OpenAI
-else:
-    try:
-        from openai import OpenAI
-    except Exception:  # pragma: no cover - when openai is missing
-        OpenAI = None  # type: ignore[assignment,misc]
+load_dotenv()
+
+
+def _call_minimax(messages: list[dict], temperature: float = 0.2) -> str:
+    """Call MiniMax chat completions API via HTTP."""
+    api_key = os.getenv("MINIMAX_API_KEY")
+    api_base = os.getenv("MINIMAX_API_BASE", "https://api.minimax.chat/v1")
+    model = os.getenv("MINIMAX_MODEL", "MiniMax-M2.7")
+    if not api_key:
+        raise RuntimeError("MINIMAX_API_KEY is not set. Provide it via env or .env file.")
+    response = requests.post(
+        f"{api_base}/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"model": model, "messages": messages, "temperature": temperature},
+        timeout=120,
+    )
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"].strip()
+
 
 # === 設定と初期化 ===
-load_dotenv()
-_client: Optional["OpenAI"] = None
-
-
-def get_client() -> "OpenAI":
-    """Lazy-load OpenAI client to avoid import時のAPIキー不足で落ちるのを防ぐ。"""
-    global _client
-    if _client is not None:
-        return _client
-    if OpenAI is None:
-        raise RuntimeError("openai SDK is not installed. Please install `openai`.")
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set. Provide it via env or .env file.")
-    _client = OpenAI(api_key=api_key)
-    return _client
-
 
 # === パス設定 ===
 SANDBOX_DIR = "../sandbox_output"
@@ -68,7 +63,7 @@ def run_pytest():
         return f"⚠️ pytest execution failed: {e}"
 
 
-# === GPTプロンプト生成 ===
+# === プロンプト生成 ===
 def generate_prompt(
     main_file, related_files, version_summary, history_summary, failed_tests, user_instruction
 ):
@@ -102,7 +97,7 @@ def generate_prompt(
 """
 
 
-# === GPT呼び出しとコード抽出 ===
+# === LLM呼び出しとコード抽出 ===
 def extract_code_and_reason(full_response):
     code_match = re.search(r"```(?:python)?\n(.*?)```", full_response, re.DOTALL)
     reason_match = re.split(r"```.*?```", full_response, maxsplit=1, flags=re.DOTALL)
@@ -111,12 +106,8 @@ def extract_code_and_reason(full_response):
     return code, reason
 
 
-def call_gpt(prompt):
-    client = get_client()
-    response = client.chat.completions.create(
-        model="gpt-4", messages=[{"role": "user", "content": prompt}], temperature=0
-    )
-    return response.choices[0].message.content.strip()
+def call_llm(prompt):
+    return _call_minimax([{"role": "user", "content": prompt}], temperature=0)
 
 
 # === 履歴保存 ===
@@ -156,8 +147,8 @@ with gr.Blocks() as demo:
         prompt = generate_prompt(
             "sample.py", "test_sample.py", version_summary, history, fail_log, user_note
         )
-        gpt_response = call_gpt(prompt)
-        code, reason = extract_code_and_reason(gpt_response)
+        llm_response = call_llm(prompt)
+        code, reason = extract_code_and_reason(llm_response)
         return code, reason, prompt
 
     def apply_patch(generated_code, reason, prompt):
