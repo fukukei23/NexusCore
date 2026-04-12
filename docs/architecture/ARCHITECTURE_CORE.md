@@ -40,11 +40,8 @@ graph TB
         Tier2[Tier 2: Mutation Testing]
     end
 
-    ModelPool --> OpenAI[OpenAI GPT]
-    ModelPool --> Anthropic[Anthropic Claude]
-    ModelPool --> DeepSeek[DeepSeek]
-    ModelPool --> Gemini[Google Gemini]
-    ModelPool --> Kimi[Kimi]
+    ModelPool --> GLM[GLM (Zhipu AI)]
+    ModelPool --> MiniMax[MiniMax]
 
     Tier1 --> Coverage[Coverage Analysis]
     Tier1 --> Pylint[Pylint]
@@ -362,11 +359,8 @@ src/nexuscore/
 - Python 3.11+
 
 **AI/LLM:**
-- OpenAI GPT (GPT-5.1, GPT-5.1-Codex, GPT-5.1-Mini)
-- Anthropic Claude (Claude 4.5 Sonnet)
-- DeepSeek (DeepSeek R1)
-- Google Gemini (Gemini 3.0 Pro)
-- Kimi
+- GLM (Zhipu AI) (GLM-4-Plus, GLM-4-Flash)
+- MiniMax (MiniMax-M2.7)
 
 **Testing:**
 - pytest

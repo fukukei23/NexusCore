@@ -5,18 +5,30 @@ import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
 
 import gradio as gr
+import requests
 from dotenv import load_dotenv
 
-if TYPE_CHECKING:
-    from openai import OpenAI
-else:
-    try:
-        from openai import OpenAI
-    except Exception:  # pragma: no cover - openai missing
-        OpenAI = None  # type: ignore[assignment,misc]
+load_dotenv()
+
+
+def _call_minimax(messages: list[dict], temperature: float = 0.2) -> str:
+    """Call MiniMax chat completions API via HTTP."""
+    api_key = os.getenv("MINIMAX_API_KEY")
+    api_base = os.getenv("MINIMAX_API_BASE", "https://api.minimax.chat/v1")
+    model = os.getenv("MINIMAX_MODEL", "MiniMax-M2.7")
+    if not api_key:
+        raise RuntimeError("MINIMAX_API_KEY is not set. Provide it via env or .env file.")
+    response = requests.post(
+        f"{api_base}/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"model": model, "messages": messages, "temperature": temperature},
+        timeout=120,
+    )
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"].strip()
+
 
 # パスはプロジェクトルート基準に統一（他UIと同様の sandbox/logs を想定）
 HERE = Path(__file__).resolve()
@@ -29,34 +41,11 @@ LOG_FILE = LOG_DIR / "save_log.txt"
 SANDBOX_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-load_dotenv()
-_client: Optional["OpenAI"] = None
 
-
-def get_client() -> "OpenAI":
-    """
-    Lazy-load OpenAI client so import時にAPIキーがなくても落ちない。
-    """
-    global _client
-    if _client is not None:
-        return _client
-    if OpenAI is None:
-        raise RuntimeError("openai SDK is not installed. Please install `openai`.")
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set. Provide it via env or .env file.")
-    _client = OpenAI(api_key=api_key)
-    return _client
-
-
-# === GPT呼び出し ===
+# === LLM呼び出し ===
 def call_gpt(prompt: str) -> str:
-    """Call OpenAI chat completions for a given prompt (model fixed to gpt-4)."""
-    client = get_client()
-    response = client.chat.completions.create(
-        model="gpt-4", messages=[{"role": "user", "content": prompt}], temperature=0
-    )
-    return (response.choices[0].message.content or "").strip()
+    """Call MiniMax chat completions for a given prompt."""
+    return _call_minimax([{"role": "user", "content": prompt}], temperature=0)
 
 
 # === コードと理由の抽出 ===

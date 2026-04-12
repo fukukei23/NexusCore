@@ -8,39 +8,31 @@ import os
 import re
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import gradio as gr
+import requests
 from dotenv import load_dotenv
-
-if TYPE_CHECKING:
-    from openai import OpenAI
-else:
-    try:
-        from openai import OpenAI
-    except Exception:  # pragma: no cover - openai missing
-        OpenAI = None  # type: ignore[assignment,misc]
 
 # ====== 設定・クライアント =====================================================
 
 load_dotenv()
-_client = None
 
 
-def get_client():
-    """
-    Lazy-load OpenAI client so import時にAPIキーが無くても落ちない。
-    """
-    global _client
-    if _client is not None:
-        return _client
-    if OpenAI is None:
-        raise RuntimeError("openai SDK is not installed. Please install `openai`.")
-    api_key = os.getenv("OPENAI_API_KEY")
+def _call_minimax(messages: list[dict], temperature: float = 0.2) -> str:
+    """Call MiniMax chat completions API via HTTP."""
+    api_key = os.getenv("MINIMAX_API_KEY")
+    api_base = os.getenv("MINIMAX_API_BASE", "https://api.minimax.chat/v1")
+    model = os.getenv("MINIMAX_MODEL", "MiniMax-M2.7")
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set. Provide it via env or .env file.")
-    _client = OpenAI(api_key=api_key)
-    return _client
+        raise RuntimeError("MINIMAX_API_KEY is not set. Provide it via env or .env file.")
+    response = requests.post(
+        f"{api_base}/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"model": model, "messages": messages, "temperature": temperature},
+        timeout=120,
+    )
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"].strip()
 
 
 ROOT = Path(__file__).resolve().parents[2]  # リポジトリルート（src/ の2つ上）
@@ -77,11 +69,8 @@ def generate_unit_test(code: str) -> str:
 **`sample.py` から `is_prime` 関数をインポートする行を含めてください。**
 """.strip()
 
-    client = get_client()
-    rsp = client.chat.completions.create(
-        model="gpt-4", messages=[{"role": "user", "content": prompt}], temperature=0
-    )
-    return extract_code(rsp.choices[0].message.content.strip())
+    rsp = _call_minimax([{"role": "user", "content": prompt}], temperature=0)
+    return extract_code(rsp)
 
 
 def save_test_code(code: str) -> None:
@@ -134,7 +123,7 @@ def process_code(code: str):
 def build_ui() -> gr.Blocks:
     with gr.Blocks(theme=gr.themes.Soft(), fill_height=True) as demo:
         gr.Markdown("## ✅ Python関数 → ユニットテスト自動生成＆実行")
-        gr.Markdown("ChatGPT が pytest 形式のテストコードを生成し、自動で実行します。")
+        gr.Markdown("MiniMax が pytest 形式のテストコードを生成し、自動で実行します。")
 
         with gr.Row():
             with gr.Column():

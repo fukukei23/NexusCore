@@ -2,7 +2,7 @@
 # ファイル名: revision_tab.py
 # レジストリ: src/nexuscore/gradio_app/
 # 日付: 2025-09-07
-# バージョン: 2.5 (完全版: 旧テキスト履歴維持 + JSON履歴併記 + (bool,str)pytest)
+# バージョン: 2.6 (GLM/MiniMax移行版)
 #
 # 概要:
 #  - auto_revision_runner.py が import する関数群を提供（互換重視）。
@@ -14,12 +14,16 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import subprocess
 from pathlib import Path
 
 import gradio as gr
+import requests
+
+logger = logging.getLogger(__name__)
 
 # ---------- パス ----------
 HERE = Path(__file__).resolve()
@@ -45,6 +49,24 @@ HISTORY_TXT = str(SANDBOX_DIR / "patch_history.txt")
 # タイムライン用 JSON はプロジェクト直下（Runner と一致）
 PATCH_HISTORY_DIR = PROJECT_ROOT / "patch_history"
 os.makedirs(PATCH_HISTORY_DIR, exist_ok=True)
+
+
+# ---------- LLM 呼び出し（MiniMax HTTP） ----------
+def _call_minimax(messages: list[dict], temperature: float = 0.2) -> str:
+    """Call MiniMax chat completions API via HTTP."""
+    api_key = os.getenv("MINIMAX_API_KEY")
+    api_base = os.getenv("MINIMAX_API_BASE", "https://api.minimax.chat/v1")
+    model = os.getenv("MINIMAX_MODEL", "MiniMax-M2.7")
+    if not api_key:
+        raise RuntimeError("MINIMAX_API_KEY is not set.")
+    response = requests.post(
+        f"{api_base}/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"model": model, "messages": messages, "temperature": temperature},
+        timeout=120,
+    )
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"].strip()
 
 
 # ---------- 互換ユーティリティ ----------
@@ -180,24 +202,16 @@ def extract_code_and_reason(response: str) -> tuple[str, str]:
 # ---------- LLM 呼び出し（安全フォールバック付き） ----------
 def call_gpt(prompt: str) -> str:
     """
-    - OPENAI_API_KEY があれば OpenAI API を使う
+    - MINIMAX_API_KEY があれば MiniMax API を使う
     - 無ければ簡易フォールバックの修正案を返す（is_prime の 2 対応など）
     """
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("MINIMAX_API_KEY")
     if api_key:
         try:
-            from openai import OpenAI
-
-            client = OpenAI(api_key=api_key)
-            rsp = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-            )
-            return (rsp.choices[0].message.content or "").strip()
+            return _call_minimax([{"role": "user", "content": prompt}], temperature=0.2)
         except Exception:
             # API失敗時はフォールバック
-            pass
+            logger.warning("MiniMax API failed, using fallback", exc_info=True)
 
     # フォールバック出力（is_prime の典型修正）
     fallback_code = """def is_prime(n):

@@ -1,48 +1,39 @@
 # modules/code_generator.py
 
 import os
-from typing import TYPE_CHECKING, Optional
 
+import requests
 from dotenv import load_dotenv
 
-if TYPE_CHECKING:
-    from openai import OpenAI
-else:
-    try:
-        from openai import OpenAI
-    except Exception:  # pragma: no cover - fallback when openai is missing
-        OpenAI = None  # type: ignore[assignment,misc]
-
-# .env 読み込みのみ先に済ませ、クライアント生成は遅延させる
 load_dotenv()
-_client: Optional["OpenAI"] = None
 
 
-def get_client() -> "OpenAI":
-    """
-    Lazily create OpenAI client to avoid import-time API key errors.
-    """
-    global _client
-    if _client is not None:
-        return _client
-    if OpenAI is None:
-        raise RuntimeError("openai SDK is not installed. Please install `openai`.")
-    api_key = os.getenv("OPENAI_API_KEY")
+def _call_minimax(messages: list[dict], temperature: float = 0.2) -> str:
+    """Call MiniMax chat completions API via HTTP."""
+    api_key = os.getenv("MINIMAX_API_KEY")
+    api_base = os.getenv("MINIMAX_API_BASE", "https://api.minimax.chat/v1")
+    model = os.getenv("MINIMAX_MODEL", "MiniMax-M2.7")
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set. Provide it via env or .env file.")
-    _client = OpenAI(api_key=api_key)
-    return _client
+        raise RuntimeError("MINIMAX_API_KEY is not set. Provide it via env or .env file.")
+    response = requests.post(
+        f"{api_base}/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"model": model, "messages": messages, "temperature": temperature},
+        timeout=120,
+    )
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"].strip()
 
 
 def generate_code_from_text(natural_text: str) -> str:
     """
-    自然言語から関数名付きのPythonコードをGPTで生成
+    自然言語から関数名付きのPythonコードをMiniMaxで生成
 
     Parameters:
         natural_text (str): ユーザーの意図や実装希望内容の自然文
 
     Returns:
-        str: GPTによるPythonコード（コードブロック付き）
+        str: MiniMaxによるPythonコード（コードブロック付き）
     """
     prompt = f"""
 以下の説明に基づいて、関数名・ドキュメント付きのPython関数コードを生成してください。
@@ -56,10 +47,6 @@ def generate_code_from_text(natural_text: str) -> str:
 
 """
     try:
-        client = get_client()
-        response = client.chat.completions.create(
-            model="gpt-4", messages=[{"role": "user", "content": prompt}], temperature=0.2
-        )
-        return (response.choices[0].message.content or "").strip()
+        return _call_minimax([{"role": "user", "content": prompt}], temperature=0.2)
     except Exception as e:  # pragma: no cover - error path for runtime failures
-        return f"⚠️ GPT code generation failed: {e}"
+        return f"⚠️ MiniMax code generation failed: {e}"

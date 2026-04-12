@@ -6,7 +6,6 @@
 # ===================================================
 
 # --- Core AI and Machine Learning ---
-openai>=1.30.0,<2.0.0
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.2.2+cpu
 tensorflow>=2.14.0,<3.0.0

@@ -1,6 +1,6 @@
 """
 Comprehensive tests for test_generator module.
-Tests pytest test code generation engine with LLM and template modes.
+Tests pytest test code generation engine with MiniMax HTTP and template modes.
 """
 
 import os
@@ -12,8 +12,8 @@ import pytest
 from nexuscore.utils.test_generator import (
     DEFAULT_CONFIG,
     TestGenConfig,
+    _call_minimax,
     _env_flag,
-    _get_client,
     _try_generate_tests_with_llm,
     generate_and_validate_test_code,
     generate_template_tests,
@@ -117,62 +117,56 @@ class TestEnvFlag:
 
 
 # ==============================================================================
-# _get_client Tests
+# _call_minimax Tests
 # ==============================================================================
 
 
-class TestGetClient:
-    """Test _get_client function"""
+class TestCallMinimax:
+    """Test _call_minimax function (MiniMax HTTP)"""
 
-    @pytest.fixture(autouse=True)
-    def reset_client(self):
-        """Reset global _client before each test"""
-        import nexuscore.utils.test_generator as tg
-
-        tg._client = None
-        yield
-        tg._client = None
-
-    @patch("nexuscore.utils.test_generator.HAS_OPENAI", True)
-    @patch("nexuscore.utils.test_generator.OpenAI")
-    def test_get_client_creates_client(self, mock_openai_class):
-        """Creates OpenAI client with API key"""
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
-
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-            client = _get_client()
-
-        assert client == mock_client
-        mock_openai_class.assert_called_once_with(api_key="test-key")
-
-    @patch("nexuscore.utils.test_generator.HAS_OPENAI", True)
-    @patch("nexuscore.utils.test_generator.OpenAI")
-    def test_get_client_lazy_initialization(self, mock_openai_class):
-        """Client is only created once (lazy initialization)"""
-        mock_client = MagicMock()
-        mock_openai_class.return_value = mock_client
-
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-            client1 = _get_client()
-            client2 = _get_client()
-
-        assert client1 == client2
-        # OpenAI should only be called once
-        assert mock_openai_class.call_count == 1
-
-    @patch("nexuscore.utils.test_generator.HAS_OPENAI", False)
-    def test_get_client_no_openai_package(self):
-        """Raises ImportError when openai package not installed"""
-        with pytest.raises(ImportError, match="openai package is not installed"):
-            _get_client()
-
-    @patch("nexuscore.utils.test_generator.HAS_OPENAI", True)
-    def test_get_client_no_api_key(self):
-        """Raises ValueError when API key not set"""
+    def test_call_minimax_no_api_key_raises(self):
+        """Raises ValueError when MINIMAX_API_KEY not set"""
         with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(ValueError, match="OPENAI_API_KEY"):
-                _get_client()
+            with pytest.raises(ValueError, match="MINIMAX_API_KEY"):
+                _call_minimax([{"role": "user", "content": "test"}])
+
+    @patch("nexuscore.utils.test_generator.requests.post")
+    def test_call_minimax_success(self, mock_post):
+        """Successfully calls MiniMax API"""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": "test response"}}]}
+        mock_response.raise_for_status = MagicMock()
+        mock_post.return_value = mock_response
+
+        with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}):
+            result = _call_minimax([{"role": "user", "content": "test"}])
+
+        assert result == "test response"
+        mock_post.assert_called_once()
+
+    @patch("nexuscore.utils.test_generator.requests.post")
+    def test_call_minimax_sends_correct_payload(self, mock_post):
+        """Sends correct model and messages"""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": "ok"}}]}
+        mock_response.raise_for_status = MagicMock()
+        mock_post.return_value = mock_response
+
+        with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}):
+            _call_minimax([{"role": "user", "content": "hello"}], temperature=0.5)
+
+        call_kwargs = mock_post.call_args
+        assert call_kwargs[1]["json"]["model"] == "MiniMax-M2.7"
+        assert call_kwargs[1]["json"]["temperature"] == 0.5
+
+    @patch("nexuscore.utils.test_generator.requests.post")
+    def test_call_minimax_api_error_raises(self, mock_post):
+        """Raises on API error"""
+        mock_post.side_effect = Exception("API error")
+
+        with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}):
+            with pytest.raises(Exception, match="API error"):
+                _call_minimax([{"role": "user", "content": "test"}])
 
 
 # ==============================================================================
@@ -322,15 +316,6 @@ class MyClass:
 class TestTryGenerateTestsWithLLM:
     """Test _try_generate_tests_with_llm function"""
 
-    @pytest.fixture(autouse=True)
-    def reset_client(self):
-        """Reset global _client"""
-        import nexuscore.utils.test_generator as tg
-
-        tg._client = None
-        yield
-        tg._client = None
-
     def test_llm_disabled_returns_template(self):
         """Returns template when LLM disabled"""
         config = TestGenConfig(use_llm=False)
@@ -341,60 +326,36 @@ class TestTryGenerateTestsWithLLM:
 
         assert result == template
 
-    @patch("nexuscore.utils.test_generator.HAS_OPENAI", True)
-    @patch("nexuscore.utils.test_generator.OpenAI")
-    def test_llm_success(self, mock_openai_class):
-        """Successfully generates tests with LLM"""
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "# generated test code"
-        mock_client.chat.completions.create.return_value = mock_response
-        mock_openai_class.return_value = mock_client
+    @patch("nexuscore.utils.test_generator._call_minimax")
+    def test_llm_success(self, mock_call):
+        """Successfully generates tests with MiniMax"""
+        mock_call.return_value = "# generated test code"
 
         config = TestGenConfig(use_llm=True)
         template = "# template"
         code = "def test(): pass"
 
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}):
             result = _try_generate_tests_with_llm(template, code, config)
 
         assert result == "# generated test code"
 
-    @patch("nexuscore.utils.test_generator.HAS_OPENAI", True)
-    @patch("nexuscore.utils.test_generator.OpenAI")
-    def test_llm_empty_response_returns_template(self, mock_openai_class):
-        """Returns template when LLM returns empty response"""
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = None
-        mock_client.chat.completions.create.return_value = mock_response
-        mock_openai_class.return_value = mock_client
+    @patch("nexuscore.utils.test_generator._call_minimax")
+    def test_llm_empty_response_returns_template(self, mock_call):
+        """Returns template when MiniMax returns empty response"""
+        mock_call.return_value = ""
 
         config = TestGenConfig(use_llm=True)
         template = "# template"
         code = "def test(): pass"
 
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}):
             result = _try_generate_tests_with_llm(template, code, config)
 
         assert result == template
 
-    @patch("nexuscore.utils.test_generator.HAS_OPENAI", False)
-    def test_llm_import_error_returns_template(self):
-        """Returns template when openai not available"""
-        config = TestGenConfig(use_llm=True)
-        template = "# template"
-        code = "def test(): pass"
-
-        result = _try_generate_tests_with_llm(template, code, config)
-
-        assert result == template
-
-    @patch("nexuscore.utils.test_generator.HAS_OPENAI", True)
     def test_llm_no_api_key_returns_template(self):
-        """Returns template when API key not set"""
+        """Returns template when MINIMAX_API_KEY not set"""
         config = TestGenConfig(use_llm=True)
         template = "# template"
         code = "def test(): pass"
@@ -404,19 +365,16 @@ class TestTryGenerateTestsWithLLM:
 
         assert result == template
 
-    @patch("nexuscore.utils.test_generator.HAS_OPENAI", True)
-    @patch("nexuscore.utils.test_generator.OpenAI")
-    def test_llm_exception_returns_template(self, mock_openai_class):
-        """Returns template when LLM raises exception"""
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.side_effect = Exception("API error")
-        mock_openai_class.return_value = mock_client
+    @patch("nexuscore.utils.test_generator._call_minimax")
+    def test_llm_exception_returns_template(self, mock_call):
+        """Returns template when MiniMax raises exception"""
+        mock_call.side_effect = Exception("API error")
 
         config = TestGenConfig(use_llm=True)
         template = "# template"
         code = "def test(): pass"
 
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}):
             result = _try_generate_tests_with_llm(template, code, config)
 
         assert result == template
@@ -429,15 +387,6 @@ class TestTryGenerateTestsWithLLM:
 
 class TestGenerateUnitTests:
     """Test generate_unit_tests function"""
-
-    @pytest.fixture(autouse=True)
-    def reset_client(self):
-        """Reset global _client"""
-        import nexuscore.utils.test_generator as tg
-
-        tg._client = None
-        yield
-        tg._client = None
 
     def test_generate_unit_tests_with_file_path(self, tmp_path):
         """Generate tests with file path"""
@@ -488,15 +437,6 @@ class TestGenerateUnitTests:
 
 class TestGenerateAndValidateTestCode:
     """Test generate_and_validate_test_code function"""
-
-    @pytest.fixture(autouse=True)
-    def reset_client(self):
-        """Reset global _client"""
-        import nexuscore.utils.test_generator as tg
-
-        tg._client = None
-        yield
-        tg._client = None
 
     def test_validate_generates_valid_code(self, tmp_path):
         """Generates and validates valid test code"""
@@ -557,15 +497,6 @@ def test_example():
 class TestGenerateTestsForModule:
     """Test generate_tests_for_module function"""
 
-    @pytest.fixture(autouse=True)
-    def reset_client(self):
-        """Reset global _client"""
-        import nexuscore.utils.test_generator as tg
-
-        tg._client = None
-        yield
-        tg._client = None
-
     def test_generate_creates_test_file(self, tmp_path):
         """Creates test file for module"""
         module_file = tmp_path / "mymodule.py"
@@ -625,15 +556,6 @@ class TestGenerateTestsForModule:
 class TestTestGeneratorIntegration:
     """Integration tests for test_generator module"""
 
-    @pytest.fixture(autouse=True)
-    def reset_client(self):
-        """Reset global _client"""
-        import nexuscore.utils.test_generator as tg
-
-        tg._client = None
-        yield
-        tg._client = None
-
     def test_end_to_end_template_mode(self, tmp_path):
         """End-to-end test in template mode"""
         # Create module
@@ -688,7 +610,7 @@ def standalone_function():
         assert hasattr(DEFAULT_CONFIG, "max_functions")
 
     def test_fallback_chain(self, tmp_path):
-        """Fallback chain works: LLM -> template"""
+        """Fallback chain works: MiniMax -> template"""
         module_file = tmp_path / "module.py"
         module_file.write_text("def func(): pass")
 
@@ -728,7 +650,7 @@ def standalone_function():
         caplog.set_level(logging.WARNING)
 
         # Generate code that will have warnings
-        code = "def test_example():\n    import os\n    os.system('ls')"
+        code = "def test_example():\n    import subprocess\n    subprocess.run(['ls'])"
 
         with patch("nexuscore.utils.test_generator.generate_unit_tests", return_value=code):
             test_code, is_valid, error, warnings = generate_and_validate_test_code(
@@ -767,15 +689,6 @@ def standalone_function():
 class TestTestGeneratorEdgeCases:
     """Test edge cases for test_generator module"""
 
-    @pytest.fixture(autouse=True)
-    def reset_client(self):
-        """Reset global _client"""
-        import nexuscore.utils.test_generator as tg
-
-        tg._client = None
-        yield
-        tg._client = None
-
     def test_empty_module(self, tmp_path):
         """Handle completely empty module"""
         module_file = tmp_path / "empty.py"
@@ -791,9 +704,9 @@ class TestTestGeneratorEdgeCases:
         module_file = tmp_path / "unicode.py"
         module_file.write_text(
             """
-def 日本語関数():
-    '''日本語のコメント'''
-    return "こんにちは"
+def japanese_function():
+    '''Japanese comment'''
+    return "hello"
 """,
             encoding="utf-8",
         )
