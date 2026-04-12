@@ -14,11 +14,11 @@ TASK_MODEL_MAP_DEFAULT: dict[str, dict[str, Any]] = build_task_model_map_dict()
 def model_family(name: str) -> str:
     """Return provider family string based on a model identifier."""
     n = name.lower()
-    if n in {"openai", "google", "anthropic", "deepseek", "kimi", "gemini", "local"}:
+    if n in {"openai", "google", "anthropic", "deepseek", "kimi", "gemini", "local", "glm", "minimax"}:
         return {"google": "gemini"}.get(n, n)
     if ":" in n:
         vendor, model = n.split(":", 1)
-        if vendor in {"openai", "google", "anthropic", "deepseek", "kimi", "local"}:
+        if vendor in {"openai", "google", "anthropic", "deepseek", "kimi", "local", "glm", "minimax"}:
             return {"google": "gemini"}.get(vendor, vendor)
         n = model
     if n.startswith(("gpt-", "o", "openai-")):
@@ -31,6 +31,10 @@ def model_family(name: str) -> str:
         return "kimi"
     if n.startswith(("claude", "anthropic")):
         return "anthropic"
+    if n.startswith(("glm-", "chatglm")):
+        return "glm"
+    if n.startswith("minimax"):
+        return "minimax"
     if n.startswith(("llama", "local")):
         return "local"
     return "local"

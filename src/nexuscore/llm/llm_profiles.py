@@ -71,6 +71,48 @@ PROFILE_REGISTRY: dict[str, LLMProfile] = {
         description="DeepSeek R1 for cross-checking and long-form reasoning",
         default_temperature=0.2,
     ),
+    "glm_default": LLMProfile(
+        name="glm_default",
+        provider="glm",
+        model="glm-4-plus",
+        description="GLM-4-Plus for general tasks and code generation",
+        default_temperature=0.2,
+    ),
+    "glm_strict": LLMProfile(
+        name="glm_strict",
+        provider="glm",
+        model="glm-4-plus",
+        description="GLM-4-Plus for high-accuracy reasoning and planning",
+        default_temperature=0.15,
+    ),
+    "glm_codex": LLMProfile(
+        name="glm_codex",
+        provider="glm",
+        model="glm-4-plus",
+        description="GLM-4-Plus for code generation and debugging",
+        default_temperature=0.2,
+    ),
+    "glm_nano": LLMProfile(
+        name="glm_nano",
+        provider="glm",
+        model="glm-4-flash",
+        description="GLM-4-Flash for lightweight and fast calls",
+        default_temperature=0.2,
+    ),
+    "minimax_default": LLMProfile(
+        name="minimax_default",
+        provider="minimax",
+        model="minimax-m2.7",
+        description="MiniMax M2.7 for general chat and creative tasks",
+        default_temperature=0.2,
+    ),
+    "minimax_analytical": LLMProfile(
+        name="minimax_analytical",
+        provider="minimax",
+        model="minimax-m2.7",
+        description="MiniMax M2.7 for analytical and structured tasks",
+        default_temperature=0.15,
+    ),
 }
 
 
