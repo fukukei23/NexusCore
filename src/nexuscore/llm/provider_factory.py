@@ -9,7 +9,9 @@ from nexuscore.llm.providers import (
     BaseLLM,
     DeepSeekLLM,
     GeminiLLM,
+    GLMLLM,
     LocalLLM,
+    MiniMaxLLM,
     MoonshotLLM,
     OpenAILLM,
 )
@@ -22,6 +24,8 @@ PROVIDER_CLASSES: dict[str, type[BaseLLM]] = {
     "anthropic": AnthropicLLM,
     "deepseek": DeepSeekLLM,
     "local": LocalLLM,
+    "glm": GLMLLM,
+    "minimax": MiniMaxLLM,
 }
 
 
