@@ -45,7 +45,7 @@ def temp_ledger(tmp_path, monkeypatch):
 def clean_env(monkeypatch):
     """環境変数をクリア"""
     # コスト関連の環境変数を全てクリア
-    for model in ["GPT_5", "GPT_5_MINI", "GEMINI_2_5_PRO", "GEMINI_2_5_FLASH"]:
+    for model in ["GLM_4_PLUS", "GLM_4_FLASH", "GLM_5_1", "MINIMAX_M2_7"]:
         monkeypatch.delenv(f"NPE_COST_{model}_PROMPT", raising=False)
         monkeypatch.delenv(f"NPE_COST_{model}_COMPLETION", raising=False)
 
@@ -66,58 +66,57 @@ def clean_env(monkeypatch):
 class TestCost:
     """_cost() のテスト"""
 
-    def test_cost_default_gpt5_prompt(self, clean_env):
-        """gpt-5 prompt のデフォルトコスト"""
-        cost = _cost("gpt-5", "prompt")
-        assert cost == 1.6
+    def test_cost_default_glm_4_plus_prompt(self, clean_env):
+        """glm-4-plus prompt のデフォルトコスト"""
+        cost = _cost("glm-4-plus", "prompt")
+        assert cost == 0.5
 
-    def test_cost_default_gpt5_completion(self, clean_env):
-        """gpt-5 completion のデフォルトコスト"""
-        cost = _cost("gpt-5", "completion")
-        assert cost == 5.0
+    def test_cost_default_glm_4_plus_completion(self, clean_env):
+        """glm-4-plus completion のデフォルトコスト"""
+        cost = _cost("glm-4-plus", "completion")
+        assert cost == 0.5
 
-    def test_cost_default_gpt5_mini(self, clean_env):
-        """gpt-5-mini のデフォルトコスト"""
-        assert _cost("gpt-5-mini", "prompt") == 0.2
-        assert _cost("gpt-5-mini", "completion") == 0.6
+    def test_cost_default_glm_4_flash(self, clean_env):
+        """glm-4-flash のデフォルトコスト"""
+        assert _cost("glm-4-flash", "prompt") == 0.1
+        assert _cost("glm-4-flash", "completion") == 0.1
 
-    def test_cost_default_gemini_pro(self, clean_env):
-        """gemini-2.5-pro のデフォルトコスト"""
-        assert _cost("gemini-2.5-pro", "prompt") == 1.2
-        assert _cost("gemini-2.5-pro", "completion") == 3.0
+    def test_cost_default_minimax_m27(self, clean_env):
+        """minimax-m2.7 のデフォルトコスト"""
+        assert _cost("minimax-m2.7", "prompt") == 0.3
+        assert _cost("minimax-m2.7", "completion") == 0.3
 
     def test_cost_env_override_prompt(self, clean_env, monkeypatch):
         """環境変数でpromptコストを上書き"""
-        monkeypatch.setenv("NPE_COST_GPT_5_PROMPT", "2.5")
-        cost = _cost("gpt-5", "prompt")
+        monkeypatch.setenv("NPE_COST_GLM_4_PLUS_PROMPT", "2.5")
+        cost = _cost("glm-4-plus", "prompt")
         assert cost == 2.5
 
     def test_cost_env_override_completion(self, clean_env, monkeypatch):
         """環境変数でcompletionコストを上書き"""
-        monkeypatch.setenv("NPE_COST_GPT_5_COMPLETION", "7.0")
-        cost = _cost("gpt-5", "completion")
+        monkeypatch.setenv("NPE_COST_GLM_4_PLUS_COMPLETION", "7.0")
+        cost = _cost("glm-4-plus", "completion")
         assert cost == 7.0
 
-    def test_cost_unknown_model_defaults_to_gpt5(self, clean_env):
-        """未知のモデルはgpt-5にフォールバック"""
+    def test_cost_unknown_model_defaults_to_glm_4_plus(self, clean_env):
+        """未知のモデルはglm-4-plusにフォールバック"""
         cost = _cost("unknown-model", "prompt")
-        assert cost == 1.6  # gpt-5のpromptコスト
+        assert cost == 0.5  # glm-4-plusのpromptコスト
 
     def test_cost_env_invalid_value_falls_back_to_default(self, clean_env, monkeypatch):
         """無効な環境変数値はデフォルトにフォールバック"""
-        monkeypatch.setenv("NPE_COST_GPT_5_PROMPT", "invalid")
-        cost = _cost("gpt-5", "prompt")
-        assert cost == 1.6
+        monkeypatch.setenv("NPE_COST_GLM_4_PLUS_PROMPT", "invalid")
+        cost = _cost("glm-4-plus", "prompt")
+        assert cost == 0.5
 
     def test_cost_all_default_models(self, clean_env):
         """全てのデフォルトモデルのコストを確認"""
         models_costs = [
-            ("gpt-5", "prompt", 1.6),
-            ("gpt-5-mini", "prompt", 0.2),
-            ("gemini-2.5-pro", "prompt", 1.2),
-            ("gemini-2.5-flash", "prompt", 0.15),
-            ("kimi-k2-turbo-preview", "prompt", 0.20),
-            ("deepseek-coder", "prompt", 0.14),
+            ("glm-4-plus", "prompt", 0.5),
+            ("glm-4-flash", "prompt", 0.1),
+            ("glm-5.1", "prompt", 0.5),
+            ("minimax-m2.7", "prompt", 0.3),
+            ("MiniMax-M2.7", "prompt", 0.3),
         ]
         for model, kind, expected in models_costs:
             assert _cost(model, kind) == expected
@@ -202,21 +201,21 @@ class TestUtilityFunctions:
 
     def test_estimate_cost_jpy_calculation(self):
         """_estimate_cost_jpy() がコストを正しく計算"""
-        # gpt-5: prompt=1.6, completion=5.0 per 1k tokens
-        # 1000 prompt + 1000 completion = 1.6 + 5.0 = 6.6
-        cost = _estimate_cost_jpy("gpt-5", 1000, 1000)
-        assert abs(cost - 6.6) < 0.01
+        # glm-4-plus: prompt=0.5, completion=0.5 per 1k tokens
+        # 1000 prompt + 1000 completion = 0.5 + 0.5 = 1.0
+        cost = _estimate_cost_jpy("glm-4-plus", 1000, 1000)
+        assert abs(cost - 1.0) < 0.01
 
     def test_estimate_cost_jpy_small_tokens(self):
         """少量のトークンでのコスト計算"""
-        # gpt-5-mini: prompt=0.2, completion=0.6
-        # 100 prompt + 50 completion = 0.02 + 0.03 = 0.05
-        cost = _estimate_cost_jpy("gpt-5-mini", 100, 50)
-        assert abs(cost - 0.05) < 0.001
+        # glm-4-flash: prompt=0.1, completion=0.1
+        # 100 prompt + 50 completion = 0.01 + 0.005 = 0.015
+        cost = _estimate_cost_jpy("glm-4-flash", 100, 50)
+        assert abs(cost - 0.015) < 0.001
 
     def test_estimate_cost_jpy_zero_tokens(self):
         """トークン数ゼロの場合"""
-        cost = _estimate_cost_jpy("gpt-5", 0, 0)
+        cost = _estimate_cost_jpy("glm-4-plus", 0, 0)
         assert cost == 0.0
 
 
@@ -307,14 +306,14 @@ class TestRecordUsage:
 
     def test_record_usage_creates_entry(self, temp_ledger):
         """使用量エントリを作成"""
-        record_usage("gpt-5", "test_task", 1.5, 100, 50)
+        record_usage("glm-4-plus", "test_task", 1.5, 100, 50)
 
         assert temp_ledger.exists()
         lines = temp_ledger.read_text().strip().split("\n")
         assert len(lines) == 1
 
         entry = json.loads(lines[0])
-        assert entry["model"] == "gpt-5"
+        assert entry["model"] == "glm-4-plus"
         assert entry["task"] == "test_task"
         assert entry["cost_jpy"] == 1.5
         assert entry["prompt_tokens"] == 100
@@ -325,19 +324,19 @@ class TestRecordUsage:
 
     def test_record_usage_appends_multiple_entries(self, temp_ledger):
         """複数のエントリを追記"""
-        record_usage("gpt-5", "task1", 1.0, 100, 50)
-        record_usage("gpt-5-mini", "task2", 0.5, 50, 25)
-        record_usage("gemini-2.5-pro", "task3", 2.0, 200, 100)
+        record_usage("glm-4-plus", "task1", 1.0, 100, 50)
+        record_usage("glm-4-flash", "task2", 0.5, 50, 25)
+        record_usage("minimax-m2.7", "task3", 2.0, 200, 100)
 
         lines = temp_ledger.read_text().strip().split("\n")
         assert len(lines) == 3
 
         models = [json.loads(line)["model"] for line in lines]
-        assert models == ["gpt-5", "gpt-5-mini", "gemini-2.5-pro"]
+        assert models == ["glm-4-plus", "glm-4-flash", "minimax-m2.7"]
 
     def test_record_usage_rounds_cost(self, temp_ledger):
         """コストが6桁に丸められる"""
-        record_usage("gpt-5", "task", 1.123456789, 100, 50)
+        record_usage("glm-4-plus", "task", 1.123456789, 100, 50)
 
         entry = json.loads(temp_ledger.read_text().strip())
         assert entry["cost_jpy"] == 1.123457
@@ -370,7 +369,7 @@ class TestPreflightCheck:
     def test_preflight_check_allows_normal_request(self, clean_env, temp_ledger):
         """通常のリクエストは許可"""
         decision = preflight_check(
-            model="gpt-5-mini",
+            model="glm-4-flash",
             task="test",
             est_prompt_tokens=100,
             est_completion_tokens=100,
@@ -385,7 +384,7 @@ class TestPreflightCheck:
         monkeypatch.setattr(budget, "PER_CALL_CAP_JPY", 0.1)
 
         decision = preflight_check(
-            model="gpt-5",
+            model="glm-4-plus",
             task="expensive",
             est_prompt_tokens=10000,
             est_completion_tokens=10000,
@@ -404,18 +403,18 @@ class TestPreflightCheck:
             with temp_ledger.open("a") as f:
                 f.write(json.dumps(entry) + "\n")
 
-        monkeypatch.setattr(budget, "DAILY_HARD_CAP_JPY", 1500.0)
+        monkeypatch.setattr(budget, "DAILY_HARD_CAP_JPY", 1410.0)
         monkeypatch.setattr(budget, "PER_CALL_CAP_JPY", 200.0)  # per-call上限を上げる
 
-        # 追加の116円リクエストは拒否される（1400 + 116 > 1500）
+        # 追加の15円リクエストは拒否される（1400 + 15 > 1410）
         decision = preflight_check(
-            model="gpt-5",
+            model="glm-4-plus",
             task="test",
-            est_prompt_tokens=10000,  # 約16円
-            est_completion_tokens=20000,  # 約100円 = 合計116円
+            est_prompt_tokens=10000,  # 5円
+            est_completion_tokens=20000,  # 10円 = 合計15円
         )
 
-        # 1400 + 116 > 1500
+        # 1400 + 15 > 1410
         assert decision.allow is False
         assert "daily hard cap exceeded" in decision.reason
 
@@ -429,7 +428,7 @@ class TestPreflightCheck:
         monkeypatch.setattr(budget, "ALLOW_WHEN_OVER_SOFT", True)
 
         decision = preflight_check(
-            model="gpt-5-mini",
+            model="glm-4-flash",
             task="test",
             est_prompt_tokens=100,
             est_completion_tokens=100,
@@ -445,17 +444,17 @@ class TestPreflightCheck:
         entry = {"day": today, "cost_jpy": 950.0}
         temp_ledger.write_text(json.dumps(entry) + "\n")
 
-        monkeypatch.setattr(budget, "DAILY_SOFT_CAP_JPY", 1000.0)
+        monkeypatch.setattr(budget, "DAILY_SOFT_CAP_JPY", 955.0)
         monkeypatch.setattr(budget, "ALLOW_WHEN_OVER_SOFT", False)
 
         decision = preflight_check(
-            model="gpt-5",
+            model="glm-4-plus",
             task="test",
-            est_prompt_tokens=10000,  # 約16円
-            est_completion_tokens=10000,  # 約50円 = 合計66円
+            est_prompt_tokens=10000,  # 5円
+            est_completion_tokens=10000,  # 5円 = 合計10円
         )
 
-        # 950 + 66 = 1016 > 1000 (soft cap)
+        # 950 + 10 = 960 > 955 (soft cap)
         assert decision.allow is False
         assert "over daily soft cap" in decision.reason
 
@@ -472,7 +471,7 @@ class TestPreflightCheck:
         monkeypatch.setattr(budget, "ALLOW_WHEN_OVER_SOFT", True)
 
         decision = preflight_check(
-            model="gpt-5",
+            model="glm-4-plus",
             task="test",
             est_prompt_tokens=5000,
             est_completion_tokens=1000,  # 約13円
@@ -484,7 +483,7 @@ class TestPreflightCheck:
     def test_preflight_check_includes_caps_in_decision(self, clean_env, temp_ledger):
         """決定に上限情報が含まれる"""
         decision = preflight_check(
-            model="gpt-5-mini",
+            model="glm-4-flash",
             task="test",
             est_prompt_tokens=100,
             est_completion_tokens=100,
@@ -515,12 +514,12 @@ class TestRecordEstimate:
             caps={"per_call_cap_jpy": 80.0},
         )
 
-        record_estimate("gpt-5", "test_task", decision)
+        record_estimate("glm-4-plus", "test_task", decision)
 
         assert temp_ledger.exists()
         entry = json.loads(temp_ledger.read_text().strip())
 
-        assert entry["model"] == "gpt-5"
+        assert entry["model"] == "glm-4-plus"
         assert entry["task"] == "test_task"
         assert entry["cost_jpy"] == 1.5
         assert entry["prompt_tokens"] == 100
@@ -541,7 +540,7 @@ class TestRecordEstimate:
             caps={},
         )
 
-        record_estimate("gpt-5", "expensive_task", decision)
+        record_estimate("glm-4-plus", "expensive_task", decision)
 
         entry = json.loads(temp_ledger.read_text().strip())
         assert entry["allow"] is False
@@ -560,7 +559,7 @@ class TestIntegrationScenarios:
         """許可されるワークフロー全体"""
         # 見積りチェック
         decision = preflight_check(
-            model="gpt-5-mini",
+            model="glm-4-flash",
             task="integration_test",
             est_prompt_tokens=100,
             est_completion_tokens=100,
@@ -568,10 +567,10 @@ class TestIntegrationScenarios:
         assert decision.allow is True
 
         # 見積り記録
-        record_estimate("gpt-5-mini", "integration_test", decision)
+        record_estimate("glm-4-flash", "integration_test", decision)
 
         # 実測値記録
-        record_usage("gpt-5-mini", "integration_test", 0.08, 100, 100)
+        record_usage("glm-4-flash", "integration_test", 0.08, 100, 100)
 
         # 台帳に2エントリ（見積り + 実測）
         lines = temp_ledger.read_text().strip().split("\n")
@@ -587,7 +586,7 @@ class TestIntegrationScenarios:
 
         # 見積りチェック（ブロック）
         decision = preflight_check(
-            model="gpt-5",
+            model="glm-4-plus",
             task="expensive_task",
             est_prompt_tokens=10000,
             est_completion_tokens=10000,
@@ -595,7 +594,7 @@ class TestIntegrationScenarios:
         assert decision.allow is False
 
         # ブロックされた見積りも記録
-        record_estimate("gpt-5", "expensive_task", decision)
+        record_estimate("glm-4-plus", "expensive_task", decision)
 
         # 実測値は記録されない（実行されないため）
 
@@ -619,7 +618,7 @@ class TestEdgeCases:
     def test_zero_token_request(self, clean_env, temp_ledger):
         """トークン数0のリクエスト"""
         decision = preflight_check(
-            model="gpt-5",
+            model="glm-4-plus",
             task="zero_tokens",
             est_prompt_tokens=0,
             est_completion_tokens=0,
@@ -630,23 +629,23 @@ class TestEdgeCases:
 
     def test_very_large_token_request(self, clean_env, temp_ledger, monkeypatch):
         """非常に大きなトークン数リクエスト"""
-        monkeypatch.setattr(budget, "PER_CALL_CAP_JPY", 500.0)
+        monkeypatch.setattr(budget, "PER_CALL_CAP_JPY", 50.0)
 
         decision = preflight_check(
-            model="gpt-5",
+            model="glm-4-plus",
             task="huge_request",
             est_prompt_tokens=100000,
             est_completion_tokens=100000,
         )
 
-        # 100k + 100k tokens = 約660円 > 500円 (per-call cap)
+        # 100k + 100k tokens = 100円 > 50円 (per-call cap)
         assert decision.allow is False
         assert "per-call cap exceeded" in decision.reason
 
     def test_negative_cost_calculation(self):
         """負のトークン数（異常値）でもエラーにならない"""
         # 実装は max(1, ...) を使っていないので負の値も計算される
-        cost = _estimate_cost_jpy("gpt-5", -100, -100)
+        cost = _estimate_cost_jpy("glm-4-plus", -100, -100)
         # 負のコストになる
         assert cost < 0
 
@@ -666,7 +665,7 @@ class TestEdgeCases:
 
         # エラーが握りつぶされることを確認
         try:
-            record_usage("gpt-5", "task", 1.0, 100, 50)
+            record_usage("glm-4-plus", "task", 1.0, 100, 50)
             # 例外が投げられないことを確認
         except Exception as e:
             pytest.fail(f"record_usage should not raise exception: {e}")
@@ -679,7 +678,7 @@ class TestEdgeCases:
 
         def writer():
             for i in range(50):
-                record_usage("gpt-5", f"task-{i}", 0.1, 10, 10)
+                record_usage("glm-4-plus", f"task-{i}", 0.1, 10, 10)
 
         def reader():
             for _ in range(50):
@@ -733,7 +732,7 @@ class TestEdgeCases:
 
     def test_unicode_in_task_name(self, temp_ledger):
         """タスク名にUnicode文字"""
-        record_usage("gpt-5", "日本語タスク", 1.0, 100, 50)
+        record_usage("glm-4-plus", "日本語タスク", 1.0, 100, 50)
 
         entry = json.loads(temp_ledger.read_text().strip())
         assert entry["task"] == "日本語タスク"
@@ -749,7 +748,7 @@ class TestEdgeCases:
     def test_caps_dictionary_structure(self, clean_env, temp_ledger):
         """caps辞書の構造を確認"""
         decision = preflight_check(
-            model="gpt-5",
+            model="glm-4-plus",
             task="test",
             est_prompt_tokens=100,
             est_completion_tokens=100,
