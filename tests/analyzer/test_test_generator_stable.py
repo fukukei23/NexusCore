@@ -148,7 +148,7 @@ def test_llm_failure_falls_back_to_template(sample_project_dir, tmp_path):
 
     # テストコードを生成（LLM 失敗をシミュレート）
     code = module_b_path.read_text(encoding="utf-8")
-    with patch("nexuscore.utils.test_generator._get_client", side_effect=mock_llm_failure):
+    with patch("nexuscore.utils.test_generator._call_minimax", side_effect=mock_llm_failure):
         generated = generate_unit_tests(
             code,
             file_path=module_b_path,
