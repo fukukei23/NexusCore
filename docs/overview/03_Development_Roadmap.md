@@ -1,9 +1,9 @@
 **Title**: 開発ロードマップとマイルストーン
-**Version**: v1.0
+**Version**: v1.1
 **Status**: CURRENT
-**Last reviewed**: 2025-12-16
+**Last reviewed**: 2026-04-17
 **Related docs**:
-- Charter: `docs/overview/NEXUSCORE_PRODUCT_CHARTER.md`（planned）
+- Charter: `docs/overview/NEXUSCORE_PRODUCT_CHARTER.md`
 - SRS: `docs/srs/NEXUSCORE_SRS.md`
 - Governance: `docs/governance/NEXUSCORE_GOVERNANCE.md`
 - CR Specs: `docs/spec/`
@@ -14,25 +14,25 @@
 # NexusCore 開発ロードマップ
 
 ## Phase 1: 基盤統合と堅牢化 (Current Priority)
-[cite_start]技術的負債を返済し、強固な単一アーキテクチャを確立します [cite: 31]。
+技術的負債を返済し、強固な単一アーキテクチャを確立します。
 
-* [cite_start]**Step 1: アーキテクチャ統合**: Orchestratorを唯一の頭脳とし、重複するUIやロジック（Gradio等）を整理・統合する [cite: 32, 35]。
-* [cite_start]**Step 2: 自己修復の完成**: DebuggerAgentによる自動修正ロジックの完全自動化 [cite: 39]。
-* [cite_start]**Step 3: 品質ゲートの実装**: テストカバレッジや静的解析スコアに基づく、コード改善の強制ループの実装 [cite: 550]。
+* **Step 1: アーキテクチャ統合**: Orchestratorを唯一の頭脳とし、重複するUIやロジック（Gradio等）を整理・統合する。
+* **Step 2: 自己修復の完成**: DebuggerAgentによる自動修正ロジックの完全自動化。
+* **Step 3: 品質ゲートの実装**: テストカバレッジや静的解析スコアに基づく、コード改善の強制ループの実装。
 
 ## Phase 2: ミニマムSaaS基盤 (MVP)
-[cite_start]Seed調達と初期顧客獲得に向けた機能実装です [cite: 276]。
+Seed調達と初期顧客獲得に向けた機能実装です。
 
-* [cite_start]**認証基盤**: GitHub OAuthによるログインとユーザー管理 [cite: 280]。
-* [cite_start]**プロジェクト管理**: 実行ログ、修正パッチ、テスト結果をプロジェクト単位でDB保存 [cite: 284]。
-* [cite_start]**ログ観測**: Agentの思考プロセスと実行結果を可視化するダッシュボード [cite: 294]。
+* **認証基盤**: GitHub OAuthによるログインとユーザー管理。
+* **プロジェクト管理**: 実行ログ、修正パッチ、テスト結果をプロジェクト単位でDB保存。
+* **ログ観測**: Agentの思考プロセスと実行結果を可視化するダッシュボード。
 
 ## Phase 3: エンタープライズ対応と拡張
-[cite_start]商用レベルの安全性とスケーラビリティを確保します [cite: 51]。
+商用レベルの安全性とスケーラビリティを確保します。
 
-* [cite_start]**分離機構**: Dockerコンテナによる完全なサンドボックス環境（マルチテナント対応） [cite: 54, 189]。
-* [cite_start]**RAG導入**: 大規模コードベースに対応するため、ベクトルDBを用いたRetrieval-Augmented Generationの実装 [cite: 56, 195]。
-* [cite_start]**IDE連携強化**: VSCode拡張機能をLSP（Language Server Protocol）ベースへ進化させ、リアルタイムフィードバックを実現 [cite: 47]。
+* **分離機構**: Dockerコンテナによる完全なサンドボックス環境（マルチテナント対応）。
+* **RAG導入**: 大規模コードベースに対応するため、ベクトルDBを用いたRetrieval-Augmented Generationの実装。
+* **IDE連携強化**: VSCode拡張機能をLSP（Language Server Protocol）ベースへ進化させ、リアルタイムフィードバックを実現。
 
 ---
 
@@ -43,11 +43,9 @@
 - **要求（SRS）を起点にする**: 直近は `docs/srs/NEXUSCORE_SRS.md` の FR/NFR を満たす順番で CR を切る（感覚論ではなく要求→実装の線を優先）。
 - **統治（Governance）を前提にする**: 凍結境界や禁止事項は `docs/governance/NEXUSCORE_GOVERNANCE.md` を正とする。
 - **CR 運用（Spec-driven）**: 新規 CR は `docs/spec/` に置き、CR 冒頭で SRS トレーサビリティを固定フォーマットで付与する（`docs/srs/README.md`）。
-- **AuthorityLevel の導入**: AuthorityLevel/互換/テスト容易性に関する最小要件は SRS（FR-1/FR-2/FR-4, NFR-3）で固定し、実装は CR で追う。
-- **[cite: ...] の扱い**: `[cite: ...]` は現状「出典メモ」。対応表は `docs/refs/REFERENCE_NOTES.md` に置く。
+- **AuthorityLevel の導入**: AuthorityLevel/互換/テスト容易性に関する最小要件は SRS（FR-ORC-003, FR-ORC-004, NFR-SEC-003）で固定し、実装は CR で追う。
 
-## Revision History
+## 改訂履歴
 
-- 2025-12-16: v0.1（DRAFT）相当の原文を保存し、v1.0 としてヘッダ統一・差分追記を実施。
-
-
+- 2026-04-17: v1.1 [cite:...]出典メモを除去。Charter参照を「planned」から実ファイルに更新。FR参照を新番号体系に更新。
+- 2025-12-16: v1.0 初版作成。
