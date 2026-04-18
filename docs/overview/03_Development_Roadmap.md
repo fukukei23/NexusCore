@@ -1,7 +1,7 @@
-**Title**: 開発ロードマップとマイルストーン
-**Version**: v1.1
+**Title**: Development Roadmap and Milestones
+**Version**: v1.2
 **Status**: CURRENT
-**Last reviewed**: 2026-04-17
+**Last reviewed**: 2026-04-19
 **Related docs**:
 - Charter: `docs/overview/NEXUSCORE_PRODUCT_CHARTER.md`
 - SRS: `docs/srs/NEXUSCORE_SRS.md`
@@ -11,41 +11,121 @@
 
 ---
 
-# NexusCore 開発ロードマップ
+# NexusCore Development Roadmap
 
-## Phase 1: 基盤統合と堅牢化 (Current Priority)
-技術的負債を返済し、強固な単一アーキテクチャを確立します。
+## Current Achievements
 
-* **Step 1: アーキテクチャ統合**: Orchestratorを唯一の頭脳とし、重複するUIやロジック（Gradio等）を整理・統合する。
-* **Step 2: 自己修復の完成**: DebuggerAgentによる自動修正ロジックの完全自動化。
-* **Step 3: 品質ゲートの実装**: テストカバレッジや静的解析スコアに基づく、コード改善の強制ループの実装。
-
-## Phase 2: ミニマムSaaS基盤 (MVP)
-Seed調達と初期顧客獲得に向けた機能実装です。
-
-* **認証基盤**: GitHub OAuthによるログインとユーザー管理。
-* **プロジェクト管理**: 実行ログ、修正パッチ、テスト結果をプロジェクト単位でDB保存。
-* **ログ観測**: Agentの思考プロセスと実行結果を可視化するダッシュボード。
-
-## Phase 3: エンタープライズ対応と拡張
-商用レベルの安全性とスケーラビリティを確保します。
-
-* **分離機構**: Dockerコンテナによる完全なサンドボックス環境（マルチテナント対応）。
-* **RAG導入**: 大規模コードベースに対応するため、ベクトルDBを用いたRetrieval-Augmented Generationの実装。
-* **IDE連携強化**: VSCode拡張機能をLSP（Language Server Protocol）ベースへ進化させ、リアルタイムフィードバックを実現。
+| Metric | Value |
+|---|---|
+| Test Coverage | 80.22% |
+| Test Cases | 4,838 |
+| LLM Providers | GLM-5.1 + MiniMax M2.7 (OpenAI SDK fully removed) |
+| Agents | 18+ specialized agents |
+| Core Modules | NPE (Security Engine), FKB (Fault Knowledge Base) |
 
 ---
 
-## Delta / Updates（現状との差分・追記）
+## Phase 1: Foundation Integration and Hardening
 
-ロードマップは将来計画を含むため、実装の「確定事項」は SRS/Governance/CR を優先する。
+**Goal**: Establish a robust single-architecture system with Orchestrator as the sole brain, complete self-healing cycles, and automate quality enforcement.
 
-- **要求（SRS）を起点にする**: 直近は `docs/srs/NEXUSCORE_SRS.md` の FR/NFR を満たす順番で CR を切る（感覚論ではなく要求→実装の線を優先）。
-- **統治（Governance）を前提にする**: 凍結境界や禁止事項は `docs/governance/NEXUSCORE_GOVERNANCE.md` を正とする。
-- **CR 運用（Spec-driven）**: 新規 CR は `docs/spec/` に置き、CR 冒頭で SRS トレーサビリティを固定フォーマットで付与する（`docs/srs/README.md`）。
-- **AuthorityLevel の導入**: AuthorityLevel/互換/テスト容易性に関する最小要件は SRS（FR-ORC-003, FR-ORC-004, NFR-SEC-003）で固定し、実装は CR で追う。
+### Milestones
 
-## 改訂履歴
+- **Month 1**: Architecture integration and duplicate functionality removal
+- **Month 2**: Self-healing cycle automation (execute -> detect -> FKB lookup -> auto-fix -> retest)
+- **Month 3**: Quality gate implementation and automated coverage improvement loop
 
-- 2026-04-17: v1.1 [cite:...]出典メモを除去。Charter参照を「planned」から実ファイルに更新。FR参照を新番号体系に更新。
-- 2025-12-16: v1.0 初版作成。
+### Definition of Done
+
+- **MC1-1**: Zero CLI/API/UI access paths bypassing the single Orchestrator
+- **MC1-2**: DebuggerAgent auto-generates and applies fix patches for FKB-known issues at **95%+ rate** without manual intervention
+- **MC1-3**: Auto-regeneration loop triggers when coverage or static analysis falls below thresholds (coverage >= 85%, Critical warnings = 0) — **FR-QGT**
+
+### Progress
+
+- [x] Orchestrator basic routing implemented
+- [x] NPE and FKB foundation implemented
+- [ ] Gradio and UI component complete separation/integration (~60%)
+- [ ] DebuggerAgent auto PR generation logic (~40%)
+
+### Related SRS Requirements
+
+- `FR-ORC`: Task management and routing via Orchestrator
+- `FR-QGT`: Quality gate enforcement of test coverage and static analysis
+- `FR-ERR`: Error handling with FKB integration
+
+---
+
+## Phase 2: Minimum SaaS Foundation (MVP)
+
+**Goal**: Multi-user cloud environment with authentication, persistent project data, and observability for individual and small team use.
+
+### Milestones
+
+- **Month 4**: GitHub OAuth authentication and session management
+- **Month 5**: RDB-based project-scoped execution logs, patches, and test results
+- **Month 6**: Real-time agent dashboard (v1) showing thinking process and results
+
+### Definition of Done
+
+- **MC2-1**: GitHub sign-up/in/out with secure session management — **NFR-SEC**
+- **MC2-2**: Users can retrieve and replay execution history, patches, and test results per project from DB
+- **MC2-3**: Dashboard streams agent communication (task assignment, progress, errors) with <1s latency — **NFR-PRF**
+
+### Progress
+
+- [ ] Authentication and DB schema design (not started)
+- [ ] Frontend dashboard mockup (not started)
+
+### Related SRS Requirements
+
+- `FR-ORC`: User-context-aware Orchestrator execution control
+- `NFR-SEC`: OAuth authentication, encrypted communication, user data isolation
+- `NFR-PRF`: Concurrent database and streaming performance
+
+---
+
+## Phase 3: Enterprise Readiness and Scaling
+
+**Goal**: Production-grade scalability and security with sandboxed multi-tenant execution, RAG-enhanced accuracy, and IDE integration.
+
+### Milestones
+
+- **Month 7**: Docker-based isolated sandbox execution environment
+- **Month 8**: Vector DB (Chroma/Qdrant) integration and RAG pipeline
+- **Month 9**: VSCode extension rewrite as LSP with beta release
+
+### Definition of Done
+
+- **MC3-1**: All code execution and tests run in isolated Docker containers with zero host/tenant cross-contamination — **NFR-SEC**
+- **MC3-2**: RAG-powered context retrieval improves patch relevance by 20% on 100K+ line codebases
+- **MC3-3**: VSCode LSP extension provides real-time NexusCore analysis feedback on save and during editing
+
+### Progress
+
+- [ ] Container execution runner prototype (~20%)
+- [ ] Vector DB technology selection (~50%)
+- [ ] Current VSCode extension (RPC-based) requirements review (~30%)
+
+### Related SRS Requirements
+
+- `FR-LLM`: Dynamic context injection via RAG with token optimization
+- `NFR-SEC`: Container isolation, least-privilege enforcement
+- `NFR-PRF`: Large codebase indexing and search performance optimization
+
+---
+
+## Delta / Updates
+
+Roadmap covers future plans; for confirmed specifications, refer to SRS/Governance/CR.
+
+- **SRS-driven**: Prioritize CRs to fulfill `docs/srs/NEXUSCORE_SRS.md` FR/NFR requirements
+- **Governance-bound**: Freeze boundaries and prohibitions per `docs/governance/NEXUSCORE_GOVERNANCE.md`
+- **CR workflow**: New CRs in `docs/spec/` with SRS traceability in fixed format
+- **AuthorityLevel**: Minimum requirements fixed in SRS (FR-ORC-003, FR-ORC-004, NFR-SEC-003)
+
+## Revision History
+
+- 2026-04-19: v1.2 Added per-phase milestones, DoD, progress tracking, and SRS requirement mapping
+- 2026-04-17: v1.1 Removed [cite:] markers, updated Charter reference, updated FR numbering
+- 2025-12-16: v1.0 Initial version
