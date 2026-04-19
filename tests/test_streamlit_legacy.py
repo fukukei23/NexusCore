@@ -8,6 +8,14 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+try:
+    import streamlit as _st
+    HAS_STREAMLIT = True
+except ImportError:
+    HAS_STREAMLIT = False
+
 try:
     import streamlit_legacy
 except ImportError:
@@ -64,6 +72,7 @@ class TestStreamlitLegacy(unittest.TestCase):
                 func = getattr(streamlit_legacy, func_name)
                 self.assertTrue(callable(func))
 
+    @pytest.mark.skipif(not HAS_STREAMLIT, reason="streamlit module not installed")
     @patch("streamlit.title")
     @patch("streamlit.sidebar")
     def test_app_initialization(self, mock_sidebar, mock_title):
@@ -89,6 +98,7 @@ class TestStreamlitLegacy(unittest.TestCase):
                         # アプリ初期化エラーは許容
                         pass
 
+    @pytest.mark.skipif(not HAS_STREAMLIT, reason="streamlit module not installed")
     @patch("streamlit.write")
     @patch("streamlit.dataframe")
     def test_data_display(self, mock_dataframe, mock_write):
@@ -110,6 +120,7 @@ class TestStreamlitLegacy(unittest.TestCase):
                         # データ表示エラーは許容
                         pass
 
+    @pytest.mark.skipif(not HAS_STREAMLIT, reason="streamlit module not installed")
     @patch("streamlit.text_input")
     @patch("streamlit.button")
     def test_user_interaction(self, mock_button, mock_text_input):

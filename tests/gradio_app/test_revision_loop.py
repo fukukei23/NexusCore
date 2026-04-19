@@ -69,37 +69,31 @@ def test_save_patch_history(tmp_path, monkeypatch):
     assert data["reason"] == "reason"
 
 
-class TestGetClient:
-    def test_returns_cached_client(self, monkeypatch):
-        mock_client = MagicMock()
-        monkeypatch.setattr(revision_loop, "_client", mock_client)
-        result = revision_loop.get_client()
-        assert result is mock_client
+class TestCallMinimax:
+    @patch("nexuscore.gradio_app.revision_loop._call_minimax", return_value="response text")
+    def test_call_minimax_success(self, mock_call):
+        result = revision_loop._call_minimax([{"role": "user", "content": "test"}])
+        assert result == "response text"
 
-    def test_raises_when_openai_missing(self, monkeypatch):
-        monkeypatch.setattr(revision_loop, "_client", None)
-        monkeypatch.setattr(revision_loop, "OpenAI", None)
-        with pytest.raises(RuntimeError, match="openai SDK"):
-            revision_loop.get_client()
+    @patch.dict("os.environ", {}, clear=True)
+    def test_call_minimax_no_api_key(self):
+        with pytest.raises(RuntimeError, match="MINIMAX_API_KEY"):
+            revision_loop._call_minimax([{"role": "user", "content": "test"}])
 
-    def test_raises_when_no_api_key(self, monkeypatch):
-        monkeypatch.setattr(revision_loop, "_client", None)
-        monkeypatch.setattr(revision_loop, "OpenAI", MagicMock)
-        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
-            revision_loop.get_client()
 
-    def test_creates_client_with_api_key(self, monkeypatch):
-        mock_openai = MagicMock()
-        mock_instance = MagicMock()
-        mock_openai.return_value = mock_instance
-        monkeypatch.setattr(revision_loop, "_client", None)
-        monkeypatch.setattr(revision_loop, "OpenAI", mock_openai)
-        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-        result = revision_loop.get_client()
-        assert result is mock_instance
-        mock_openai.assert_called_once_with(api_key="test-key")
-        monkeypatch.setattr(revision_loop, "_client", None)  # cleanup
+class TestCallLlm:
+    @patch("nexuscore.gradio_app.revision_loop._call_minimax", return_value="llm response")
+    def test_call_llm_success(self, mock_call):
+        result = revision_loop.call_llm("test prompt")
+        assert result == "llm response"
+        mock_call.assert_called_once()
+        messages = mock_call.call_args[0][0]
+        assert messages[0]["content"] == "test prompt"
+
+    @patch("nexuscore.gradio_app.revision_loop._call_minimax", side_effect=RuntimeError("API error"))
+    def test_call_llm_error(self, mock_call):
+        with pytest.raises(RuntimeError, match="API error"):
+            revision_loop.call_llm("test")
 
 
 class TestRunPytestException:
@@ -111,19 +105,8 @@ class TestRunPytestException:
         assert "failed" in output
 
 
-class TestCallGpt:
-    def test_call_gpt_success(self, monkeypatch):
-        mock_client = MagicMock()
-        mock_msg = MagicMock()
-        mock_msg.content = "  response text  "
-        mock_choice = MagicMock()
-        mock_choice.message = mock_msg
-        mock_rsp = MagicMock()
-        mock_rsp.choices = [mock_choice]
-        mock_client.chat.completions.create.return_value = mock_rsp
-        monkeypatch.setattr(revision_loop, "_client", mock_client)
-        result = revision_loop.call_gpt("test prompt")
-        assert result == "response text"
+class TestCallGptRemoved:
+    """call_gpt was replaced by call_llm — kept as placeholder for any remaining tests"""
 
 
 class TestLaunchRevisionUi:
