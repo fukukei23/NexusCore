@@ -654,7 +654,7 @@ class TestOrchestratorEnsureFastlaneTests:
 class TestAssembleAgentTeam:
     """assemble_agent_team() のテスト"""
 
-    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
+    @patch.dict(os.environ, {"GLM_API_KEY": "test-key"})
     @patch("nexuscore.core.orchestrator.RequirementAgent")
     @patch("nexuscore.core.orchestrator.ArchitectAgent")
     @patch("nexuscore.core.orchestrator.PlannerAgent")
@@ -720,17 +720,17 @@ class TestAssembleAgentTeam:
         # KnowledgeCuratorAgentがAPI keyとmodelで初期化されることを確認
         mock_curator.assert_called_once_with(
             api_key="test-key",
-            model="claude-3.5-sonnet",
+            model="glm-4-plus",
         )
 
     @patch.dict(os.environ, {}, clear=True)
     def test_assemble_agent_team_no_api_key(self, tmp_path):
         """API keyがない場合はRuntimeErrorを投げる"""
-        with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
+        with pytest.raises(RuntimeError, match="GLM_API_KEY"):
             assemble_agent_team(str(tmp_path))
 
     @patch.dict(
-        os.environ, {"ANTHROPIC_API_KEY": "test-key", "NEXUS_TASK_MODEL_KNOWLEDGE": "claude-3-opus"}
+        os.environ, {"GLM_API_KEY": "test-key", "NEXUS_TASK_MODEL_KNOWLEDGE": "glm-4-custom"}
     )
     @patch("nexuscore.core.orchestrator.RequirementAgent")
     @patch("nexuscore.core.orchestrator.ArchitectAgent")
@@ -782,7 +782,7 @@ class TestAssembleAgentTeam:
         # カスタムモデルで初期化されることを確認
         mock_curator.assert_called_once_with(
             api_key="test-key",
-            model="claude-3-opus",
+            model="glm-4-custom",
         )
 
 

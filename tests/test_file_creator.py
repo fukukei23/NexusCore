@@ -569,21 +569,9 @@ def test_create_code_file_with_code_generator_output(tmp_path, monkeypatch):
     sys.path.insert(0, str(project_root / "src"))
     from nexuscore.modules import code_generator
 
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
-
-    # コードジェネレーターをモック
-    mock_response = MagicMock()
-    mock_response.choices = [MagicMock()]
-    mock_response.choices[0].message.content = (
-        "```python\ndef generated_func():\n    return 42\n```"
-    )
-
-    mock_client = MagicMock()
-    mock_client.chat.completions.create.return_value = mock_response
-
     folder = str(tmp_path / "generated")
 
-    with patch("nexuscore.modules.code_generator.get_client", return_value=mock_client):
+    with patch("nexuscore.modules.code_generator._call_minimax", return_value="```python\ndef generated_func():\n    return 42\n```"):
         # コードを生成
         generated_code = code_generator.generate_code_from_text("Create a function that returns 42")
 

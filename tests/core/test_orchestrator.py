@@ -534,7 +534,7 @@ class TestAssembleAgentTeam:
 
     def test_assemble_agent_team_creates_all_agents(self, temp_project, monkeypatch):
         """全エージェントとLLMRouterが作成される"""
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-api-key")
+        monkeypatch.setenv("GLM_API_KEY", "test-api-key")
 
         result = assemble_agent_team(temp_project)
 
@@ -553,11 +553,11 @@ class TestAssembleAgentTeam:
         assert "llm_router" in result
 
     def test_assemble_agent_team_missing_api_key(self, temp_project, monkeypatch):
-        """ANTHROPIC_API_KEYがない場合はRuntimeError"""
+        """GLM_API_KEYがない場合はRuntimeError"""
         # 環境変数をクリア
-        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("GLM_API_KEY", raising=False)
 
-        with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
+        with pytest.raises(RuntimeError, match="GLM_API_KEY"):
             assemble_agent_team(temp_project)
 
 
@@ -593,7 +593,7 @@ class TestCLI:
 
     def test_main_creates_orchestrator_and_runs(self, monkeypatch, temp_project):
         """main()がOrchestratorを作成してrun_full_projectを実行"""
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-api-key")
+        monkeypatch.setenv("GLM_API_KEY", "test-api-key")
         monkeypatch.setattr(
             "sys.argv",
             [
@@ -635,7 +635,7 @@ class TestCLI:
 
     def test_main_handles_session_stopped(self, monkeypatch, temp_project):
         """main()がSessionStoppedを正常終了として扱う"""
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-api-key")
+        monkeypatch.setenv("GLM_API_KEY", "test-api-key")
         monkeypatch.setattr(
             "sys.argv", ["prog", "--project", temp_project, "--requirement", "Test"]
         )

@@ -177,30 +177,14 @@ class TestCallGpt:
         assert "is_prime" in data["code"]
 
     def test_openai_success(self):
-        mock_msg = MagicMock()
-        mock_msg.content = "  result text  "
-        mock_choice = MagicMock()
-        mock_choice.message = mock_msg
-        mock_rsp = MagicMock()
-        mock_rsp.choices = [mock_choice]
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_rsp
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "fake"}, clear=True):
-            with patch("openai.OpenAI", return_value=mock_client):
+        with patch("nexuscore.gradio_app.revision_tab._call_minimax", return_value="result text"):
+            with patch.dict(os.environ, {"MINIMAX_API_KEY": "fake"}, clear=True):
                 result = revision_tab.call_gpt("test prompt")
         assert result == "result text"
 
     def test_openai_none_content(self):
-        mock_msg = MagicMock()
-        mock_msg.content = None
-        mock_choice = MagicMock()
-        mock_choice.message = mock_msg
-        mock_rsp = MagicMock()
-        mock_rsp.choices = [mock_choice]
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_rsp
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "fake"}, clear=True):
-            with patch("openai.OpenAI", return_value=mock_client):
+        with patch("nexuscore.gradio_app.revision_tab._call_minimax", return_value=""):
+            with patch.dict(os.environ, {"MINIMAX_API_KEY": "fake"}, clear=True):
                 result = revision_tab.call_gpt("test")
         assert result == ""
 
