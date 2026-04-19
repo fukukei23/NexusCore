@@ -78,14 +78,17 @@ class TestVoiceToTextDeep(unittest.TestCase):
     def test_whisper_integration(self):
         """Whisper統合機能の詳細テスト"""
         with (
-            patch("nexuscore.audio.voice_to_text.openai") as mock_openai,
+            patch("nexuscore.audio.voice_to_text.requests") as mock_requests,
             patch("builtins.open", mock_open(read_data=b"fake audio data")),
         ):
-            mock_openai.audio.transcriptions.create.return_value = {
+            mock_response = MagicMock()
+            mock_response.json.return_value = {
                 "text": self.expected_text,
                 "segments": [{"text": self.expected_text, "start": 0.0, "end": 5.0}],
                 "language": "ja",
             }
+            mock_response.raise_for_status.return_value = None
+            mock_requests.post.return_value = mock_response
 
             whisper_functions = [
                 "whisper_transcribe",
