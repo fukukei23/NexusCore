@@ -14,36 +14,25 @@ from unittest.mock import MagicMock
 
 import pytest
 
-# ============================================================================
-# Fixtures
-# ============================================================================
-
 
 @pytest.fixture(autouse=True)
-def reset_webapp_module():
-    """各テスト前後でwebappモジュールをリセット"""
-    # テスト前の状態を保存
-    webapp_module = sys.modules.get("nexuscore.webapp")
-    logging_service_module = sys.modules.get("nexuscore.webapp.logging_service")
-
-    # テスト前に orchestrator_db_hook を削除し、再インポート時に新規モジュールが使われるようにする
+def _reset_db_hook_module():
+    """各テスト前後で orchestrator_db_hook をリセット（再インポートを強制）"""
+    sys.modules.pop("nexuscore.core.orchestrator_db_hook", None)
+    yield
     sys.modules.pop("nexuscore.core.orchestrator_db_hook", None)
 
-    yield
 
-    # テスト後に復元
-    if "nexuscore.core.orchestrator_db_hook" in sys.modules:
-        del sys.modules["nexuscore.core.orchestrator_db_hook"]
+def _inject_mock_webapp(monkeypatch, mock_webapp):
+    """Mock webapp を monkeypatch で安全に注入（テスト終了後自動復元）"""
+    monkeypatch.setitem(sys.modules, "nexuscore.webapp", mock_webapp)
+    monkeypatch.setitem(sys.modules, "nexuscore.webapp.logging_service", mock_webapp.logging_service)
 
-    if webapp_module is not None:
-        sys.modules["nexuscore.webapp"] = webapp_module
-    else:
-        sys.modules.pop("nexuscore.webapp", None)
 
-    if logging_service_module is not None:
-        sys.modules["nexuscore.webapp.logging_service"] = logging_service_module
-    else:
-        sys.modules.pop("nexuscore.webapp.logging_service", None)
+def _remove_webapp(monkeypatch):
+    """webapp モジュールを monkeypatch で安全に削除（テスト終了後自動復元）"""
+    monkeypatch.delitem(sys.modules, "nexuscore.webapp", raising=False)
+    monkeypatch.delitem(sys.modules, "nexuscore.webapp.logging_service", raising=False)
 
 
 # ============================================================================
@@ -52,17 +41,14 @@ def reset_webapp_module():
 
 
 class TestLogOrchestratorEventWithWebapp:
-    def test_log_event_with_all_parameters(self):
+    def test_log_event_with_all_parameters(self, monkeypatch):
         """全てのパラメータを指定してログイベントを記録"""
-        # webapp モジュールをモック
         mock_log_func = MagicMock()
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules["nexuscore.webapp"] = mock_webapp
-        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
+        _inject_mock_webapp(monkeypatch, mock_webapp)
 
-        # モジュールを再インポート
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
         log_orchestrator_event(
@@ -84,14 +70,13 @@ class TestLogOrchestratorEventWithWebapp:
         assert call_kwargs["payload"]["duration"] == 5.2
         assert call_kwargs["payload"]["files"] == 10
 
-    def test_log_event_failed_status(self):
+    def test_log_event_failed_status(self, monkeypatch):
         """FAILEDステータスでERRORレベルになる"""
         mock_log_func = MagicMock()
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules["nexuscore.webapp"] = mock_webapp
-        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
+        _inject_mock_webapp(monkeypatch, mock_webapp)
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -102,14 +87,13 @@ class TestLogOrchestratorEventWithWebapp:
         call_kwargs = mock_log_func.call_args[1]
         assert call_kwargs["level"] == "ERROR"
 
-    def test_log_event_error_status(self):
+    def test_log_event_error_status(self, monkeypatch):
         """errorステータス（小文字）でERRORレベルになる"""
         mock_log_func = MagicMock()
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules["nexuscore.webapp"] = mock_webapp
-        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
+        _inject_mock_webapp(monkeypatch, mock_webapp)
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -118,14 +102,13 @@ class TestLogOrchestratorEventWithWebapp:
         call_kwargs = mock_log_func.call_args[1]
         assert call_kwargs["level"] == "ERROR"
 
-    def test_log_event_without_extra(self):
+    def test_log_event_without_extra(self, monkeypatch):
         """extraなしでログイベントを記録"""
         mock_log_func = MagicMock()
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules["nexuscore.webapp"] = mock_webapp
-        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
+        _inject_mock_webapp(monkeypatch, mock_webapp)
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -138,14 +121,13 @@ class TestLogOrchestratorEventWithWebapp:
         assert call_kwargs["payload"]["status"] == "STARTED"
         assert "duration" not in call_kwargs["payload"]
 
-    def test_log_event_with_none_run_id(self):
+    def test_log_event_with_none_run_id(self, monkeypatch):
         """run_db_id=Noneでも動作する"""
         mock_log_func = MagicMock()
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules["nexuscore.webapp"] = mock_webapp
-        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
+        _inject_mock_webapp(monkeypatch, mock_webapp)
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -156,14 +138,13 @@ class TestLogOrchestratorEventWithWebapp:
         call_kwargs = mock_log_func.call_args[1]
         assert call_kwargs["run_id"] is None
 
-    def test_log_event_with_empty_extra(self):
+    def test_log_event_with_empty_extra(self, monkeypatch):
         """空のextraディクショナリ"""
         mock_log_func = MagicMock()
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules["nexuscore.webapp"] = mock_webapp
-        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
+        _inject_mock_webapp(monkeypatch, mock_webapp)
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -179,14 +160,13 @@ class TestLogOrchestratorEventWithWebapp:
         assert call_kwargs["payload"]["phase"] == "shutdown"
         assert call_kwargs["payload"]["status"] == "FINISHED"
 
-    def test_log_event_multiple_phases(self):
+    def test_log_event_multiple_phases(self, monkeypatch):
         """複数のフェーズでログイベントを記録"""
         mock_log_func = MagicMock()
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules["nexuscore.webapp"] = mock_webapp
-        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
+        _inject_mock_webapp(monkeypatch, mock_webapp)
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -204,14 +184,13 @@ class TestLogOrchestratorEventWithWebapp:
             call_kwargs = mock_log_func.call_args_list[i][1]
             assert call_kwargs["payload"]["phase"] == phase
 
-    def test_log_event_with_complex_extra(self):
+    def test_log_event_with_complex_extra(self, monkeypatch):
         """複雑なextraデータ"""
         mock_log_func = MagicMock()
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules["nexuscore.webapp"] = mock_webapp
-        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
+        _inject_mock_webapp(monkeypatch, mock_webapp)
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -244,11 +223,9 @@ class TestLogOrchestratorEventWithWebapp:
 
 
 class TestLogOrchestratorEventWithoutWebapp:
-    def test_log_event_without_webapp_module(self):
+    def test_log_event_without_webapp_module(self, monkeypatch):
         """webappモジュールがない場合は何もしない"""
-        # webappモジュールを削除
-        sys.modules.pop("nexuscore.webapp", None)
-        sys.modules.pop("nexuscore.webapp.logging_service", None)
+        _remove_webapp(monkeypatch)
 
         # モジュールを再インポート
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
@@ -258,11 +235,9 @@ class TestLogOrchestratorEventWithoutWebapp:
             run_db_id=123, phase="planning", status="SUCCESS", message="Planning completed"
         )
 
-    def test_log_event_with_import_error(self):
+    def test_log_event_with_import_error(self, monkeypatch):
         """webappのインポートがImportErrorの場合"""
-        # ImportErrorをシミュレート
-        sys.modules.pop("nexuscore.webapp", None)
-        sys.modules.pop("nexuscore.webapp.logging_service", None)
+        _remove_webapp(monkeypatch)
 
         # モジュールを再インポート
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
@@ -275,10 +250,9 @@ class TestLogOrchestratorEventWithoutWebapp:
             message="Orchestrator started in CLI mode",
         )
 
-    def test_log_event_cli_mode_multiple_calls(self):
+    def test_log_event_cli_mode_multiple_calls(self, monkeypatch):
         """CLI モードで複数回呼び出しても安全"""
-        sys.modules.pop("nexuscore.webapp", None)
-        sys.modules.pop("nexuscore.webapp.logging_service", None)
+        _remove_webapp(monkeypatch)
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -295,14 +269,13 @@ class TestLogOrchestratorEventWithoutWebapp:
 
 
 class TestStatusLevelMapping:
-    def test_status_to_level_mapping(self):
+    def test_status_to_level_mapping(self, monkeypatch):
         """ステータスからログレベルへのマッピング"""
         mock_log_func = MagicMock()
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules["nexuscore.webapp"] = mock_webapp
-        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
+        _inject_mock_webapp(monkeypatch, mock_webapp)
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -337,14 +310,13 @@ class TestStatusLevelMapping:
 
 
 class TestPayloadConstruction:
-    def test_payload_always_includes_phase_and_status(self):
+    def test_payload_always_includes_phase_and_status(self, monkeypatch):
         """payloadには常にphaseとstatusが含まれる"""
         mock_log_func = MagicMock()
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules["nexuscore.webapp"] = mock_webapp
-        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
+        _inject_mock_webapp(monkeypatch, mock_webapp)
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -360,14 +332,13 @@ class TestPayloadConstruction:
         assert payload["phase"] == "coding"
         assert payload["status"] == "RUNNING"
 
-    def test_payload_merges_extra_correctly(self):
+    def test_payload_merges_extra_correctly(self, monkeypatch):
         """extraがpayloadに正しくマージされる"""
         mock_log_func = MagicMock()
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules["nexuscore.webapp"] = mock_webapp
-        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
+        _inject_mock_webapp(monkeypatch, mock_webapp)
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -386,14 +357,13 @@ class TestPayloadConstruction:
         assert payload["count"] == 42
         assert payload["nested"]["key"] == "value"
 
-    def test_payload_extra_does_not_overwrite_phase_status(self):
+    def test_payload_extra_does_not_overwrite_phase_status(self, monkeypatch):
         """extraがphaseやstatusを上書きできるか確認"""
         mock_log_func = MagicMock()
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules["nexuscore.webapp"] = mock_webapp
-        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
+        _inject_mock_webapp(monkeypatch, mock_webapp)
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 
@@ -419,14 +389,13 @@ class TestPayloadConstruction:
 
 
 class TestIntegrationScenarios:
-    def test_full_orchestrator_lifecycle(self):
+    def test_full_orchestrator_lifecycle(self, monkeypatch):
         """Orchestratorの完全なライフサイクル"""
         mock_log_func = MagicMock()
         mock_webapp = MagicMock()
         mock_webapp.logging_service.log_execution_event = mock_log_func
 
-        sys.modules["nexuscore.webapp"] = mock_webapp
-        sys.modules["nexuscore.webapp.logging_service"] = mock_webapp.logging_service
+        _inject_mock_webapp(monkeypatch, mock_webapp)
 
         from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
 

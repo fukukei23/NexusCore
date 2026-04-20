@@ -39,6 +39,16 @@ def _is_mock_instance(obj: object) -> bool:
 # モジュール収集前の sys.modules スナップショット（元のモジュールオブジェクトを保持）
 _saved_modules: dict[str, object] = {}
 
+# 保護対象モジュール: テスト中に sys.modules が汚染されると後続テストが壊れる
+_PROTECTED_MODULES = [
+    "flask",
+    "nexuscore.webapp",
+    "nexuscore.webapp.models",
+    "nexuscore.webapp.logging_service",
+    "nexuscore.webapp.celery_app",
+    "nexuscore.webapp.auth_api",
+]
+
 
 def pytest_collectstart(collector):
     """各モジュール収集前に、Mock ではないモジュールを保存"""
@@ -62,6 +72,11 @@ def pytest_collectreport(report):
         else:
             sys.modules.pop(key, None)
 
+    # 保護対象モジュールの強制復元（常に _saved_modules の値に戻す）
+    for key in _PROTECTED_MODULES:
+        if key in _saved_modules:
+            sys.modules[key] = _saved_modules[key]
+
     # 収集エラーを記録
     if report.failed:
         test_result = {
@@ -78,19 +93,89 @@ def pytest_collectreport(report):
 @pytest.fixture(autouse=True)
 def _isolate_sys_modules():
     """各テストの前後で sys.modules 内の Mock を元のモジュールに復元（安全網）"""
+    # Mock 系モジュールの復元
     mock_keys = [key for key, value in list(sys.modules.items()) if _is_mock_instance(value)]
     for key in mock_keys:
         if key in _saved_modules:
             sys.modules[key] = _saved_modules[key]
         else:
             sys.modules.pop(key, None)
+
+    # 保護対象モジュールの強制復元（常に _saved_modules の値に戻す）
+    for key in _PROTECTED_MODULES:
+        if key in _saved_modules:
+            sys.modules[key] = _saved_modules[key]
+
     yield
+
+    # テスト後も同様に復元
     mock_keys = [key for key, value in list(sys.modules.items()) if _is_mock_instance(value)]
     for key in mock_keys:
         if key in _saved_modules:
             sys.modules[key] = _saved_modules[key]
         else:
             sys.modules.pop(key, None)
+
+    for key in _PROTECTED_MODULES:
+        if key in _saved_modules:
+            sys.modules[key] = _saved_modules[key]
+
+
+# ============================================================================
+# load_dotenv 無効化: テスト中の .env ファイル読み込みによる環境汚染を防止
+#
+# 多くのソースモジュールがモジュールレベルで load_dotenv() を呼び出しており、
+# テストのインポート時に .env ファイルの値がグローバル環境変数にロードされる。
+# これにより後続テストの環境が汚染され、フルスイート実行時のみFAILする
+# テスト隔離問題が発生していた。
+#
+# 解決策: pytest_configure で load_dotenv を no-op に monkeypatch する。
+# テスト側で環境変数が必要な場合は monkeypatch.setenv() で明示的に設定する。
+# ============================================================================
+
+
+def _noop_load_dotenv(*args, **kwargs):
+    """load_dotenv の no-op 置き換え。何もしない。"""
+    pass
+
+
+_original_load_dotenv = None
+
+
+def pytest_configure(config):
+    """
+    テスト開始時に load_dotenv を no-op に置き換え、
+    全モジュールのスナップショットを保存する。
+    """
+    global _result_file_path, _error_log_file_path, _original_load_dotenv, _saved_modules
+
+    # load_dotenv を no-op に置き換え
+    try:
+        import dotenv
+        _original_load_dotenv = dotenv.load_dotenv
+        dotenv.load_dotenv = _noop_load_dotenv
+    except ImportError:
+        pass
+
+    # 全モジュールのスナップショットを保存（Mock ではないもののみ）
+    # これは pytest_collectstart よりも早く実行されるため、
+    # モジュールレベルで sys.modules を汚染するテストファイルの
+    # 収集前の状態を確実にキャプチャできる
+    for key, value in list(sys.modules.items()):
+        if key not in _saved_modules and not _is_mock_instance(value):
+            _saved_modules[key] = value
+
+    # プロジェクトルートを取得
+    project_root = Path(__file__).resolve().parents[1]
+
+    # docs/reports/ ディレクトリを作成
+    reports_dir = project_root / "docs" / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    # タイムスタンプ付きファイル名を生成
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    _result_file_path = reports_dir / f"TEST_RESULTS_{timestamp}.txt"
+    _error_log_file_path = reports_dir / f"TEST_ERRORS_{timestamp}.txt"
 
 
 # webapp 関連のインポートは lazy（トップレベル import の副作用回避）
@@ -397,29 +482,10 @@ def test_api_key(app, test_user_id):
 # テスト結果自動保存機能
 # ==============================================================================
 
-# テスト結果を保存するためのグローバル変数
 _test_results: list[dict[str, Any]] = []
-_result_file_path: Path | None = None
-_error_log_file_path: Path | None = None
 
 
-def pytest_configure(config):
-    """
-    テスト開始時に結果ファイルのパスを設定
-    """
-    global _result_file_path, _error_log_file_path
-
-    # プロジェクトルートを取得
-    project_root = Path(__file__).resolve().parents[1]
-
-    # docs/reports/ ディレクトリを作成
-    reports_dir = project_root / "docs" / "reports"
-    reports_dir.mkdir(parents=True, exist_ok=True)
-
-    # タイムスタンプ付きファイル名を生成
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    _result_file_path = reports_dir / f"TEST_RESULTS_{timestamp}.txt"
-    _error_log_file_path = reports_dir / f"TEST_ERRORS_{timestamp}.txt"
+# (pytest_configure is defined above with load_dotenv neutralization)
 
 
 def pytest_runtest_logreport(report):
