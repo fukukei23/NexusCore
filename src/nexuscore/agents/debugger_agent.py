@@ -209,3 +209,53 @@ class DebuggerAgent(BaseAgent):
             tofile=f"b/{rel_path}",
         )
         return "".join(diff)
+
+
+    def auto_generate_pr(
+        self,
+        error_log: str,
+        files_content: dict[str, str],
+        project_path: str,
+        repo_full_name: str,
+        base_branch: str,
+        fix_branch: str,
+        github_token: str,
+    ) -> dict[str, Any]:
+        """
+        エラーログからパッチを生成し、GitHub PR を自動作成するフルフロー。
+
+        フロー:
+          1. debug_and_patch() でパッチ・修正コードを生成
+          2. GitHubPRCreator.create_fix_pr() でブランチ作成→コミット→PR作成
+
+        Returns:
+            成功: {"status": "created", "pr_number": int, "pr_url": str, "branch": str}
+            失敗: {"status": "error", "error": str}
+        """
+        from nexuscore.agents.github_pr_creator import GitHubPRCreator
+
+        result = self.debug_and_patch(error_log, files_content, project_path)
+        if "error" in result:
+            return {"status": "error", "error": result["error"]}
+
+        fixed_code = result.get("fixed_code")
+        if not fixed_code:
+            return {"status": "error", "error": "No fixed code generated."}
+
+        source_path = next(iter(files_content))
+        error_summary = (error_log or "")[:120].replace("\n", " ")
+
+        try:
+            creator = GitHubPRCreator(token=github_token)
+            pr_result = creator.create_fix_pr(
+                repo_full_name=repo_full_name,
+                file_path=source_path,
+                fixed_content=fixed_code,
+                base_branch=base_branch,
+                fix_branch=fix_branch,
+                error_summary=error_summary,
+            )
+            return pr_result
+        except Exception as e:
+            self.logger.error("PR creation failed: %s", e, exc_info=True)
+            return {"status": "error", "error": str(e)}
