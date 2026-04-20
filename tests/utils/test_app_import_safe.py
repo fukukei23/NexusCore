@@ -13,9 +13,10 @@ def test_app_imports_with_mocks(monkeypatch):
         def run(self, *a, **k):
             return None
 
-    sys.modules["flask"] = type("M", (), {"Flask": DummyFlask})
-    sys.modules["routes_ai_repair"] = type("M", (), {"bp": object()})
-    sys.modules["gradio_ui"] = type("M", (), {"gradio_launch": lambda: None})
+    # monkeypatch.setitem を使って sys.modules を安全に変更（テスト終了後に自動復元）
+    monkeypatch.setitem(sys.modules, "flask", type("M", (), {"Flask": DummyFlask}))
+    monkeypatch.setitem(sys.modules, "routes_ai_repair", type("M", (), {"bp": object()}))
+    monkeypatch.setitem(sys.modules, "gradio_ui", type("M", (), {"gradio_launch": lambda: None}))
 
     class DummyThread:
         def __init__(self, *a, **k):
