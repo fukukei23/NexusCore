@@ -12,14 +12,24 @@ Comprehensive Tests for constitutional_council_agent.py
 import sys
 from unittest.mock import MagicMock
 
-# Flask をモック化（import 前に実行）
-sys.modules["flask"] = MagicMock()
-
 import json
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
+# Flask をモック化する autouse fixture（テスト終了後に自動復元）
+@pytest.fixture(autouse=True)
+def _mock_flask_module():
+    """テスト中のみ flask を MagicMock に置き換える"""
+    original = sys.modules.get("flask")
+    sys.modules["flask"] = MagicMock()
+    yield
+    if original is not None:
+        sys.modules["flask"] = original
+    else:
+        sys.modules.pop("flask", None)
+
 
 from nexuscore.agents.constitutional_council_agent import ConstitutionalCouncilAgent
 

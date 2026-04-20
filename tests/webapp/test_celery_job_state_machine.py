@@ -37,24 +37,14 @@ class TestCeleryTaskWithJobStateMachine:
     @pytest.mark.skipif(not HAS_WEBAPP, reason="webapp modules not available")
     def test_celery_task_state_transition_success(self):
         """Celery タスクが正常に状態遷移することを確認"""
-        # パッチを適用する前に、モジュールを先にインポート
-        # これにより、パッチが正しく適用される
-        import nexuscore.webapp.celery_app
-        import nexuscore.webapp.models
-        import nexuscore.webapp.orchestrator_helper
-
-        # パッチを関数内で適用（遅延パッチ）
-        # celery_app.py 内で使用される場所に合わせてパッチ
-        # celery_app.py では `from nexuscore.webapp.models import Run, Project` とインポート
-        # その後、`Run.query.get()` という形で使用される
-        # db は `from nexuscore.webapp import db` でインポートされているため、nexuscore.webapp.db をパッチ
+        # celery_app.py 内のローカル参照を直接パッチ
+        # celery_app.py は `from nexuscore.webapp.models import Run, Project` しているため、
+        # celery_app モジュール内の Run/Project をパッチする必要がある
         with (
-            patch.object(nexuscore.webapp.models, "Run") as mock_run_class,
-            patch.object(nexuscore.webapp.models, "Project") as mock_project_class,
+            patch("nexuscore.webapp.celery_app.Run") as mock_run_class,
+            patch("nexuscore.webapp.celery_app.Project") as mock_project_class,
             patch("nexuscore.webapp.celery_app.db") as mock_db,
-            patch.object(
-                nexuscore.webapp.orchestrator_helper, "run_orchestrator_sync"
-            ) as mock_run_orchestrator_sync,
+            patch("nexuscore.webapp.celery_app.run_orchestrator_sync") as mock_run_orchestrator_sync,
         ):
 
             # モックの設定
@@ -79,11 +69,6 @@ class TestCeleryTaskWithJobStateMachine:
             mock_db.session = MagicMock()
             mock_db.session.commit = MagicMock()
 
-            # Celery タスクをインポート（パッチ適用後）
-            # パッチが適用された状態でインポートすることで、モックが使用される
-            # モジュールを再読み込みしてパッチを反映
-            if "nexuscore.webapp.celery_app" in sys.modules:
-                importlib.reload(sys.modules["nexuscore.webapp.celery_app"])
             from nexuscore.webapp.celery_app import run_orchestrator_task
 
             # タスクを実行
@@ -98,20 +83,11 @@ class TestCeleryTaskWithJobStateMachine:
     @pytest.mark.skipif(not HAS_WEBAPP, reason="webapp modules not available")
     def test_celery_task_state_transition_failure(self):
         """Celery タスクが失敗時に適切に状態遷移することを確認"""
-        # パッチを適用する前に、モジュールを先にインポート
-        import nexuscore.webapp.celery_app
-        import nexuscore.webapp.models
-        import nexuscore.webapp.orchestrator_helper
-
-        # パッチを関数内で適用（遅延パッチ）
-        # db は `from nexuscore.webapp import db` でインポートされているため、nexuscore.webapp.db をパッチ
         with (
-            patch.object(nexuscore.webapp.models, "Run") as mock_run_class,
-            patch.object(nexuscore.webapp.models, "Project") as mock_project_class,
+            patch("nexuscore.webapp.celery_app.Run") as mock_run_class,
+            patch("nexuscore.webapp.celery_app.Project") as mock_project_class,
             patch("nexuscore.webapp.celery_app.db") as mock_db,
-            patch.object(
-                nexuscore.webapp.orchestrator_helper, "run_orchestrator_sync"
-            ) as mock_run_orchestrator_sync,
+            patch("nexuscore.webapp.celery_app.run_orchestrator_sync") as mock_run_orchestrator_sync,
         ):
 
             # モックの設定
@@ -139,10 +115,6 @@ class TestCeleryTaskWithJobStateMachine:
             # エラーを発生させる
             mock_run_orchestrator_sync.side_effect = Exception("Test error")
 
-            # Celery タスクをインポート（パッチ適用後）
-            # モジュールを再読み込みしてパッチを反映
-            if "nexuscore.webapp.celery_app" in sys.modules:
-                importlib.reload(sys.modules["nexuscore.webapp.celery_app"])
             from nexuscore.webapp.celery_app import run_orchestrator_task
 
             # タスクを実行
@@ -157,22 +129,13 @@ class TestCeleryTaskWithJobStateMachine:
     @pytest.mark.skipif(not HAS_WEBAPP, reason="webapp modules not available")
     def test_celery_task_with_missing_run(self):
         """Run が見つからない場合の処理を確認"""
-        # パッチを適用する前に、モジュールを先にインポート
-        import nexuscore.webapp.celery_app
-        import nexuscore.webapp.models
-
-        # パッチを関数内で適用（遅延パッチ）
         with (
-            patch.object(nexuscore.webapp.models, "Run") as mock_run_class,
-            patch.object(nexuscore.webapp.celery_app, "db") as mock_db,
+            patch("nexuscore.webapp.celery_app.Run") as mock_run_class,
+            patch("nexuscore.webapp.celery_app.db") as mock_db,
         ):
 
             mock_run_class.query.get.return_value = None
 
-            # Celery タスクをインポート（パッチ適用後）
-            # モジュールを再読み込みしてパッチを反映
-            if "nexuscore.webapp.celery_app" in sys.modules:
-                importlib.reload(sys.modules["nexuscore.webapp.celery_app"])
             from nexuscore.webapp.celery_app import run_orchestrator_task
 
             # タスクを実行（エラーが発生しないことを確認）
@@ -184,15 +147,9 @@ class TestCeleryTaskWithJobStateMachine:
     @pytest.mark.skipif(not HAS_WEBAPP, reason="webapp modules not available")
     def test_celery_task_with_missing_requirement(self):
         """requirement が空の場合の処理を確認"""
-        # パッチを適用する前に、モジュールを先にインポート
-        import nexuscore.webapp.celery_app
-        import nexuscore.webapp.models
-
-        # パッチを関数内で適用（遅延パッチ）
-        # db は `from nexuscore.webapp import db` でインポートされているため、nexuscore.webapp.db をパッチ
         with (
-            patch.object(nexuscore.webapp.models, "Run") as mock_run_class,
-            patch.object(nexuscore.webapp.models, "Project"),
+            patch("nexuscore.webapp.celery_app.Run") as mock_run_class,
+            patch("nexuscore.webapp.celery_app.Project"),
             patch("nexuscore.webapp.celery_app.db") as mock_db,
         ):
 
@@ -208,15 +165,6 @@ class TestCeleryTaskWithJobStateMachine:
             # mock_db の設定
             mock_db.session = MagicMock()
             mock_db.session.commit = MagicMock()
-
-            # Celery タスクをインポート（パッチ適用後）
-            # モジュールを再読み込みしてパッチを反映
-            if "nexuscore.webapp.celery_app" in sys.modules:
-                importlib.reload(sys.modules["nexuscore.webapp.celery_app"])
-            # パッチを適用した後、モジュール内の db を直接置き換える
-            import nexuscore.webapp.celery_app as celery_app_module
-
-            celery_app_module.db = mock_db
 
             from nexuscore.webapp.celery_app import run_orchestrator_task
 

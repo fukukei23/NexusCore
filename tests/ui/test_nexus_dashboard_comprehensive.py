@@ -7,14 +7,9 @@ NexusCore Gradio Dashboard の関数とロジックのテスト
 import sys
 from unittest.mock import MagicMock, patch
 
-# Gradioと依存モジュールのモック化
-sys.modules["gradio"] = MagicMock()
-sys.modules["nexuscore.agents.context_agent"] = MagicMock()
-sys.modules["nexuscore.agents.debugger_agent"] = MagicMock()
-sys.modules["nexuscore.agents.coder_agent"] = MagicMock()
-sys.modules["nexuscore.agents.patch_applier"] = MagicMock()
-sys.modules["nexuscore.webapp"] = MagicMock()
-sys.modules["nexuscore.webapp.models"] = MagicMock()
+# テスト全体を通じて sys.modules をモックするコンテキストマネージャ
+# モジュールレベルの MagicMock 設定は他のテストを汚染するため、
+# 各テストメソッド内で patch.dict を使用する
 
 from nexuscore.ui.nexus_dashboard import create_nexus_dashboard, launch_dashboard
 
