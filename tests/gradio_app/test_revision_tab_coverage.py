@@ -1,6 +1,6 @@
 """
 Additional tests for revision_tab.py to reach 85%+ coverage.
-Targets: _call_minimax HTTP, SANDBOX_DIR branch, tab_revision callbacks.
+Targets: call_llm_messages HTTP, SANDBOX_DIR branch, tab_revision callbacks.
 """
 
 import json
@@ -15,9 +15,9 @@ from nexuscore.gradio_app import revision_tab
 
 
 class TestCallMinimaxHTTP:
-    """_call_minimax のHTTPリクエスト本体をテスト"""
+    """call_llm_messages のHTTPリクエスト本体をテスト"""
 
-    def test_call_minimax_success(self, monkeypatch):
+    def testcall_llm_messages_success(self, monkeypatch):
         """API正常応答でコンテンツを返す"""
         monkeypatch.setenv("MINIMAX_API_KEY", "test-key-123")
         monkeypatch.setenv("MINIMAX_API_BASE", "https://api.example.com/v1")
@@ -30,7 +30,7 @@ class TestCallMinimaxHTTP:
         mock_response.raise_for_status = Mock()
 
         with patch("nexuscore.gradio_app.revision_tab.requests.post", return_value=mock_response) as mock_post:
-            result = revision_tab._call_minimax(
+            result = revision_tab.call_llm_messages(
                 [{"role": "user", "content": "test"}], temperature=0.5
             )
 
@@ -41,13 +41,13 @@ class TestCallMinimaxHTTP:
         assert call_kwargs[1]["json"]["model"] == "test-model"
         assert call_kwargs[1]["json"]["temperature"] == 0.5
 
-    def test_call_minimax_no_api_key_raises(self, monkeypatch):
+    def testcall_llm_messages_no_api_key_raises(self, monkeypatch):
         """MINIMAX_API_KEY未設定でRuntimeError"""
         monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
         with pytest.raises(RuntimeError, match="MINIMAX_API_KEY"):
-            revision_tab._call_minimax([{"role": "user", "content": "test"}])
+            revision_tab.call_llm_messages([{"role": "user", "content": "test"}])
 
-    def test_call_minimax_http_error(self, monkeypatch):
+    def testcall_llm_messages_http_error(self, monkeypatch):
         """HTTP エラーでraise_for_statusが発火"""
         monkeypatch.setenv("MINIMAX_API_KEY", "test-key")
         mock_response = Mock()
@@ -55,9 +55,9 @@ class TestCallMinimaxHTTP:
 
         with patch("nexuscore.gradio_app.revision_tab.requests.post", return_value=mock_response):
             with pytest.raises(Exception, match="HTTP 500"):
-                revision_tab._call_minimax([{"role": "user", "content": "test"}])
+                revision_tab.call_llm_messages([{"role": "user", "content": "test"}])
 
-    def test_call_minimax_default_temperature(self, monkeypatch):
+    def testcall_llm_messages_default_temperature(self, monkeypatch):
         """デフォルトtemperature=0.2で呼ばれる"""
         monkeypatch.setenv("MINIMAX_API_KEY", "test-key")
         mock_response = Mock()
@@ -65,7 +65,7 @@ class TestCallMinimaxHTTP:
         mock_response.raise_for_status = Mock()
 
         with patch("nexuscore.gradio_app.revision_tab.requests.post", return_value=mock_response) as mock_post:
-            revision_tab._call_minimax([{"role": "user", "content": "test"}])
+            revision_tab.call_llm_messages([{"role": "user", "content": "test"}])
 
         assert mock_post.call_args[1]["json"]["temperature"] == 0.2
 
@@ -118,11 +118,11 @@ class TestCallGptWithApiKey:
     """call_gpt のAPI keyありパスの追加テスト"""
 
     def test_call_gpt_with_key_calls_minimax(self, monkeypatch):
-        """API keyあり → _call_minimax が呼ばれる"""
+        """API keyあり → call_llm_messages が呼ばれる"""
         monkeypatch.setenv("MINIMAX_API_KEY", "real-key")
 
         mock_llm_response = json.dumps({"code": "def f(): pass", "reason": "test"})
-        with patch("nexuscore.gradio_app.revision_tab._call_minimax", return_value=mock_llm_response) as mock_call:
+        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", return_value=mock_llm_response) as mock_call:
             result = revision_tab.call_gpt("fix the code")
 
         assert result == mock_llm_response

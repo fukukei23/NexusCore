@@ -17,8 +17,9 @@ import sys
 from datetime import datetime
 
 import gradio as gr
-import requests
 from dotenv import load_dotenv
+
+from nexuscore.gradio_app.llm_helper import call_llm_messages
 
 # ===== 1. 設定とロギングの初期化 =====
 
@@ -114,31 +115,14 @@ logger.info(f"🔗 Context Agent統合状況: [エージェント: {agent_type}]
 # ===== 3. MiniMax API連携 =====
 
 
-def _call_minimax_sync(messages: list[dict], temperature: float = 0.1) -> str:
-    """MiniMax APIをHTTPで呼び出す"""
-    if not MINIMAX_API_KEY:
-        raise RuntimeError("MINIMAX_API_KEY is not set")
-    api_base = os.getenv("MINIMAX_API_BASE", "https://api.minimax.chat/v1")
-    response = requests.post(
-        f"{api_base}/chat/completions",
-        headers={"Authorization": f"Bearer {MINIMAX_API_KEY}", "Content-Type": "application/json"},
-        json={"model": MINIMAX_MODEL, "messages": messages, "temperature": temperature, "max_tokens": MAX_TOKENS},
-        timeout=120,
-    )
-    response.raise_for_status()
-    return response.json()["choices"][0]["message"]["content"] or ""
-
-
 async def call_gpt_async(prompt: str, temperature: float = 0.1) -> str:
-    """非同期版 MiniMax API呼び出し（Context Agent対応）"""
-    if not MINIMAX_API_KEY:
-        return "❌ エラー: MiniMax APIキーが設定されていません。"
+    """非同期版 LLM呼び出し（llm_helper経由）"""
     try:
-        logger.info(f"MiniMax API呼び出し開始 (Model: {MINIMAX_MODEL})")
+        logger.info("LLM呼び出し開始 (llm_helper経由)")
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             None,
-            lambda: _call_minimax_sync(
+            lambda: call_llm_messages(
                 [
                     {"role": "system", "content": "あなたは優秀なPythonプログラマーです。Context Agentの推奨事項に従い、高品質なコードを生成してください。"},
                     {"role": "user", "content": prompt},
@@ -146,12 +130,12 @@ async def call_gpt_async(prompt: str, temperature: float = 0.1) -> str:
                 temperature=temperature,
             ),
         )
-        logger.info("MiniMax API呼び出し成功")
+        logger.info("LLM呼び出し成功")
         return result
 
     except Exception as e:
-        logger.error(f"MiniMax API エラー: {e}", exc_info=True)
-        return f"❌ MiniMax API エラー: {e}"
+        logger.error(f"LLM エラー: {e}", exc_info=True)
+        return f"❌ LLM エラー: {e}"
 
 
 def extract_code_from_response(response: str) -> str:

@@ -68,9 +68,9 @@ def mock_subprocess_failure():
 
 @pytest.fixture
 def mock_openai_client():
-    """Mock MiniMax _call_minimax for LLM calls."""
+    """Mock MiniMax call_llm_messages for LLM calls."""
     with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}):
-        with patch("nexuscore.gradio_app.revision_tab._call_minimax") as mock_call:
+        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages") as mock_call:
             mock_call.return_value = '{"code": "def is_prime(n):\\n    return n >= 2", "reason": "Fixed edge case"}'
             yield mock_call
 
@@ -723,7 +723,7 @@ class TestCallGpt:
     def test_call_gpt_without_api_key(self, monkeypatch):
         """Test GPT call without API key returns fallback."""
         monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
-        with patch("nexuscore.gradio_app.revision_tab._call_minimax", side_effect=RuntimeError("MINIMAX_API_KEY is not set")):
+        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", side_effect=RuntimeError("MINIMAX_API_KEY is not set")):
             response = revision_tab.call_gpt("Fix this")
 
         assert "code" in response or "def is_prime" in response
@@ -734,7 +734,7 @@ class TestCallGpt:
     def test_call_gpt_api_exception(self):
         """Test GPT call with API exception falls back."""
         with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}):
-            with patch("nexuscore.gradio_app.revision_tab._call_minimax", side_effect=Exception("API Error")):
+            with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", side_effect=Exception("API Error")):
                 response = revision_tab.call_gpt("prompt")
 
         # Should return fallback
@@ -744,7 +744,7 @@ class TestCallGpt:
     def test_call_gpt_fallback_structure(self, monkeypatch):
         """Test that fallback response has correct structure."""
         monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
-        with patch("nexuscore.gradio_app.revision_tab._call_minimax", side_effect=RuntimeError("No key")):
+        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", side_effect=RuntimeError("No key")):
             response = revision_tab.call_gpt("test prompt")
         data = json.loads(response)
 
@@ -806,7 +806,7 @@ class TestIntegration:
         patch_dir.mkdir(parents=True, exist_ok=True)
         monkeypatch.setattr(revision_tab, "SANDBOX_DIR", sandbox)
         monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
-        monkeypatch.setattr(revision_tab, "_call_minimax", lambda msgs, **kw: '{"code": "def is_prime(n):\\n    return True", "reason": "Fixed"}')
+        monkeypatch.setattr(revision_tab, "call_llm_messages", lambda msgs, **kw: '{"code": "def is_prime(n):\\n    return True", "reason": "Fixed"}')
 
         # Generate prompt
         prompt = revision_tab.generate_prompt(
