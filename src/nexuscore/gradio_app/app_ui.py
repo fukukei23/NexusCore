@@ -10,29 +10,13 @@ import subprocess
 from pathlib import Path
 
 import gradio as gr
-import requests
 from dotenv import load_dotenv
+
+from nexuscore.gradio_app.llm_helper import call_llm_messages
 
 # ====== 設定・クライアント =====================================================
 
 load_dotenv()
-
-
-def _call_minimax(messages: list[dict], temperature: float = 0.2) -> str:
-    """Call MiniMax chat completions API via HTTP."""
-    api_key = os.getenv("MINIMAX_API_KEY")
-    api_base = os.getenv("MINIMAX_API_BASE", "https://api.minimax.chat/v1")
-    model = os.getenv("MINIMAX_MODEL", "MiniMax-M2.7")
-    if not api_key:
-        raise RuntimeError("MINIMAX_API_KEY is not set. Provide it via env or .env file.")
-    response = requests.post(
-        f"{api_base}/chat/completions",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={"model": model, "messages": messages, "temperature": temperature},
-        timeout=120,
-    )
-    response.raise_for_status()
-    return response.json()["choices"][0]["message"]["content"].strip()
 
 
 ROOT = Path(__file__).resolve().parents[2]  # リポジトリルート（src/ の2つ上）
@@ -69,7 +53,7 @@ def generate_unit_test(code: str) -> str:
 **`sample.py` から `is_prime` 関数をインポートする行を含めてください。**
 """.strip()
 
-    rsp = _call_minimax([{"role": "user", "content": prompt}], temperature=0)
+    rsp = call_llm_messages([{"role": "user", "content": prompt}], temperature=0)
     return extract_code(rsp)
 
 

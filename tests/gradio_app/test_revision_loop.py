@@ -69,28 +69,19 @@ def test_save_patch_history(tmp_path, monkeypatch):
     assert data["reason"] == "reason"
 
 
-class TestCallMinimax:
-    @patch("nexuscore.gradio_app.revision_loop._call_minimax", return_value="response text")
-    def test_call_minimax_success(self, mock_call):
-        result = revision_loop._call_minimax([{"role": "user", "content": "test"}])
-        assert result == "response text"
+class TestCallLlmRouting:
+    """call_llm が llm_helper 経由でルーティングされることを検証。"""
 
-    @patch.dict("os.environ", {}, clear=True)
-    def test_call_minimax_no_api_key(self):
-        with pytest.raises(RuntimeError, match="MINIMAX_API_KEY"):
-            revision_loop._call_minimax([{"role": "user", "content": "test"}])
-
-
-class TestCallLlm:
-    @patch("nexuscore.gradio_app.revision_loop._call_minimax", return_value="llm response")
+    @patch("nexuscore.gradio_app.revision_loop._call_llm_routed", return_value="llm response")
     def test_call_llm_success(self, mock_call):
         result = revision_loop.call_llm("test prompt")
         assert result == "llm response"
-        mock_call.assert_called_once()
-        messages = mock_call.call_args[0][0]
-        assert messages[0]["content"] == "test prompt"
+        mock_call.assert_called_once_with("test prompt", temperature=0)
 
-    @patch("nexuscore.gradio_app.revision_loop._call_minimax", side_effect=RuntimeError("API error"))
+    @patch(
+        "nexuscore.gradio_app.revision_loop._call_llm_routed",
+        side_effect=RuntimeError("API error"),
+    )
     def test_call_llm_error(self, mock_call):
         with pytest.raises(RuntimeError, match="API error"):
             revision_loop.call_llm("test")

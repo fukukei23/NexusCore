@@ -7,27 +7,11 @@ from datetime import datetime
 from pathlib import Path
 
 import gradio as gr
-import requests
 from dotenv import load_dotenv
 
+from nexuscore.gradio_app.llm_helper import call_llm
+
 load_dotenv()
-
-
-def _call_minimax(messages: list[dict], temperature: float = 0.2) -> str:
-    """Call MiniMax chat completions API via HTTP."""
-    api_key = os.getenv("MINIMAX_API_KEY")
-    api_base = os.getenv("MINIMAX_API_BASE", "https://api.minimax.chat/v1")
-    model = os.getenv("MINIMAX_MODEL", "MiniMax-M2.7")
-    if not api_key:
-        raise RuntimeError("MINIMAX_API_KEY is not set. Provide it via env or .env file.")
-    response = requests.post(
-        f"{api_base}/chat/completions",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={"model": model, "messages": messages, "temperature": temperature},
-        timeout=120,
-    )
-    response.raise_for_status()
-    return response.json()["choices"][0]["message"]["content"].strip()
 
 
 # パスはプロジェクトルート基準に統一（他UIと同様の sandbox/logs を想定）
@@ -44,8 +28,8 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # === LLM呼び出し ===
 def call_gpt(prompt: str) -> str:
-    """Call MiniMax chat completions for a given prompt."""
-    return _call_minimax([{"role": "user", "content": prompt}], temperature=0)
+    """LLM を呼び出す（Orchestrator LLMRouter 経由、フォールバック付き）。"""
+    return call_llm(prompt, temperature=0)
 
 
 # === コードと理由の抽出 ===
