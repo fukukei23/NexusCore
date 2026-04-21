@@ -1,28 +1,34 @@
 """
 NexusCore SaaS基盤 - Gradioダッシュボード
 
-既存の Orchestrator / NPE / Agents を統合した Gradio UI。
-
-既存の RequirementAgent Gradio UI を参考にしつつ、
-複数プロジェクト・複数ユーザーで共通利用できるテンプレ化を実現。
+Orchestrator / assemble_agent_team 経由でエージェントにアクセスし、
+Orchestrator バイパスを排除した統合 UI。
 """
 
 from __future__ import annotations
 
+import functools
+
 import gradio as gr
 
-# 既存のエージェントをインポート（必要に応じて）
-try:
-    from nexuscore.agents.coder_agent import CoderAgent
-    from nexuscore.agents.context_agent import ContextAgent
-    from nexuscore.agents.debugger_agent import DebuggerAgent
-    from nexuscore.agents.patch_applier import PatchApplier
-except ImportError:
-    # エージェントが存在しない場合は None として扱う
-    ContextAgent = None
-    DebuggerAgent = None
-    CoderAgent = None
-    PatchApplier = None
+from nexuscore.core.orchestrator import assemble_agent_team
+
+# モジュールレベルのエージェントキャッシュ
+_agents_cache: dict | None = None
+
+
+@functools.lru_cache(maxsize=1)
+def _get_agents(project_path: str) -> dict:
+    return assemble_agent_team(project_path)
+
+
+def _get_cached_agents(project_path: str | None) -> dict | None:
+    if not project_path:
+        return None
+    try:
+        return _get_agents(project_path)
+    except Exception:
+        return None
 
 
 def create_nexus_dashboard(
@@ -55,13 +61,13 @@ def create_nexus_dashboard(
                         return "No project path specified", "No context available"
 
                     try:
-                        # ContextAgent を使用してコンテキストを取得
-                        if ContextAgent:
-                            context_agent = ContextAgent(project_root=proj_path)
-                            context = context_agent.get_context()
+                        agents = _get_cached_agents(proj_path)
+                        if agents and "architect_agent" in agents:
+                            architect = agents["architect_agent"]
+                            context = getattr(architect, "get_context", lambda: "No context method")()
                             return f"Project: {proj_path}", str(context)
                         else:
-                            return f"Project: {proj_path}", "ContextAgent not available"
+                            return f"Project: {proj_path}", "Agent team not available"
                     except Exception as e:
                         return f"Error: {proj_path}", f"Analysis failed: {str(e)}"
 
@@ -90,13 +96,13 @@ def create_nexus_dashboard(
                         return "No error log or project path", ""
 
                     try:
-                        if DebuggerAgent and PatchApplier:
-                            DebuggerAgent(project_root=proj_path)
-                            # 簡易版：実際の実装では、より詳細な処理が必要
+                        agents = _get_cached_agents(proj_path)
+                        debugger = agents.get("debugger_agent") if agents else None
+                        if debugger:
                             patch_text = f"# Generated patch for: {proj_path}\n# Error: {error_log_text[:100]}"
                             return patch_text, "Patch generated (preview mode)"
                         else:
-                            return "DebuggerAgent or PatchApplier not available", ""
+                            return "DebuggerAgent not available via agent team", ""
                     except Exception as e:
                         return "", f"Patch generation failed: {str(e)}"
 
@@ -106,8 +112,9 @@ def create_nexus_dashboard(
                         return "No patch or project path"
 
                     try:
-                        if PatchApplier:
-                            applier = PatchApplier()
+                        agents = _get_cached_agents(proj_path)
+                        applier = agents.get("patch_applier_agent") if agents else None
+                        if applier:
                             result = applier.apply_patch(
                                 patch_text=patch_text,
                                 project_path=proj_path,
@@ -119,7 +126,7 @@ def create_nexus_dashboard(
                             else:
                                 return f"Patch application failed: {result.get('error', 'Unknown error')}"
                         else:
-                            return "PatchApplier not available"
+                            return "PatchApplier not available via agent team"
                     except Exception as e:
                         return f"Patch application failed: {str(e)}"
 
