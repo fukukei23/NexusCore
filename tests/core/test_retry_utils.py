@@ -162,26 +162,25 @@ class TestRetryDecorator:
 
         assert call_count == 3  # max_retries=2 なので計3回試行 (0, 1, 2)
 
-    def test_exponential_backoff_delays(self):
-        """指数バックオフの遅延が正しいことを確認"""
-        call_times = []
+    def test_exponential_backoff_delays(self, mock_sleep):
+        """指数バックオフの遅延が正しいことを確認（実時間依存を排除した安定テスト）"""
+        call_count = 0
 
         @retry(max_retries=2, base_delay=0.2)
         def timed_function():
-            call_times.append(time.time())
+            nonlocal call_count
+            call_count += 1
             raise ModelTimeoutError("Timeout")
 
         with pytest.raises(ModelTimeoutError):
             timed_function()
 
-        # 遅延の確認（0.2s、0.4s の指数バックオフ）
-        assert len(call_times) == 3
-        delay_1 = call_times[1] - call_times[0]
-        delay_2 = call_times[2] - call_times[1]
-
-        # 許容誤差を考慮して検証
-        assert 0.15 < delay_1 < 0.35, f"First delay should be ~0.2s, got {delay_1:.3f}s"
-        assert 0.30 < delay_2 < 0.60, f"Second delay should be ~0.4s, got {delay_2:.3f}s"
+        # 3回試行（初回＋2回リトライ）
+        assert call_count == 3
+        assert mock_sleep.call_count == 2
+        # 指数バックオフ: base_delay=0.2, multiplier=2.0 → 0.2s, 0.4s
+        assert mock_sleep.call_args_list[0][0][0] == pytest.approx(0.2)
+        assert mock_sleep.call_args_list[1][0][0] == pytest.approx(0.4)
 
     def test_non_retryable_error_not_retried(self):
         """リトライ対象外のエラーでは即座に失敗するテスト"""
