@@ -162,7 +162,7 @@ class TestExtractCodeAndReason:
 
 class TestCallGpt:
     def test_fallback_no_api_key(self):
-        with patch.dict(os.environ, {}, clear=True):
+        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", side_effect=RuntimeError("no key")):
             result = revision_tab.call_gpt("test")
         data = json.loads(result)
         assert "code" in data
@@ -170,20 +170,19 @@ class TestCallGpt:
         assert "is_prime" in data["code"]
 
     def test_api_error_fallback(self):
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "fake"}, clear=True):
-            with patch.dict("sys.modules", {"openai": None, "openai.OpenAI": None}):
-                result = revision_tab.call_gpt("test")
+        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", side_effect=RuntimeError("API error")):
+            result = revision_tab.call_gpt("test")
         data = json.loads(result)
         assert "is_prime" in data["code"]
 
     def test_openai_success(self):
-        with patch("nexuscore.gradio_app.revision_tab._call_minimax", return_value="result text"):
+        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", return_value="result text"):
             with patch.dict(os.environ, {"MINIMAX_API_KEY": "fake"}, clear=True):
                 result = revision_tab.call_gpt("test prompt")
         assert result == "result text"
 
     def test_openai_none_content(self):
-        with patch("nexuscore.gradio_app.revision_tab._call_minimax", return_value=""):
+        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", return_value=""):
             with patch.dict(os.environ, {"MINIMAX_API_KEY": "fake"}, clear=True):
                 result = revision_tab.call_gpt("test")
         assert result == ""
