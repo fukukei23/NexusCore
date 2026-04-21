@@ -33,30 +33,7 @@ except Exception as exc:
     logging.warning("Failed to configure import paths for API server: %s", exc)
 
 # --- NexusCoreのコンポーネントをインポート ---
-from nexuscore.agents.architect_agent import ArchitectAgent
-from nexuscore.agents.coder_agent import CoderAgent
-from nexuscore.agents.debugger_agent import DebuggerAgent
-from nexuscore.agents.guardian_agent import GuardianAgent
-from nexuscore.agents.planner_agent import PlannerAgent
-from nexuscore.agents.tester_agent import TesterAgent
-from nexuscore.core.orchestrator import Orchestrator
-
-try:
-    from nexuscore.agents.policy_agent import PolicyAgent
-except ImportError:
-
-    class PolicyAgent:  # type: ignore[no-redef]
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def audit(self, *args, **kwargs):
-            return {"result": "APPROVED"}
-
-
-from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
-from nexuscore.agents.patch_applier import PatchApplier
-from nexuscore.agents.postmortem_agent import PostmortemAgent
-from nexuscore.llm.llm_router import LLMRouter
+from nexuscore.core.orchestrator import Orchestrator, assemble_agent_team
 
 # --- グローバル変数（既存の Flask 実装と共有） ---
 # 既存の Flask 実装 (`server.py`) の `tasks` 辞書を共有するため、
@@ -69,8 +46,6 @@ except ImportError:
     # フォールバック: モジュールが見つからない場合は新規作成
     tasks = {}
     logging.warning("Could not import server.tasks, using local tasks dict")
-
-llm_router = LLMRouter()
 
 # --- ロギング設定 ---
 from nexuscore.utils.log_config import get_logs_dir
@@ -85,63 +60,21 @@ def run_orchestrator_task(task_id: str, requirement: str, project_path: str, con
     """
     Orchestratorをバックグラウンドで実行するワーカー関数
 
-    既存の Flask 実装と同じロジックを使用。
+    assemble_agent_team() 経由でエージェントを生成し、
+    Orchestrator バイパスを排除する。
     """
     logger.info(f"Starting background task: {task_id}")
     tasks[task_id] = {"status": "running", "message": "Initializing agents..."}
 
     try:
-        # --- 1. 近代化されたエージェントの招集 (引数なし) ---
-        architect_agent = ArchitectAgent()
-        planner_agent = PlannerAgent()
-        coder_agent = CoderAgent()
-        tester_agent = TesterAgent()
-        debugger_agent = DebuggerAgent()
-        postmortem_agent = PostmortemAgent()
-
-        # --- 2. 特殊任務エージェントのプロビジョニング (引数あり) ---
-        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "A primary API key (e.g., GEMINI_API_KEY or OPENAI_API_KEY) must be set in the .env file."
-            )
-
-        def provision_agent(agent_class, task_type: str, **kwargs):
-            """エージェントを動的にプロビジョニングするヘルパー関数"""
-            model_name = llm_router.task_model_map.get(task_type, llm_router.default_model)
-            logger.info(
-                f"Provisioning {agent_class.__name__} for '{task_type}' task with model '{model_name}'."
-            )
-            base_args = {"api_key": api_key, "model": model_name}
-            all_args = {**base_args, **kwargs}
-            return agent_class(**all_args)
-
-        guardian_agent = provision_agent(GuardianAgent, "review")
-        knowledge_curator_agent = provision_agent(KnowledgeCuratorAgent, "general")
-
-        policy_rules_path = os.path.join(PROJECT_ROOT, "config", "policy_rules.json")
-        policy_agent = provision_agent(PolicyAgent, "policy", policy_rules_path=policy_rules_path)
-
-        # --- 3. ユーティリティと司令塔 (Orchestrator) の任命 ---
-        patch_applier = PatchApplier()
+        agents = assemble_agent_team(project_path)
 
         orchestrator = Orchestrator(
             project_path=project_path,
             constitution=constitution,
-            requirement_agent=None,
-            architect_agent=architect_agent,
-            planner_agent=planner_agent,
-            coder_agent=coder_agent,
-            tester_agent=tester_agent,
-            debugger_agent=debugger_agent,
-            guardian_agent=guardian_agent,
-            policy_agent=policy_agent,
-            postmortem_agent=postmortem_agent,
-            knowledge_curator_agent=knowledge_curator_agent,
-            patch_applier=patch_applier,
+            **agents,
         )
 
-        # --- 4. 開発プロセスの開始 ---
         tasks[task_id]["message"] = "Design phase started."
         orchestrator.design_phase(requirement)
 

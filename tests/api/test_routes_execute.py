@@ -1,5 +1,7 @@
 """
 Tests for nexuscore.api.routes.execute module.
+
+assemble_agent_team() 経由でエージェントを生成するリファクタリング後のテスト。
 """
 
 import os
@@ -42,86 +44,59 @@ def mock_tasks():
     exec_mod.tasks.update(original)
 
 
+def _make_mock_agents():
+    """assemble_agent_team() の戻り値をモック"""
+    return {
+        "requirement_agent": MagicMock(),
+        "architect_agent": MagicMock(),
+        "planner_agent": MagicMock(),
+        "coder_agent": MagicMock(),
+        "tester_agent": MagicMock(),
+        "debugger_agent": MagicMock(),
+        "guardian_agent": MagicMock(),
+        "policy_agent": MagicMock(),
+        "postmortem_agent": MagicMock(),
+        "knowledge_curator_agent": MagicMock(),
+        "patch_applier_agent": MagicMock(),
+        "llm_router": MagicMock(),
+    }
+
+
 class TestRunOrchestratorTask:
     """run_orchestrator_task 関数のテスト"""
 
     def test_run_success(self, mock_tasks):
         from nexuscore.api.routes.execute import run_orchestrator_task
 
-        # モックエージェントに __name__ を設定
-        mock_agents = {}
-        for name in [
-            "ArchitectAgent", "PlannerAgent", "CoderAgent", "TesterAgent",
-            "DebuggerAgent", "GuardianAgent", "PolicyAgent", "PostmortemAgent",
-            "KnowledgeCuratorAgent", "PatchApplier",
-        ]:
-            m = MagicMock()
-            m.__name__ = name
-            mock_agents[name] = m
-
+        mock_agents = _make_mock_agents()
         mock_orch_instance = MagicMock()
 
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
-            with patch("nexuscore.api.routes.execute.ArchitectAgent", mock_agents["ArchitectAgent"]):
-                with patch("nexuscore.api.routes.execute.PlannerAgent", mock_agents["PlannerAgent"]):
-                    with patch("nexuscore.api.routes.execute.CoderAgent", mock_agents["CoderAgent"]):
-                        with patch("nexuscore.api.routes.execute.TesterAgent", mock_agents["TesterAgent"]):
-                            with patch("nexuscore.api.routes.execute.DebuggerAgent", mock_agents["DebuggerAgent"]):
-                                with patch("nexuscore.api.routes.execute.GuardianAgent", mock_agents["GuardianAgent"]):
-                                    with patch("nexuscore.api.routes.execute.PolicyAgent", mock_agents["PolicyAgent"]):
-                                        with patch("nexuscore.api.routes.execute.PostmortemAgent", mock_agents["PostmortemAgent"]):
-                                            with patch("nexuscore.api.routes.execute.KnowledgeCuratorAgent", mock_agents["KnowledgeCuratorAgent"]):
-                                                with patch("nexuscore.api.routes.execute.PatchApplier", mock_agents["PatchApplier"]):
-                                                    with patch("nexuscore.api.routes.execute.Orchestrator", return_value=mock_orch_instance):
-                                                        # llm_router グローバルをモック
-                                                        with patch("nexuscore.api.routes.execute.llm_router") as mock_router:
-                                                            mock_router.task_model_map = {}
-                                                            mock_router.default_model = "test-model"
-                                                            run_orchestrator_task("task-1", "Build app", "/tmp/test", {})
+        with patch("nexuscore.api.routes.execute.assemble_agent_team", return_value=mock_agents):
+            with patch("nexuscore.api.routes.execute.Orchestrator", return_value=mock_orch_instance):
+                run_orchestrator_task("task-1", "Build app", "/tmp/test", {})
 
         assert mock_tasks["task-1"]["status"] == "completed"
         mock_orch_instance.design_phase.assert_called_once_with("Build app")
 
-    def test_run_missing_api_key(self, mock_tasks):
+    def test_run_assemble_fails(self, mock_tasks):
         from nexuscore.api.routes.execute import run_orchestrator_task
 
-        with patch.dict(os.environ, {}, clear=True):
+        with patch("nexuscore.api.routes.execute.assemble_agent_team", side_effect=RuntimeError("No GLM_API_KEY")):
             run_orchestrator_task("task-2", "Build app", "/tmp/test", {})
+
         assert mock_tasks["task-2"]["status"] == "error"
-        assert "API key" in mock_tasks["task-2"]["message"]
+        assert "failed" in mock_tasks["task-2"]["message"]
 
     def test_run_orchestrator_exception(self, mock_tasks):
         from nexuscore.api.routes.execute import run_orchestrator_task
 
-        mock_agents = {}
-        for name in [
-            "ArchitectAgent", "PlannerAgent", "CoderAgent", "TesterAgent",
-            "DebuggerAgent", "GuardianAgent", "PolicyAgent", "PostmortemAgent",
-            "KnowledgeCuratorAgent", "PatchApplier",
-        ]:
-            m = MagicMock()
-            m.__name__ = name
-            mock_agents[name] = m
-
+        mock_agents = _make_mock_agents()
         mock_orch_instance = MagicMock()
         mock_orch_instance.design_phase.side_effect = RuntimeError("Design failed")
 
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
-            with patch("nexuscore.api.routes.execute.ArchitectAgent", mock_agents["ArchitectAgent"]):
-                with patch("nexuscore.api.routes.execute.PlannerAgent", mock_agents["PlannerAgent"]):
-                    with patch("nexuscore.api.routes.execute.CoderAgent", mock_agents["CoderAgent"]):
-                        with patch("nexuscore.api.routes.execute.TesterAgent", mock_agents["TesterAgent"]):
-                            with patch("nexuscore.api.routes.execute.DebuggerAgent", mock_agents["DebuggerAgent"]):
-                                with patch("nexuscore.api.routes.execute.GuardianAgent", mock_agents["GuardianAgent"]):
-                                    with patch("nexuscore.api.routes.execute.PolicyAgent", mock_agents["PolicyAgent"]):
-                                        with patch("nexuscore.api.routes.execute.PostmortemAgent", mock_agents["PostmortemAgent"]):
-                                            with patch("nexuscore.api.routes.execute.KnowledgeCuratorAgent", mock_agents["KnowledgeCuratorAgent"]):
-                                                with patch("nexuscore.api.routes.execute.PatchApplier", mock_agents["PatchApplier"]):
-                                                    with patch("nexuscore.api.routes.execute.Orchestrator", return_value=mock_orch_instance):
-                                                        with patch("nexuscore.api.routes.execute.llm_router") as mock_router:
-                                                            mock_router.task_model_map = {}
-                                                            mock_router.default_model = "test-model"
-                                                            run_orchestrator_task("task-3", "Build app", "/tmp/test", {})
+        with patch("nexuscore.api.routes.execute.assemble_agent_team", return_value=mock_agents):
+            with patch("nexuscore.api.routes.execute.Orchestrator", return_value=mock_orch_instance):
+                run_orchestrator_task("task-3", "Build app", "/tmp/test", {})
 
         assert mock_tasks["task-3"]["status"] == "error"
         assert "failed" in mock_tasks["task-3"]["message"]
