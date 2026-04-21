@@ -1,6 +1,6 @@
 """
 Additional tests for revision_tab.py to reach 85%+ coverage.
-Targets: _call_minimax HTTP, SANDBOX_DIR branch, tab_revision callbacks.
+Targets: call_llm_messages routing, SANDBOX_DIR branch, tab_revision callbacks.
 """
 
 import json
@@ -14,60 +14,32 @@ import pytest
 from nexuscore.gradio_app import revision_tab
 
 
-class TestCallMinimaxHTTP:
-    """_call_minimax のHTTPリクエスト本体をテスト"""
+class TestCallLlmMessagesRouting:
+    """call_llm_messages 経由のLLM呼び出しをテスト"""
 
-    def test_call_minimax_success(self, monkeypatch):
-        """API正常応答でコンテンツを返す"""
-        monkeypatch.setenv("MINIMAX_API_KEY", "test-key-123")
-        monkeypatch.setenv("MINIMAX_API_BASE", "https://api.example.com/v1")
-        monkeypatch.setenv("MINIMAX_MODEL", "test-model")
-
-        mock_response = Mock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": "  generated code  "}}]
-        }
-        mock_response.raise_for_status = Mock()
-
-        with patch("nexuscore.gradio_app.revision_tab.requests.post", return_value=mock_response) as mock_post:
-            result = revision_tab._call_minimax(
-                [{"role": "user", "content": "test"}], temperature=0.5
-            )
+    def test_call_llm_messages_success(self):
+        """call_llm_messages が正常応答を返す"""
+        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", return_value="generated code") as mock_call:
+            result = revision_tab.call_gpt("test prompt")
 
         assert result == "generated code"
-        mock_post.assert_called_once()
-        call_kwargs = mock_post.call_args
-        assert "test-key-123" in call_kwargs[1]["headers"]["Authorization"]
-        assert call_kwargs[1]["json"]["model"] == "test-model"
-        assert call_kwargs[1]["json"]["temperature"] == 0.5
 
-    def test_call_minimax_no_api_key_raises(self, monkeypatch):
-        """MINIMAX_API_KEY未設定でRuntimeError"""
-        monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
-        with pytest.raises(RuntimeError, match="MINIMAX_API_KEY"):
-            revision_tab._call_minimax([{"role": "user", "content": "test"}])
+    def test_call_llm_messages_error_triggers_fallback(self):
+        """call_llm_messages 例外 → フォールバック応答"""
+        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", side_effect=RuntimeError("API error")):
+            result = revision_tab.call_gpt("test")
 
-    def test_call_minimax_http_error(self, monkeypatch):
-        """HTTP エラーでraise_for_statusが発火"""
-        monkeypatch.setenv("MINIMAX_API_KEY", "test-key")
-        mock_response = Mock()
-        mock_response.raise_for_status.side_effect = Exception("HTTP 500")
+        data = json.loads(result)
+        assert "code" in data
+        assert "is_prime" in data["code"]
 
-        with patch("nexuscore.gradio_app.revision_tab.requests.post", return_value=mock_response):
-            with pytest.raises(Exception, match="HTTP 500"):
-                revision_tab._call_minimax([{"role": "user", "content": "test"}])
+    def test_call_llm_messages_passes_prompt(self):
+        """プロンプトが正しく call_llm_messages に渡される"""
+        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", return_value="ok") as mock_call:
+            revision_tab.call_gpt("fix the code")
 
-    def test_call_minimax_default_temperature(self, monkeypatch):
-        """デフォルトtemperature=0.2で呼ばれる"""
-        monkeypatch.setenv("MINIMAX_API_KEY", "test-key")
-        mock_response = Mock()
-        mock_response.json.return_value = {"choices": [{"message": {"content": "ok"}}]}
-        mock_response.raise_for_status = Mock()
-
-        with patch("nexuscore.gradio_app.revision_tab.requests.post", return_value=mock_response) as mock_post:
-            revision_tab._call_minimax([{"role": "user", "content": "test"}])
-
-        assert mock_post.call_args[1]["json"]["temperature"] == 0.2
+        call_args = mock_call.call_args[0]
+        assert call_args[0][0]["content"] == "fix the code"
 
 
 class TestSandboxDirFallback:
@@ -83,7 +55,6 @@ class TestSandboxDirFallback:
         monkeypatch.setattr(revision_tab, "SRC_ROOT", src_root)
         monkeypatch.setattr(revision_tab, "PROJECT_ROOT", project_root)
 
-        # モジュールレベルの再評価をシミュレート
         candidates = [src_root / "sandbox_output", project_root / "sandbox_output"]
         for c in candidates:
             if c.exists():
@@ -110,19 +81,16 @@ class TestExtractCodeEdgeCases:
         response = "```python\nx = 42\n```"
         code, reason = revision_tab.extract_code_and_reason(response)
         assert "x = 42" in code
-        # コードブロックを除いた残りが空なのでフォールバックメッセージ
         assert isinstance(reason, str)
 
 
 class TestCallGptWithApiKey:
     """call_gpt のAPI keyありパスの追加テスト"""
 
-    def test_call_gpt_with_key_calls_minimax(self, monkeypatch):
-        """API keyあり → _call_minimax が呼ばれる"""
-        monkeypatch.setenv("MINIMAX_API_KEY", "real-key")
-
+    def test_call_gpt_routes_through_llm_helper(self):
+        """call_gpt → call_llm_messages 経由で呼ばれる"""
         mock_llm_response = json.dumps({"code": "def f(): pass", "reason": "test"})
-        with patch("nexuscore.gradio_app.revision_tab._call_minimax", return_value=mock_llm_response) as mock_call:
+        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", return_value=mock_llm_response) as mock_call:
             result = revision_tab.call_gpt("fix the code")
 
         assert result == mock_llm_response

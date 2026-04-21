@@ -67,15 +67,15 @@ class TestCreateNexusDashboard:
 # Tab1: 解析 - analyze_project テスト
 # ============================================================================
 class TestAnalyzeProject:
-    @patch("nexuscore.ui.nexus_dashboard.ContextAgent")
-    def test_analyze_project_no_path(self, mock_context_agent):
+    @patch("nexuscore.ui.nexus_dashboard.assemble_agent_team")
+    def test_analyze_project_no_path(self, mock_assemble):
         """プロジェクトパスなしの場合"""
         # dashboardを作成せずに、analyze_project関数を直接テストするのは難しいため
         # 統合的なテストとして扱う
         pass
 
-    @patch("nexuscore.ui.nexus_dashboard.ContextAgent")
-    def test_analyze_project_with_path(self, mock_context_agent):
+    @patch("nexuscore.ui.nexus_dashboard.assemble_agent_team")
+    def test_analyze_project_with_path(self, mock_assemble):
         """プロジェクトパスありの場合"""
         # 同様に統合テストとして扱う
         pass
@@ -224,8 +224,8 @@ class TestNexusDashboardIntegration:
         assert mock_gr.Tab.call_count >= 4  # 4つのタブ
 
     @patch("nexuscore.ui.nexus_dashboard.gr")
-    @patch("nexuscore.ui.nexus_dashboard.ContextAgent")
-    def test_dashboard_with_context_agent_available(self, mock_context_agent, mock_gr):
+    @patch("nexuscore.ui.nexus_dashboard.assemble_agent_team")
+    def test_dashboard_with_context_agent_available(self, mock_assemble, mock_gr):
         """ContextAgentが利用可能な場合"""
         mock_blocks = MagicMock()
         mock_gr.Blocks.return_value.__enter__.return_value = mock_blocks
@@ -236,8 +236,8 @@ class TestNexusDashboardIntegration:
         assert result is not None
 
     @patch("nexuscore.ui.nexus_dashboard.gr")
-    @patch("nexuscore.ui.nexus_dashboard.ContextAgent", None)
-    def test_dashboard_without_context_agent(self, mock_gr):
+    @patch("nexuscore.ui.nexus_dashboard.assemble_agent_team", side_effect=ImportError("no agent"))
+    def test_dashboard_without_context_agent(self, mock_assemble, mock_gr):
         """ContextAgentが利用不可な場合"""
         mock_blocks = MagicMock()
         mock_gr.Blocks.return_value.__enter__.return_value = mock_blocks

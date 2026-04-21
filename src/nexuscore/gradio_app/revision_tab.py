@@ -21,7 +21,8 @@ import subprocess
 from pathlib import Path
 
 import gradio as gr
-import requests
+
+from nexuscore.gradio_app.llm_helper import call_llm_messages
 
 logger = logging.getLogger(__name__)
 
@@ -51,22 +52,7 @@ PATCH_HISTORY_DIR = PROJECT_ROOT / "patch_history"
 os.makedirs(PATCH_HISTORY_DIR, exist_ok=True)
 
 
-# ---------- LLM 呼び出し（MiniMax HTTP） ----------
-def _call_minimax(messages: list[dict], temperature: float = 0.2) -> str:
-    """Call MiniMax chat completions API via HTTP."""
-    api_key = os.getenv("MINIMAX_API_KEY")
-    api_base = os.getenv("MINIMAX_API_BASE", "https://api.minimax.chat/v1")
-    model = os.getenv("MINIMAX_MODEL", "MiniMax-M2.7")
-    if not api_key:
-        raise RuntimeError("MINIMAX_API_KEY is not set.")
-    response = requests.post(
-        f"{api_base}/chat/completions",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={"model": model, "messages": messages, "temperature": temperature},
-        timeout=120,
-    )
-    response.raise_for_status()
-    return response.json()["choices"][0]["message"]["content"].strip()
+# ---------- LLM 呼び出し（llm_helper 経由） ----------
 
 
 # ---------- 互換ユーティリティ ----------
@@ -205,11 +191,9 @@ def call_gpt(prompt: str) -> str:
     - MINIMAX_API_KEY があれば MiniMax API を使う
     - 無ければ簡易フォールバックの修正案を返す（is_prime の 2 対応など）
     """
-    api_key = os.getenv("MINIMAX_API_KEY")
-    if api_key:
-        try:
-            return _call_minimax([{"role": "user", "content": prompt}], temperature=0.2)
-        except Exception:
+    try:
+        return call_llm_messages([{"role": "user", "content": prompt}], temperature=0.2)
+    except Exception:
             # API失敗時はフォールバック
             logger.warning("MiniMax API failed, using fallback", exc_info=True)
 

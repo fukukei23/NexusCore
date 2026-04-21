@@ -20,8 +20,9 @@ def test_load_api_key_prefers_env(monkeypatch):
 
 def test_call_gpt_async_without_key(monkeypatch):
     monkeypatch.setattr(streamlit_migrated_tab, "MINIMAX_API_KEY", None)
-    result = asyncio.run(streamlit_migrated_tab.call_gpt_async("hello"))
-    assert "APIキー" in result or "エラー" in result or "キー" in result
+    with patch("nexuscore.gradio_app.streamlit_migrated_tab.call_llm_messages", side_effect=RuntimeError("no key")):
+        result = asyncio.run(streamlit_migrated_tab.call_gpt_async("hello"))
+    assert "エラー" in result
 
 
 def test_load_api_key_from_dotenv(monkeypatch):
