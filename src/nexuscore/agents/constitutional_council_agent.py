@@ -525,7 +525,7 @@ Analyze the case files in light of the current constitution and propose exactly 
                 return False
             return True
 
-        @app.route("/approve/<filename>")
+        @app.route("/approve/<path:filename>")
         def approve(filename: str):
             if not _is_safe_filename(filename):
                 logger.warning(f"[WEB-UI] Invalid path/filename detected in approve: {filename}")
@@ -558,7 +558,7 @@ Analyze the case files in light of the current constitution and propose exactly 
                 flash(f"承認処理中に予期せぬエラー: {e}", "danger")
             return redirect(url_for("index"))
 
-        @app.route("/reject/<filename>")
+        @app.route("/reject/<path:filename>")
         def reject(filename: str):
             if not _is_safe_filename(filename):
                 logger.warning(f"[WEB-UI] Invalid path/filename detected in reject: {filename}")
