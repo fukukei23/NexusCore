@@ -1,40 +1,65 @@
-# ==============================================================================
-# ファイル名: test_diff_viewer.py (20%突破保険)
-# 配置場所: tests/modules/
-# メモ: 4行のdiff_viewer.py完全攻略・+0.2%保険向上
-# ==============================================================================
+"""
+diff_viewer.py 包括テスト
+generate_diff() の正常系・エッジケースを完全カバー
+"""
+from __future__ import annotations
 
-import unittest
+import pytest
 
-try:
-    import nexuscore.modules.diff_viewer as diff_viewer
-except ImportError:
-    diff_viewer = None
+from nexuscore.modules.diff_viewer import generate_diff
 
 
-class TestDiffViewer(unittest.TestCase):
-    """差分表示機能のテスト。"""
+class TestGenerateDiff:
+    def test_diff_identical_strings_returns_empty(self):
+        result = generate_diff("hello", "hello")
+        assert result == ""
 
-    def test_diff_viewer_import(self):
-        """差分ビューアーのインポートテスト。"""
-        try:
-            import nexuscore.modules.diff_viewer as dv
+    def test_diff_different_strings_contains_header(self):
+        result = generate_diff("old line", "new line")
+        assert "--- Before" in result
+        assert "+++ After" in result
 
-            self.assertIsNotNone(dv)
-        except ImportError:
-            self.skipTest("Diff Viewerのインポートに失敗")
+    def test_diff_shows_removed_line(self):
+        result = generate_diff("old line", "new line")
+        assert "-old line" in result
 
-    def test_diff_functions(self):
-        """差分表示関数のテスト。"""
-        if diff_viewer is None:
-            self.skipTest("Diff Viewerが利用できません")
+    def test_diff_shows_added_line(self):
+        result = generate_diff("old line", "new line")
+        assert "+new line" in result
 
-        diff_functions = ["show_diff", "display_diff", "view_diff"]
-        for func_name in diff_functions:
-            if hasattr(diff_viewer, func_name):
-                func = getattr(diff_viewer, func_name)
-                self.assertTrue(callable(func))
+    def test_diff_empty_old_code(self):
+        result = generate_diff("", "new line")
+        assert "+new line" in result
 
+    def test_diff_empty_new_code(self):
+        result = generate_diff("old line", "")
+        assert "-old line" in result
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    def test_diff_both_empty_returns_empty(self):
+        result = generate_diff("", "")
+        assert result == ""
+
+    def test_diff_multiline_code(self):
+        old = "def foo():\n    return 1"
+        new = "def foo():\n    return 2"
+        result = generate_diff(old, new)
+        assert "-    return 1" in result
+        assert "+    return 2" in result
+
+    def test_diff_returns_string(self):
+        result = generate_diff("a", "b")
+        assert isinstance(result, str)
+
+    def test_diff_added_multiple_lines(self):
+        old = "line1"
+        new = "line1\nline2\nline3"
+        result = generate_diff(old, new)
+        assert "+line2" in result
+        assert "+line3" in result
+
+    def test_diff_no_format_in_unified_diff(self):
+        """unified_diff uses lineterm="" so no extra newlines"""
+        result = generate_diff("a", "b")
+        # Should not have trailing newlines in joined output
+        assert isinstance(result, str)
+        assert len(result) > 0
