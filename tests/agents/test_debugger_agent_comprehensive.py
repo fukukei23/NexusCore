@@ -11,6 +11,7 @@ debugger_agent.py の包括的テスト
 """
 
 import json
+import os
 from unittest.mock import Mock, patch
 
 import pytest
@@ -384,3 +385,126 @@ class TestEdgeCases:
         # マッチしない場合はNoneが返される
         solution = agent._find_solution_from_kb(error_log)
         assert solution is None
+
+
+# --- Coverage gap tests for lines 38-55, 190->192 ---
+
+
+@pytest.mark.skipif(not HAS_DEBUGGER_AGENT, reason="debugger_agent module not available")
+class TestFindProjectRoot:
+    """Cover lines 38-55: _find_project_root_for_database()."""
+
+    def test_env_var_set_with_valid_dir(self, tmp_path):
+        kb_dir = tmp_path / "database"
+        kb_dir.mkdir()
+        (kb_dir / "knowledge_base.py").write_text("# dummy")
+        import nexuscore.agents.debugger_agent as mod
+
+        with patch.dict(os.environ, {"NEXUS_PROJECT_ROOT": str(tmp_path)}):
+            result = mod._find_project_root_for_database()
+            assert result == str(tmp_path)
+
+    def test_env_var_set_but_no_kb_file(self, tmp_path):
+        import nexuscore.agents.debugger_agent as mod
+
+        with patch.dict(os.environ, {"NEXUS_PROJECT_ROOT": str(tmp_path)}):
+            with patch.object(mod, "__file__", str(tmp_path / "dummy.py")):
+                result = mod._find_project_root_for_database()
+                assert result is None
+
+    def test_traverse_finds_database_dir(self, tmp_path):
+        kb_dir = tmp_path / "database"
+        kb_dir.mkdir()
+        (kb_dir / "knowledge_base.py").write_text("# dummy")
+        sub = tmp_path / "src" / "nexuscore" / "agents"
+        sub.mkdir(parents=True)
+        dummy = sub / "debugger_agent.py"
+        dummy.write_text("# dummy")
+        import nexuscore.agents.debugger_agent as mod
+
+        with patch.dict(os.environ, {}, clear=False):
+            with patch.object(mod, "__file__", str(dummy)):
+                result = mod._find_project_root_for_database()
+                assert result == str(tmp_path)
+
+    def test_returns_none_when_not_found(self, tmp_path):
+        dummy = tmp_path / "dummy.py"
+        dummy.write_text("# dummy")
+        import nexuscore.agents.debugger_agent as mod
+
+        with patch.dict(os.environ, {"NEXUS_PROJECT_ROOT": "/nonexistent"}, clear=False):
+            with patch.object(mod, "__file__", str(dummy)):
+                result = mod._find_project_root_for_database()
+                assert result is None
+
+
+@pytest.mark.skipif(not HAS_DEBUGGER_AGENT, reason="debugger_agent module not available")
+class TestGenerateFixedCodePythonPrefix:
+    """Cover branch 190->192: ```python prefix in _generate_fixed_code."""
+
+    def test_python_prefix_stripped(self):
+        agent = DebuggerAgent.__new__(DebuggerAgent)
+        agent.logger = Mock()
+
+        with patch.object(agent, "execute_llm_task", return_value="```python\nprint('hi')\n```"):
+            result = agent._generate_fixed_code("err", "file.py", "code", "fix it")
+            assert result == "print('hi')"
+
+    def test_diff_prefix_stripped(self):
+        agent = DebuggerAgent.__new__(DebuggerAgent)
+        agent.logger = Mock()
+
+        with patch.object(agent, "execute_llm_task", return_value="```diff\n--- a/f.py\n+++ b/f.py\n```"):
+            result = agent._generate_fixed_code("err", "file.py", "code", "fix it")
+            assert result == "--- a/f.py\n+++ b/f.py"
+
+    def test_no_prefix_returns_as_is(self):
+        agent = DebuggerAgent.__new__(DebuggerAgent)
+        agent.logger = Mock()
+
+        with patch.object(agent, "execute_llm_task", return_value="plain code here"):
+            result = agent._generate_fixed_code("err", "file.py", "code", "fix it")
+            assert result == "plain code here"
+
+    def test_empty_response_returns_none(self):
+        agent = DebuggerAgent.__new__(DebuggerAgent)
+        agent.logger = Mock()
+
+        with patch.object(agent, "execute_llm_task", return_value=""):
+            result = agent._generate_fixed_code("err", "file.py", "code", "fix it")
+            assert result is None
+
+
+@pytest.mark.skipif(not HAS_DEBUGGER_AGENT, reason="debugger_agent module not available")
+class TestDebugAndPatchEdgeCases:
+    """Cover lines 134, 153-157, 200-201."""
+
+    def test_empty_files_returns_error(self):
+        agent = DebuggerAgent.__new__(DebuggerAgent)
+        agent.logger = Mock()
+        result = agent.debug_and_patch("some error", {}, "/project")
+        assert "error" in result
+        assert "No files" in result["error"]
+
+    def test_knowledge_base_find_solution_exception(self):
+        """Cover lines 153-157: knowledge_base.find_solution raises exception."""
+        import nexuscore.agents.debugger_agent as mod
+
+        mock_kb = Mock()
+        mock_kb.find_solution.side_effect = RuntimeError("DB error")
+        agent = DebuggerAgent.__new__(DebuggerAgent)
+        agent.logger = Mock()
+        agent.local_knowledge_base = None
+
+        with patch.object(mod, "knowledge_base", mock_kb):
+            result = agent._find_solution_from_kb("some error")
+            assert result is None
+
+    def test_create_diff_relpath_exception(self):
+        """Cover lines 200-201: os.path.relpath raises exception."""
+        agent = DebuggerAgent.__new__(DebuggerAgent)
+        agent.logger = Mock()
+
+        with patch("os.path.relpath", side_effect=ValueError("path error")):
+            diff = agent._create_diff("original\n", "fixed\n", "/abs/path.py", "/project")
+            assert "/abs/path.py" in diff
