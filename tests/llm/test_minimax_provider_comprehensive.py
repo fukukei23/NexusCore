@@ -380,3 +380,135 @@ class TestMiniMaxProviderStubDetails:
         parsed = json.loads(result)
         assert parsed["model"] == "minimax-m2.7"
         assert parsed["mode"] == "minimax-stub-fallback"
+
+
+# --- Coverage gap tests for lines 26-27, 68-69, 75-76, branch 90->88 ---
+
+
+class TestCoverageGapLines26to27:
+    """Cover lines 26-27: api_key is None but real_calls would be True."""
+
+    @patch.dict(os.environ, {}, clear=True)
+    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    def test_no_api_key_but_real_enabled_falls_back(self, mock_factory, mock_real_enabled):
+        mock_factory.available = True
+        mock_factory.create_session.return_value = Mock()
+        provider = MiniMaxLLM("minimax-m2.7")
+        assert provider.real_calls is False
+
+
+class TestCoverageGapMaxTokens:
+    """Cover lines 68-69: NEXUS_DEFAULT_MAX_OUT_TOKENS env var."""
+
+    @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key", "NEXUS_DEFAULT_MAX_OUT_TOKENS": "512"}, clear=True)
+    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    def test_max_tokens_from_env_in_real_call_payload(self, mock_factory, mock_real_enabled):
+        mock_resp = Mock()
+        mock_resp.json.return_value = {
+            "choices": [{"message": {"content": "hello"}}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+        }
+        mock_resp.raise_for_status = Mock()
+        mock_session = Mock()
+        mock_session.post.return_value = mock_resp
+        mock_factory.available = True
+        mock_factory.create_session.return_value = mock_session
+        provider = MiniMaxLLM("minimax-m2.7")
+        result = provider.execute("prompt", "system")
+        assert result == "hello"
+        call_kwargs = mock_session.post.call_args
+        payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
+        assert payload["max_tokens"] == 512
+
+    @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key", "NEXUS_DEFAULT_MAX_OUT_TOKENS": "abc"}, clear=True)
+    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    def test_invalid_max_tokens_env_ignored(self, mock_factory, mock_real_enabled):
+        mock_resp = Mock()
+        mock_resp.json.return_value = {
+            "choices": [{"message": {"content": "ok"}}],
+            "usage": {},
+        }
+        mock_resp.raise_for_status = Mock()
+        mock_session = Mock()
+        mock_session.post.return_value = mock_resp
+        mock_factory.available = True
+        mock_factory.create_session.return_value = mock_session
+        provider = MiniMaxLLM("minimax-m2.7")
+        provider.execute("prompt", "system")
+        call_kwargs = mock_session.post.call_args
+        payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
+        assert "max_tokens" not in payload
+
+
+class TestCoverageGapAsJsonResponseFormat:
+    """Cover line 75-76: as_json=True adds response_format."""
+
+    @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
+    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    def test_as_json_adds_response_format_to_payload(self, mock_factory, mock_real_enabled):
+        mock_resp = Mock()
+        mock_resp.json.return_value = {
+            "choices": [{"message": {"content": '{"key": "value"}'}}],
+            "usage": {},
+        }
+        mock_resp.raise_for_status = Mock()
+        mock_session = Mock()
+        mock_session.post.return_value = mock_resp
+        mock_factory.available = True
+        mock_factory.create_session.return_value = mock_session
+        provider = MiniMaxLLM("minimax-m2.7")
+        result = provider.execute("prompt", "system", as_json=True)
+        call_kwargs = mock_session.post.call_args
+        payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
+        assert payload["response_format"] == {"type": "json_object"}
+        assert "key" in result
+
+
+class TestCoverageGapTemperatureErrorBranch:
+    """Cover branch 90->88: temperature TypeError/ValueError handling."""
+
+    @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
+    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    def test_invalid_temperature_type_error_handled(self, mock_factory, mock_real_enabled):
+        mock_resp = Mock()
+        mock_resp.json.return_value = {
+            "choices": [{"message": {"content": "ok"}}],
+            "usage": {},
+        }
+        mock_resp.raise_for_status = Mock()
+        mock_session = Mock()
+        mock_session.post.return_value = mock_resp
+        mock_factory.available = True
+        mock_factory.create_session.return_value = mock_session
+        provider = MiniMaxLLM("minimax-m2.7")
+        result = provider.execute("prompt", "system", temperature="not-a-number")
+        assert result == "ok"
+        call_kwargs = mock_session.post.call_args
+        payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
+        assert "temperature" not in payload
+
+    @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
+    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    def test_none_temperature_handled(self, mock_factory, mock_real_enabled):
+        mock_resp = Mock()
+        mock_resp.json.return_value = {
+            "choices": [{"message": {"content": "ok"}}],
+            "usage": {},
+        }
+        mock_resp.raise_for_status = Mock()
+        mock_session = Mock()
+        mock_session.post.return_value = mock_resp
+        mock_factory.available = True
+        mock_factory.create_session.return_value = mock_session
+        provider = MiniMaxLLM("minimax-m2.7")
+        result = provider.execute("prompt", "system", temperature=None)
+        assert result == "ok"
+        call_kwargs = mock_session.post.call_args
+        payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
+        assert "temperature" not in payload
