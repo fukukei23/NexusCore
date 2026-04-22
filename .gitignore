@@ -125,3 +125,21 @@ minikube-linux-amd64
 
 # ローカルデータベース
 nexus_local.db
+
+# --- 履歴・生成物（Git追跡から除外） ---
+test_history/
+patch_history/
+codex_history/
+src/logs/
+tools/exports/
+_demo_runs/
+tmp/
+data_collection/
+healing_sandbox/
+sandbox_output/
+coverage_reports/
+policies/
+fkb_local.json
+
+# エージェント残骸
+webapp/
