@@ -135,3 +135,36 @@ jobs:
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: true
+
+  # ============================================================================
+  # Gradio Isolation Check / Gradio依存分離チェック
+  # ============================================================================
+  gradio-isolation:
+    name: Gradio UI ↔ Core Separation Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run Gradio isolation check
+        run: |
+          python scripts/check_gradio_isolation.py --strict
+
+      - name: Run Gradio isolation check (JSON report)
+        if: always()
+        run: |
+          python scripts/check_gradio_isolation.py --json > gradio-isolation-report.json || true
+
+      - name: Upload isolation report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: gradio-isolation-report
+          path: gradio-isolation-report.json
+          retention-days: 30
