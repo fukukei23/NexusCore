@@ -106,10 +106,13 @@ jobs:
 
       - name: Run tests and generate coverage report
         run: |
-          # --cov=src measures coverage for entire src folder
-          # --cov-report=xml generates XML report for Codecov
-          # --cov-report=term-missing shows missing lines
-          python -m pytest --cov=src --cov-report=xml --cov-report=term-missing
+          # -n auto: parallel execution across all CPU cores (pytest-xdist)
+          # --dist=loadfile: group tests by file to avoid module-level conflicts
+          # --cov-fail-under=80: FAIL CI if coverage drops below 80%
+          python -m pytest -n auto --dist=loadfile \
+            --cov=src --cov-report=xml --cov-report=term-missing \
+            --cov-fail-under=80 \
+            --durations=20
 
       - name: Run webapp UI smoke tests
         run: |
@@ -135,3 +138,13 @@ jobs:
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: true
+
+      - name: Upload test results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-py${{ matrix.python-version }}
+          path: |
+            coverage.xml
+            docs/reports/
+          retention-days: 14
