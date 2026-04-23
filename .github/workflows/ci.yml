@@ -103,13 +103,17 @@ jobs:
           pip install -r requirements.txt
           # Install dev dependencies (includes pytest-cov)
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          pip install pytest-xdist
 
       - name: Run tests and generate coverage report
         run: |
           # --cov=src measures coverage for entire src folder
           # --cov-report=xml generates XML report for Codecov
           # --cov-report=term-missing shows missing lines
-          python -m pytest --cov=src --cov-report=xml --cov-report=term-missing
+          # --cov-fail-under=80 ensures coverage doesn't drop below 80%
+          # -n auto --dist=loadfile enables parallel test execution
+          python -m pytest --cov=src --cov-report=xml --cov-report=term-missing \
+            --cov-fail-under=80 --durations=20 -n auto --dist=loadfile
 
       - name: Run webapp UI smoke tests
         run: |
@@ -126,6 +130,16 @@ jobs:
         with:
           header: phase3-coverage
           path: docs/coverage_phase3_summary_ci.md
+
+      - name: Upload test results as artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-py${{ matrix.python-version }}
+          path: |
+            coverage.xml
+            test-results/
+          retention-days: 7
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
