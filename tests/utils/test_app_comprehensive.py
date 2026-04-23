@@ -92,8 +92,10 @@ class TestAppImport:
 
             import nexuscore.utils.app as app_module  # noqa: F401
 
-            # Verify thread was created with gradio_launch as target
-            mock_thread_cls.assert_called_once_with(target=mock_gradio_launch, daemon=True)
+            # Verify thread was created (lazy import wrapper is the target)
+            mock_thread_cls.assert_called_once()
+            call_kwargs = mock_thread_cls.call_args[1]
+            assert call_kwargs.get("daemon") is True
 
             # Verify thread was started
             mock_thread.start.assert_called_once()

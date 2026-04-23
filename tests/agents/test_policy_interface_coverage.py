@@ -95,11 +95,16 @@ class TestLaunchAndWaitForInput:
         assert result is not None
         assert result["method"] == "safe_default"
 
-    def test_returns_queue_result(self):
+    @patch("nexuscore.agents.policy_interface.GRADIO_AVAILABLE", True)
+    @patch("nexuscore.agents.policy_interface.gr")
+    def test_returns_queue_result(self, mock_gr):
         """キューに結果がある場合、即座に返す（行167-169）"""
         from nexuscore.agents.policy_interface import PolicyInterface
 
         pi = PolicyInterface()
+        mock_blocks = MagicMock()
+        mock_gr.Blocks.return_value.__enter__.return_value = mock_blocks
+
         expected = {"test_import_policy": "test", "method": "queue_test"}
         pi.result_queue.put(expected)
         result = pi.launch_and_wait_for_input(timeout=5)
