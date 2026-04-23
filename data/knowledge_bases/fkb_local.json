@@ -93,5 +93,916 @@
       "instructions": "First, check for typos in the import statement. If it's correct, the module may not be installed. Add the required package to `requirements.txt` and try to install it."
     },
     "notes": "Can be a dependency issue or a simple typo."
+  },
+  {
+    "error_signature": "fixture '.*' not found",
+    "cause": "pytestフィクスチャが定義されていない、またはconftest.pyに配置されていない。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "test_file",
+      "instructions": "Check if the fixture is defined in conftest.py or the test file. If missing, create the fixture. If in a different conftest.py, move it to the appropriate shared conftest."
+    },
+    "notes": "Common when tests reference fixtures from other test modules."
+  },
+  {
+    "error_signature": "E\\s+TypeError: unsupported operand type.*for .*: 'NoneType' and '.*'",
+    "cause": "None値に対して演算やメソッド呼び出しを行っている。関数の戻り値がNoneの場合がある。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Add None check before the operation. Use guard clause: if value is None: return default or raise appropriate error."
+    },
+    "notes": "Very common when API responses or database queries return None."
+  },
+  {
+    "error_signature": "E\\s+AttributeError: 'NoneType' object has no attribute '.*'",
+    "cause": "None値の属性にアクセスしている。チェーンメソッド呼び出しの中間結果がNone。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Add None guard before attribute access. Use getattr(obj, attr, default) or explicit if obj is not None check."
+    },
+    "notes": "Common with chained method calls like response.json()['key']['subkey']."
+  },
+  {
+    "error_signature": "E\\s+AttributeError: module '.*' has no attribute '.*'",
+    "cause": "モジュールに存在しない属性・関数を参照している。名前のタイポまたはバージョン差異。",
+    "solution_pattern": {
+      "type": "correct_variable_name",
+      "instructions": "Check for typos in the attribute name. Verify the module's actual exports using dir(module). May be a version mismatch."
+    },
+    "notes": "Frequent with third-party library API changes across versions."
+  },
+  {
+    "error_signature": "E\\s+TypeError: .*\\(\\) missing \\d+ required positional argument",
+    "cause": "関数呼び出し時に必須引数が不足している。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check the function signature and provide all required positional arguments. Review the traceback for the call site."
+    },
+    "notes": "Common when refactoring function signatures without updating all call sites."
+  },
+  {
+    "error_signature": "E\\s+TypeError: .*\\(\\) takes \\d+ positional argument but \\d+ were given",
+    "cause": "関数に渡す引数が多すぎる。self引数の考慮漏れや不要な引数渡し。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Remove extra arguments from the function call. Check if self is needed for method calls."
+    },
+    "notes": "Often happens when calling instance methods without self or passing extra args."
+  },
+  {
+    "error_signature": "E\\s+TypeError: '.*' object is not callable",
+    "cause": "呼び出し可能でないオブジェクトを関数として呼び出している。変数名と関数名の衝突。",
+    "solution_pattern": {
+      "type": "correct_variable_name",
+      "instructions": "Check if a variable shadows a function name. Rename the variable to avoid the conflict."
+    },
+    "notes": "Common when assigning to a variable with the same name as an imported function."
+  },
+  {
+    "error_signature": "E\\s+TypeError: '.*' object is not subscriptable",
+    "cause": "インデックスアクセスをサポートしないオブジェクトに[]演算子を使用している。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check if the object supports indexing. Use proper attribute access (obj.key) instead of subscript (obj['key']) for non-dict types."
+    },
+    "notes": "Happens with NamedTuple, dataclass, or custom objects vs dict confusion."
+  },
+  {
+    "error_signature": "E\\s+TypeError: can only concatenate str \\(not '.*'\\) to str",
+    "cause": "文字列と数値等を+で結合しようとしている。",
+    "solution_pattern": {
+      "type": "regex_replace",
+      "search": "(\\w+)\\s*\\+\\s*\"(.*)\"",
+      "replace": "f\"{\\1}\\2\""
+    },
+    "notes": "Fix by converting to f-string or wrapping non-str in str()."
+  },
+  {
+    "error_signature": "E\\s+ValueError: invalid literal for int\\(\\) with base 10: '.*'",
+    "cause": "数値変換不可能な文字列をint()に渡している。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Add input validation before int() conversion. Use try/except or str.isdigit() check. Consider float() first if decimal."
+    },
+    "notes": "Common when parsing user input or data files."
+  },
+  {
+    "error_signature": "E\\s+KeyError: '.*'",
+    "cause": "辞書に存在しないキーでアクセスしている。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Use dict.get(key, default) instead of dict[key] for optional keys. Check key existence with 'in' operator first."
+    },
+    "notes": "One of the most common runtime errors in Python."
+  },
+  {
+    "error_signature": "E\\s+IndexError: list index out of range",
+    "cause": "リストの範囲外インデックスにアクセスしている。空リストや想定より短いリスト。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check list length before indexing. Use conditional: if len(lst) > idx: or use try/except IndexError."
+    },
+    "notes": "Common when parsing structured data or splitting strings."
+  },
+  {
+    "error_signature": "E\\s+FileNotFoundError: \\[Errno 2\\] No such file or directory: '.*'",
+    "cause": "指定されたファイルパスが存在しない。パスの構築ミスまたはファイル未作成。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Verify the file path is correct. Use pathlib.Path for path construction. Add file existence check with Path.exists() before access."
+    },
+    "notes": "Common with relative paths or when assuming file creation by prior steps."
+  },
+  {
+    "error_signature": "E\\s+PermissionError: \\[Errno 13\\] Permission denied: '.*'",
+    "cause": "ファイルやディレクトリへのアクセス権限がない。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check file/directory permissions. Use os.access() to verify. Consider writing to a different location with proper permissions."
+    },
+    "notes": "Common in containerized environments or CI/CD."
+  },
+  {
+    "error_signature": "E\\s+json.decoder.JSONDecodeError: .*",
+    "cause": "JSONパース失敗。不正なJSON形式または空ファイル。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Add JSON validation before parsing. Check for empty response. Use try/except json.JSONDecodeError with fallback."
+    },
+    "notes": "Common with API responses and config files."
+  },
+  {
+    "error_signature": "E\\s+UnicodeDecodeError: '.*' codec can't decode byte",
+    "cause": "ファイルエンコーディングが想定と異なる。UTF-8以外のファイルをUTF-8として読んでいる。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Specify encoding explicitly: open(path, encoding='utf-8'). Try 'utf-8-sig' for BOM files, or 'latin-1' as fallback."
+    },
+    "notes": "Common on Windows or with Excel-generated CSV files."
+  },
+  {
+    "error_signature": "E\\s+IsADirectoryError: \\[Errno 21\\] Is a directory: '.*'",
+    "cause": "ディレクトリパスをファイルとして開こうとしている。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check if path is a file before opening: if path.is_file(). Append filename to directory path if needed."
+    },
+    "notes": "Happens when constructing paths incorrectly."
+  },
+  {
+    "error_signature": "E\\s+ConnectionError:.*",
+    "cause": "ネットワーク接続に失敗。対象サーバーが応答しないまたはネットワーク到達不能。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Add retry logic with exponential backoff. Check network connectivity. Use requests.Session with retry adapter."
+    },
+    "notes": "Transient network issues should have retry logic."
+  },
+  {
+    "error_signature": "E\\s+requests.exceptions.Timeout:.*",
+    "cause": "HTTPリクエストがタイムアウトした。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Increase timeout value. Add retry logic. Consider using async requests for better timeout handling."
+    },
+    "notes": "Common with slow external APIs."
+  },
+  {
+    "error_signature": "E\\s+requests.exceptions.ConnectionError:.*",
+    "cause": "HTTP接続エラー。URLが不正またはサーバーが停止している。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Verify the URL is correct and accessible. Add connection retry with backoff. Use mock for tests."
+    },
+    "notes": "In tests, mock the HTTP client instead of making real requests."
+  },
+  {
+    "error_signature": "E\\s+httpx.HTTPStatusError: .*",
+    "cause": "HTTPレスポンスのステータスコードがエラー（4xx/5xx）。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check response status before processing: if response.status_code == 200. Handle specific error codes appropriately."
+    },
+    "notes": "Should validate status codes in API client code."
+  },
+  {
+    "error_signature": "E\\s+RuntimeError: There is no current event loop in thread '.*'",
+    "cause": "非同期イベントループが存在しないスレッドでasync関数を呼び出している。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Use asyncio.run() for top-level async calls. Ensure event loop is created before async operations."
+    },
+    "notes": "Common when mixing sync and async code."
+  },
+  {
+    "error_signature": "E\\s+RuntimeError: Event loop is closed",
+    "cause": "閉じたイベントループで非同期操作を実行しようとしている。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Create a new event loop or use asyncio.new_event_loop(). Check if aiohttp session is properly managed."
+    },
+    "notes": "Common with improperly cleaned up async resources."
+  },
+  {
+    "error_signature": "E\\s+RuntimeError: coroutine '.*' was never awaited",
+    "cause": "async関数をawaitなしで呼び出している。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Add await keyword before the async function call. If called from sync code, use asyncio.run() or ensure the caller is async."
+    },
+    "notes": "Very common mistake when starting with async/await."
+  },
+  {
+    "error_signature": "E\\s+sqlite3.IntegrityError: UNIQUE constraint failed: .*",
+    "cause": "一意制約違反。既に存在する値を重複して挿入しようとしている。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check for existing record before insert using SELECT. Use INSERT OR IGNORE or INSERT OR REPLACE for SQLite."
+    },
+    "notes": "Common in data import and batch processing."
+  },
+  {
+    "error_signature": "E\\s+sqlite3.OperationalError: no such table: .*",
+    "cause": "データベースに指定されたテーブルが存在しない。マイグレーション未実行。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Run database migrations before accessing tables. Use create_all() to ensure schema exists."
+    },
+    "notes": "Common in test environments with fresh databases."
+  },
+  {
+    "error_signature": "E\\s+psycopg2.OperationalError:.*",
+    "cause": "PostgreSQL接続エラー。接続文字列が不正またはDBが停止している。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check DATABASE_URL connection string. Verify PostgreSQL is running. Add connection retry logic."
+    },
+    "notes": "Common in CI/CD environments or Docker setups."
+  },
+  {
+    "error_signature": "E\\s+RecursionError: maximum recursion depth exceeded",
+    "cause": "再帰が深すぎる。無限再帰または終了条件の欠落。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check base case in recursive function. Consider converting to iterative approach. Increase recursion limit if legitimate deep recursion."
+    },
+    "notes": "Often caused by circular references or missing base cases."
+  },
+  {
+    "error_signature": "E\\s+StopIteration",
+    "cause": "イテレータが尽きた後にnext()を呼び出している。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Use next(iterator, default) with a default value. Or wrap next() in try/except StopIteration."
+    },
+    "notes": "Common when manually iterating generators."
+  },
+  {
+    "error_signature": "E\\s+NotImplementedError",
+    "cause": "抽象メソッドが実装されていない。サブクラスでオーバーライドが必要。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Implement the abstract method in the subclass. Remove the NotImplementedError and add actual implementation."
+    },
+    "notes": "Common when adding new abstract methods to base classes."
+  },
+  {
+    "error_signature": "E\\s+TypeError: 'NoneType' object is not iterable",
+    "cause": "None値をイテラブルとしてfor文等で使用している。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Add None check before iteration: for item in (items or []): or if items is not None: before the loop."
+    },
+    "notes": "Common when function returns None instead of empty list."
+  },
+  {
+    "error_signature": "E\\s+TypeError: argument of type 'NoneType' is not iterable",
+    "cause": "None値に対して'in'演算子を使用している。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check for None before using 'in': if container is not None and key in container. Or use default empty container."
+    },
+    "notes": "Similar to NoneType not iterable but specifically for 'in' operator."
+  },
+  {
+    "error_signature": "E\\s+ZeroDivisionError: division by zero",
+    "cause": "ゼロで除算している。分母の変数が0または0.0。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Add zero check before division: if denominator != 0: or use try/except ZeroDivisionError with default value."
+    },
+    "notes": "Common in percentage/ratio calculations."
+  },
+  {
+    "error_signature": "E\\s+TypeError: 'dict' object is not callable",
+    "cause": "辞書を関数として呼び出している。dict[key]をdict(key)と書いている。",
+    "solution_pattern": {
+      "type": "regex_replace",
+      "search": "(\\w+)\\((['\"].*['\"])\\)",
+      "replace": "\\1[\\2]"
+    },
+    "notes": "Common typo: dict('key') should be dict['key']."
+  },
+  {
+    "error_signature": "E\\s+SyntaxError: invalid syntax$",
+    "cause": "Python構文エラー。カッコの不一致やコロン忘れ等。",
+    "solution_pattern": {
+      "type": "autoformat_code",
+      "instructions": "Check for mismatched parentheses, missing colons after if/for/def, or invalid characters. Use a linter to identify the exact issue."
+    },
+    "notes": "Generic syntax error, often from AI-generated code."
+  },
+  {
+    "error_signature": "E\\s+SyntaxError: EOL while scanning string literal",
+    "cause": "文字列リテラルが閉じられていない。引用符の不一致。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check for unclosed string literals. Ensure opening and closing quotes match (both single or both double)."
+    },
+    "notes": "Common in dynamically generated code strings."
+  },
+  {
+    "error_signature": "E\\s+TabError: inconsistent use of tabs and spaces in indentation",
+    "cause": "タブとスペースが混在している。",
+    "solution_pattern": {
+      "type": "autoformat_code",
+      "instructions": "Convert all tabs to spaces (4 spaces per PEP 8). Use expandtabs(4) or reformat with Black."
+    },
+    "notes": "Common when mixing code from different sources."
+  },
+  {
+    "error_signature": "E\\s+TypeError: Object of type .* is not JSON serializable",
+    "cause": "JSON化できないオブジェクト（datetime, bytes, etc）をjson.dumpsに渡している。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Add custom JSON encoder for non-serializable types. Use str() conversion or .isoformat() for datetime objects."
+    },
+    "notes": "Very common with datetime and custom objects."
+  },
+  {
+    "error_signature": "E\\s+UnboundLocalError: local variable '.*' referenced before assignment",
+    "cause": "ローカル変数が代入前に参照されている。条件分岐内での代入漏れ。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Initialize the variable before the conditional block. Ensure all code paths assign a value before use."
+    },
+    "notes": "Common when variable is only assigned inside an if/else block."
+  },
+  {
+    "error_signature": "E\\s+OverflowError: math range error",
+    "cause": "数値計算のオーバーフロー。指数計算や対数計算で極端な値。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Add bounds checking before math operations. Use try/except OverflowError with appropriate fallback values."
+    },
+    "notes": "Common with exponential or logarithmic calculations."
+  },
+  {
+    "error_signature": "E\\s+OSError: \\[Errno 98\\] Address already in use",
+    "cause": "指定ポートが既に使用されている。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Use a different port or find and kill the process using the current port. Set SO_REUSEADDR socket option."
+    },
+    "notes": "Common in development servers and test fixtures."
+  },
+  {
+    "error_signature": "E\\s+pickle.UnpicklingError:.*",
+    "cause": "pickleファイルの読み込み失敗。破損またはバージョン不整合。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Regenerate the pickle file. Add try/except with fallback to recreate from source data."
+    },
+    "notes": "Common when Python version changes or file is corrupted."
+  },
+  {
+    "error_signature": "E\\s+TypeError: expected str, bytes or os.PathLike object, not NoneType",
+    "cause": "パス引数にNoneを渡している。パスの構築結果がNone。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check that path construction returns a valid value. Add None guard: path = path or 'default_path'."
+    },
+    "notes": "Common when path is built from missing configuration values."
+  },
+  {
+    "error_signature": "AssertionError: assert None",
+    "cause": "テストの結果がNone。関数の戻り値が期待されていたがNoneが返された。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check if the tested function returns a value. Ensure all code paths return a result instead of None."
+    },
+    "notes": "Common when function ends without explicit return."
+  },
+  {
+    "error_signature": "E\\s+pytest.exceptions.Failed:.*FAILED.*",
+    "cause": "pytestテストが失敗。具体的なアサーションエラーは出力に含まれる。",
+    "solution_pattern": {
+      "type": "llm_diagnose_and_fix",
+      "instruction": "Analyze the full test output including the FAILED test details. Identify the root cause from the assertion message and fix the source code or test accordingly."
+    },
+    "notes": "Generic pytest failure requiring detailed analysis."
+  },
+  {
+    "error_signature": "E\\s+subprocess.CalledProcessError: Command '.*' returned non-zero exit status",
+    "cause": "サブプロセスコマンドが非ゼロで終了した。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check the command and its arguments. Capture stderr for error details. Add error handling for subprocess failures."
+    },
+    "notes": "Common when calling external tools from Python."
+  },
+  {
+    "error_signature": "E\\s+TypeError: 'typing\\..*' object is not subscriptable",
+    "cause": "Python 3.8以下でジェネリクスの添字表記（list[str]等）を使用している。",
+    "solution_pattern": {
+      "type": "add_import",
+      "import": "from __future__ import annotations"
+    },
+    "notes": "Fix: add 'from __future__ import annotations' at top of file for PEP 604 support."
+  },
+  {
+    "error_signature": "E\\s+TypeError: descriptor '.*' requires a '.*' object but received a '.*'",
+    "cause": "間違った型のオブジェクトでメソッドを呼び出している。型の混同。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check the object type before calling the method. Ensure the correct type is being used."
+    },
+    "notes": "Common with class methods and inheritance."
+  },
+  {
+    "error_signature": "E\\s+RuntimeError: maximum recursion depth exceeded while calling a Python object",
+    "cause": "__repr__や__eq__の無限再帰。自己参照するデータ構造。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check for circular references in __repr__ or __eq__. Add visited tracking or break circular reference."
+    },
+    "notes": "Different from general RecursionError - specifically in object methods."
+  },
+  {
+    "error_signature": "E\\s+ValueError: too many values to unpack \\(expected \\d+\\)",
+    "cause": "タプルアンパックの数が合わない。イテラブルの要素数と変数数が不一致。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check the number of values being unpacked matches the number of variables. Use *_ to capture remaining values."
+    },
+    "notes": "Common with function return values that changed signature."
+  },
+  {
+    "error_signature": "E\\s+ValueError: not enough values to unpack \\(expected \\d+, got \\d+\\)",
+    "cause": "タプルアンパックで値が足りない。空のイテラブルや短すぎるシーケンス。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Verify the iterable has enough elements before unpacking. Add length check or use default values."
+    },
+    "notes": "Common when parsing split() results with missing delimiters."
+  },
+  {
+    "error_signature": "E\\s+TypeError: 'float' object is not subscriptable",
+    "cause": "浮動小数点数にインデックスアクセスしている。タプル/リストの期待がfloat。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check if the function should return a tuple instead of a float. The return value may need wrapping in a tuple."
+    },
+    "notes": "Common when a function returns a single value instead of a tuple."
+  },
+  {
+    "error_signature": "E\\s+AttributeError: 'dict' object has no attribute '.*'",
+    "cause": "辞書にドット記法でアクセスしている。obj.keyをobj['key']にする必要がある。",
+    "solution_pattern": {
+      "type": "regex_replace",
+      "search": "(\\w+)\\.(?!items|keys|values|get|pop|update|setdefault|copy|clear|fromkeys|popitem)([a-zA-Z_]\\w*)",
+      "replace": "\\1['\\2']"
+    },
+    "notes": "Use dict['key'] syntax or convert to SimpleNamespace for dot access."
+  },
+  {
+    "error_signature": "E\\s+TypeError: cannot unpack non-iterable NoneType object",
+    "cause": "Noneをアンパックしようとしている。関数が値を返していない。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Ensure the function returns a tuple/list. Add None check before unpacking or return empty tuple as default."
+    },
+    "notes": "Common when forgetting to return from a function."
+  },
+  {
+    "error_signature": "E\\s+re.error: invalid regular expression: .*",
+    "cause": "不正な正規表現パターン。エスケープ不足や無効な構文。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Fix the regex pattern. Escape special characters properly. Test the regex in a separate tool before using."
+    },
+    "notes": "Common in dynamic regex construction."
+  },
+  {
+    "error_signature": "E\\s+TypeError: 'str' object does not support item assignment",
+    "cause": "文字列はイミュータブル。文字列のインデックスに代入できない。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Convert string to list, modify, then join back: chars = list(s); chars[i] = 'x'; s = ''.join(chars)."
+    },
+    "notes": "Python strings are immutable, unlike some other languages."
+  },
+  {
+    "error_signature": "E\\s+ValueError: I/O operation on closed file",
+    "cause": "閉じたファイルオブジェクトに対して読み書きを行っている。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Move operations inside the with block. Ensure file is not closed before use."
+    },
+    "notes": "Common when trying to access file outside 'with' context."
+  },
+  {
+    "error_signature": "E\\s+TypeError: 'module' object is not callable",
+    "cause": "モジュール自体を関数として呼び出している。モジュール名と関数名の混同。",
+    "solution_pattern": {
+      "type": "correct_variable_name",
+      "instructions": "Use module.function() instead of module(). Check the import statement - may need 'from module import function'."
+    },
+    "notes": "Common with confusing module/class naming."
+  },
+  {
+    "error_signature": "E\\s+ReferenceError: weakly-referenced object no longer exists",
+    "cause": "弱参照先オブジェクトが既にガベージコレクションされている。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Keep a strong reference to the object. Avoid relying on weak references for long-lived access."
+    },
+    "notes": "Uncommon but occurs with caching and observer patterns."
+  },
+  {
+    "error_signature": "E\\s+BufferError:.*",
+    "cause": "バッファ操作エラー。メモリビューやバイト操作の問題。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check buffer size and alignment. Ensure correct data type for buffer operations."
+    },
+    "notes": "Rare, occurs in low-level data processing."
+  },
+  {
+    "error_signature": "E\\s+TypeError: 'bool' object is not subscriptable",
+    "cause": "ブール値にインデックスアクセスしている。APIレスポンスのパースミス。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check the actual return type of the function. The response may be a boolean status instead of a data structure."
+    },
+    "notes": "Common when API returns success flag instead of data."
+  },
+  {
+    "error_signature": "E\\s+TimeoutError$",
+    "cause": "一般的なタイムアウトエラー。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Increase timeout value. Add retry logic with exponential backoff. Check for deadlock or infinite loops."
+    },
+    "notes": "Generic timeout, could be network, thread, or process related."
+  },
+  {
+    "error_signature": "E\\s+TypeError: __init__\\(\\) got an unexpected keyword argument '.*'",
+    "cause": "コンストラクタに存在しないキーワード引数を渡している。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check the class __init__ signature. Remove or rename the invalid keyword argument. May need to update class definition."
+    },
+    "notes": "Common after refactoring class constructors."
+  },
+  {
+    "error_signature": "E\\s+ValueError: time data '.*' does not match format '.*'",
+    "cause": "日付時刻文字列が指定フォーマットと一致しない。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Verify the date format string matches the actual data. Try multiple formats or use dateutil.parser for flexible parsing."
+    },
+    "notes": "Common when handling dates from multiple sources with different formats."
+  },
+  {
+    "error_signature": "E\\s+TypeError: '>' not supported between instances of '.*' and '.*'",
+    "cause": "比較不可能な型同士を比較している。Noneと数値の比較等。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Add type checking before comparison. Handle None case separately. Ensure both operands are comparable types."
+    },
+    "notes": "Common when sorting mixed-type lists or comparing optional values."
+  },
+  {
+    "error_signature": "E\\s+FileExistsError: \\[Errno 17\\] File exists: '.*'",
+    "cause": "既に存在するファイルを作成しようとしている。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check if file exists before creation. Use exist_ok=True with makedirs. Overwrite or skip as appropriate."
+    },
+    "notes": "Common in file generation pipelines without cleanup."
+  },
+  {
+    "error_signature": "E\\s+TypeError: expected .* got .*",
+    "cause": "型アノテーションと実際の型が一致しない。ランタイム型チェック失敗。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Convert the value to the expected type before passing. Add type coercion or validation at the boundary."
+    },
+    "notes": "Common with Pydantic or similar validation frameworks."
+  },
+  {
+    "error_signature": "E\\s+pydantic.*ValidationError:.*",
+    "cause": "Pydanticモデルのバリデーション失敗。必須フィールド不足や型不一致。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check the Pydantic model schema. Ensure all required fields are provided with correct types. Use Optional for optional fields."
+    },
+    "notes": "Common with API request/response models."
+  },
+  {
+    "error_signature": "E\\s+openai.APIError:.*",
+    "cause": "OpenAI API呼び出しエラー。APIキー不正、レート制限、またはサーバーエラー。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check API key validity. Add retry with exponential backoff for rate limits. Handle specific error codes appropriately."
+    },
+    "notes": "Common in AI-powered applications."
+  },
+  {
+    "error_signature": "E\\s+openai.RateLimitError:.*",
+    "cause": "OpenAI APIのレート制限に達した。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Implement exponential backoff retry. Add request queuing. Reduce batch size or add delays between requests."
+    },
+    "notes": "Common with high-volume API usage."
+  },
+  {
+    "error_signature": "E\\s+openai.AuthenticationError:.*",
+    "cause": "OpenAI APIキーが無効または期限切れ。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Verify OPENAI_API_KEY environment variable. Check key validity at platform.openai.com. Regenerate if needed."
+    },
+    "notes": "Common in CI/CD environments with expired secrets."
+  },
+  {
+    "error_signature": "E\\s+yaml.YAMLError:.*",
+    "cause": "YAMLパース失敗。インデントエラーまたは不正な構文。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check YAML indentation (spaces not tabs). Verify string quoting. Use yaml.safe_load() instead of yaml.load()."
+    },
+    "notes": "Common with configuration files."
+  },
+  {
+    "error_signature": "E\\s+OSError: \\[Errno 28\\] No space left on device",
+    "cause": "ディスク容量不足。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Clean up temporary files. Check disk usage. Implement file size limits and cleanup policies."
+    },
+    "notes": "Common in long-running processes and CI/CD."
+  },
+  {
+    "error_signature": "E\\s+MemoryError$",
+    "cause": "メモリ不足。大きなデータを一度にメモリに読み込んでいる。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Process data in chunks instead of loading all at once. Use generators for streaming. Consider memory-mapped files."
+    },
+    "notes": "Common with large file processing and ML workloads."
+  },
+  {
+    "error_signature": "E\\s+TypeError: 'set' object is not subscriptable",
+    "cause": "セットにインデックスアクセスしている。セットは順序なし。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Convert to list before indexing: list(my_set)[0]. Or use next(iter(my_set)) for first element."
+    },
+    "notes": "Common when assuming ordered collection."
+  },
+  {
+    "error_signature": "E\\s+TypeError: 'int' object is not iterable",
+    "cause": "整数をイテラブルとして使用している。range()の引数間違い等。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check if you meant range(n) instead of iterating over n. Verify the variable is the expected collection type."
+    },
+    "notes": "Common when variable types are confused."
+  },
+  {
+    "error_signature": "E\\s+TypeError: 'generator' object is not subscriptable",
+    "cause": "ジェネレータにインデックスアクセスしている。リストに変換が必要。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Convert generator to list first: list(gen)[index]. Or use itertools.islice for lazy slicing."
+    },
+    "notes": "Common when treating generators like lists."
+  },
+  {
+    "error_signature": "E\\s+ValueError: '.*' is not in list",
+    "cause": "list.index()で存在しない値を検索している。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check if value exists in list before calling index(): if value in lst: idx = lst.index(value). Or use try/except ValueError."
+    },
+    "notes": "Common when searching for expected-but-missing items."
+  },
+  {
+    "error_signature": "E\\s+TypeError: cannot create '.*' instances",
+    "cause": "抽象クラスのインスタンス化または型の不正使用。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Use a concrete subclass instead of the abstract class. Implement all abstract methods."
+    },
+    "notes": "Common with ABC-based designs."
+  },
+  {
+    "error_signature": "E\\s+ssl.SSLError:.*",
+    "cause": "SSL/TLS証明書エラーまたは暗号化通信の問題。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check SSL certificate validity. Update certifi package. For development, consider verify=False (not for production)."
+    },
+    "notes": "Common with self-signed certificates or expired certs."
+  },
+  {
+    "error_signature": "E\\s+socket.timeout: timed out",
+    "cause": "ソケット操作がタイムアウトした。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Increase socket timeout. Add retry logic. Check network stability and server responsiveness."
+    },
+    "notes": "Low-level socket timeout, often wrapped by higher-level libraries."
+  },
+  {
+    "error_signature": "E\\s+AttributeError: type object '.*' has no attribute '.*'",
+    "cause": "クラスオブジェクトに存在しない属性にアクセスしている。クラス属性の定義漏れ。",
+    "solution_pattern": {
+      "type": "correct_variable_name",
+      "instructions": "Check for typos in the attribute name. Verify the class definition has the expected class-level attributes."
+    },
+    "notes": "Common with dataclass field names or enum values."
+  },
+  {
+    "error_signature": "E\\s+TypeError: 'bytes' object has no attribute '.*'",
+    "cause": "bytesオブジェクトにstrのメソッドを使用している。デコードが必要。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Decode bytes to string first: data.decode('utf-8'). Or encode string to bytes: s.encode('utf-8')."
+    },
+    "notes": "Common with network responses and file I/O in binary mode."
+  },
+  {
+    "error_signature": "E\\s+UnicodeEncodeError: '.*' codec can't encode character",
+    "cause": "エンコード不可能な文字が含まれている。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Use encoding='utf-8' for file output. Add errors='replace' or errors='ignore' for problematic characters."
+    },
+    "notes": "Common with internationalized text."
+  },
+  {
+    "error_signature": "E\\s+concurrent.futures._base.TimeoutError:.*",
+    "cause": "並行処理のタスクがタイムアウトした。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Increase the timeout for future.result(). Check for deadlocks. Reduce task complexity."
+    },
+    "notes": "Common with thread/process pool executors."
+  },
+  {
+    "error_signature": "E\\s+PermissionError: \\[WinError 5\\]",
+    "cause": "Windows環境でのアクセス拒否エラー。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Run as administrator. Check file permissions. Use a different output directory."
+    },
+    "notes": "Windows-specific permission issue."
+  },
+  {
+    "error_signature": "E\\s+AttributeError: 'function' object has no attribute '.*'",
+    "cause": "関数オブジェクトに存在しない属性にアクセスしている。",
+    "solution_pattern": {
+      "type": "correct_variable_name",
+      "instructions": "Check if the attribute exists on the function. May need to use functools.wraps or check the module instead."
+    },
+    "notes": "Common when confusing module functions with class methods."
+  },
+  {
+    "error_signature": "E\\s+TypeError: 'property' object has no attribute '.*'",
+    "cause": "プロパティデコレータの誤用。@propertyのgetter/setter定義ミス。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Check property decorator usage. Ensure setter is defined with @attribute.setter. Verify property is accessed on instance not class."
+    },
+    "notes": "Common with Python property patterns."
+  },
+  {
+    "error_signature": "E\\s+ValueError: mutable default .* for field .* is not allowed",
+    "cause": "dataclassのフィールドにミュータブルなデフォルト値を設定している。",
+    "solution_pattern": {
+      "type": "regex_replace",
+      "search": "([a-zA-Z_]\\w*):\\s*(list|dict|set)\\s*=\\s*(\\[\\]|\\{\\}|set\\(\\))",
+      "replace": "\\1: \\2 = field(default_factory=\\2)"
+    },
+    "notes": "Fix: use field(default_factory=list) instead of []. Requires dataclasses import."
+  },
+  {
+    "error_signature": "E\\s+TypeError: must be .* not .*",
+    "cause": "C拡張モジュールまたは組み込み関数に不正な型を渡している。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Convert the argument to the expected type before passing. Check function documentation for type requirements."
+    },
+    "notes": "Common with numpy, pandas, or C extension functions."
+  },
+  {
+    "error_signature": "E\\s+TypeError: 'enumerate' object is not subscriptable",
+    "cause": "enumerateオブジェクトにインデックスアクセスしている。list()変換が必要。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Convert enumerate to list first, or iterate directly. enumerate() returns an iterator, not a sequence."
+    },
+    "notes": "Common when misunderstanding enumerate return type."
+  },
+  {
+    "error_signature": "E\\s+DeprecationWarning:.*",
+    "cause": "非推奨のAPIを使用している。将来のバージョンで削除される可能性がある。",
+    "solution_pattern": {
+      "type": "analyze_and_fix_code",
+      "target": "source_code",
+      "instructions": "Update to the recommended replacement API. Check the deprecation message for migration guidance."
+    },
+    "notes": "Should be addressed before upgrading dependencies."
   }
 ]
