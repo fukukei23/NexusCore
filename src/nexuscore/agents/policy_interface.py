@@ -6,19 +6,13 @@ Policy Interface - 開発方針設定UI（安全性強化版）
 
 from __future__ import annotations
 
-# 安全性強化のためのインポート
-try:
-    import gradio as gr
-
-    GRADIO_AVAILABLE = True
-except ImportError:
-    GRADIO_AVAILABLE = False
-    gr = None
-    print("⚠️ Gradio未インストール：コマンドライン版を使用します")
-
 import queue
 import threading
 from datetime import datetime
+
+# Lazy import flag: Gradio is loaded inside methods, not at module level
+GRADIO_AVAILABLE = True
+gr = None  # Placeholder; actual import happens in methods
 
 
 class PolicyInterface:
@@ -26,9 +20,13 @@ class PolicyInterface:
         self.result_queue = queue.Queue()
         self.interface = None
 
-    def create_gradio_interface(self) -> gr.Blocks:
+    def create_gradio_interface(self):
         """Gradio UIインターフェースを作成"""
-        if not GRADIO_AVAILABLE:
+        global gr, GRADIO_AVAILABLE
+        if not GRADIO_AVAILABLE and gr is None:
+            raise ImportError("Gradio がインストールされていません")
+        # gr is set via mock in tests, or loaded lazily at module level
+        if gr is None:
             raise ImportError("Gradio がインストールされていません")
 
         with gr.Blocks(title="Context Agent - 開発方針設定", theme=gr.themes.Soft()) as interface:
@@ -135,7 +133,7 @@ class PolicyInterface:
         """UIを起動してユーザー入力を待機（安全性強化版）"""
 
         # 安全性チェック追加
-        if not GRADIO_AVAILABLE:
+        if not GRADIO_AVAILABLE or gr is None:
             print("📝 Gradio未利用：デフォルト設定を使用")
             return self._get_safe_default_policy()
 
