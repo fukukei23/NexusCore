@@ -22,15 +22,14 @@ from typing import Any
 
 import git
 
-from nexuscore.agents.mutation_tester_agent import MutationReport, MutationTesterAgent
+from .base_agent import BaseAgent
+from .mutation_tester_agent import MutationReport, MutationTesterAgent
 from nexuscore.config.constitution_loader import get_constitution
 from nexuscore.utils.code_analyzer import QualityReport, analyze_code_quality
 from nexuscore.utils.vcs import GitController
 
-from .base_agent import BaseAgent
-
 try:
-    from .guardian_auto_reviewer import GuardianAutoReviewer, ReviewDecision, ReviewResult
+    from nexuscore.guard.guardian_auto_reviewer import GuardianAutoReviewer, ReviewDecision, ReviewResult
 except ImportError:
     GuardianAutoReviewer = None  # type: ignore
     ReviewDecision = None  # type: ignore

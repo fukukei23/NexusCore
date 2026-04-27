@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from nexuscore.agents.base_agent import BaseAgent
+from .base_agent import BaseAgent
 
 
 # ==================== カスタム例外 ====================

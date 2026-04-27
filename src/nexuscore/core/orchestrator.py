@@ -50,7 +50,7 @@ from nexuscore.agents.coder_agent import CoderAgent
 from nexuscore.agents.debugger_agent import DebuggerAgent
 from nexuscore.agents.guardian_agent import GuardianAgent
 from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
-from nexuscore.agents.patch_applier import PatchApplier
+from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.agents.planner_agent import PlannerAgent
 from nexuscore.agents.policy_agent import PolicyAgent
 from nexuscore.agents.postmortem_agent import PostmortemAgent

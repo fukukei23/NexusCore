@@ -14,7 +14,7 @@ import logging
 import os
 from typing import Any
 
-from nexuscore.agents.patch_applier import PatchApplier
+from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.config.self_healing_config import SelfHealingConfig
 from nexuscore.core.run_history import RunHistoryLogger
 from nexuscore.core.session_control import SessionController

@@ -14,7 +14,7 @@ import tempfile
 from pathlib import Path
 
 from .debugger_agent import DebuggerAgent
-from .patch_applier import PatchApplier
+from nexuscore.services.patch_applier import PatchApplier
 
 
 class KnowledgeCuratorAgent:

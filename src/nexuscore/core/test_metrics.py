@@ -182,7 +182,7 @@ class TestMetricsCollector:
 
         # リスクランクと目標カバレッジを取得
         risk_level = latest_record.get("risk_level", "B")
-        from nexuscore.agents.test_strategy import TestStrategyManager
+        from nexuscore.utils.test_strategy import TestStrategyManager
 
         strategy_manager = TestStrategyManager()
         coverage_target = strategy_manager.get_min_coverage(module_name)

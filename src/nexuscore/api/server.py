@@ -68,7 +68,7 @@ except ImportError:
 
 
 from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
-from nexuscore.agents.patch_applier import PatchApplier
+from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.agents.postmortem_agent import PostmortemAgent
 from nexuscore.llm.llm_router import LLMRouter
 
