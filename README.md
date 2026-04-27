@@ -15,7 +15,7 @@
 
 ### マルチエージェントシステム
 
-10以上の専門エージェントが協調動作し、開発プロセス全体を自動化します。
+14の専門エージェントが協調動作し、開発プロセス全体を自動化します。
 
 | エージェント | 担当領域 |
 |-------------|---------|
@@ -30,8 +30,16 @@
 | Policy | ポリシー適用 |
 | Constitutional Council | ガバナンス・意思決定 |
 | Mutation Tester | テストスイート強度測定 |
+| Planner | 実装計画 |
+| Context | プロジェクトコンテキスト管理 |
 
-### タスクベースLLMルーティング
+```
+Task → LLM Router → [OpenAI GPT | Anthropic Claude | DeepSeek | Google Gemini | Kimi | MiniMax]
+                      ↕
+                 Budget Manager（日次上限・フォールバック制御）
+```
+
+### 多層品質ゲート
 
 各タスクに最適なLLMを自動選択し、コストと品質のバランスを最適化します。
 
@@ -80,7 +88,7 @@ User / Developer
 | レイヤー | フレームワーク | 役割 |
 |---------|-------------|------|
 | 公開API | **FastAPI** (`/api/v1/*`) | 外部統合向けREST API。OpenAPI仕様・SDK自動生成対応 |
-| Web UI | **Flask** (`/projects/*`, `/dashboard/*`) | HTML画面。内部UI専用 |
+| Web UI | **Gradio** | 統合UI（解析→修正→テスト→履歴） |
 
 - SDK自動生成: OpenAPI仕様書から Python / TypeScript 向けSDKを生成（`make sdk`）
 - 認証: API Key認証（`POST /api/v1/api-keys` で発行）
@@ -91,10 +99,10 @@ User / Developer
 
 | 指標 | 値 |
 |------|-----|
-| テストスイート | 4,838 passed / 25 failed |
-| テストカバレッジ | 80.22% (api + core + gradio_app) |
-| エージェント数 | 20+ 専門エージェント |
-| LLMプロバイダー | 5プロバイダー（OpenAI, Anthropic, DeepSeek, Google, Kimi） |
+| テストスイート | 392テストファイル |
+| テストカバレッジ | 80%+ |
+| エージェント数 | 14専門エージェント |
+| LLMプロバイダー | 6プロバイダー（OpenAI, Anthropic, DeepSeek, Google, Kimi, MiniMax） |
 | 品質ゲート | 2層（静的解析 + 動的テスト） |
 
 ---
@@ -104,15 +112,29 @@ User / Developer
 ```
 NexusCore/
 ├── src/nexuscore/
-│   ├── agents/              # AIエージェント（Architect, Coder, Debugger, ...）
+│   ├── agents/              # AIエージェント（14専門エージェント + BaseAgent）
+│   ├── analyzer/            # コード解析（AST, 依存グラフ）
+│   ├── api/                 # FastAPI公開API（/api/v1/*）
+│   ├── audio/               # 音声入力（Whisper統合）
+│   ├── cli/                 # CLIツール
+│   ├── config/              # 設定・憲法ローダー・ポリシー
+│   ├── core/                # オーケストレーター, リトライポリシー, セッション管理
+│   ├── diff/                # コード差分の意味的解析
+│   ├── eval/                # JSON構造出力評価
+│   ├── governance/          # CR仕様管理
+│   ├── guard/               # 品質ゲート・自動レビュー・ポリシーエンジン
+│   ├── integration/         # GitHub PR連携
 │   ├── llm/                 # LLM統合レイヤー（Router, Budget, Providers）
-│   ├── utils/               # コード分析, Git操作, 差分生成
-│   ├── core/                # オーケストレーター, リトライポリシー
+│   ├── modules/             # 機能モジュール（Whisper等）
+│   ├── npe/                 # 予算・ポリシー・ガードエンジン
+│   ├── orchestrator/        # 実行管理（Authority Runner, 状態管理）
 │   ├── services/            # Self-Healing Service, パッチ適用
-│   ├── npe/                 # 予算・ポリシー・ガード
-│   └── webapp/              # Web UI (Flask)
+│   ├── trace/               # 実行トレース
+│   ├── ui/                  # Gradio統合UI
+│   ├── utils/               # コード分析, Git操作, 差分生成, テスト戦略
+│   └── webapp/              # Web UI (Flask, レガシー)
 │
-├── tests/                   # 4,800+ テストケース
+├── tests/                   # テストスイート（agents/api/core/等で構造化）
 ├── docs/                    # ドキュメント群
 │   ├── governance/          # 統治ルール
 │   ├── overview/            # ビジョン, アーキテクチャ, ロードマップ
@@ -149,17 +171,14 @@ cp .env.template .env
 ### 基本的な使用例
 
 ```python
-from nexuscore.agents.coder_agent import CoderAgent
-from nexuscore.llm.llm_router import LLMRouter
+from nexuscore.agents import CoderAgent
 
-router = LLMRouter()
-coder = CoderAgent(llm_router=router)
+coder = CoderAgent()
 
-result = coder.implement_code(
-    task_description="Pythonで二分探索を実装してください",
-    context="データ構造の勉強用"
+result = coder.execute_llm_task(
+    prompt="Pythonで二分探索を実装してください"
 )
-print(result["code"])
+print(result)
 ```
 
 ### テスト実行
@@ -179,8 +198,8 @@ python -m pytest tests/ --cov=src/nexuscore --cov-report=html
 | カテゴリ | 技術 |
 |---------|------|
 | 言語 | Python 3.11+ |
-| AI/LLM | OpenAI GPT, Anthropic Claude, DeepSeek, Google Gemini, Kimi |
-| API | FastAPI, Flask |
+| AI/LLM | OpenAI GPT, Anthropic Claude, DeepSeek, Google Gemini, Kimi, MiniMax |
+| API | FastAPI |
 | テスト | pytest, pytest-cov, カスタムミューテーションテスト |
 | 品質 | pylint, mypy, bandit |
 | Web UI | Gradio |
