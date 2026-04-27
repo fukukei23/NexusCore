@@ -10,21 +10,13 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-# 安全なインポート
+from nexuscore.analyzer.context_analyzer import ContextAnalyzer
+
 try:
-    from nexuscore.agents.context_analyzer import ContextAnalyzer
-
-    # policy_interfaceはオプション機能の可能性があるため、より安全にインポート
-    from nexuscore.agents.policy_interface import PolicyInterface
+    from nexuscore.config.policy_interface import PolicyInterface
 except ImportError:
-    # フォールバック: 同じディレクトリから
-    from .context_analyzer import ContextAnalyzer
-
-    try:
-        from .policy_interface import PolicyInterface
-    except ImportError:
-        print("⚠️ policy_interface.pyが見つかりません。コマンドライン入力のみ利用可能です。")
-        PolicyInterface = None
+    print("⚠️ policy_interface.pyが見つかりません。コマンドライン入力のみ利用可能です。")
+    PolicyInterface = None
 
 
 class ContextAgent:

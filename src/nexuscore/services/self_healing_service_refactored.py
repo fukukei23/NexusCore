@@ -29,7 +29,7 @@ from datetime import UTC
 from pathlib import Path
 from typing import Any
 
-from nexuscore.agents.patch_applier import PatchApplier
+from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.config.self_healing_config import SelfHealingConfig
 from nexuscore.core.diff_preview import summarize_diff_files, wrap_diff_as_markdown
 from nexuscore.core.run_history import RunHistoryLogger

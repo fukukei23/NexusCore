@@ -25,13 +25,11 @@ import re
 import subprocess
 from pathlib import Path
 
-# (ご提案 #2) 相対インポートから絶対インポートへ修正
-# これにより、異なるディレクトリ階層からの呼び出し時も安定します。
-from nexuscore.agents.base_agent import BaseAgent
+from .base_agent import BaseAgent
 
 try:
-    from nexuscore.agents.test_generator_prompt import build_test_generation_prompt
-    from nexuscore.agents.test_strategy import TestStrategyManager
+    from nexuscore.utils.test_generator_prompt import build_test_generation_prompt
+    from nexuscore.utils.test_strategy import TestStrategyManager
     from nexuscore.core.test_metrics import TestMetricsCollector
 except ImportError:
     TestStrategyManager = None

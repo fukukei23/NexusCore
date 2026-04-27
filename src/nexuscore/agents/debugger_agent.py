@@ -235,7 +235,7 @@ class DebuggerAgent(BaseAgent):
             成功: {"status": "created", "pr_number": int, "pr_url": str, "branch": str}
             失敗: {"status": "error", "error": str}
         """
-        from nexuscore.agents.github_pr_creator import GitHubPRCreator
+        from nexuscore.utils.github_pr_creator import GitHubPRCreator
 
         DebuggerAgent.total_pr_attempts += 1
 
