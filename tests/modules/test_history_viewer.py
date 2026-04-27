@@ -9,7 +9,7 @@ import os
 
 import pytest
 
-from nexuscore.modules.history_viewer import format_history_markdown, load_history
+from nexuscore.archive.modules.history_viewer import format_history_markdown, load_history
 
 
 @pytest.fixture

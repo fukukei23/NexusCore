@@ -567,11 +567,11 @@ def test_create_code_file_with_code_generator_output(tmp_path, monkeypatch):
 
     project_root = Path(__file__).parent.parent
     sys.path.insert(0, str(project_root / "src"))
-    from nexuscore.modules import code_generator
+    from nexuscore.archive.modules import code_generator
 
     folder = str(tmp_path / "generated")
 
-    with patch("nexuscore.modules.code_generator._call_minimax", return_value="```python\ndef generated_func():\n    return 42\n```"):
+    with patch("nexuscore.archive.modules.code_generator._call_minimax", return_value="```python\ndef generated_func():\n    return 42\n```"):
         # コードを生成
         generated_code = code_generator.generate_code_from_text("Create a function that returns 42")
 

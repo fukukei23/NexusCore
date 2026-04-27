@@ -3,13 +3,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from nexuscore.modules import (
+from nexuscore.modules import whisper_handler
+from nexuscore.archive.modules import (
     chat_handler,
     code_generator,
     diff_viewer,
     history_viewer,
     tester,
-    whisper_handler,
 )
 
 # whisper がインストールされていない環境では、

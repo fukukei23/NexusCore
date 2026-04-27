@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from nexuscore.gradio_app import revision_tab
+from nexuscore.archive.gradio_app import revision_tab
 
 
 class TestCallMinimaxHTTP:
@@ -29,7 +29,7 @@ class TestCallMinimaxHTTP:
         }
         mock_response.raise_for_status = Mock()
 
-        with patch("nexuscore.gradio_app.revision_tab.requests.post", return_value=mock_response) as mock_post:
+        with patch("nexuscore.archive.gradio_app.revision_tab.requests.post", return_value=mock_response) as mock_post:
             result = revision_tab.call_llm_messages(
                 [{"role": "user", "content": "test"}], temperature=0.5
             )
@@ -53,7 +53,7 @@ class TestCallMinimaxHTTP:
         mock_response = Mock()
         mock_response.raise_for_status.side_effect = Exception("HTTP 500")
 
-        with patch("nexuscore.gradio_app.revision_tab.requests.post", return_value=mock_response):
+        with patch("nexuscore.archive.gradio_app.revision_tab.requests.post", return_value=mock_response):
             with pytest.raises(Exception, match="HTTP 500"):
                 revision_tab.call_llm_messages([{"role": "user", "content": "test"}])
 
@@ -64,7 +64,7 @@ class TestCallMinimaxHTTP:
         mock_response.json.return_value = {"choices": [{"message": {"content": "ok"}}]}
         mock_response.raise_for_status = Mock()
 
-        with patch("nexuscore.gradio_app.revision_tab.requests.post", return_value=mock_response) as mock_post:
+        with patch("nexuscore.archive.gradio_app.revision_tab.requests.post", return_value=mock_response) as mock_post:
             revision_tab.call_llm_messages([{"role": "user", "content": "test"}])
 
         assert mock_post.call_args[1]["json"]["temperature"] == 0.2
@@ -122,7 +122,7 @@ class TestCallGptWithApiKey:
         monkeypatch.setenv("MINIMAX_API_KEY", "real-key")
 
         mock_llm_response = json.dumps({"code": "def f(): pass", "reason": "test"})
-        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", return_value=mock_llm_response) as mock_call:
+        with patch("nexuscore.archive.gradio_app.revision_tab.call_llm_messages", return_value=mock_llm_response) as mock_call:
             result = revision_tab.call_gpt("fix the code")
 
         assert result == mock_llm_response

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nexuscore.agents.github_pr_creator import GitHubPRCreator
+from nexuscore.utils.github_pr_creator import GitHubPRCreator
 
 
 @pytest.fixture

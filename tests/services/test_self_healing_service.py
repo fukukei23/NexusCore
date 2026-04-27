@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from nexuscore.agents.patch_applier import PatchApplier
+from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.core.run_history import RunHistoryLogger
 from nexuscore.core.session_control import SessionController
 from nexuscore.services.self_healing_service import SelfHealingService

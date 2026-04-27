@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from nexuscore.gradio_app import revision_tab
+from nexuscore.archive.gradio_app import revision_tab
 
 
 def test_extract_code_and_reason_handles_json_and_fence():

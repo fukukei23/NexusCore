@@ -26,7 +26,7 @@ _HAS_REAL_GRADIO = gr is not None and not isinstance(gr, MagicMock)
 # Mock gradio before importing repair_timeline
 sys.modules["gradio"] = MagicMock()
 
-from nexuscore.gradio_app import repair_timeline
+from nexuscore.archive.gradio_app import repair_timeline
 
 # ============================================================================
 # Fixtures

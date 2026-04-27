@@ -1,4 +1,4 @@
-from nexuscore.agents.context_analyzer import ContextAnalyzer
+from nexuscore.analyzer.context_analyzer import ContextAnalyzer
 
 
 def test_detect_tech_stack_handles_missing_files(tmp_path):

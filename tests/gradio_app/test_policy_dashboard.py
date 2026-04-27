@@ -1,6 +1,6 @@
 import json
 
-from nexuscore.gradio_app import policy_dashboard
+from nexuscore.archive.gradio_app import policy_dashboard
 
 
 def test_load_policy_defaults(tmp_path, monkeypatch):

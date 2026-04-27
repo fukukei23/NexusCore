@@ -1,12 +1,12 @@
-"""Tests for nexuscore.modules.chat_handler — MiniMax HTTP backend"""
+"""Tests for nexuscore.archive.modules.chat_handler — MiniMax HTTP backend"""
 
 import pytest
 from unittest.mock import patch
 
-from nexuscore.modules.chat_handler import handle_chat
+from nexuscore.archive.modules.chat_handler import handle_chat
 
 
-@patch("nexuscore.modules.chat_handler._call_minimax", return_value="こんにちは！")
+@patch("nexuscore.archive.modules.chat_handler._call_minimax", return_value="こんにちは！")
 def test_handle_chat_normal(mock_call):
     """[正常系] レスポンスと更新済み履歴が返る"""
     history = []
@@ -21,7 +21,7 @@ def test_handle_chat_normal(mock_call):
     assert mock_call.call_count == 1
 
 
-@patch("nexuscore.modules.chat_handler._call_minimax", return_value="元気です")
+@patch("nexuscore.archive.modules.chat_handler._call_minimax", return_value="元気です")
 def test_handle_chat_with_existing_history(mock_call):
     """[正常系] 既存履歴を保持したまま追加"""
     history = [
@@ -40,7 +40,7 @@ def test_handle_chat_with_existing_history(mock_call):
     assert len(called_arg) == 4  # 2 existing + 1 user + 1 assistant (mutated in-place)
 
 
-@patch("nexuscore.modules.chat_handler._call_minimax", side_effect=RuntimeError("API down"))
+@patch("nexuscore.archive.modules.chat_handler._call_minimax", side_effect=RuntimeError("API down"))
 def test_handle_chat_error(mock_call):
     """[異常系] エラー時にエラーメッセージが返り、userのみ履歴に追加"""
     history = []
@@ -51,7 +51,7 @@ def test_handle_chat_error(mock_call):
     assert new_history == [{"role": "user", "content": "エラー起こして"}]
 
 
-@patch("nexuscore.modules.chat_handler._call_minimax", return_value="空ですね")
+@patch("nexuscore.archive.modules.chat_handler._call_minimax", return_value="空ですね")
 def test_handle_chat_empty_message(mock_call):
     """[境界] 空メッセージでも処理される"""
     history = []
@@ -62,7 +62,7 @@ def test_handle_chat_empty_message(mock_call):
     assert new_history[1] == {"role": "assistant", "content": "空ですね"}
 
 
-@patch("nexuscore.modules.chat_handler._call_minimax")
+@patch("nexuscore.archive.modules.chat_handler._call_minimax")
 def test_handle_chat_sequential_calls(mock_call):
     """[正常系] 複数回連続で履歴が累積される"""
     mock_call.side_effect = ["回答1", "回答2", "回答3"]
@@ -86,7 +86,7 @@ def test_handle_chat_sequential_calls(mock_call):
     assert contents == ["質問1", "回答1", "質問2", "回答2", "質問3", "回答3"]
 
 
-@patch("nexuscore.modules.chat_handler._call_minimax")
+@patch("nexuscore.archive.modules.chat_handler._call_minimax")
 def test_handle_chat_error_recovery(mock_call):
     """[正常系] エラー後も次の呼び出しで成功できる"""
     history = []
@@ -103,7 +103,7 @@ def test_handle_chat_error_recovery(mock_call):
     assert len(history) == 3
 
 
-@patch("nexuscore.modules.chat_handler._call_minimax", return_value="Response")
+@patch("nexuscore.archive.modules.chat_handler._call_minimax", return_value="Response")
 def test_handle_chat_special_characters(mock_call):
     """[境界] 特殊文字を含むメッセージ"""
     special = "Hello! こんにちは! @#$%^&*()"
@@ -113,7 +113,7 @@ def test_handle_chat_special_characters(mock_call):
     assert new_history[0]["content"] == special
 
 
-@patch("nexuscore.modules.chat_handler._call_minimax", return_value="Long response ok")
+@patch("nexuscore.archive.modules.chat_handler._call_minimax", return_value="Long response ok")
 def test_handle_chat_long_message(mock_call):
     """[境界] 長いメッセージ"""
     long_msg = "A" * 1000
@@ -123,7 +123,7 @@ def test_handle_chat_long_message(mock_call):
     assert new_history[0]["content"] == long_msg
 
 
-@patch("nexuscore.modules.chat_handler._call_minimax", side_effect=TimeoutError("timeout"))
+@patch("nexuscore.archive.modules.chat_handler._call_minimax", side_effect=TimeoutError("timeout"))
 def test_handle_chat_timeout(mock_call):
     """[異常系] タイムアウト時にエラーメッセージが返る"""
     result_msg, new_history = handle_chat("Test", [])
@@ -132,7 +132,7 @@ def test_handle_chat_timeout(mock_call):
     assert len(new_history) == 1
 
 
-@patch("nexuscore.modules.chat_handler._call_minimax")
+@patch("nexuscore.archive.modules.chat_handler._call_minimax")
 def test_handle_chat_history_ordering(mock_call):
     """[正常系] 履歴の順序が保持される"""
     mock_call.side_effect = ["A", "B", "C"]
@@ -145,7 +145,7 @@ def test_handle_chat_history_ordering(mock_call):
     assert contents == ["1", "A", "2", "B", "3", "C"]
 
 
-@patch("nexuscore.modules.chat_handler._call_minimax")
+@patch("nexuscore.archive.modules.chat_handler._call_minimax")
 def test_handle_chat_error_recovery_sequence(mock_call):
     """[正常系] エラー→成功→エラー→成功のパターン"""
     mock_call.side_effect = [

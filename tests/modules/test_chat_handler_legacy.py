@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 try:
-    import nexuscore.modules.chat_handler as chat_handler
+    import nexuscore.archive.modules.chat_handler as chat_handler
 except ImportError:
     chat_handler = None
 
@@ -19,7 +19,7 @@ class TestChatHandler(unittest.TestCase):
     def test_chat_handler_import(self):
         """チャットハンドラーのインポートテスト。"""
         try:
-            import nexuscore.modules.chat_handler as ch
+            import nexuscore.archive.modules.chat_handler as ch
 
             self.assertIsNotNone(ch)
         except ImportError:

@@ -1,16 +1,16 @@
-"""Tests for nexuscore.modules.code_generator — MiniMax HTTP backend"""
+"""Tests for nexuscore.archive.modules.code_generator — MiniMax HTTP backend"""
 
 import pytest
 import requests
 from unittest.mock import patch, MagicMock
 
-from nexuscore.modules.code_generator import generate_code_from_text, _call_minimax
+from nexuscore.archive.modules.code_generator import generate_code_from_text, _call_minimax
 
 
 class TestCallMinimax:
     """_call_minimax 関数のテスト"""
 
-    @patch("nexuscore.modules.code_generator.requests.post")
+    @patch("nexuscore.archive.modules.code_generator.requests.post")
     @patch.dict(
         "os.environ",
         {
@@ -54,7 +54,7 @@ class TestCallMinimax:
         with pytest.raises(RuntimeError, match="MINIMAX_API_KEY is not set"):
             _call_minimax(messages)
 
-    @patch("nexuscore.modules.code_generator.requests.post")
+    @patch("nexuscore.archive.modules.code_generator.requests.post")
     @patch.dict("os.environ", {"MINIMAX_API_KEY": "test-api-key"})
     def test_call_minimax_http_error(self, mock_post):
         """[異常系] HTTPエラー時にraise_for_statusが例外を送出"""
@@ -69,7 +69,7 @@ class TestCallMinimax:
 class TestGenerateCodeFromText:
     """generate_code_from_text 関数のテスト"""
 
-    @patch("nexuscore.modules.code_generator._call_minimax")
+    @patch("nexuscore.archive.modules.code_generator._call_minimax")
     def test_success_returns_code(self, mock_call):
         """[正常系] LLMからの文字列がそのまま返る"""
         expected = "```python\ndef hello():\n    return 'world'\n```"
@@ -80,7 +80,7 @@ class TestGenerateCodeFromText:
         assert result == expected
         mock_call.assert_called_once()
 
-    @patch("nexuscore.modules.code_generator._call_minimax")
+    @patch("nexuscore.archive.modules.code_generator._call_minimax")
     def test_prompt_includes_user_input(self, mock_call):
         """[正常系] プロンプトにユーザー入力が含まれる"""
         mock_call.return_value = "```python\npass\n```"
@@ -93,7 +93,7 @@ class TestGenerateCodeFromText:
         assert messages[0]["role"] == "user"
         assert user_input in messages[0]["content"]
 
-    @patch("nexuscore.modules.code_generator._call_minimax")
+    @patch("nexuscore.archive.modules.code_generator._call_minimax")
     def test_temperature_is_02(self, mock_call):
         """[正常系] temperature=0.2が渡される"""
         mock_call.return_value = "```python\npass\n```"
@@ -103,7 +103,7 @@ class TestGenerateCodeFromText:
         _, kwargs = mock_call.call_args
         assert kwargs.get("temperature") == 0.2
 
-    @patch("nexuscore.modules.code_generator._call_minimax")
+    @patch("nexuscore.archive.modules.code_generator._call_minimax")
     def test_error_returns_minimax_prefix(self, mock_call):
         """[エラー] RuntimeError時にMiniMaxエラーメッセージが返る"""
         mock_call.side_effect = RuntimeError("MINIMAX_API_KEY is not set")
@@ -112,7 +112,7 @@ class TestGenerateCodeFromText:
 
         assert "⚠️ MiniMax code generation failed:" in result
 
-    @patch("nexuscore.modules.code_generator._call_minimax")
+    @patch("nexuscore.archive.modules.code_generator._call_minimax")
     def test_error_http_returns_minimax_prefix(self, mock_call):
         """[エラー] HTTPエラー時にMiniMaxエラーメッセージが返る"""
         mock_call.side_effect = requests.exceptions.HTTPError("500 Server Error")
@@ -122,7 +122,7 @@ class TestGenerateCodeFromText:
         assert "⚠️ MiniMax code generation failed:" in result
         assert "500 Server Error" in result
 
-    @patch("nexuscore.modules.code_generator._call_minimax")
+    @patch("nexuscore.archive.modules.code_generator._call_minimax")
     def test_empty_input_still_calls(self, mock_call):
         """[境界] 空文字でも呼び出しは行われる"""
         mock_call.return_value = "```python\npass\n```"
@@ -131,7 +131,7 @@ class TestGenerateCodeFromText:
         assert result is not None
         mock_call.assert_called_once()
 
-    @patch("nexuscore.modules.code_generator._call_minimax")
+    @patch("nexuscore.archive.modules.code_generator._call_minimax")
     def test_code_block_with_explanation(self, mock_call):
         """[正常系] コードブロック + 説明文が含まれるレスポンス"""
         mock_call.return_value = "Here is the code:\n```python\ndef hello():\n    return True\n```\nDone."
@@ -139,7 +139,7 @@ class TestGenerateCodeFromText:
         result = generate_code_from_text("Create example")
         assert "def hello()" in result
 
-    @patch("nexuscore.modules.code_generator._call_minimax")
+    @patch("nexuscore.archive.modules.code_generator._call_minimax")
     def test_response_without_code_block(self, mock_call):
         """[正常系] コードブロックなしの生コードレスポンス"""
         mock_call.return_value = "def hello():\n    print('world')"
@@ -147,7 +147,7 @@ class TestGenerateCodeFromText:
         result = generate_code_from_text("Hello world")
         assert "def hello()" in result
 
-    @patch("nexuscore.modules.code_generator._call_minimax")
+    @patch("nexuscore.archive.modules.code_generator._call_minimax")
     def test_multiple_requests_sequential(self, mock_call):
         """[正常系] 連続リクエストで異なる結果が返る"""
         mock_call.side_effect = [
@@ -161,7 +161,7 @@ class TestGenerateCodeFromText:
         assert "f1" in r1
         assert "f2" in r2
 
-    @patch("nexuscore.modules.code_generator._call_minimax")
+    @patch("nexuscore.archive.modules.code_generator._call_minimax")
     def test_error_recovery(self, mock_call):
         """[正常系] エラー後も次の呼び出しで成功"""
         mock_call.side_effect = [
@@ -175,7 +175,7 @@ class TestGenerateCodeFromText:
         r2 = generate_code_from_text("Test 2")
         assert "pass" in r2
 
-    @patch("nexuscore.modules.code_generator._call_minimax")
+    @patch("nexuscore.archive.modules.code_generator._call_minimax")
     def test_unicode_in_response(self, mock_call):
         """[正常系] Unicode文字を含むレスポンス"""
         mock_call.return_value = "```python\ndef 関数名():\n    return '🎉'\n```"
@@ -183,7 +183,7 @@ class TestGenerateCodeFromText:
         result = generate_code_from_text("Create Unicode function")
         assert "関数名" in result
 
-    @patch("nexuscore.modules.code_generator._call_minimax")
+    @patch("nexuscore.archive.modules.code_generator._call_minimax")
     def test_long_response(self, mock_call):
         """[正常系] 非常に長いレスポンス"""
         long_code = "def func():\n    " + "\n    ".join([f"x{i} = {i}" for i in range(500)])

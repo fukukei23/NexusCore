@@ -1,5 +1,5 @@
 # test_streamlit_tab.py
-from src.nexuscore.gradio_app.streamlit_migrated_tab import tab_streamlit_port
+from nexuscore.archive.gradio_app.streamlit_migrated_tab import tab_streamlit_port
 
 if __name__ == "__main__":
     # タブを単体でテスト

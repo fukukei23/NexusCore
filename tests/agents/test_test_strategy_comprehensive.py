@@ -19,7 +19,7 @@ from unittest.mock import patch
 import pytest
 
 try:
-    from nexuscore.agents.test_strategy import (
+    from nexuscore.utils.test_strategy import (
         ModuleTestStrategy,
         TestStrategyConfig,
         TestStrategyManager,

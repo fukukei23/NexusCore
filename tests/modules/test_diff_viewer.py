@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from nexuscore.modules.diff_viewer import generate_diff
+from nexuscore.archive.modules.diff_viewer import generate_diff
 
 
 class TestGenerateDiff:

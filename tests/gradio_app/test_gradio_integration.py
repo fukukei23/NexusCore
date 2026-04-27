@@ -10,9 +10,9 @@ class TestGradioIntegration(unittest.TestCase):
     def test_gradio_modules_import(self):
         """Gradioモジュールのインポートテスト"""
         gradio_modules = [
-            "nexuscore.gradio_app.app_ui",
-            "nexuscore.gradio_app.interactive_generator",
-            "nexuscore.gradio_app.revision_loop",
+            "nexuscore.archive.gradio_app.app_ui",
+            "nexuscore.archive.gradio_app.interactive_generator",
+            "nexuscore.archive.gradio_app.revision_loop",
         ]
 
         imported_modules = []
@@ -29,7 +29,7 @@ class TestGradioIntegration(unittest.TestCase):
     def test_interactive_generator_structure(self):
         """インタラクティブジェネレーター構造テスト"""
         try:
-            import nexuscore.gradio_app.interactive_generator as ig
+            import nexuscore.archive.gradio_app.interactive_generator as ig
 
             # モジュールが存在することを確認
             self.assertIsNotNone(ig)
@@ -44,7 +44,7 @@ class TestGradioIntegration(unittest.TestCase):
     def test_gradio_app_ui_functions(self):
         """Gradio App UIの関数テスト"""
         try:
-            import nexuscore.gradio_app.app_ui as app_ui
+            import nexuscore.archive.gradio_app.app_ui as app_ui
 
             # 可能性のある関数名
             possible_functions = [

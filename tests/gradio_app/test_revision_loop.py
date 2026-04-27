@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nexuscore.gradio_app import revision_loop
+from nexuscore.archive.gradio_app import revision_loop
 
 
 def test_save_and_read_file(tmp_path):
@@ -70,7 +70,7 @@ def test_save_patch_history(tmp_path, monkeypatch):
 
 
 class TestCallMinimax:
-    @patch("nexuscore.gradio_app.revision_loop._call_minimax", return_value="response text")
+    @patch("nexuscore.archive.gradio_app.revision_loop._call_minimax", return_value="response text")
     def test_call_minimax_success(self, mock_call):
         result = revision_loop._call_minimax([{"role": "user", "content": "test"}])
         assert result == "response text"
@@ -82,7 +82,7 @@ class TestCallMinimax:
 
 
 class TestCallLlm:
-    @patch("nexuscore.gradio_app.revision_loop._call_minimax", return_value="llm response")
+    @patch("nexuscore.archive.gradio_app.revision_loop._call_minimax", return_value="llm response")
     def test_call_llm_success(self, mock_call):
         result = revision_loop.call_llm("test prompt")
         assert result == "llm response"
@@ -90,7 +90,7 @@ class TestCallLlm:
         messages = mock_call.call_args[0][0]
         assert messages[0]["content"] == "test prompt"
 
-    @patch("nexuscore.gradio_app.revision_loop._call_minimax", side_effect=RuntimeError("API error"))
+    @patch("nexuscore.archive.gradio_app.revision_loop._call_minimax", side_effect=RuntimeError("API error"))
     def test_call_llm_error(self, mock_call):
         with pytest.raises(RuntimeError, match="API error"):
             revision_loop.call_llm("test")

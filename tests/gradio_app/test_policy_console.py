@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from nexuscore.gradio_app import policy_console
+from nexuscore.archive.gradio_app import policy_console
 
 
 def test_template_finance_has_rules():

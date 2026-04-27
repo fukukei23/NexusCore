@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pytest
 
-from nexuscore.gradio_app import dashboard
+from nexuscore.archive.gradio_app import dashboard
 
 
 @pytest.fixture

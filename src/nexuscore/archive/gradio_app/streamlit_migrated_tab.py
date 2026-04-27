@@ -19,7 +19,7 @@ from datetime import datetime
 import gradio as gr
 from dotenv import load_dotenv
 
-from nexuscore.gradio_app.llm_helper import call_llm_messages
+from nexuscore.archive.gradio_app.llm_helper import call_llm_messages
 
 # ===== 1. 設定とロギングの初期化 =====
 

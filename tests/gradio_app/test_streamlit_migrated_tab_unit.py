@@ -2,7 +2,7 @@ import asyncio
 import os
 from unittest.mock import patch
 
-from nexuscore.gradio_app import streamlit_migrated_tab
+from nexuscore.archive.gradio_app import streamlit_migrated_tab
 
 
 def test_extract_code_from_response_handles_python_block():
@@ -20,7 +20,7 @@ def test_load_api_key_prefers_env(monkeypatch):
 
 def test_call_gpt_async_without_key(monkeypatch):
     monkeypatch.setattr(streamlit_migrated_tab, "MINIMAX_API_KEY", None)
-    with patch("nexuscore.gradio_app.streamlit_migrated_tab.call_llm_messages", side_effect=RuntimeError("no key")):
+    with patch("nexuscore.archive.gradio_app.streamlit_migrated_tab.call_llm_messages", side_effect=RuntimeError("no key")):
         result = asyncio.run(streamlit_migrated_tab.call_gpt_async("hello"))
     assert "エラー" in result
 

@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-from nexuscore.ventures.vc_agent import VentureCapitalistAgent
+from nexuscore.archive.ventures.ventures.vc_agent import VentureCapitalistAgent
 
 
 class DummySearch:

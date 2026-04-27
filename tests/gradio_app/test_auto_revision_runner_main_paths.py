@@ -1,6 +1,6 @@
 import json
 
-from nexuscore.gradio_app import auto_revision_runner as arr
+from nexuscore.archive.gradio_app import auto_revision_runner as arr
 
 
 def test_snapshot_and_diff(tmp_path, monkeypatch):

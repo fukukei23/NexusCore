@@ -1,6 +1,6 @@
 import json
 
-from nexuscore.gradio_app import policy_console
+from nexuscore.archive.gradio_app import policy_console
 
 
 def test_save_profile_invalid_json(monkeypatch, tmp_path):

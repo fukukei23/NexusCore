@@ -25,7 +25,7 @@ import pytest
 # Mock gradio before importing dashboard (matplotlib works with Agg backend)
 sys.modules["gradio"] = MagicMock()
 
-from nexuscore.gradio_app import dashboard
+from nexuscore.archive.gradio_app import dashboard
 
 # ============================================================================
 # Fixtures

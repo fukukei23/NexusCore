@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from nexuscore.gradio_app import auto_revision_runner as arr
+from nexuscore.archive.gradio_app import auto_revision_runner as arr
 
 
 def test_run_pytest_once_subprocess(monkeypatch):

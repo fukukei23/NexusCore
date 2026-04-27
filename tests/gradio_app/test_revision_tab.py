@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nexuscore.gradio_app import revision_tab
+from nexuscore.archive.gradio_app import revision_tab
 
 
 class TestNowTag:
@@ -162,7 +162,7 @@ class TestExtractCodeAndReason:
 
 class TestCallGpt:
     def test_fallback_no_api_key(self):
-        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", side_effect=RuntimeError("no key")):
+        with patch("nexuscore.archive.gradio_app.revision_tab.call_llm_messages", side_effect=RuntimeError("no key")):
             result = revision_tab.call_gpt("test")
         data = json.loads(result)
         assert "code" in data
@@ -170,19 +170,19 @@ class TestCallGpt:
         assert "is_prime" in data["code"]
 
     def test_api_error_fallback(self):
-        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", side_effect=RuntimeError("API error")):
+        with patch("nexuscore.archive.gradio_app.revision_tab.call_llm_messages", side_effect=RuntimeError("API error")):
             result = revision_tab.call_gpt("test")
         data = json.loads(result)
         assert "is_prime" in data["code"]
 
     def test_openai_success(self):
-        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", return_value="result text"):
+        with patch("nexuscore.archive.gradio_app.revision_tab.call_llm_messages", return_value="result text"):
             with patch.dict(os.environ, {"MINIMAX_API_KEY": "fake"}, clear=True):
                 result = revision_tab.call_gpt("test prompt")
         assert result == "result text"
 
     def test_openai_none_content(self):
-        with patch("nexuscore.gradio_app.revision_tab.call_llm_messages", return_value=""):
+        with patch("nexuscore.archive.gradio_app.revision_tab.call_llm_messages", return_value=""):
             with patch.dict(os.environ, {"MINIMAX_API_KEY": "fake"}, clear=True):
                 result = revision_tab.call_gpt("test")
         assert result == ""

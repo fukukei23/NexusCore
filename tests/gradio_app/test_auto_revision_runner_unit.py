@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nexuscore.gradio_app import auto_revision_runner as runner
+from nexuscore.archive.gradio_app import auto_revision_runner as runner
 
 
 def test_load_policy_context_prefers_context_file(tmp_path, monkeypatch):

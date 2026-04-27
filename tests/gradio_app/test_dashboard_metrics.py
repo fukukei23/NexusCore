@@ -1,6 +1,6 @@
 import json
 
-from nexuscore.gradio_app import dashboard
+from nexuscore.archive.gradio_app import dashboard
 
 
 def test_categorize_rules():

@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timedelta
 
-from nexuscore.gradio_app import repair_timeline
+from nexuscore.archive.gradio_app import repair_timeline
 
 
 def test_read_json_handles_missing(tmp_path):

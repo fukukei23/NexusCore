@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 # Streamlitのモック化
 sys.modules["streamlit"] = MagicMock()
 
-from nexuscore.ui.self_healing_dashboard import _parse_args, load_history, main
+from nexuscore.archive.ui.self_healing_dashboard import _parse_args, load_history, main
 
 
 # ============================================================================
@@ -155,8 +155,8 @@ class TestLoadHistory:
 # main 関数テスト（Streamlit モック）
 # ============================================================================
 class TestMain:
-    @patch("nexuscore.ui.self_healing_dashboard.st")
-    @patch("nexuscore.ui.self_healing_dashboard.load_history")
+    @patch("nexuscore.archive.ui.self_healing_dashboard.st")
+    @patch("nexuscore.archive.ui.self_healing_dashboard.load_history")
     def test_main_no_records(self, mock_load_history, mock_st, tmp_path):
         """レコードがない場合"""
         mock_load_history.return_value = []
@@ -166,8 +166,8 @@ class TestMain:
         # 情報メッセージが表示される
         mock_st.info.assert_called_once()
 
-    @patch("nexuscore.ui.self_healing_dashboard.st")
-    @patch("nexuscore.ui.self_healing_dashboard.load_history")
+    @patch("nexuscore.archive.ui.self_healing_dashboard.st")
+    @patch("nexuscore.archive.ui.self_healing_dashboard.load_history")
     def test_main_with_records(self, mock_load_history, mock_st, tmp_path):
         """レコードがある場合"""
         mock_load_history.return_value = [
@@ -194,8 +194,8 @@ class TestMain:
         # タイトルが設定される
         mock_st.title.assert_called_once()
 
-    @patch("nexuscore.ui.self_healing_dashboard.st")
-    @patch("nexuscore.ui.self_healing_dashboard.load_history")
+    @patch("nexuscore.archive.ui.self_healing_dashboard.st")
+    @patch("nexuscore.archive.ui.self_healing_dashboard.load_history")
     def test_main_displays_total_count(self, mock_load_history, mock_st, tmp_path):
         """総レコード数を表示"""
         records = [{"status": "success", "run_id": str(i)} for i in range(10)]
@@ -209,8 +209,8 @@ class TestMain:
         # writeメソッドが呼ばれる（総数表示）
         assert mock_st.write.called
 
-    @patch("nexuscore.ui.self_healing_dashboard.st")
-    @patch("nexuscore.ui.self_healing_dashboard.load_history")
+    @patch("nexuscore.archive.ui.self_healing_dashboard.st")
+    @patch("nexuscore.archive.ui.self_healing_dashboard.load_history")
     def test_main_filters_by_status(self, mock_load_history, mock_st, tmp_path):
         """ステータスでフィルタリング"""
         records = [
@@ -229,8 +229,8 @@ class TestMain:
         # フィルタリング結果が表示される
         assert mock_st.write.called
 
-    @patch("nexuscore.ui.self_healing_dashboard.st")
-    @patch("nexuscore.ui.self_healing_dashboard.load_history")
+    @patch("nexuscore.archive.ui.self_healing_dashboard.st")
+    @patch("nexuscore.archive.ui.self_healing_dashboard.load_history")
     def test_main_displays_status_summary(self, mock_load_history, mock_st, tmp_path):
         """ステータスサマリーを表示"""
         records = [
@@ -248,8 +248,8 @@ class TestMain:
         # サブヘッダーが設定される
         assert mock_st.subheader.called
 
-    @patch("nexuscore.ui.self_healing_dashboard.st")
-    @patch("nexuscore.ui.self_healing_dashboard.load_history")
+    @patch("nexuscore.archive.ui.self_healing_dashboard.st")
+    @patch("nexuscore.archive.ui.self_healing_dashboard.load_history")
     def test_main_displays_recent_runs(self, mock_load_history, mock_st, tmp_path):
         """最近の実行を表示"""
         records = [
@@ -335,7 +335,7 @@ class TestSelfHealingDashboardIntegration:
         assert all(r["status"] == "success" for r in filtered)
         assert all(r["repo_full_name"] == "repo1" for r in filtered)
 
-    @patch("nexuscore.ui.self_healing_dashboard.st")
+    @patch("nexuscore.archive.ui.self_healing_dashboard.st")
     def test_main_full_workflow(self, mock_st, tmp_path):
         """main関数の完全ワークフロー"""
         # ヒストリーファイルを作成

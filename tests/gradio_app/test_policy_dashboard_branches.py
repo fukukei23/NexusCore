@@ -1,4 +1,4 @@
-from nexuscore.gradio_app import policy_dashboard
+from nexuscore.archive.gradio_app import policy_dashboard
 
 
 def test_validation_summary_invalid_language():

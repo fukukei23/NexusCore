@@ -22,7 +22,7 @@ from pathlib import Path
 
 import gradio as gr
 
-from nexuscore.gradio_app.llm_helper import call_llm_messages
+from nexuscore.archive.gradio_app.llm_helper import call_llm_messages
 
 logger = logging.getLogger(__name__)
 

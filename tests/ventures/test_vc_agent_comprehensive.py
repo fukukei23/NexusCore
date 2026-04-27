@@ -1,5 +1,5 @@
 """
-Comprehensive tests for nexuscore.ventures.vc_agent module.
+Comprehensive tests for nexuscore.archive.ventures.ventures.vc_agent module.
 
 This test suite achieves 2.0x+ test coverage by thoroughly testing:
 - Initialization and configuration
@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 import pytest
 
-from nexuscore.ventures.vc_agent import (
+from nexuscore.archive.ventures.ventures.vc_agent import (
     INVESTMENT_MEMO_KEYS,
     LLMClient,
     SearchTool,
@@ -636,7 +636,7 @@ class TestTriggerSelfClone:
         policy = {"approved_by_human": True}
 
         # Capture logging to verify sandbox_id format
-        with patch("nexuscore.ventures.vc_agent.logger") as mock_logger:
+        with patch("nexuscore.archive.ventures.ventures.vc_agent.logger") as mock_logger:
             agent.trigger_self_clone("Test Venture Name", policy)
 
             assert mock_logger.info.called
@@ -659,7 +659,7 @@ class TestLoggingAndTelemetry:
         search = MockSearchTool(responses=[search_results])
         agent = VentureCapitalistAgent(llm_client=llm, tools={"Google Search": search})
 
-        with patch("nexuscore.ventures.vc_agent.logger") as mock_logger:
+        with patch("nexuscore.archive.ventures.ventures.vc_agent.logger") as mock_logger:
             agent._search_with_retry(["test"])
 
             assert mock_logger.info.called
@@ -683,7 +683,7 @@ class TestLoggingAndTelemetry:
 
         agent = VentureCapitalistAgent(llm_client=llm, tools={"Google Search": FailThenSucceed()})
 
-        with patch("nexuscore.ventures.vc_agent.logger") as mock_logger:
+        with patch("nexuscore.archive.ventures.ventures.vc_agent.logger") as mock_logger:
             agent._search_with_retry(["test"], retries=1, delay=0.01)
 
             assert mock_logger.warning.called
@@ -694,7 +694,7 @@ class TestLoggingAndTelemetry:
         search = MockSearchTool(responses=[search_results])
         agent = VentureCapitalistAgent(llm_client=llm, tools={"Google Search": search})
 
-        with patch("nexuscore.ventures.vc_agent.logger") as mock_logger:
+        with patch("nexuscore.archive.ventures.ventures.vc_agent.logger") as mock_logger:
             agent.scout_for_opportunities()
 
             # Check for start and success logs
@@ -710,7 +710,7 @@ class TestLoggingAndTelemetry:
         search = MockSearchTool(responses=[search_results])
         agent = VentureCapitalistAgent(llm_client=llm, tools={"Google Search": search})
 
-        with patch("nexuscore.ventures.vc_agent.logger") as mock_logger:
+        with patch("nexuscore.archive.ventures.ventures.vc_agent.logger") as mock_logger:
             agent.scout_for_opportunities()
 
             assert mock_logger.error.called

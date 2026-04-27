@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 try:
-    import nexuscore.modules.code_generator as code_generator
+    import nexuscore.archive.modules.code_generator as code_generator
 except ImportError:
     code_generator = None
 
@@ -19,7 +19,7 @@ class TestCodeGenerator(unittest.TestCase):
     def test_code_generator_import(self):
         """コード生成モジュールのインポートテスト。"""
         try:
-            import nexuscore.modules.code_generator as cg
+            import nexuscore.archive.modules.code_generator as cg
 
             self.assertIsNotNone(cg)
         except ImportError:
