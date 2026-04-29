@@ -16,7 +16,6 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 import logging
 import os
@@ -25,7 +24,6 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum, auto
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +58,12 @@ from nexuscore.agents.tester_agent import TesterAgent
 # セッション制御
 from nexuscore.core.session_control import SessionController
 
+# Data models
+from nexuscore.core.orchestrator_models import OrchestratorContext, OrchestratorPhase
+
+# Agent factory (re-exported for backward compatibility)
+from nexuscore.core.agent_factory import assemble_agent_team  # noqa: F401
+
 # LLM ルーター
 from nexuscore.llm.llm_router import LLMRouter
 
@@ -78,48 +82,6 @@ except Exception:
 # ==============================================================================
 # Orchestrator 本体
 # ==============================================================================
-
-
-class OrchestratorPhase(Enum):
-    """
-    開発フローのフェーズを表現する Enum。
-
-    Requirement → Plan → Architecture → Implementation → Testing → Review
-    の順序で実行される。
-    """
-
-    REQUIREMENTS = auto()
-    PLAN = auto()
-    ARCHITECTURE = auto()
-    IMPLEMENTATION = auto()
-    TESTING = auto()
-    REVIEW = auto()
-
-
-@dataclass
-class OrchestratorContext:
-    """
-    Orchestrator の実行コンテキストを保持するデータクラス。
-
-    各フェーズ間で状態を引き継ぐために使用される。
-    """
-
-    task_id: str
-    user_requirement: str
-    language: str = "ja"
-    fast_lane: bool = False
-    run_db_id: int | None = None
-
-    # フェーズごとの出力
-    specs: dict[str, Any] = field(default_factory=dict)
-    plan: dict[str, Any] = field(default_factory=dict)
-    architecture: dict[str, Any] = field(default_factory=dict)
-    implementation: dict[str, Any] = field(default_factory=dict)
-    testing: dict[str, Any] = field(default_factory=dict)
-    review: dict[str, Any] = field(default_factory=dict)
-
-    # フェーズ実行ログ（テスト用）
-    phase_log: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -784,159 +746,7 @@ python hello.py
 # ==============================================================================
 
 
-def assemble_agent_team(project_path: str) -> dict[str, Any]:
-    """
-    ハイブリッド・アーキテクチャに基づき、Orchestrator に渡すエージェント群と LLMRouter を生成する。
-    API サーバ等の外部エントリポイントからも再利用され得るデフォルトのチーム編成。
-
-    戻り値:
-        {
-            "requirement_agent": RequirementAgent(...),
-            "architect_agent":   ArchitectAgent(...),
-            ...
-            "patch_applier_agent": PatchApplier(...),
-            "llm_router":        LLMRouter(...),
-        }
-    """
-    logger = logging.getLogger("AgentAssembler")
-    logger.info("Assembling agent team for NexusCore Orchestrator v8.2...")
-
-    # LLM Router を最初に作成しておく（必要ならエージェントに渡せるようにする）
-    llm_router = LLMRouter()
-
-    # ここでは、各 Agent がデフォルトコンストラクタで生成できる前提とし、
-    # 追加の依存は将来的に渡せるよう拡張余地を残す。
-    requirement_agent = RequirementAgent()
-    architect_agent = ArchitectAgent()
-    planner_agent = PlannerAgent()
-    coder_agent = CoderAgent()
-    tester_agent = TesterAgent()
-    debugger_agent = DebuggerAgent()
-    guardian_agent = GuardianAgent()
-    policy_agent = PolicyAgent()
-    postmortem_agent = PostmortemAgent()
-    curator_api_key = os.getenv("GLM_API_KEY", "")
-    curator_model = os.getenv("NEXUS_TASK_MODEL_KNOWLEDGE", "glm-4-plus")
-
-    if not curator_api_key:
-        raise RuntimeError(
-            "KnowledgeCuratorAgent requires GLM_API_KEY. Set it in the environment before assembling agent team."
-        )
-
-    knowledge_curator_agent = KnowledgeCuratorAgent(
-        api_key=curator_api_key,
-        model=curator_model,
-    )
-    patch_applier_agent = PatchApplier()
-
-    agents: dict[str, Any] = {
-        "requirement_agent": requirement_agent,
-        "architect_agent": architect_agent,
-        "planner_agent": planner_agent,
-        "coder_agent": coder_agent,
-        "tester_agent": tester_agent,
-        "debugger_agent": debugger_agent,
-        "guardian_agent": guardian_agent,
-        "policy_agent": policy_agent,
-        "postmortem_agent": postmortem_agent,
-        "knowledge_curator_agent": knowledge_curator_agent,
-        "patch_applier_agent": patch_applier_agent,
-        "llm_router": llm_router,
-    }
-
-    logger.info(f"Agent team assembled. total={len(agents)} (including llm_router).")
-    return agents
-
 
 # ==============================================================================
-# CLI エントリポイント (main_cli.py からも直接 import されることを想定)
+# CLI エントリポイントは main_cli.py を使用してください
 # ==============================================================================
-
-
-def _build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="NexusCore Orchestrator v8.2 (NPE + Router Integrated)"
-    )
-    parser.add_argument(
-        "--project",
-        type=str,
-        default=str(Path.cwd()),
-        help="プロジェクトのルートパス（デフォルト: カレントディレクトリ）",
-    )
-    parser.add_argument(
-        "--requirement",
-        type=str,
-        default="サンプルの要件です。",
-        help="自然言語での要件（デモ・テスト用）",
-    )
-    parser.add_argument(
-        "--autonomy-level",
-        type=int,
-        default=1,
-        help="自動化レベル（0=対話中心, 1=半自動, 2=ほぼ全自動）",
-    )
-    parser.add_argument(
-        "--fast-lane",
-        action="store_true",
-        help="Planner/Coder/Tester を並列で走らせる高速モードを有効化",
-    )
-    # 新規: セッションID（省略時は自動生成）
-    parser.add_argument(
-        "--session-id",
-        type=str,
-        help="セッションID（省略時は UUID で自動生成されます）",
-    )
-    return parser
-
-
-def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    parser = _build_arg_parser()
-    args = parser.parse_args()
-
-    logger = logging.getLogger("CLI_LAUNCHER")
-    logger.info("Orchestrator launch sequence initiated (v8.2).")
-
-    constitution = {
-        "automation_policy": {
-            "autonomy_level": args.autonomy_level,
-        }
-    }
-
-    # セッションIDの決定（指定がなければ UUID を採用）
-    session_id = args.session_id or uuid.uuid4().hex
-    logger.info(f"Using session_id={session_id} for this run.")
-
-    # SessionController を初期化
-    session_controller = SessionController(
-        session_id=session_id, root_dir=os.path.join(args.project, ".nexus", "sessions")
-    )
-
-    try:
-        agent_team = assemble_agent_team(project_path=args.project)
-        orch = Orchestrator(
-            project_path=args.project,
-            constitution=constitution,
-            session_controller=session_controller,
-            **agent_team,
-        )
-        logger.info("Orchestrator instance created. Starting full project run.")
-        orch.run_full_project(args.requirement, fast_lane=args.fast_lane)
-        logger.info("Orchestrator process finished successfully.")
-    except RuntimeError as e:
-        if str(e) == "SessionStopped":
-            logger.info("Orchestrator stopped by user request (SessionStopped).")
-            sys.exit(0)  # 正常終了として扱う
-        raise
-    except Exception as e:
-        logger.critical(f"A critical error occurred in Orchestrator: {e}", exc_info=True)
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

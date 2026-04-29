@@ -11,7 +11,7 @@ import functools
 
 import gradio as gr
 
-from nexuscore.core.orchestrator import assemble_agent_team
+from nexuscore.core.agent_factory import assemble_agent_team
 
 # モジュールレベルのエージェントキャッシュ
 _agents_cache: dict | None = None
