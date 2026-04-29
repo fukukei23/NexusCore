@@ -106,7 +106,7 @@ class TestMultiLLMReviewPureFunctions:
 
 # ======================== context_agent ========================
 
-from nexuscore.agents.context_agent import ContextAgent
+from nexuscore.analyzer.context_agent import ContextAgent
 
 
 class TestContextAgentFindProjectRoot:

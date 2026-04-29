@@ -9,7 +9,7 @@ Comprehensive Tests for test_generator_prompt module
 ============================================================================
 """
 
-from nexuscore.agents.test_generator_prompt import (
+from nexuscore.utils.test_generator_prompt import (
     build_specification_based_test_prompt,
     build_test_generation_prompt,
 )

@@ -6,7 +6,7 @@ test_test_generator_prompt.py
 
 from __future__ import annotations
 
-from nexuscore.agents.test_generator_prompt import (
+from nexuscore.utils.test_generator_prompt import (
     build_specification_based_test_prompt,
     build_test_generation_prompt,
 )

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from nexuscore.agents.context_agent import ContextAgent
+from nexuscore.analyzer.context_agent import ContextAgent
 
 
 def test_load_cached_context_bad_json(tmp_path, capsys, monkeypatch):

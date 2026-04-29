@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from nexuscore.agents.context_analyzer import ContextAnalyzer
+from nexuscore.analyzer.context_analyzer import ContextAnalyzer
 
 
 def test_safe_parse_requirements_large_file(tmp_path, monkeypatch, capsys):

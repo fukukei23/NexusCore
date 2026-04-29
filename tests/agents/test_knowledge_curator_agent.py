@@ -43,7 +43,7 @@ def project(tmp_path, monkeypatch):
 
 def test_validate_fkb_suggestion_success(project, monkeypatch):
     proj, source_file, test_file = project
-    agent = KnowledgeCuratorAgent(api_key="x", model="y")
+    agent = KnowledgeCuratorAgent()
     monkeypatch.setattr(agent, "_run_tests_in_sandbox", lambda sandbox, rel: (True, "ok"))
 
     suggestion = {"id": "1", "solution": "fix"}

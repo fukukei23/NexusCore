@@ -19,21 +19,9 @@ from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
 
 
 @pytest.fixture
-def api_key():
-    """テスト用のAPIキー"""
-    return "test-api-key-12345"
-
-
-@pytest.fixture
-def model():
-    """テスト用のモデル名"""
-    return "gpt-4"
-
-
-@pytest.fixture
-def curator_agent(api_key, model):
+def curator_agent():
     """KnowledgeCuratorAgentのインスタンス"""
-    return KnowledgeCuratorAgent(api_key=api_key, model=model)
+    return KnowledgeCuratorAgent()
 
 
 @pytest.fixture
@@ -110,18 +98,10 @@ E        +  where 8 = subtract(5, 3)
 
 
 class TestInit:
-    def test_init_sets_api_key(self, curator_agent, api_key):
-        """APIキーが正しく設定される"""
-        assert curator_agent.api_key == api_key
-
-    def test_init_sets_model(self, curator_agent, model):
-        """モデル名が正しく設定される"""
-        assert curator_agent.model == model
-
     def test_init_creates_logger(self, curator_agent):
         """ロガーが作成される"""
         assert curator_agent.logger is not None
-        assert curator_agent.logger.name == "KnowledgeCuratorAgent"
+        assert "base_agent" in curator_agent.logger.name
 
 
 # ============================================================================

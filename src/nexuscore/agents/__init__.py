@@ -2,7 +2,6 @@ from .architect_agent import ArchitectAgent
 from .base_agent import BaseAgent
 from .coder_agent import CoderAgent
 from .constitutional_council_agent import ConstitutionalCouncilAgent
-from .context_agent import ContextAgent
 from .debugger_agent import DebuggerAgent
 from .guardian_agent import GuardianAgent
 from .knowledge_curator_agent import KnowledgeCuratorAgent
@@ -18,7 +17,6 @@ __all__ = [
     "BaseAgent",
     "CoderAgent",
     "ConstitutionalCouncilAgent",
-    "ContextAgent",
     "DebuggerAgent",
     "GuardianAgent",
     "KnowledgeCuratorAgent",

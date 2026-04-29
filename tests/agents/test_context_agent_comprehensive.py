@@ -46,7 +46,7 @@ def mock_dependencies():
 
 
 try:
-    from nexuscore.agents.context_agent import ContextAgent
+    from nexuscore.analyzer.context_agent import ContextAgent
 
     HAS_CONTEXT_AGENT = True
 except ImportError:

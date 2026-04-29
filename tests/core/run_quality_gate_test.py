@@ -111,7 +111,7 @@ def main():
             policy_rules_path=f"{TEST_PROJECT_PATH}/config/policy_rules.json",
         )
         postmortem_agent = PostmortemAgent(api_key=API_KEY, model=MODEL)
-        knowledge_curator_agent = KnowledgeCuratorAgent(api_key=API_KEY, model=MODEL)
+        knowledge_curator_agent = KnowledgeCuratorAgent()
 
         # --- Orchestratorの初期化 ---
         orchestrator = Orchestrator(

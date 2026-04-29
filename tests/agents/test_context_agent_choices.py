@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from nexuscore.agents.context_agent import ContextAgent
+from nexuscore.analyzer.context_agent import ContextAgent
 
 
 def test_ask_choice_reprompts(monkeypatch, capsys):

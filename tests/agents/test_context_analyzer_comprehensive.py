@@ -21,7 +21,7 @@ from unittest.mock import patch
 import pytest
 
 try:
-    from nexuscore.agents.context_analyzer import ContextAnalyzer
+    from nexuscore.analyzer.context_analyzer import ContextAnalyzer
 
     HAS_CONTEXT_ANALYZER = True
 except ImportError:

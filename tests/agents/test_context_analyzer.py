@@ -1,4 +1,4 @@
-from nexuscore.agents.context_analyzer import ContextAnalyzer
+from nexuscore.analyzer.context_analyzer import ContextAnalyzer
 
 
 def test_safe_parse_requirements(tmp_path):

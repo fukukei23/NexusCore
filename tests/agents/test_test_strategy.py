@@ -9,7 +9,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from nexuscore.agents.test_strategy import (
+from nexuscore.utils.test_strategy import (
     ModuleTestStrategy,
     TestStrategyManager,
 )

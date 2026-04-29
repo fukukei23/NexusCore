@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from nexuscore.agents import patch_applier as pa_module
-from nexuscore.agents.patch_applier import PatchApplier
+from nexuscore.services import patch_applier as pa_module
+from nexuscore.services.patch_applier import PatchApplier
 
 
 class DummyPatchSet:

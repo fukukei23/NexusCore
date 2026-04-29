@@ -1,4 +1,4 @@
-from nexuscore.agents.policy_interface import PolicyInterface
+from nexuscore.config.policy_interface import PolicyInterface
 
 
 def test_safe_default_policy():

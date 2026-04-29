@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nexuscore.agents import policy_interface
+from nexuscore.config import policy_interface
 
 
 def test_policy_interface_init():
