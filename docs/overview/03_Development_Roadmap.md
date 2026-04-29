@@ -19,7 +19,7 @@
 |---|---|
 | Test Coverage | 80.22% |
 | Test Cases | 4,838 |
-| LLM Providers | GLM-5.1 + MiniMax M2.7 (OpenAI SDK fully removed) |
+| LLM Providers | GPT-5.5 / Sonnet 4.6 / Gemini 3.1 Pro / GLM-5.1 / MiniMax M2.7 |
 | Agents | 18+ specialized agents |
 | Core Modules | NPE (Security Engine), FKB (Fault Knowledge Base) |
 

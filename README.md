@@ -34,17 +34,17 @@
 | Context | プロジェクトコンテキスト管理 |
 
 ```
-Task → LLM Router → [OpenAI GPT | Anthropic Claude | DeepSeek | Google Gemini | Kimi | MiniMax]
+Task → LLM Router → [OpenAI GPT-5.5 | Anthropic Sonnet 4.6 | Google Gemini 3.1 | GLM-5.1 | MiniMax M2.7]
                       ↕
                  Budget Manager（日次上限・フォールバック制御）
 ```
 
 ### 多層品質ゲート
 
-各タスクに最適なLLMを自動選択し、コストと品質のバランスを最適化します。
+品質重視タスクにGPT-5.5/Sonnet 4.6、軽量タスクにGLM-5.1/MiniMax M2.7を自動選択し、コストと品質のバランスを最適化します。
 
 ```
-Task → LLM Router → [OpenAI GPT | Anthropic Claude | DeepSeek | Google Gemini | Kimi]
+Task → LLM Router → [OpenAI GPT-5.5 | Anthropic Sonnet 4.6 | Google Gemini 3.1 | GLM-5.1 | MiniMax M2.7]
                       ↕
                  Budget Manager（日次上限・フォールバック制御）
 ```
@@ -102,7 +102,7 @@ User / Developer
 | テストスイート | 392テストファイル |
 | テストカバレッジ | 80%+ |
 | エージェント数 | 14専門エージェント |
-| LLMプロバイダー | 6プロバイダー（OpenAI, Anthropic, DeepSeek, Google, Kimi, MiniMax） |
+| LLMプロバイダー | 5プロバイダー（OpenAI, Anthropic, Google, GLM, MiniMax） |
 | 品質ゲート | 2層（静的解析 + 動的テスト） |
 
 ---
@@ -198,7 +198,7 @@ python -m pytest tests/ --cov=src/nexuscore --cov-report=html
 | カテゴリ | 技術 |
 |---------|------|
 | 言語 | Python 3.11+ |
-| AI/LLM | OpenAI GPT, Anthropic Claude, DeepSeek, Google Gemini, Kimi, MiniMax |
+| AI/LLM | OpenAI GPT-5.5, Anthropic Sonnet 4.6, Google Gemini 3.1, GLM-5.1, MiniMax M2.7 |
 | API | FastAPI |
 | テスト | pytest, pytest-cov, カスタムミューテーションテスト |
 | 品質 | pylint, mypy, bandit |

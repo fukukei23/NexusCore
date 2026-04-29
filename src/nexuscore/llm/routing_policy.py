@@ -1,7 +1,5 @@
 """
 Routing policy utilities and task-model mappings for LLMRouter.
-
-NexusCore routes exclusively through GLM (Zhipu AI) and MiniMax providers.
 """
 
 from __future__ import annotations
@@ -12,22 +10,42 @@ from nexuscore.llm.task_model_map import LEGACY_TO_TASK, build_task_model_map_di
 
 TASK_MODEL_MAP_DEFAULT: dict[str, dict[str, Any]] = build_task_model_map_dict()
 
+_KNOWN_VENDORS = {
+    "openai",
+    "anthropic",
+    "google",
+    "deepseek",
+    "glm",
+    "minimax",
+    "moonshot",
+    "local",
+}
+
 
 def model_family(name: str) -> str:
     """Return provider family string based on a model identifier."""
     n = name.lower()
-    if n in {"glm", "minimax"}:
+    if n in _KNOWN_VENDORS:
         return n
     if ":" in n:
         vendor, model = n.split(":", 1)
-        if vendor in {"glm", "minimax"}:
+        if vendor in _KNOWN_VENDORS:
             return vendor
         n = model
+    if n.startswith(("gpt-", "o1-", "o3-", "o4-")):
+        return "openai"
+    if n.startswith("claude"):
+        return "anthropic"
+    if n.startswith("gemini"):
+        return "google"
+    if n.startswith("deepseek"):
+        return "deepseek"
     if n.startswith(("glm-", "chatglm")):
         return "glm"
     if n.startswith("minimax"):
         return "minimax"
-    # Unknown providers are routed to glm as default
+    if n.startswith("moonshot"):
+        return "moonshot"
     return "glm"
 
 

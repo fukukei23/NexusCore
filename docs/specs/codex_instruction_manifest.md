@@ -54,7 +54,7 @@ NexusCore はマルチエージェント開発 OS です。Codex が作業を引
   - GLM: `curl -H "Authorization: Bearer $GLM_API_KEY" $GLM_API_BASE/chat/completions`
   - MiniMax: `curl -H "Authorization: Bearer $MINIMAX_API_KEY" $MINIMAX_API_BASE/chat/completions`
 - 実コールしたいときは `NEXUS_REAL_CALLS=1` を明示。スタブにしたいときは `0` を明示。
-- LLM利用方針: NexusCoreはGLM (Zhipu AI) / MiniMax のみを使用。OpenAI/Gemini/Claude/DeepSeekは使用しない。
+- LLM利用方針: NexusCoreはマルチプロバイダー構成。品質重視タスクにGPT-5.5/Sonnet 4.6/Gemini 3.1 Pro、軽量タスクにGLM-5.1/MiniMax M2.7を使用。
 - SaaS展開を見据え、環境変数はデフォルト値として扱いつつ、テナント/プロジェクト/リクエスト単位で安全に上書きできる設計方針で進める。
 
 ---
@@ -84,16 +84,23 @@ NexusCore はマルチエージェント開発 OS です。Codex が作業を引
 
 ---
 
-## 7. LLM ルーティング（GLM/MiniMax デュアルプロバイダー版）
+## 7. LLM ルーティング（マルチプロバイダー版）
 
-- モデル役割:
-  - GLM (Zhipu AI): `glm_codex` / `glm_strict` / `glm_default` / `glm_nano`（コード生成/修復/推論/軽量タスク）
-  - MiniMax: `minimax_analytical` / `minimax_default`（分析/計画/チャット/創作タスク）
+- 品質ティア（コード生成・推論・設計）:
+  - OpenAI: `gpt5_codex` / `gpt5_strict`（GPT-5.5）
+  - Anthropic: `sonnet_review` / `sonnet_code`（Sonnet 4.6）
+  - Google: `gemini_secondary`（Gemini 3.1 Pro、セカンダリ）
+- 軽量ティア（チャット・分類・分析）:
+  - GLM (Zhipu AI): `glm_default` / `glm_strict`（GLM-5.1）
+  - MiniMax: `minimax_default` / `minimax_analytical`（MiniMax M2.7）
 - タスクマップは `src/nexuscore/llm/task_model_map.py` の `TASK_MODEL_CONFIGS`。cheap モード時もタスクごとに軽量モデルへ自動アサイン。
 - 環境変数:
+  - `OPENAI_API_KEY` でOpenAI設定
+  - `ANTHROPIC_API_KEY` でAnthropic設定
+  - `GEMINI_API_KEY` でGoogle Gemini設定
   - `GLM_API_KEY`, `GLM_API_BASE`, `GLM_MODEL` でGLM設定
   - `MINIMAX_API_KEY`, `MINIMAX_API_BASE`, `MINIMAX_MODEL` でMiniMax設定
-  - `NEXUS_CLASSIFIER_MODEL` でタスク分類モデルを上書き可能（デフォルト `glm:glm-4-flash`）
+  - `NEXUS_CLASSIFIER_MODEL` でタスク分類モデルを上書き可能
 
 ---
 

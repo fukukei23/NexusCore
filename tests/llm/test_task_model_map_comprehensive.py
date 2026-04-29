@@ -23,25 +23,25 @@ class TestTaskModelConfig:
         config = TaskModelConfig(
             primary="glm_default",
             secondary=["minimax_default"],
-            fallback="glm_nano",
+            fallback="glm_default",
         )
 
         assert config.primary == "glm_default"
         assert config.secondary == ["minimax_default"]
-        assert config.fallback == "glm_nano"
+        assert config.fallback == "glm_default"
         assert config.temperature is None
 
     def test_config_creation_with_temperature(self):
         """temperature指定で設定作成"""
         config = TaskModelConfig(
-            primary="glm_codex",
-            secondary=["minimax_analytical"],
+            primary="gpt5_codex",
+            secondary=["sonnet_code"],
             fallback="glm_default",
             temperature=0.5,
         )
 
-        assert config.primary == "glm_codex"
-        assert config.secondary == ["minimax_analytical"]
+        assert config.primary == "gpt5_codex"
+        assert config.secondary == ["sonnet_code"]
         assert config.fallback == "glm_default"
         assert config.temperature == 0.5
 
@@ -54,20 +54,20 @@ class TestTaskModelConfig:
 
     def test_config_secondary_can_be_empty(self):
         """secondaryは空リスト可能"""
-        config = TaskModelConfig(primary="glm_default", secondary=[], fallback="glm_nano")
+        config = TaskModelConfig(primary="glm_default", secondary=[], fallback="glm_default")
 
         assert config.secondary == []
 
     def test_config_secondary_can_be_multiple(self):
         """複数のsecondaryモデル指定可能"""
         config = TaskModelConfig(
-            primary="glm_strict",
-            secondary=["minimax_analytical", "glm_default", "minimax_default"],
-            fallback="glm_default",
+            primary="sonnet_review",
+            secondary=["gpt5_strict", "gemini_secondary", "glm_strict"],
+            fallback="glm_strict",
         )
 
         assert len(config.secondary) == 3
-        assert "minimax_analytical" in config.secondary
+        assert "gpt5_strict" in config.secondary
 
 
 # ============================================================================
@@ -80,7 +80,6 @@ class TestTaskModelConfigs:
             "code_generate",
             "code_refactor",
             "code_review",
-            "code_explain",
             "test_generate",
             "debug",
         ]
@@ -125,7 +124,6 @@ class TestTaskModelConfigs:
 
     def test_configs_minimum_count(self):
         """最低限のタスク数が定義されている"""
-        # 少なくとも25個のタスクが定義されているべき
         assert len(TASK_MODEL_CONFIGS) >= 25
 
     def test_all_configs_have_required_fields(self):
@@ -137,45 +135,55 @@ class TestTaskModelConfigs:
             assert isinstance(config.fallback, str)
             assert len(config.fallback) > 0
 
-    def test_code_generate_config(self):
-        """code_generateタスクの設定を検証"""
+    def test_code_generate_uses_quality_tier(self):
+        """code_generateタスクは品質ティア（OpenAI）を使用"""
         config = TASK_MODEL_CONFIGS["code_generate"]
 
-        assert config.primary == "glm_codex"
-        assert "minimax_analytical" in config.secondary
+        assert config.primary == "gpt5_codex"
+        assert "sonnet_code" in config.secondary
         assert config.fallback == "glm_default"
         assert config.temperature == 0.2
 
-    def test_code_review_config(self):
-        """code_reviewタスクの設定を検証"""
+    def test_code_review_uses_quality_tier(self):
+        """code_reviewタスクは品質ティア（Anthropic）を使用"""
         config = TASK_MODEL_CONFIGS["code_review"]
 
-        assert config.primary == "glm_strict"
-        assert "minimax_analytical" in config.secondary
-        assert config.fallback == "glm_default"
+        assert config.primary == "sonnet_review"
+        assert "gpt5_strict" in config.secondary
+        assert config.fallback == "glm_strict"
 
-    def test_self_heal_config(self):
-        """self_healタスクの設定を検証"""
+    def test_architect_uses_quality_tier(self):
+        """architectタスクは品質ティア（Anthropic）を使用"""
+        config = TASK_MODEL_CONFIGS["architect"]
+
+        assert config.primary == "sonnet_review"
+        assert "gpt5_strict" in config.secondary
+
+    def test_chat_general_uses_lightweight_tier(self):
+        """chat_generalタスクは軽量ティアを使用"""
+        config = TASK_MODEL_CONFIGS["chat_general"]
+
+        assert config.primary == "glm_default"
+        assert "minimax_default" in config.secondary
+
+    def test_self_heal_uses_quality_tier(self):
+        """self_healタスクは品質ティア（OpenAI）を使用"""
         config = TASK_MODEL_CONFIGS["self_heal"]
 
-        assert config.primary == "glm_codex"
-        assert "minimax_analytical" in config.secondary
-        assert config.fallback == "glm_default"
+        assert config.primary == "gpt5_codex"
+        assert "sonnet_code" in config.secondary
 
-    def test_routing_classify_config(self):
-        """routing_classifyタスクの設定を検証"""
+    def test_routing_classify_uses_lightweight_tier(self):
+        """routing_classifyタスクは軽量ティアを使用"""
         config = TASK_MODEL_CONFIGS["routing_classify"]
 
-        assert config.primary == "glm_nano"
-        assert "glm_default" in config.secondary
-        assert config.fallback == "glm_nano"
+        assert config.primary == "glm_strict"
 
     def test_all_primary_profiles_are_strings(self):
         """全primaryがプロファイルID文字列"""
         for config in TASK_MODEL_CONFIGS.values():
             assert isinstance(config.primary, str)
-            # プロファイル名の形式チェック
-            assert "_" in config.primary or config.primary.startswith("glm")
+            assert "_" in config.primary
 
     def test_all_fallbacks_are_strings(self):
         """全fallbackがプロファイルID文字列"""
@@ -188,8 +196,25 @@ class TestTaskModelConfigs:
         for task, config in TASK_MODEL_CONFIGS.items():
             if config.temperature is not None:
                 assert 0.0 <= config.temperature <= 2.0, f"Task {task} has invalid temperature"
-                # 一般的には0.1〜0.8の範囲
                 assert 0.1 <= config.temperature <= 1.0
+
+    def test_quality_tasks_use_quality_tier(self):
+        """品質重視タスクがOpenAI/Anthropicプロファイルを使用"""
+        quality_tasks = [
+            "code_generate", "code_refactor", "debug", "test_generate", "self_heal",
+        ]
+        for task in quality_tasks:
+            config = TASK_MODEL_CONFIGS[task]
+            assert config.primary.startswith(("gpt5_", "sonnet_")), \
+                f"Task {task} should use quality tier, got {config.primary}"
+
+    def test_lightweight_tasks_use_lightweight_tier(self):
+        """軽量タスクがGLM/MiniMaxプロファイルを使用"""
+        lightweight_tasks = ["chat_general", "creative", "general"]
+        for task in lightweight_tasks:
+            config = TASK_MODEL_CONFIGS[task]
+            assert config.primary.startswith(("glm_", "minimax_")), \
+                f"Task {task} should use lightweight tier, got {config.primary}"
 
 
 # ============================================================================
@@ -230,7 +255,6 @@ class TestLegacyToTask:
 
     def test_legacy_mapping_minimum_count(self):
         """最低限のレガシーマッピング数"""
-        # 少なくとも10個のレガシーマッピングが存在するべき
         assert len(LEGACY_TO_TASK) >= 10
 
     def test_legacy_keys_are_lowercase(self):
@@ -271,11 +295,18 @@ class TestBuildTaskModelMapDict:
         result = build_task_model_map_dict()
         entry = result["code_generate"]
 
-        assert entry["primary"].startswith("glm:")
+        assert entry["primary"].startswith("openai:")
         assert isinstance(entry["fallbacks"], list)
         assert len(entry["fallbacks"]) > 0
         assert "temperature" in entry
         assert entry["temperature"] == 0.2
+
+    def test_build_code_review_entry(self):
+        """code_reviewエントリの構造を検証"""
+        result = build_task_model_map_dict()
+        entry = result["code_review"]
+
+        assert entry["primary"].startswith("anthropic:")
 
     def test_build_primary_format(self):
         """primaryが provider:model 形式"""
@@ -308,7 +339,6 @@ class TestBuildTaskModelMapDict:
             entry = result[task]
             fallbacks = entry["fallbacks"]
 
-            # fallback modelがリストに含まれる
             from nexuscore.llm.llm_profiles import profile_to_model_name
 
             fallback_model = profile_to_model_name(config.fallback)
@@ -328,9 +358,8 @@ class TestBuildTaskModelMapDict:
         """temperatureがNoneの場合、エントリに含まれない可能性"""
         build_task_model_map_dict()
 
-        # 少なくとも一つのタスクでtemperatureがNone
         has_none_temp = any(config.temperature is None for config in TASK_MODEL_CONFIGS.values())
-        assert has_none_temp  # テストの前提条件
+        assert has_none_temp
 
     def test_build_deterministic(self):
         """同じ入力で同じ出力（決定論的）"""
@@ -348,11 +377,8 @@ class TestBuildTaskModelMapDict:
 class TestTaskAliasIntegration:
     def test_alias_source_creates_configs(self):
         """_TASK_ALIAS_SOURCEによりエイリアス設定が作成される"""
-        # "testing" は "test_generate" のエイリアス
         assert "testing" in TASK_MODEL_CONFIGS
         assert "test_generate" in TASK_MODEL_CONFIGS
-
-        # 同じ設定を参照している
         assert TASK_MODEL_CONFIGS["testing"] == TASK_MODEL_CONFIGS["test_generate"]
 
     def test_debugging_alias(self):
@@ -386,18 +412,13 @@ class TestTaskAliasIntegration:
 class TestTaskModelMapIntegration:
     def test_full_workflow_config_to_dict(self):
         """設定から辞書への完全ワークフロー"""
-        # 特定タスクの設定を取得
         config = TASK_MODEL_CONFIGS["code_review"]
-
-        # 辞書ビルド
         result_dict = build_task_model_map_dict()
-
-        # エントリ検証
         entry = result_dict["code_review"]
+
         assert "primary" in entry
         assert "fallbacks" in entry
 
-        # プロファイルからモデル名への変換が正しい
         from nexuscore.llm.llm_profiles import profile_to_model_name
 
         expected_primary = profile_to_model_name(config.primary)
@@ -408,20 +429,17 @@ class TestTaskModelMapIntegration:
         from nexuscore.llm.llm_profiles import get_profile
 
         for task, config in TASK_MODEL_CONFIGS.items():
-            # primary プロファイルが有効
             primary_profile = get_profile(config.primary)
             assert (
                 primary_profile is not None
             ), f"Task {task} has invalid primary profile: {config.primary}"
 
-            # secondary プロファイルが有効
             for secondary in config.secondary:
                 sec_profile = get_profile(secondary)
                 assert (
                     sec_profile is not None
                 ), f"Task {task} has invalid secondary profile: {secondary}"
 
-            # fallback プロファイルが有効
             fallback_profile = get_profile(config.fallback)
             assert (
                 fallback_profile is not None
@@ -429,7 +447,6 @@ class TestTaskModelMapIntegration:
 
     def test_legacy_to_task_to_config_chain(self):
         """レガシー→タスク→設定のチェーン"""
-        # レガシータスク名から設定を取得
         legacy_task = "qa"
         modern_task = LEGACY_TO_TASK[legacy_task]
         config = TASK_MODEL_CONFIGS[modern_task]
@@ -443,22 +460,23 @@ class TestTaskModelMapIntegration:
 
         result = build_task_model_map_dict()
 
-        # JSON化できることを確認
         try:
             json_str = json.dumps(result)
             assert len(json_str) > 0
         except Exception as e:
             pytest.fail(f"build_task_model_map_dict output is not JSON serializable: {e}")
 
-    def test_no_circular_fallbacks(self):
-        """フォールバックの循環参照がない（primary==fallbackは許容）"""
-        # 各タスクのprimaryとfallbackが異なることが望ましいが、
-        # routing_classifyのように同じモデルを使うことも有効
-        # ここでは循環参照（primaryがfallbackを参照し、fallbackがprimaryを参照）がないことを確認
+    def test_multi_provider_routing(self):
+        """マルチプロバイダーのルーティング構成を検証"""
+        result = build_task_model_map_dict()
 
-        # 実際には、primary==fallbackは許容される設計
-        # 例: routing_classify は gpt5_nano を primary と fallback の両方に使用
-        for _task, _config in TASK_MODEL_CONFIGS.items():
-            # 同じプロファイルを使うことは許容される
-            # 循環参照はタスク間の参照なので、ここではチェック不要
-            pass
+        # 品質ティアタスクがOpenAI/Anthropicを使用
+        quality_task = result["code_generate"]
+        assert quality_task["primary"].startswith("openai:")
+
+        review_task = result["code_review"]
+        assert review_task["primary"].startswith("anthropic:")
+
+        # 軽量ティアタスクがGLM/MiniMaxを使用
+        chat_task = result["chat_general"]
+        assert chat_task["primary"].startswith(("glm:", "minimax:"))

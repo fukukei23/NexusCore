@@ -2,7 +2,7 @@
 Comprehensive tests for llm/llm_profiles.py
 
 LLMプロファイルレジストリとヘルパー関数のテスト
-NexusCore uses GLM (Zhipu AI) and MiniMax as the sole LLM providers.
+NexusCore uses a multi-provider architecture: GPT-5.5, Sonnet 4.6, Gemini 3.1, GLM-5.1, MiniMax M2.7.
 """
 
 import pytest
@@ -22,11 +22,11 @@ from nexuscore.llm.llm_profiles import (
 class TestLLMProfile:
     def test_profile_creation_minimal(self):
         """最小限のパラメータでプロファイル作成"""
-        profile = LLMProfile(name="test_profile", provider="glm", model="glm-4-plus")
+        profile = LLMProfile(name="test_profile", provider="openai", model="gpt-5.5")
 
         assert profile.name == "test_profile"
-        assert profile.provider == "glm"
-        assert profile.model == "glm-4-plus"
+        assert profile.provider == "openai"
+        assert profile.model == "gpt-5.5"
         assert profile.description is None
         assert profile.default_temperature == 0.2
 
@@ -48,14 +48,14 @@ class TestLLMProfile:
 
     def test_profile_is_frozen(self):
         """frozenデータクラスのため変更不可"""
-        profile = LLMProfile(name="test", provider="glm", model="glm-4-plus")
+        profile = LLMProfile(name="test", provider="glm", model="glm-5.1")
 
         with pytest.raises(Exception):  # FrozenInstanceError  # noqa: B017
             profile.name = "new_name"  # type: ignore
 
     def test_profile_default_temperature(self):
         """デフォルトtemperatureは0.2"""
-        profile = LLMProfile(name="test", provider="glm", model="glm-4-plus")
+        profile = LLMProfile(name="test", provider="glm", model="glm-5.1")
 
         assert profile.default_temperature == 0.2
 
@@ -64,25 +64,48 @@ class TestLLMProfile:
 # PROFILE_REGISTRY テスト
 # ============================================================================
 class TestProfileRegistry:
+    def test_registry_contains_openai_profiles(self):
+        """OpenAI系プロファイルが登録されている"""
+        for profile_id in ["gpt5_codex", "gpt5_strict"]:
+            assert profile_id in PROFILE_REGISTRY
+
+    def test_registry_contains_anthropic_profiles(self):
+        """Anthropic系プロファイルが登録されている"""
+        for profile_id in ["sonnet_review", "sonnet_code"]:
+            assert profile_id in PROFILE_REGISTRY
+
+    def test_registry_contains_google_profiles(self):
+        """Google系プロファイルが登録されている"""
+        assert "gemini_secondary" in PROFILE_REGISTRY
+
     def test_registry_contains_glm_profiles(self):
         """GLM系プロファイルが登録されている"""
-        glm_profiles = [
-            "glm_default",
-            "glm_strict",
-            "glm_codex",
-            "glm_nano",
-        ]
-        for profile_id in glm_profiles:
+        for profile_id in ["glm_default", "glm_strict"]:
             assert profile_id in PROFILE_REGISTRY
 
     def test_registry_contains_minimax_profiles(self):
         """MiniMax系プロファイルが登録されている"""
-        minimax_profiles = [
-            "minimax_default",
-            "minimax_analytical",
-        ]
-        for profile_id in minimax_profiles:
+        for profile_id in ["minimax_default", "minimax_analytical"]:
             assert profile_id in PROFILE_REGISTRY
+
+    def test_registry_profile_structure_gpt5_codex(self):
+        """gpt5_codexの構造を検証"""
+        profile = PROFILE_REGISTRY["gpt5_codex"]
+
+        assert profile.name == "gpt5_codex"
+        assert profile.provider == "openai"
+        assert profile.model == "gpt-5.5"
+        assert profile.description is not None
+        assert profile.default_temperature == 0.2
+
+    def test_registry_profile_structure_sonnet_review(self):
+        """sonnet_reviewの構造を検証"""
+        profile = PROFILE_REGISTRY["sonnet_review"]
+
+        assert profile.name == "sonnet_review"
+        assert profile.provider == "anthropic"
+        assert profile.model == "claude-sonnet-4-6"
+        assert profile.default_temperature == 0.15
 
     def test_registry_profile_structure_glm_default(self):
         """glm_defaultの構造を検証"""
@@ -90,7 +113,7 @@ class TestProfileRegistry:
 
         assert profile.name == "glm_default"
         assert profile.provider == "glm"
-        assert profile.model == "glm-4-plus"
+        assert profile.model == "glm-5.1"
         assert profile.description is not None
         assert profile.default_temperature == 0.2
 
@@ -120,8 +143,8 @@ class TestProfileRegistry:
 
     def test_registry_minimum_profiles_exist(self):
         """最低限のプロファイル数が存在"""
-        # 少なくとも6つのプロファイルが定義されているべき（GLM×4 + MiniMax×2）
-        assert len(PROFILE_REGISTRY) >= 6
+        # OpenAI×2 + Anthropic×2 + Google×1 + GLM×2 + MiniMax×2 = 9
+        assert len(PROFILE_REGISTRY) >= 9
 
 
 # ============================================================================
@@ -130,10 +153,10 @@ class TestProfileRegistry:
 class TestGetProfile:
     def test_get_profile_existing(self):
         """存在するプロファイルを取得"""
-        profile = get_profile("glm_default")
+        profile = get_profile("gpt5_codex")
 
         assert profile is not None
-        assert profile.name == "glm_default"
+        assert profile.name == "gpt5_codex"
 
     def test_get_profile_nonexistent(self):
         """存在しないプロファイルはNone"""
@@ -177,10 +200,11 @@ class TestProfileIds:
         """既知のプロファイルIDを含む"""
         ids = profile_ids()
 
+        assert "gpt5_codex" in ids
+        assert "sonnet_review" in ids
+        assert "gemini_secondary" in ids
         assert "glm_default" in ids
-        assert "glm_codex" in ids
         assert "minimax_default" in ids
-        assert "minimax_analytical" in ids
 
     def test_profile_ids_length_matches_registry(self):
         """レジストリのサイズと一致"""
@@ -207,27 +231,33 @@ class TestProfileIds:
 # profile_to_model_name テスト
 # ============================================================================
 class TestProfileToModelName:
+    def test_profile_to_model_name_gpt5_codex(self):
+        """gpt5_codexを正しく変換"""
+        model_name = profile_to_model_name("gpt5_codex")
+
+        assert model_name == "openai:gpt-5.5"
+
+    def test_profile_to_model_name_sonnet_review(self):
+        """sonnet_reviewを正しく変換"""
+        model_name = profile_to_model_name("sonnet_review")
+
+        assert model_name == "anthropic:claude-sonnet-4-6"
+
+    def test_profile_to_model_name_gemini_secondary(self):
+        """gemini_secondaryを正しく変換"""
+        model_name = profile_to_model_name("gemini_secondary")
+
+        assert model_name == "google:gemini-3.1-pro"
+
     def test_profile_to_model_name_glm_default(self):
         """glm_defaultを正しく変換"""
         model_name = profile_to_model_name("glm_default")
 
-        assert model_name == "glm:glm-4-plus"
+        assert model_name == "glm:glm-5.1"
 
     def test_profile_to_model_name_minimax_default(self):
         """minimax_defaultを正しく変換"""
         model_name = profile_to_model_name("minimax_default")
-
-        assert model_name == "minimax:minimax-m2.7"
-
-    def test_profile_to_model_name_glm_codex(self):
-        """glm_codexを正しく変換"""
-        model_name = profile_to_model_name("glm_codex")
-
-        assert model_name == "glm:glm-4-plus"
-
-    def test_profile_to_model_name_minimax_analytical(self):
-        """minimax_analyticalを正しく変換"""
-        model_name = profile_to_model_name("minimax_analytical")
 
         assert model_name == "minimax:minimax-m2.7"
 
@@ -253,13 +283,13 @@ class TestProfileToModelName:
 
     def test_profile_to_model_name_format(self):
         """provider:model形式を返す"""
-        model_name = profile_to_model_name("glm_strict")
+        model_name = profile_to_model_name("gpt5_strict")
 
         assert ":" in model_name
         parts = model_name.split(":")
         assert len(parts) == 2
-        assert parts[0] == "glm"  # provider
-        assert parts[1] == "glm-4-plus"  # model
+        assert parts[0] == "openai"
+        assert parts[1] == "gpt-5.5"
 
 
 # ============================================================================
@@ -268,32 +298,27 @@ class TestProfileToModelName:
 class TestProfilesIntegration:
     def test_full_workflow_get_and_convert(self):
         """プロファイル取得から変換までの完全ワークフロー"""
-        # プロファイル取得
-        profile = get_profile("glm_codex")
+        profile = get_profile("sonnet_code")
         assert profile is not None
 
-        # モデル名に変換
-        model_name = profile_to_model_name("glm_codex")
+        model_name = profile_to_model_name("sonnet_code")
 
         assert model_name == f"{profile.provider}:{profile.model}"
-        assert model_name == "glm:glm-4-plus"
+        assert model_name == "anthropic:claude-sonnet-4-6"
 
     def test_all_profiles_convertible(self):
         """全プロファイルが変換可能であることを統合確認"""
         ids = profile_ids()
 
         for profile_id in ids:
-            # get_profile経由で取得
             profile = get_profile(profile_id)
             assert profile is not None
 
-            # profile_to_model_name経由で変換
             model_name = profile_to_model_name(profile_id)
             assert model_name == f"{profile.provider}:{profile.model}"
 
     def test_profile_registry_consistency(self):
         """レジストリの一貫性チェック"""
-        # profile_ids()の結果とREGISTRYのキーが一致
         ids = profile_ids()
         registry_keys = list(PROFILE_REGISTRY.keys())
 
@@ -303,7 +328,6 @@ class TestProfilesIntegration:
         """全プロファイルのtemperatureが妥当な範囲"""
         for profile in PROFILE_REGISTRY.values():
             assert 0.0 <= profile.default_temperature <= 2.0
-            # 一般的には0.15〜0.5の範囲
             assert 0.1 <= profile.default_temperature <= 1.0
 
     def test_providers_are_lowercase(self):
@@ -311,10 +335,11 @@ class TestProfilesIntegration:
         for profile in PROFILE_REGISTRY.values():
             assert profile.provider == profile.provider.lower()
 
-    def test_all_providers_are_glm_or_minimax(self):
-        """全プロバイダーがglmまたはminimax"""
+    def test_all_providers_are_known(self):
+        """全プロバイダーが既知のベンダー"""
+        known_providers = {"openai", "anthropic", "google", "glm", "minimax"}
         for profile in PROFILE_REGISTRY.values():
-            assert profile.provider in ("glm", "minimax")
+            assert profile.provider in known_providers
 
     def test_profile_names_match_registry_keys(self):
         """プロファイル名がレジストリキーと一致"""

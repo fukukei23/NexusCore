@@ -5,7 +5,7 @@ This module centralizes .env loading, environment-variable synchronization,
 and typed access to runtime settings so that the router itself can focus on
 provider logic.
 
-NexusCore uses GLM (Zhipu AI) and MiniMax as the sole LLM providers.
+NexusCore uses a multi-provider architecture: GPT-5.5, Sonnet 4.6, Gemini 3.1 Pro, GLM-5.1, MiniMax M2.7.
 """
 
 from __future__ import annotations

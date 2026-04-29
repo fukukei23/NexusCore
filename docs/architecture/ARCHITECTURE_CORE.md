@@ -40,8 +40,11 @@ graph TB
         Tier2[Tier 2: Mutation Testing]
     end
 
-    ModelPool --> GLM[GLM (Zhipu AI)]
-    ModelPool --> MiniMax[MiniMax]
+    ModelPool --> OpenAI[OpenAI GPT-5.5]
+    ModelPool --> Anthropic[Anthropic Sonnet 4.6]
+    ModelPool --> Google[Google Gemini 3.1]
+    ModelPool --> GLM[GLM-5.1]
+    ModelPool --> MiniMax[MiniMax M2.7]
 
     Tier1 --> Coverage[Coverage Analysis]
     Tier1 --> Pylint[Pylint]
@@ -359,8 +362,11 @@ src/nexuscore/
 - Python 3.11+
 
 **AI/LLM:**
-- GLM (Zhipu AI) (GLM-4-Plus, GLM-4-Flash)
-- MiniMax (MiniMax-M2.7)
+- OpenAI (GPT-5.5)
+- Anthropic (Sonnet 4.6)
+- Google (Gemini 3.1 Pro)
+- GLM (Zhipu AI) (GLM-5.1)
+- MiniMax (MiniMax M2.7)
 
 **Testing:**
 - pytest
