@@ -2,7 +2,8 @@
 Comprehensive tests for llm/routing_policy.py
 
 ルーティングポリシーとモデルファミリー識別のテスト
-NexusCore uses GLM (Zhipu AI) and MiniMax as the sole LLM providers.
+NexusCore supports multiple LLM providers: OpenAI, Anthropic, Google Gemini,
+GLM (Zhipu AI), MiniMax, DeepSeek, and Moonshot.
 """
 
 from nexuscore.llm.routing_policy import (
@@ -170,15 +171,16 @@ class TestTaskModelMapDefault:
         expected = build_task_model_map_dict()
         assert TASK_MODEL_MAP_DEFAULT == expected
 
-    def test_all_providers_are_glm_or_minimax(self):
-        """全プロバイダーがGLMまたはMiniMax"""
+    def test_all_providers_are_valid(self):
+        """全プロバイダーが既知のプロバイダー"""
+        valid_prefixes = ("openai:", "anthropic:", "google:", "glm:", "minimax:", "deepseek:", "moonshot:", "local:")
         for task, config in TASK_MODEL_MAP_DEFAULT.items():
             primary = config["primary"]
-            assert primary.startswith("glm:") or primary.startswith("minimax:"), \
-                f"Task {task} has non-GLM/MiniMax primary: {primary}"
+            assert primary.startswith(valid_prefixes), \
+                f"Task {task} has unknown provider primary: {primary}"
             for fb in config["fallbacks"]:
-                assert fb.startswith("glm:") or fb.startswith("minimax:"), \
-                    f"Task {task} has non-GLM/MiniMax fallback: {fb}"
+                assert fb.startswith(valid_prefixes), \
+                    f"Task {task} has unknown provider fallback: {fb}"
 
 
 # ============================================================================

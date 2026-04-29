@@ -141,8 +141,8 @@ class TestTaskModelConfigs:
         """code_generateタスクの設定を検証"""
         config = TASK_MODEL_CONFIGS["code_generate"]
 
-        assert config.primary == "glm_codex"
-        assert "minimax_analytical" in config.secondary
+        assert config.primary == "gpt_codex"
+        assert "sonnet_code" in config.secondary
         assert config.fallback == "glm_default"
         assert config.temperature == 0.2
 
@@ -150,25 +150,25 @@ class TestTaskModelConfigs:
         """code_reviewタスクの設定を検証"""
         config = TASK_MODEL_CONFIGS["code_review"]
 
-        assert config.primary == "glm_strict"
-        assert "minimax_analytical" in config.secondary
-        assert config.fallback == "glm_default"
+        assert config.primary == "sonnet_review"
+        assert "gpt_strict" in config.secondary
+        assert config.fallback == "glm_strict"
 
     def test_self_heal_config(self):
         """self_healタスクの設定を検証"""
         config = TASK_MODEL_CONFIGS["self_heal"]
 
-        assert config.primary == "glm_codex"
-        assert "minimax_analytical" in config.secondary
+        assert config.primary == "gpt_codex"
+        assert "sonnet_code" in config.secondary
         assert config.fallback == "glm_default"
 
     def test_routing_classify_config(self):
         """routing_classifyタスクの設定を検証"""
         config = TASK_MODEL_CONFIGS["routing_classify"]
 
-        assert config.primary == "glm_nano"
-        assert "glm_default" in config.secondary
-        assert config.fallback == "glm_nano"
+        assert config.primary == "glm_default"
+        assert "minimax_default" in config.secondary
+        assert config.fallback == "glm_default"
 
     def test_all_primary_profiles_are_strings(self):
         """全primaryがプロファイルID文字列"""
@@ -271,7 +271,7 @@ class TestBuildTaskModelMapDict:
         result = build_task_model_map_dict()
         entry = result["code_generate"]
 
-        assert entry["primary"].startswith("glm:")
+        assert entry["primary"].startswith("openai:")
         assert isinstance(entry["fallbacks"], list)
         assert len(entry["fallbacks"]) > 0
         assert "temperature" in entry
