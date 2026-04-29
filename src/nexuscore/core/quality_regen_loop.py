@@ -95,7 +95,7 @@ class QualityRegenLoop:
         if self.orchestrator is None:
             return True
         try:
-            from nexuscore.core.orchestrator import OrchestratorContext
+            from nexuscore.core.orchestrator_models import OrchestratorContext
             ctx = OrchestratorContext(
                 task_id=f"quality_regen_iter_{iteration}",
                 user_requirement="auto-regeneration: improve coverage and fix lint warnings",

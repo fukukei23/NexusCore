@@ -19,9 +19,11 @@ import pytest
 
 from nexuscore.core.orchestrator import (
     Orchestrator,
-    _build_arg_parser,
     assemble_agent_team,
-    main,
+)
+from nexuscore.core.orchestrator_models import (
+    OrchestratorContext,
+    OrchestratorPhase,
 )
 
 # ==============================================================================
@@ -130,7 +132,7 @@ class TestExecuteTaskViaNPE:
         )
 
         with patch(
-            "nexuscore.core.orchestrator.guarded_llm_call",
+            "nexuscore.core.phase_runner_mixin.guarded_llm_call",
             return_value={"ok": True, "content": "Test response content", "usage": {"tokens": 100}},
         ):
             result = orchestrator._execute_task_via_npe(
@@ -146,7 +148,7 @@ class TestExecuteTaskViaNPE:
         )
 
         with patch(
-            "nexuscore.core.orchestrator.guarded_llm_call", return_value="Direct string response"
+            "nexuscore.core.phase_runner_mixin.guarded_llm_call", return_value="Direct string response"
         ):
             result = orchestrator._execute_task_via_npe(
                 prompt="Test prompt", metadata={"task_type": "coding"}
@@ -167,7 +169,7 @@ class TestExecuteTaskViaNPE:
         )
 
         with patch(
-            "nexuscore.core.orchestrator.guarded_llm_call",
+            "nexuscore.core.phase_runner_mixin.guarded_llm_call",
             return_value={"ok": True, "content": "Response", "usage": {}},
         ) as mock_call:
             orchestrator._execute_task_via_npe(prompt="Test", metadata={"task_type": "planning"})
@@ -184,7 +186,7 @@ class TestExecuteTaskViaNPE:
         )
 
         with patch(
-            "nexuscore.core.orchestrator.guarded_llm_call",
+            "nexuscore.core.phase_runner_mixin.guarded_llm_call",
             return_value={"ok": True, "content": "Response", "usage": {}},
         ) as mock_call:
             orchestrator._execute_task_via_npe(prompt="Test", metadata={})  # task_typeなし
@@ -562,106 +564,5 @@ class TestAssembleAgentTeam:
 
 
 # ==============================================================================
-# TestCLI: CLIエントリポイント
+# Note: CLI tests removed — CLI entry point is now in main_cli.py
 # ==============================================================================
-
-
-class TestCLI:
-    """CLI関数（_build_arg_parser, main）のテスト"""
-
-    def test_build_arg_parser_creates_parser(self):
-        """_build_arg_parserがArgumentParserを作成"""
-        parser = _build_arg_parser()
-
-        # パーサーが作成される
-        assert parser is not None
-        assert parser.prog is not None
-
-    def test_build_arg_parser_has_required_arguments(self):
-        """必須引数が定義されている"""
-        parser = _build_arg_parser()
-
-        # 引数をパース
-        args = parser.parse_args([])
-
-        # デフォルト値が設定されている
-        assert hasattr(args, "project")
-        assert hasattr(args, "requirement")
-        assert hasattr(args, "autonomy_level")
-        assert hasattr(args, "fast_lane")
-        assert hasattr(args, "session_id")
-
-    def test_main_creates_orchestrator_and_runs(self, monkeypatch, temp_project):
-        """main()がOrchestratorを作成してrun_full_projectを実行"""
-        monkeypatch.setenv("GLM_API_KEY", "test-api-key")
-        monkeypatch.setattr(
-            "sys.argv",
-            [
-                "prog",
-                "--project",
-                temp_project,
-                "--requirement",
-                "Test requirement",
-                "--autonomy-level",
-                "1",
-            ],
-        )
-
-        with patch("nexuscore.core.orchestrator.assemble_agent_team") as mock_assemble:
-            mock_team = {
-                "requirement_agent": MagicMock(),
-                "architect_agent": MagicMock(),
-                "planner_agent": MagicMock(),
-                "coder_agent": MagicMock(),
-                "tester_agent": MagicMock(),
-                "debugger_agent": MagicMock(),
-                "guardian_agent": MagicMock(),
-                "policy_agent": MagicMock(),
-                "postmortem_agent": MagicMock(),
-                "knowledge_curator_agent": MagicMock(),
-                "patch_applier_agent": MagicMock(),
-                "llm_router": MagicMock(),
-            }
-            mock_assemble.return_value = mock_team
-
-            with patch.object(Orchestrator, "run_full_project") as mock_run:
-                main()
-
-                # assemble_agent_teamが呼ばれた
-                mock_assemble.assert_called_once_with(project_path=temp_project)
-
-                # run_full_projectが呼ばれた
-                mock_run.assert_called_once()
-
-    def test_main_handles_session_stopped(self, monkeypatch, temp_project):
-        """main()がSessionStoppedを正常終了として扱う"""
-        monkeypatch.setenv("GLM_API_KEY", "test-api-key")
-        monkeypatch.setattr(
-            "sys.argv", ["prog", "--project", temp_project, "--requirement", "Test"]
-        )
-
-        with patch("nexuscore.core.orchestrator.assemble_agent_team") as mock_assemble:
-            mock_team = {
-                "requirement_agent": MagicMock(),
-                "architect_agent": MagicMock(),
-                "planner_agent": MagicMock(),
-                "coder_agent": MagicMock(),
-                "tester_agent": MagicMock(),
-                "debugger_agent": MagicMock(),
-                "guardian_agent": MagicMock(),
-                "policy_agent": MagicMock(),
-                "postmortem_agent": MagicMock(),
-                "knowledge_curator_agent": MagicMock(),
-                "patch_applier_agent": MagicMock(),
-                "llm_router": MagicMock(),
-            }
-            mock_assemble.return_value = mock_team
-
-            with patch.object(
-                Orchestrator, "run_full_project", side_effect=RuntimeError("SessionStopped")
-            ):
-                with pytest.raises(SystemExit) as exc_info:
-                    main()
-
-                # 正常終了（exit code 0）
-                assert exc_info.value.code == 0
