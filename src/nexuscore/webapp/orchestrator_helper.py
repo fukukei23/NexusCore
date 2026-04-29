@@ -12,7 +12,8 @@ import uuid
 from typing import Any
 
 from nexuscore.config.config import AppConfig
-from nexuscore.core.orchestrator import Orchestrator, assemble_agent_team
+from nexuscore.core.orchestrator import Orchestrator
+from nexuscore.core.agent_factory import assemble_agent_team
 from nexuscore.core.session_control import SessionController
 
 logger = logging.getLogger(__name__)

@@ -159,7 +159,7 @@ class TestRequestRegeneration:
         mock_ctx = MagicMock()
         mock_orch.run_testing_phase.return_value = mock_ctx
         loop = QualityRegenLoop(project_path="/p", orchestrator=mock_orch)
-        with patch("nexuscore.core.orchestrator.OrchestratorContext") as mock_octx_cls:
+        with patch("nexuscore.core.orchestrator_models.OrchestratorContext") as mock_octx_cls:
             mock_octx_cls.return_value = mock_ctx
             result = loop.request_regeneration(1)
         assert result is True
