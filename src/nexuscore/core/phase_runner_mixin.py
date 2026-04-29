@@ -8,7 +8,6 @@ project_path, constitution as instance attributes.
 from __future__ import annotations
 
 import json
-import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
