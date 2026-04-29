@@ -554,13 +554,12 @@ class TestAssembleAgentTeam:
         assert "patch_applier_agent" in result
         assert "llm_router" in result
 
-    def test_assemble_agent_team_missing_api_key(self, temp_project, monkeypatch):
-        """GLM_API_KEYがない場合はRuntimeError"""
-        # 環境変数をクリア
+    def test_assemble_agent_team_works_without_glm_api_key(self, temp_project, monkeypatch):
+        """GLM_API_KEYがなくてもagent teamは構築可能（KnowledgeCuratorAgentはAPIキー不要）"""
         monkeypatch.delenv("GLM_API_KEY", raising=False)
 
-        with pytest.raises(RuntimeError, match="GLM_API_KEY"):
-            assemble_agent_team(temp_project)
+        result = assemble_agent_team(temp_project)
+        assert "knowledge_curator_agent" in result
 
 
 # ==============================================================================

@@ -32,7 +32,7 @@ def mock_gradio():
 
 
 try:
-    from nexuscore.agents.policy_interface import GRADIO_AVAILABLE, PolicyInterface
+    from nexuscore.config.policy_interface import GRADIO_AVAILABLE, PolicyInterface
 
     HAS_POLICY_INTERFACE = True
 except ImportError:

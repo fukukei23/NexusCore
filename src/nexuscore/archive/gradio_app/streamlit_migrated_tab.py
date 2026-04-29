@@ -90,7 +90,7 @@ agent_type = "基本版"
 
 logger.info("🔍 Context Agent検索中...")
 try:
-    from nexuscore.agents.context_agent import ContextAgent
+    from nexuscore.analyzer.context_agent import ContextAgent
 
     context_agent = ContextAgent()
     rules = context_agent.get_error_prevention_rules()

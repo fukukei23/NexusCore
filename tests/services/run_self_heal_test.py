@@ -80,7 +80,7 @@ def main():
         # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         postmortem_agent = PostmortemAgent()
         policy_agent = PolicyAgent()
-        knowledge_curator_agent = KnowledgeCuratorAgent(api_key="dummy", model="dummy")
+        knowledge_curator_agent = KnowledgeCuratorAgent()
         patch_applier = PatchApplier()
         print("✅ [INFO] All agents instantiated.")
 

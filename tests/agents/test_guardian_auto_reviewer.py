@@ -6,7 +6,7 @@ GuardianAutoReviewer のユニットテスト。
 
 from __future__ import annotations
 
-from nexuscore.agents.guardian_auto_reviewer import (
+from nexuscore.guard.guardian_auto_reviewer import (
     GuardianAutoReviewer,
     ProjectType,
     ReviewDecision,

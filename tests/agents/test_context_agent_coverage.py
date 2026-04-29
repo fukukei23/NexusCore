@@ -20,7 +20,7 @@ class TestContextAgentInit:
     """ContextAgent 初期化テスト"""
 
     def test_init_with_project_root(self):
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.object(ContextAgent, "request_human_dev_policy", return_value={"method": "test"}):
@@ -30,7 +30,7 @@ class TestContextAgentInit:
 
     def test_init_finds_project_root(self):
         """_find_project_root が .git または pyproject.toml を見つける"""
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # pyproject.toml を作成
@@ -44,7 +44,7 @@ class TestCreateSafeBaseContext:
     """_create_safe_base_context のテスト"""
 
     def test_returns_expected_keys(self):
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.object(ContextAgent, "request_human_dev_policy", return_value={"method": "test"}):
@@ -62,7 +62,7 @@ class TestSafeCountFiles:
     """_safe_count_files / _safe_count_python_files のテスト"""
 
     def test_count_files_in_temp_dir(self):
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # テストファイルを作成
@@ -75,7 +75,7 @@ class TestSafeCountFiles:
                 assert count >= 3  # 3ファイル + .nexus_context.json 等の可能性
 
     def test_count_python_files(self):
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             for name in ["a.py", "b.txt", "c.py"]:
@@ -91,7 +91,7 @@ class TestSafeDetectFrameworks:
     """_safe_detect_frameworks のテスト"""
 
     def test_detect_from_requirements(self):
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with open(os.path.join(tmpdir, "requirements.txt"), "w") as f:
@@ -105,7 +105,7 @@ class TestSafeDetectFrameworks:
                 assert "pytest" in fw
 
     def test_no_requirements_returns_empty(self):
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.object(ContextAgent, "request_human_dev_policy", return_value={"method": "test"}):
@@ -118,7 +118,7 @@ class TestGetErrorPreventionRules:
     """get_error_prevention_rules のテスト"""
 
     def test_default_rules(self):
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             policy = {
@@ -136,7 +136,7 @@ class TestGetErrorPreventionRules:
                 assert rules["use_env_vars"] is True
 
     def test_empty_policy_defaults(self):
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.object(ContextAgent, "request_human_dev_policy", return_value={}):
@@ -150,7 +150,7 @@ class TestGenerateRecommendations:
     """_generate_recommendations のテスト"""
 
     def test_test_import_recommendation(self):
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.object(ContextAgent, "request_human_dev_policy", return_value={"method": "test"}):
@@ -163,7 +163,7 @@ class TestGenerateRecommendations:
                 assert any("インポート" in r for r in recs)
 
     def test_api_recommendation(self):
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.object(ContextAgent, "request_human_dev_policy", return_value={"method": "test"}):
@@ -176,7 +176,7 @@ class TestGenerateRecommendations:
                 assert any("環境変数" in r for r in recs)
 
     def test_docstring_recommendation(self):
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.object(ContextAgent, "request_human_dev_policy", return_value={"method": "test"}):
@@ -193,7 +193,7 @@ class TestAnalyzeCodeRequest:
     """analyze_code_request のテスト"""
 
     def test_returns_analysis_dict(self):
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.object(ContextAgent, "request_human_dev_policy", return_value={"method": "test"}):
@@ -208,7 +208,7 @@ class TestSaveAndLoadContext:
     """save_context / load_cached_context のテスト"""
 
     def test_save_and_load_roundtrip(self):
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.object(ContextAgent, "request_human_dev_policy", return_value={"method": "test"}):
@@ -225,7 +225,7 @@ class TestRequestHumanDevPolicy:
     """request_human_dev_policy のテスト"""
 
     def test_uses_policy_interface(self):
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.object(ContextAgent, "request_human_dev_policy", return_value={"method": "test"}):
@@ -244,7 +244,7 @@ class TestRequestHumanDevPolicy:
 
     def test_falls_back_when_no_policy_interface(self):
         """policy_interface=Noneの場合、_command_line_policy_setupが呼ばれる"""
-        from nexuscore.agents.context_agent import ContextAgent
+        from nexuscore.analyzer.context_agent import ContextAgent
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.object(ContextAgent, "request_human_dev_policy", return_value={"method": "test"}):

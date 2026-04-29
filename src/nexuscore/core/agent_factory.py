@@ -36,18 +36,7 @@ def assemble_agent_team(project_path: str) -> dict[str, Any]:
     guardian_agent = GuardianAgent()
     policy_agent = PolicyAgent()
     postmortem_agent = PostmortemAgent()
-    curator_api_key = os.getenv("GLM_API_KEY", "")
-    curator_model = os.getenv("NEXUS_TASK_MODEL_KNOWLEDGE", "glm-4-plus")
-
-    if not curator_api_key:
-        raise RuntimeError(
-            "KnowledgeCuratorAgent requires GLM_API_KEY. Set it in the environment before assembling agent team."
-        )
-
-    knowledge_curator_agent = KnowledgeCuratorAgent(
-        api_key=curator_api_key,
-        model=curator_model,
-    )
+    knowledge_curator_agent = KnowledgeCuratorAgent()
     patch_applier_agent = PatchApplier()
 
     agents: dict[str, Any] = {

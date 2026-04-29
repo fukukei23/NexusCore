@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from nexuscore.agents import context_agent as context_agent_module
-from nexuscore.agents.context_agent import ContextAgent
+from nexuscore.analyzer import context_agent as context_agent_module
+from nexuscore.analyzer.context_agent import ContextAgent
 
 
 @pytest.fixture(autouse=True)

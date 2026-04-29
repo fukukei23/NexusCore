@@ -314,17 +314,17 @@ class TestGitHubPRCreatorExtensions:
     """リトライ・差分サイズ・ラベルのテスト"""
 
     def test_validate_diff_size_within_limit(self):
-        from nexuscore.agents.github_pr_creator import GitHubPRCreator
+        from nexuscore.utils.github_pr_creator import GitHubPRCreator
         diff = "\n".join(["+ line"] * 500)
         assert GitHubPRCreator.validate_diff_size(diff, 1000) is True
 
     def test_validate_diff_size_exceeds_limit(self):
-        from nexuscore.agents.github_pr_creator import GitHubPRCreator
+        from nexuscore.utils.github_pr_creator import GitHubPRCreator
         diff = "\n".join(["+ line"] * 1001)
         assert GitHubPRCreator.validate_diff_size(diff, 1000) is False
 
     def test_create_fix_pr_skips_no_changes(self):
-        from nexuscore.agents.github_pr_creator import GitHubPRCreator
+        from nexuscore.utils.github_pr_creator import GitHubPRCreator
         creator = GitHubPRCreator(token="fake")
         with patch.object(creator, "get_branch_sha"):
             result = creator.create_fix_pr(
@@ -337,7 +337,7 @@ class TestGitHubPRCreatorExtensions:
         assert result["reason"] == "no_changes"
 
     def test_create_fix_pr_skips_oversized_diff(self):
-        from nexuscore.agents.github_pr_creator import GitHubPRCreator, MAX_DIFF_LINES
+        from nexuscore.utils.github_pr_creator import GitHubPRCreator, MAX_DIFF_LINES
         creator = GitHubPRCreator(token="fake", max_diff_lines=10)
         big_code = "\n".join([f"line {i}" for i in range(100)])
         fixed_code = "\n".join([f"fixed {i}" for i in range(100)])
@@ -352,7 +352,7 @@ class TestGitHubPRCreatorExtensions:
         assert result["reason"] == "diff_too_large"
 
     def test_add_labels_called_on_pr_creation(self):
-        from nexuscore.agents.github_pr_creator import GitHubPRCreator
+        from nexuscore.utils.github_pr_creator import GitHubPRCreator
         creator = GitHubPRCreator(token="fake")
         with patch.object(creator, "get_branch_sha", return_value="abc123"), \
              patch.object(creator, "create_branch", return_value=True), \
@@ -369,7 +369,7 @@ class TestGitHubPRCreatorExtensions:
             mock_labels.assert_called_once_with("r/r", 42)
 
     def test_request_with_retry_succeeds_first_try(self):
-        from nexuscore.agents.github_pr_creator import GitHubPRCreator
+        from nexuscore.utils.github_pr_creator import GitHubPRCreator
         creator = GitHubPRCreator(token="fake")
         mock_resp = MagicMock()
         mock_resp.raise_for_status = MagicMock()
@@ -378,7 +378,7 @@ class TestGitHubPRCreatorExtensions:
             assert resp == mock_resp
 
     def test_request_with_retry_retries_on_failure(self):
-        from nexuscore.agents.github_pr_creator import GitHubPRCreator
+        from nexuscore.utils.github_pr_creator import GitHubPRCreator
         creator = GitHubPRCreator(token="fake")
         import requests as req
         mock_resp = MagicMock()
@@ -390,7 +390,7 @@ class TestGitHubPRCreatorExtensions:
             assert resp == mock_resp
 
     def test_request_with_retry_exhausts_retries(self):
-        from nexuscore.agents.github_pr_creator import GitHubPRCreator
+        from nexuscore.utils.github_pr_creator import GitHubPRCreator
         import requests as req
         creator = GitHubPRCreator(token="fake")
         with patch("nexuscore.agents.github_pr_creator.requests.request",

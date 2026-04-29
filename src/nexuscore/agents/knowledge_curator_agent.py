@@ -5,7 +5,6 @@
 #      のと同一の「生のエラーログ」をDebuggerAgentに引き継ぐように修正。
 # ==============================================================================
 import json
-import logging
 import os
 import shutil
 import subprocess
@@ -13,15 +12,19 @@ import sys
 import tempfile
 from pathlib import Path
 
+from .base_agent import BaseAgent
 from .debugger_agent import DebuggerAgent
 from nexuscore.services.patch_applier import PatchApplier
 
 
-class KnowledgeCuratorAgent:
-    def __init__(self, api_key: str, model: str):
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.api_key = api_key
-        self.model = model
+class KnowledgeCuratorAgent(BaseAgent):
+    SYSTEM_PROMPT: str = (
+        "You are a Knowledge Curator agent. "
+        "Your role is to validate and manage knowledge base entries for the NexusCore system."
+    )
+
+    def __init__(self):
+        super().__init__()
 
     def validate_fkb_suggestion(
         self,
