@@ -1,7 +1,8 @@
 """
 Routing policy utilities and task-model mappings for LLMRouter.
 
-NexusCore routes exclusively through GLM (Zhipu AI) and MiniMax providers.
+NexusCore supports multiple LLM providers: OpenAI, Anthropic, Google Gemini,
+GLM (Zhipu AI), MiniMax, DeepSeek, Moonshot, and local models.
 """
 
 from __future__ import annotations
@@ -15,19 +16,32 @@ TASK_MODEL_MAP_DEFAULT: dict[str, dict[str, Any]] = build_task_model_map_dict()
 
 def model_family(name: str) -> str:
     """Return provider family string based on a model identifier."""
-    n = name.lower()
-    if n in {"glm", "minimax"}:
+    n = name.lower().strip()
+    # Direct family match
+    known_families = {"glm", "minimax", "openai", "anthropic", "google", "deepseek", "moonshot", "local"}
+    if n in known_families:
         return n
+    # vendor:model format
     if ":" in n:
-        vendor, model = n.split(":", 1)
-        if vendor in {"glm", "minimax"}:
+        vendor, _ = n.split(":", 1)
+        if vendor in known_families:
             return vendor
-        n = model
+    # Prefix-based inference
     if n.startswith(("glm-", "chatglm")):
         return "glm"
     if n.startswith("minimax"):
         return "minimax"
-    # Unknown providers are routed to glm as default
+    if n.startswith("gpt-"):
+        return "openai"
+    if n.startswith(("claude-", "claude")):
+        return "anthropic"
+    if n.startswith("gemini"):
+        return "google"
+    if n.startswith("deepseek"):
+        return "deepseek"
+    if n.startswith(("moonshot", "kimi")):
+        return "moonshot"
+    # Default fallback
     return "glm"
 
 

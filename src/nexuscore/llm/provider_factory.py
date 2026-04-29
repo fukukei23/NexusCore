@@ -5,15 +5,27 @@ Factory helpers that map model names to provider classes.
 from __future__ import annotations
 
 from nexuscore.llm.providers import (
+    AnthropicLLM,
     BaseLLM,
+    DeepSeekLLM,
+    GeminiLLM,
     GLMLLM,
+    LocalLLM,
     MiniMaxLLM,
+    MoonshotLLM,
+    OpenAILLM,
 )
 from nexuscore.llm.routing_policy import model_family, split_provider
 
 PROVIDER_CLASSES: dict[str, type[BaseLLM]] = {
+    "openai": OpenAILLM,
+    "anthropic": AnthropicLLM,
+    "google": GeminiLLM,
+    "deepseek": DeepSeekLLM,
     "glm": GLMLLM,
     "minimax": MiniMaxLLM,
+    "moonshot": MoonshotLLM,
+    "local": LocalLLM,
 }
 
 

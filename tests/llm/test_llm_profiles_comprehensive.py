@@ -2,7 +2,8 @@
 Comprehensive tests for llm/llm_profiles.py
 
 LLMプロファイルレジストリとヘルパー関数のテスト
-NexusCore uses GLM (Zhipu AI) and MiniMax as the sole LLM providers.
+NexusCore supports multiple LLM providers: OpenAI, Anthropic, Google Gemini,
+GLM (Zhipu AI), MiniMax, DeepSeek, and Moonshot.
 """
 
 import pytest
@@ -69,8 +70,6 @@ class TestProfileRegistry:
         glm_profiles = [
             "glm_default",
             "glm_strict",
-            "glm_codex",
-            "glm_nano",
         ]
         for profile_id in glm_profiles:
             assert profile_id in PROFILE_REGISTRY
@@ -90,7 +89,7 @@ class TestProfileRegistry:
 
         assert profile.name == "glm_default"
         assert profile.provider == "glm"
-        assert profile.model == "glm-4-plus"
+        assert profile.model == "glm-5.1"
         assert profile.description is not None
         assert profile.default_temperature == 0.2
 
@@ -120,8 +119,9 @@ class TestProfileRegistry:
 
     def test_registry_minimum_profiles_exist(self):
         """最低限のプロファイル数が存在"""
-        # 少なくとも6つのプロファイルが定義されているべき（GLM×4 + MiniMax×2）
-        assert len(PROFILE_REGISTRY) >= 6
+        # 少なくとも9つのプロファイルが定義されているべき
+        # (OpenAI×2 + Anthropic×2 + Gemini×1 + GLM×2 + MiniMax×2)
+        assert len(PROFILE_REGISTRY) >= 9
 
 
 # ============================================================================
@@ -178,7 +178,8 @@ class TestProfileIds:
         ids = profile_ids()
 
         assert "glm_default" in ids
-        assert "glm_codex" in ids
+        assert "gpt_codex" in ids
+        assert "sonnet_review" in ids
         assert "minimax_default" in ids
         assert "minimax_analytical" in ids
 
@@ -211,7 +212,7 @@ class TestProfileToModelName:
         """glm_defaultを正しく変換"""
         model_name = profile_to_model_name("glm_default")
 
-        assert model_name == "glm:glm-4-plus"
+        assert model_name == "glm:glm-5.1"
 
     def test_profile_to_model_name_minimax_default(self):
         """minimax_defaultを正しく変換"""
@@ -219,11 +220,11 @@ class TestProfileToModelName:
 
         assert model_name == "minimax:minimax-m2.7"
 
-    def test_profile_to_model_name_glm_codex(self):
-        """glm_codexを正しく変換"""
-        model_name = profile_to_model_name("glm_codex")
+    def test_profile_to_model_name_gpt_codex(self):
+        """gpt_codexを正しく変換"""
+        model_name = profile_to_model_name("gpt_codex")
 
-        assert model_name == "glm:glm-4-plus"
+        assert model_name == "openai:gpt-4o"
 
     def test_profile_to_model_name_minimax_analytical(self):
         """minimax_analyticalを正しく変換"""
@@ -259,7 +260,7 @@ class TestProfileToModelName:
         parts = model_name.split(":")
         assert len(parts) == 2
         assert parts[0] == "glm"  # provider
-        assert parts[1] == "glm-4-plus"  # model
+        assert parts[1] == "glm-5.1"  # model
 
 
 # ============================================================================
@@ -269,14 +270,14 @@ class TestProfilesIntegration:
     def test_full_workflow_get_and_convert(self):
         """プロファイル取得から変換までの完全ワークフロー"""
         # プロファイル取得
-        profile = get_profile("glm_codex")
+        profile = get_profile("gpt_codex")
         assert profile is not None
 
         # モデル名に変換
-        model_name = profile_to_model_name("glm_codex")
+        model_name = profile_to_model_name("gpt_codex")
 
         assert model_name == f"{profile.provider}:{profile.model}"
-        assert model_name == "glm:glm-4-plus"
+        assert model_name == "openai:gpt-4o"
 
     def test_all_profiles_convertible(self):
         """全プロファイルが変換可能であることを統合確認"""
@@ -311,10 +312,11 @@ class TestProfilesIntegration:
         for profile in PROFILE_REGISTRY.values():
             assert profile.provider == profile.provider.lower()
 
-    def test_all_providers_are_glm_or_minimax(self):
-        """全プロバイダーがglmまたはminimax"""
+    def test_all_providers_are_valid(self):
+        """全プロバイダーが既知のプロバイダー"""
+        valid_providers = {"openai", "anthropic", "google", "glm", "minimax", "deepseek", "moonshot", "local"}
         for profile in PROFILE_REGISTRY.values():
-            assert profile.provider in ("glm", "minimax")
+            assert profile.provider in valid_providers
 
     def test_profile_names_match_registry_keys(self):
         """プロファイル名がレジストリキーと一致"""

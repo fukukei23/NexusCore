@@ -1,5 +1,9 @@
 """
 Task to model configuration map built on top of LLM profiles.
+
+Multi-provider routing:
+- Quality tier (code, architecture, reasoning): OpenAI GPT / Anthropic Claude / Gemini
+- Lightweight tier (chat, analytics, classification): GLM-5.1 / MiniMax M2.7
 """
 
 from __future__ import annotations
@@ -20,145 +24,145 @@ class TaskModelConfig:
 
 
 TASK_MODEL_CONFIGS: dict[str, TaskModelConfig] = {
-    # --- Core coding tasks ---
+    # --- Core coding tasks (quality tier) ---
     "code_generate": TaskModelConfig(
-        primary="glm_codex",
-        secondary=["minimax_analytical"],
+        primary="gpt_codex",
+        secondary=["sonnet_code", "glm_default"],
         fallback="glm_default",
         temperature=0.2,
     ),
     "code_refactor": TaskModelConfig(
-        primary="glm_codex",
-        secondary=["minimax_analytical"],
+        primary="gpt_codex",
+        secondary=["sonnet_code", "glm_default"],
         fallback="glm_default",
     ),
     "code_review": TaskModelConfig(
-        primary="glm_strict",
-        secondary=["minimax_analytical"],
-        fallback="glm_default",
+        primary="sonnet_review",
+        secondary=["gpt_strict", "glm_strict"],
+        fallback="glm_strict",
     ),
     "code_explain": TaskModelConfig(
-        primary="glm_default",
-        secondary=["minimax_default"],
-        fallback="glm_nano",
+        primary="sonnet_code",
+        secondary=["gpt_codex", "glm_default"],
+        fallback="glm_default",
     ),
     "test_generate": TaskModelConfig(
-        primary="glm_codex",
-        secondary=["minimax_analytical"],
+        primary="gpt_codex",
+        secondary=["sonnet_code", "glm_default"],
         fallback="glm_default",
     ),
     "debug": TaskModelConfig(
-        primary="glm_codex",
-        secondary=["minimax_analytical"],
+        primary="gpt_codex",
+        secondary=["sonnet_code", "glm_default"],
         fallback="glm_default",
     ),
-    # --- Planning / architecture / requirements ---
+    # --- Planning / architecture / requirements (quality tier) ---
     "architect": TaskModelConfig(
-        primary="glm_strict",
-        secondary=["minimax_analytical"],
-        fallback="glm_default",
+        primary="sonnet_review",
+        secondary=["gpt_strict", "glm_strict"],
+        fallback="glm_strict",
     ),
     "arch_design": TaskModelConfig(
-        primary="glm_strict",
-        secondary=["minimax_analytical"],
-        fallback="glm_default",
+        primary="sonnet_review",
+        secondary=["gpt_strict", "glm_strict"],
+        fallback="glm_strict",
     ),
     "plan_generate": TaskModelConfig(
-        primary="minimax_analytical",
-        secondary=["glm_strict"],
-        fallback="glm_default",
+        primary="sonnet_review",
+        secondary=["gpt_strict", "gemini_secondary", "glm_strict"],
+        fallback="glm_strict",
     ),
     "requirement": TaskModelConfig(
-        primary="glm_strict",
-        secondary=["minimax_analytical"],
-        fallback="glm_default",
+        primary="sonnet_review",
+        secondary=["gpt_strict", "glm_strict"],
+        fallback="glm_strict",
     ),
     "requirement_elicit": TaskModelConfig(
-        primary="glm_strict",
-        secondary=["minimax_analytical"],
-        fallback="glm_default",
+        primary="sonnet_review",
+        secondary=["gpt_strict", "glm_strict"],
+        fallback="glm_strict",
     ),
     # --- Maintenance / governance ---
     "self_heal": TaskModelConfig(
-        primary="glm_codex",
-        secondary=["minimax_analytical"],
+        primary="gpt_codex",
+        secondary=["sonnet_code", "glm_default"],
         fallback="glm_default",
     ),
     "routing_classify": TaskModelConfig(
-        primary="glm_nano",
-        secondary=["glm_default"],
-        fallback="glm_nano",
+        primary="glm_default",
+        secondary=["minimax_default"],
+        fallback="glm_default",
     ),
     "policy_check": TaskModelConfig(
-        primary="glm_strict",
-        secondary=["minimax_analytical"],
-        fallback="glm_default",
+        primary="sonnet_review",
+        secondary=["gpt_strict", "glm_strict"],
+        fallback="glm_strict",
     ),
     "postmortem_analyze": TaskModelConfig(
-        primary="glm_strict",
-        secondary=["minimax_analytical"],
-        fallback="glm_default",
+        primary="sonnet_review",
+        secondary=["gpt_strict", "gemini_secondary", "glm_strict"],
+        fallback="glm_strict",
     ),
     "knowledge_curate": TaskModelConfig(
-        primary="minimax_analytical",
-        secondary=["glm_strict"],
+        primary="glm_strict",
+        secondary=["minimax_analytical", "glm_default"],
         fallback="glm_default",
     ),
     # --- Commerce / scraping ---
     "scraping_analyze": TaskModelConfig(
         primary="minimax_analytical",
         secondary=["glm_default"],
-        fallback="glm_nano",
+        fallback="glm_default",
     ),
     "pricing_strategy": TaskModelConfig(
         primary="minimax_analytical",
-        secondary=["glm_strict"],
+        secondary=["glm_strict", "glm_default"],
         fallback="glm_default",
     ),
     "catalog_enrich": TaskModelConfig(
         primary="minimax_default",
-        secondary=["glm_nano"],
+        secondary=["glm_default"],
         fallback="glm_default",
     ),
     "shipping_infer": TaskModelConfig(
         primary="glm_default",
         secondary=["minimax_default"],
-        fallback="glm_nano",
+        fallback="glm_default",
     ),
-    # --- General chat / creativity ---
+    # --- General chat / creativity (lightweight tier) ---
     "chat_general": TaskModelConfig(
-        primary="minimax_default",
-        secondary=["glm_default"],
-        fallback="glm_nano",
+        primary="glm_default",
+        secondary=["minimax_default"],
+        fallback="glm_default",
     ),
     "creative": TaskModelConfig(
         primary="minimax_default",
         secondary=["glm_default"],
-        fallback="glm_nano",
+        fallback="glm_default",
     ),
     "analytical": TaskModelConfig(
         primary="minimax_analytical",
-        secondary=["glm_strict"],
+        secondary=["gemini_secondary", "glm_default"],
         fallback="glm_default",
     ),
     "secure": TaskModelConfig(
         primary="glm_strict",
-        secondary=["minimax_analytical"],
+        secondary=["minimax_analytical", "glm_default"],
         fallback="glm_default",
     ),
     "general": TaskModelConfig(
         primary="glm_default",
         secondary=["minimax_default"],
-        fallback="glm_nano",
+        fallback="glm_default",
     ),
     "vc_analysis": TaskModelConfig(
         primary="minimax_analytical",
-        secondary=["glm_strict"],
+        secondary=["gemini_secondary", "glm_default"],
         fallback="glm_default",
     ),
     "npe_govern": TaskModelConfig(
         primary="glm_strict",
-        secondary=["minimax_analytical"],
+        secondary=["minimax_analytical", "glm_default"],
         fallback="glm_default",
     ),
 }

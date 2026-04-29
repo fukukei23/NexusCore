@@ -1,8 +1,9 @@
 """
 Central registry for LLM profiles referenced by the router.
 
-NexusCore uses GLM (Zhipu AI) and MiniMax as the sole LLM providers.
-All tasks are routed through these two providers only.
+NexusCore supports multiple LLM providers:
+- Quality tier: OpenAI GPT, Anthropic Claude, Google Gemini
+- Lightweight tier: GLM (Zhipu AI), MiniMax
 """
 
 from __future__ import annotations
@@ -25,34 +26,58 @@ class LLMProfile:
 
 
 PROFILE_REGISTRY: dict[str, LLMProfile] = {
+    # --- OpenAI profiles ---
+    "gpt_codex": LLMProfile(
+        name="gpt_codex",
+        provider="openai",
+        model="gpt-4o",
+        description="GPT-4o for code generation and debugging",
+        default_temperature=0.2,
+    ),
+    "gpt_strict": LLMProfile(
+        name="gpt_strict",
+        provider="openai",
+        model="gpt-4o",
+        description="GPT-4o for high-accuracy reasoning",
+        default_temperature=0.15,
+    ),
+    # --- Anthropic profiles ---
+    "sonnet_review": LLMProfile(
+        name="sonnet_review",
+        provider="anthropic",
+        model="claude-sonnet-4-6",
+        description="Claude Sonnet for reviews and architecture design",
+        default_temperature=0.15,
+    ),
+    "sonnet_code": LLMProfile(
+        name="sonnet_code",
+        provider="anthropic",
+        model="claude-sonnet-4-6",
+        description="Claude Sonnet for code and debugging",
+        default_temperature=0.2,
+    ),
+    # --- Google Gemini profiles ---
+    "gemini_secondary": LLMProfile(
+        name="gemini_secondary",
+        provider="google",
+        model="gemini-2.5-pro",
+        description="Gemini 2.5 Pro for secondary analysis",
+        default_temperature=0.2,
+    ),
     # --- GLM (Zhipu AI) profiles ---
     "glm_default": LLMProfile(
         name="glm_default",
         provider="glm",
-        model="glm-4-plus",
-        description="GLM-4-Plus for general tasks and code generation",
+        model="glm-5.1",
+        description="GLM-5.1 for lightweight general tasks",
         default_temperature=0.2,
     ),
     "glm_strict": LLMProfile(
         name="glm_strict",
         provider="glm",
-        model="glm-4-plus",
-        description="GLM-4-Plus for high-accuracy reasoning and planning",
+        model="glm-5.1",
+        description="GLM-5.1 for lightweight high-accuracy tasks",
         default_temperature=0.15,
-    ),
-    "glm_codex": LLMProfile(
-        name="glm_codex",
-        provider="glm",
-        model="glm-4-plus",
-        description="GLM-4-Plus for code generation and debugging",
-        default_temperature=0.2,
-    ),
-    "glm_nano": LLMProfile(
-        name="glm_nano",
-        provider="glm",
-        model="glm-4-flash",
-        description="GLM-4-Flash for lightweight and fast calls",
-        default_temperature=0.2,
     ),
     # --- MiniMax profiles ---
     "minimax_default": LLMProfile(
