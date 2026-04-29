@@ -16,6 +16,13 @@ except ImportError:
     HAS_SKLEARN = False
 
 try:
+    import openai  # noqa: F401
+
+    HAS_OPENAI = True
+except ImportError:
+    HAS_OPENAI = False
+
+try:
     from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
 except ImportError:
     KnowledgeCuratorAgent = None
@@ -253,39 +260,41 @@ class TestKnowledgeCuratorAgentUltimate(unittest.TestCase):
                     except Exception:
                         pass
 
-    @patch("openai.ChatCompletion.create")
-    def test_content_analysis_system(self, mock_openai):
+    @unittest.skipUnless(HAS_OPENAI, "openai not installed")
+    def test_content_analysis_system(self):
         """コンテンツ解析システムのテスト。"""
         if knowledge_curator_agent is None:
             self.skipTest("知識キュレーターエージェントが利用できません")
 
-        # OpenAI APIのモック設定
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = (
-            "高品質なコンテンツです。技術的正確性: 95%, 実用性: 90%"
-        )
-        mock_openai.return_value = mock_response
+        from unittest.mock import patch as _patch
 
-        analysis_functions = [
-            "analyze_content_quality",
-            "extract_insights",
-            "identify_key_concepts",
-            "assess_credibility",
-            "detect_bias",
-            "evaluate_completeness",
-        ]
+        with _patch("openai.ChatCompletion.create") as mock_openai:
+            mock_response = MagicMock()
+            mock_response.choices[0].message.content = (
+                "高品質なコンテンツです。技術的正確性: 95%, 実用性: 90%"
+            )
+            mock_openai.return_value = mock_response
 
-        for func_name in analysis_functions:
-            if hasattr(knowledge_curator_agent, func_name):
-                with self.subTest(function=func_name):
-                    func = getattr(knowledge_curator_agent, func_name)
-                    try:
-                        for item in self.learning_data:
-                            result = func(item["content"])
-                            if result is not None:
-                                self.assertIsInstance(result, (dict, str, float, list))
-                    except Exception:
-                        pass
+            analysis_functions = [
+                "analyze_content_quality",
+                "extract_insights",
+                "identify_key_concepts",
+                "assess_credibility",
+                "detect_bias",
+                "evaluate_completeness",
+            ]
+
+            for func_name in analysis_functions:
+                if hasattr(knowledge_curator_agent, func_name):
+                    with self.subTest(function=func_name):
+                        func = getattr(knowledge_curator_agent, func_name)
+                        try:
+                            for item in self.learning_data:
+                                result = func(item["content"])
+                                if result is not None:
+                                    self.assertIsInstance(result, (dict, str, float, list))
+                        except Exception:
+                            pass
 
     @patch("json.dump")
     @patch("builtins.open", new_callable=mock_open)
