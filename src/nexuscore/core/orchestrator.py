@@ -44,7 +44,7 @@ from nexuscore.agents.requirement_agent import RequirementAgent
 from nexuscore.agents.tester_agent import TesterAgent
 
 from nexuscore.core.session_control import SessionController
-from nexuscore.core.orchestrator_models import OrchestratorContext, OrchestratorPhase
+from nexuscore.core.orchestrator_models import OrchestratorContext
 from nexuscore.core.phase_runner_mixin import PhaseRunnerMixin
 from nexuscore.core.agent_factory import assemble_agent_team  # noqa: F401 backward-compat
 from nexuscore.llm.llm_router import LLMRouter

@@ -18,35 +18,6 @@ from typing import Any
 
 # --- サードパーティライブラリ ---
 try:
-    import tqdm as _tqdm  # noqa: F401
-
-    HAS_TQDM = True
-except ImportError:
-    HAS_TQDM = False
-
-try:
-    from colorama import Fore, Style, init
-
-    init(autoreset=True)
-    HAS_COLORAMA = True
-except ImportError:
-    HAS_COLORAMA = False
-
-    class Fore:  # type: ignore[no-redef]
-        RED = GREEN = YELLOW = BLUE = MAGENTA = CYAN = WHITE = ""
-
-    class Style:  # type: ignore[no-redef]
-        BRIGHT = RESET_ALL = ""
-
-
-try:
-    import speech_recognition as _sr  # noqa: F401
-
-    HAS_SPEECH = True
-except ImportError:
-    HAS_SPEECH = False
-
-try:
     from tree_sitter import Node, Query
     from tree_sitter_language_pack import get_language, get_parser
 
