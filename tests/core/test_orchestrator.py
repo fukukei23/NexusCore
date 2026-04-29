@@ -132,7 +132,7 @@ class TestExecuteTaskViaNPE:
         )
 
         with patch(
-            "nexuscore.core.orchestrator.guarded_llm_call",
+            "nexuscore.core.phase_runner_mixin.guarded_llm_call",
             return_value={"ok": True, "content": "Test response content", "usage": {"tokens": 100}},
         ):
             result = orchestrator._execute_task_via_npe(
@@ -148,7 +148,7 @@ class TestExecuteTaskViaNPE:
         )
 
         with patch(
-            "nexuscore.core.orchestrator.guarded_llm_call", return_value="Direct string response"
+            "nexuscore.core.phase_runner_mixin.guarded_llm_call", return_value="Direct string response"
         ):
             result = orchestrator._execute_task_via_npe(
                 prompt="Test prompt", metadata={"task_type": "coding"}
@@ -169,7 +169,7 @@ class TestExecuteTaskViaNPE:
         )
 
         with patch(
-            "nexuscore.core.orchestrator.guarded_llm_call",
+            "nexuscore.core.phase_runner_mixin.guarded_llm_call",
             return_value={"ok": True, "content": "Response", "usage": {}},
         ) as mock_call:
             orchestrator._execute_task_via_npe(prompt="Test", metadata={"task_type": "planning"})
@@ -186,7 +186,7 @@ class TestExecuteTaskViaNPE:
         )
 
         with patch(
-            "nexuscore.core.orchestrator.guarded_llm_call",
+            "nexuscore.core.phase_runner_mixin.guarded_llm_call",
             return_value={"ok": True, "content": "Response", "usage": {}},
         ) as mock_call:
             orchestrator._execute_task_via_npe(prompt="Test", metadata={})  # task_typeなし
