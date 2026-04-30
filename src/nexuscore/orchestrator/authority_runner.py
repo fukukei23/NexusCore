@@ -457,6 +457,68 @@ def set_resume_orchestrator_factory(factory: Callable[[], Any]) -> None:
     _RESUME_ORCHESTRATOR_FACTORY = factory
 
 
+_PHASE_MAP = {
+    "requirements": "run_requirements_phase",
+    "planning": "run_planning_phase",
+    "architecture": "run_architecture_phase",
+    "implementation": "run_implementation_phase",
+    "testing": "run_testing_phase",
+    "review": "run_review_phase",
+}
+
+_PHASE_ORDER = ["requirements", "planning", "architecture", "implementation", "testing", "review"]
+
+
+def _execute_remaining_phases(orchestrator: Any, state: dict[str, Any]) -> None:
+    """Resume execution from the paused phase onward.
+
+    Reconstructs an OrchestratorContext from the saved state and invokes
+    each remaining phase method on the orchestrator.
+    """
+    from nexuscore.core.orchestrator import OrchestratorContext
+
+    next_phase = state.get("next_phase")
+    if not next_phase or next_phase not in _PHASE_MAP:
+        import logging
+        logging.getLogger(__name__).warning(
+            "resume: no valid next_phase in state (got %r), skipping phase execution",
+            next_phase,
+        )
+        return
+
+    # Rebuild context from saved state
+    context = OrchestratorContext(
+        task_id=state.get("run_id", ""),
+        user_requirement=state.get("user_requirement", ""),
+        language=state.get("language", "ja"),
+        fast_lane=state.get("fast_lane", False),
+        run_db_id=state.get("run_db_id"),
+    )
+
+    # Restore partial results from state
+    if "requirement_result" in state:
+        context.requirement = state["requirement_result"]
+    if "plan" in state:
+        context.plan = state["plan"]
+    if "architecture" in state:
+        context.architecture = state["architecture"]
+    if "implementation" in state:
+        context.implementation = state["implementation"]
+    if "testing" in state:
+        context.testing = state["testing"]
+
+    start_idx = _PHASE_ORDER.index(next_phase)
+    for phase_name in _PHASE_ORDER[start_idx:]:
+        method_name = _PHASE_MAP[phase_name]
+        phase_fn = getattr(orchestrator, method_name, None)
+        if not callable(phase_fn):
+            break
+        context = phase_fn(context)
+        # Persist progress after each phase
+        state["next_phase"] = _PHASE_ORDER[_PHASE_ORDER.index(phase_name) + 1] if phase_name != "review" else None
+        update_state(state)
+
+
 def resume_run(
     run_id: str,
     *,
@@ -618,13 +680,8 @@ def resume_run(
             state["status"] = "RUNNING"
             update_state(state)
 
-            # 10) Start (dummy/optional)
-            start_fn = getattr(orchestrator, "start", None)
-            if callable(start_fn):
-                try:
-                    start_fn(run_id=run_id, state=state)
-                except TypeError:
-                    start_fn()
+            # 10) Resume phase execution
+            _execute_remaining_phases(orchestrator, state)
 
             # Check if refresh failed during execution (polling with delay to allow refresh loop to detect failure)
             # Poll for at least 2x refresh_interval to ensure we catch refresh failures
