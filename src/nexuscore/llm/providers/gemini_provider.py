@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 class GeminiLLM(BaseLLM):
     """
-    gemini-2.5-flash / gemini-2.5-pro 等のGoogle/Geminiモデル想定
+    gemini-3.1-pro / gemini-2.5-flash 等のGoogle/Geminiモデル想定
     (v2.3.4: Hotfix 3 適用済)
     """
 
