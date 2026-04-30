@@ -44,7 +44,7 @@ class AnthropicLLM(BaseLLM):
             try:
                 url = f"{self.base_url}/v1/messages"
                 headers = {
-                    "Authorization": f"Bearer {self.api_key}",
+                    "x-api-key": self.api_key,
                     "Content-Type": "application/json",
                     "anthropic-version": "2023-06-01",
                 }

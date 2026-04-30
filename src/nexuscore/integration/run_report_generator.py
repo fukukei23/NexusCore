@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -272,7 +272,7 @@ def generate_run_report_markdown(run_db_id: int) -> str:
         # Markdown 生成
         report = f"""# Run Report: {run.run_id}
 
-**Generated at:** {datetime.utcnow().isoformat()} UTC
+**Generated at:** {datetime.now(UTC).isoformat()} UTC
 
 ---
 

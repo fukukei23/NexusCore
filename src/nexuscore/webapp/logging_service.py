@@ -10,7 +10,7 @@ Orchestrator / NPE / SandboxExecutor から直接 DB を触らずに、
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from flask import has_app_context
@@ -67,8 +67,8 @@ def log_execution_event(
         source=source,
         level=level,
         message=message[:512],  # DB負荷抑制のため適当に切る
-        payload_json=_to_json(payload),
-        created_at=datetime.utcnow(),
+        payload_json=payload,
+        created_at=datetime.now(UTC),
     )
 
     db.session.add(log)

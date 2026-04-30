@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
+from datetime import UTC, datetime
 
 from celery import Celery
 
@@ -124,7 +125,7 @@ def _register_tasks(celery_instance: Celery) -> None:
         if not run.requirement:
             logger.error(f"Run.requirement is empty for run_id={run.id}")
             run.status = "FAILED"
-            run.finished_at = datetime.utcnow()
+            run.finished_at = datetime.now(UTC)
             db.session.commit()
             return
 
@@ -152,7 +153,7 @@ def _register_tasks(celery_instance: Celery) -> None:
 
             # Run テーブルを更新
             run.status = "RUNNING"
-            run.started_at = datetime.utcnow()
+            run.started_at = datetime.now(UTC)
             db.session.commit()
 
             # Orchestrator を実行
@@ -193,7 +194,7 @@ def _register_tasks(celery_instance: Celery) -> None:
             status = "error"
 
         finally:
-            run.finished_at = datetime.utcnow()
+            run.finished_at = datetime.now(UTC)
             try:
                 db.session.commit()
             except Exception as e:

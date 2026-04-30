@@ -6,7 +6,7 @@ JWTトークンベースの認証を提供する。
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from functools import wraps
 
 from flask import jsonify, request
@@ -103,8 +103,8 @@ def generate_token(user_id: str, expires_in_hours: int = 24) -> str:
 
     payload = {
         "user_id": user_id,
-        "exp": datetime.utcnow() + timedelta(hours=expires_in_hours),
-        "iat": datetime.utcnow(),
+        "exp": datetime.now(UTC) + timedelta(hours=expires_in_hours),
+        "iat": datetime.now(UTC),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 

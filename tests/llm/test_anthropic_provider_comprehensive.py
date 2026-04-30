@@ -247,7 +247,7 @@ class TestAnthropicProviderHeaders:
     @patch("nexuscore.llm.providers.anthropic_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.anthropic_provider.HTTP_CLIENT_FACTORY")
     def test_execute_includes_authorization_header(self, mock_factory, mock_real_enabled):
-        """Should include Bearer token in Authorization header"""
+        """Should include x-api-key header for Anthropic API"""
         mock_session = Mock()
         mock_response = Mock()
         mock_response.status_code = 200
@@ -264,7 +264,7 @@ class TestAnthropicProviderHeaders:
 
         call_args = mock_session.post.call_args
         headers = call_args[1]["headers"]
-        assert headers["Authorization"] == "Bearer test-key"
+        assert headers["x-api-key"] == "test-key"
 
 
 class TestAnthropicProviderModels:
