@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 import os
 import threading
 import time
@@ -39,8 +40,8 @@ def _cost(model: str, kind: str) -> float:
     if key in os.environ:
         try:
             return float(os.environ[key])
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger("npe.budget").warning("Invalid env override %s: %s", key, e)
     return DEFAULT_COST_TABLE.get(model, DEFAULT_COST_TABLE["glm-4-plus"]).get(kind, 1.0)
 
 
@@ -108,7 +109,8 @@ def _read_today_total() -> float:
                         row = json.loads(line)
                         if row.get("day") == day:
                             total += float(row.get("cost_jpy", 0.0))
-                    except Exception:
+                    except Exception as e:
+                        logging.getLogger("npe.budget").warning("Skipping malformed ledger line: %s", e)
                         continue
         except Exception:
             return total
