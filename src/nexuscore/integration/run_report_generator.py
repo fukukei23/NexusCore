@@ -30,14 +30,12 @@ except ImportError:
     ExecutionLog = None
     db = None
 
-# Config は必須
 try:
-    from nexuscore.config.config import AppConfig
+    from nexuscore.config.unified_config import get_config as _get_config
+    _webapp_base_url = _get_config().webapp_base_url
 except ImportError:
     import os
-
-    class AppConfig:  # type: ignore
-        WEBAPP_BASE_URL = os.getenv("WEBAPP_BASE_URL", "http://localhost:5000")
+    _webapp_base_url = os.getenv("WEBAPP_BASE_URL", "http://localhost:5000")
 
 
 def _format_duration(run: Run) -> str:
@@ -241,7 +239,7 @@ def generate_run_report_markdown(run_db_id: int) -> str:
         success_rate = _compute_recent_success_rate(project.id, limit=30)
 
         # URL生成
-        base_url = AppConfig.WEBAPP_BASE_URL.rstrip("/")
+        base_url = _webapp_base_url.rstrip("/")
         run_logs_url = f"{base_url}/logs/runs/{run.run_id}"
         project_logs_url = f"{base_url}/logs/projects/{project.id}"
         project_dashboard_url = f"{base_url}/dashboard/projects/{project.id}"

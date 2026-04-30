@@ -317,9 +317,9 @@ def _send_slack_notification_if_configured(result: dict, payload: dict) -> None:
         run_logs_url = None
         if run and run.run_id:
             try:
-                from nexuscore.config.config import AppConfig
+                from nexuscore.config.unified_config import get_config as _get_config
 
-                base_url = AppConfig.WEBAPP_BASE_URL.rstrip("/")
+                base_url = _get_config().webapp_base_url.rstrip("/")
                 run_logs_url = f"{base_url}/logs/runs/{run.run_id}"
             except Exception as e:
                 logger.warning(f"Failed to build run_logs_url: {e}", exc_info=True)
