@@ -2,8 +2,8 @@
 Central registry for LLM profiles referenced by the router.
 
 NexusCore supports multiple LLM providers:
-- Quality tier: OpenAI GPT, Anthropic Claude, Google Gemini
-- Lightweight tier: GLM (Zhipu AI), MiniMax
+- Quality tier: OpenAI GPT-5.5, Anthropic Claude Sonnet 4.6, Google Gemini 3.1 Pro
+- Lightweight tier: GLM-5.1 (Zhipu AI), MiniMax M2.7
 """
 
 from __future__ import annotations
@@ -30,15 +30,15 @@ PROFILE_REGISTRY: dict[str, LLMProfile] = {
     "gpt_codex": LLMProfile(
         name="gpt_codex",
         provider="openai",
-        model="gpt-4o",
-        description="GPT-4o for code generation and debugging",
+        model="gpt-5.5",
+        description="GPT-5.5 for code generation and debugging",
         default_temperature=0.2,
     ),
     "gpt_strict": LLMProfile(
         name="gpt_strict",
         provider="openai",
-        model="gpt-4o",
-        description="GPT-4o for high-accuracy reasoning",
+        model="gpt-5.5",
+        description="GPT-5.5 for high-accuracy reasoning",
         default_temperature=0.15,
     ),
     # --- Anthropic profiles ---
@@ -60,8 +60,8 @@ PROFILE_REGISTRY: dict[str, LLMProfile] = {
     "gemini_secondary": LLMProfile(
         name="gemini_secondary",
         provider="google",
-        model="gemini-2.5-pro",
-        description="Gemini 2.5 Pro for secondary analysis",
+        model="gemini-3.1-pro",
+        description="Gemini 3.1 Pro for secondary analysis",
         default_temperature=0.2,
     ),
     # --- GLM (Zhipu AI) profiles ---

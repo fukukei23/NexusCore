@@ -2,7 +2,7 @@
 Task to model configuration map built on top of LLM profiles.
 
 Multi-provider routing:
-- Quality tier (code, architecture, reasoning): OpenAI GPT / Anthropic Claude / Gemini
+- Quality tier (code, architecture, reasoning): OpenAI GPT-5.5 / Anthropic Claude Sonnet 4.6 / Gemini 3.1 Pro
 - Lightweight tier (chat, analytics, classification): GLM-5.1 / MiniMax M2.7
 """
 

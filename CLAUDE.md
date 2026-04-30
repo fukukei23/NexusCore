@@ -17,7 +17,6 @@ src/nexuscore/
 ├── npe/        # 予算・ポリシー・ログ管理
 ├── api/        # FastAPI REST API
 ├── webapp/     # Flask SaaSアプリ
-├── gradio_app/ # Gradioダッシュボード
 └── utils/      # ユーティリティ
 ```
 

@@ -224,9 +224,7 @@ class TestProfileToModelName:
         """gpt_codexを正しく変換"""
         model_name = profile_to_model_name("gpt_codex")
 
-        assert model_name == "openai:gpt-4o"
-
-    def test_profile_to_model_name_minimax_analytical(self):
+        assert model_name == "openai:gpt-5.5"
         """minimax_analyticalを正しく変換"""
         model_name = profile_to_model_name("minimax_analytical")
 
@@ -277,9 +275,7 @@ class TestProfilesIntegration:
         model_name = profile_to_model_name("gpt_codex")
 
         assert model_name == f"{profile.provider}:{profile.model}"
-        assert model_name == "openai:gpt-4o"
-
-    def test_all_profiles_convertible(self):
+        assert model_name == "openai:gpt-5.5"
         """全プロファイルが変換可能であることを統合確認"""
         ids = profile_ids()
 
