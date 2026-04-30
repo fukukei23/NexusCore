@@ -150,7 +150,7 @@ class ConstitutionLoader:
         """
         プロジェクトルートを検索（.git または pyproject.toml の存在で判定）
         """
-        current = Path(__file__).resolve()
+        current = Path(__file__).resolve().parent
 
         # 最大10階層まで遡る
         for _ in range(10):

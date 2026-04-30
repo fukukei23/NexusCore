@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
@@ -31,8 +31,8 @@ class User(db.Model):
     name = Column(String(255))
     avatar_url = Column(String(512))
     email = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(UTC), nullable=False)
+    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC), nullable=False)
 
     # リレーション
     projects = relationship("Project", back_populates="owner", lazy="dynamic")
@@ -58,8 +58,8 @@ class Project(db.Model):
     repo_url = Column(String(512))
     local_path = Column(String(512), nullable=False)  # Orchestrator / NPE が動くローカルパス
     context_bundle_path = Column(String(512), nullable=True)  # context_bundles/latest.json など
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(UTC), nullable=False)
+    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC), nullable=False)
 
     # リレーション
     owner = relationship("User", back_populates="projects")
@@ -90,7 +90,7 @@ class Run(db.Model):
     autonomy_level = Column(Integer, nullable=True)  # 実行時の設定
     llm_model_summary = Column(String(512), nullable=True)  # 使用されたモデルの概要文字列
     requirement = Column(Text, nullable=True)  # ユーザー要件（実行時に指定）
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(UTC), nullable=False)
 
     # リレーション
     project = relationship("Project", back_populates="runs")
@@ -118,7 +118,7 @@ class PatchRecord(db.Model):
     file_path = Column(String(512), nullable=False)
     diff_text = Column(Text, nullable=False)  # unified diff
     applied = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(UTC), nullable=False)
 
     # リレーション
     run = relationship("Run", back_populates="patch_records")
@@ -142,7 +142,7 @@ class ExecutionLog(db.Model):
     level = Column(String(16), nullable=False, index=True)  # INFO, WARNING, ERROR
     message = Column(String(512), nullable=False)
     payload_json = Column(JSON, nullable=True)  # 任意の詳細情報
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.now(UTC), nullable=False, index=True)
 
     # リレーション
     run = relationship("Run", back_populates="execution_logs")
@@ -162,7 +162,7 @@ class ApiKey(db.Model):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     token_hash = Column(String(128), nullable=False, unique=True, index=True)  # ハッシュ化したキー
     name = Column(String(255), nullable=False)  # 用途メモ
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(UTC), nullable=False)
 
     # リレーション
     user = relationship("User", back_populates="api_keys")

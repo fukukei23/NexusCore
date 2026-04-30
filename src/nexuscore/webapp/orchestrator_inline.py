@@ -7,7 +7,7 @@ NexusCore Webapp - Orchestrator インライン実行ヘルパー
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from nexuscore.webapp import db
 from nexuscore.webapp.models import Project, Run
@@ -40,7 +40,7 @@ def run_orchestrator_inline(
     try:
         # 実行開始
         run.status = "RUNNING"
-        run.started_at = datetime.utcnow()
+        run.started_at = datetime.now(UTC)
         db.session.commit()
 
         # Orchestrator を同期的に実行
@@ -63,7 +63,7 @@ def run_orchestrator_inline(
         # ログ自体は orchestrator_db_hook / logging_service 経由で ExecutionLog に入る
         raise
     finally:
-        run.finished_at = datetime.utcnow()
+        run.finished_at = datetime.now(UTC)
         db.session.commit()
 
         # Slack 通知を送信
