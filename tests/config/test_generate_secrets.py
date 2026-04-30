@@ -4,6 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
+dotenv = pytest.importorskip("dotenv")
+
 
 @pytest.fixture
 def env_setup(tmp_path):

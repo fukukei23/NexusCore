@@ -73,7 +73,7 @@ class TestGetDefaultPolicy:
 class TestCreateGradioInterface:
     """create_gradio_interface のテスト（行29-132）"""
 
-    @patch("nexuscore.agents.policy_interface.GRADIO_AVAILABLE", False)
+    @patch("nexuscore.config.policy_interface.GRADIO_AVAILABLE", False)
     def test_raises_import_error_without_gradio(self):
         from nexuscore.config.policy_interface import PolicyInterface
 
@@ -85,7 +85,7 @@ class TestCreateGradioInterface:
 class TestLaunchAndWaitForInput:
     """launch_and_wait_for_input のテスト（行134-187）"""
 
-    @patch("nexuscore.agents.policy_interface.GRADIO_AVAILABLE", False)
+    @patch("nexuscore.config.policy_interface.GRADIO_AVAILABLE", False)
     def test_returns_default_when_no_gradio(self):
         """Gradio未インストール時はデフォルト設定を返す（行138-140）"""
         from nexuscore.config.policy_interface import PolicyInterface
@@ -95,8 +95,8 @@ class TestLaunchAndWaitForInput:
         assert result is not None
         assert result["method"] == "safe_default"
 
-    @patch("nexuscore.agents.policy_interface.GRADIO_AVAILABLE", True)
-    @patch("nexuscore.agents.policy_interface.gr")
+    @patch("nexuscore.config.policy_interface.GRADIO_AVAILABLE", True)
+    @patch("nexuscore.config.policy_interface.gr")
     def test_returns_queue_result(self, mock_gr):
         """キューに結果がある場合、即座に返す（行167-169）"""
         from nexuscore.config.policy_interface import PolicyInterface

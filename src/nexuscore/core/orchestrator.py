@@ -13,8 +13,19 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass, field
+from enum import IntEnum
 from pathlib import Path
 from typing import Any
+
+
+class OrchestratorPhase(IntEnum):
+    """Orchestrator execution phases in order."""
+    REQUIREMENTS = 1
+    PLAN = 2
+    ARCHITECTURE = 3
+    IMPLEMENTATION = 4
+    TESTING = 5
+    REVIEW = 6
 
 # ------------------------------------------------------------------------------
 # パス設定 (自己完結性を高めるため: src/ を sys.path に追加)

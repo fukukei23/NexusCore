@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 try:
     import main_ui
+    import tkinter  # noqa: F401 — verify tkinter is actually available
 except ImportError:
     main_ui = None
 
@@ -64,6 +65,7 @@ class TestMainUI(unittest.TestCase):
                 func = getattr(main_ui, func_name)
                 self.assertTrue(callable(func))
 
+    @unittest.skipIf(main_ui is None, "main_ui module not available")
     @patch("tkinter.Tk")
     def test_window_creation(self, mock_tk):
         """ウィンドウ作成機能のテスト。"""
@@ -88,6 +90,7 @@ class TestMainUI(unittest.TestCase):
                         # ウィンドウ作成エラーは許容
                         pass
 
+    @unittest.skipIf(main_ui is None, "main_ui module not available")
     @patch("tkinter.ttk.Button")
     @patch("tkinter.ttk.Label")
     def test_widget_creation(self, mock_label, mock_button):
@@ -128,6 +131,7 @@ class TestMainUI(unittest.TestCase):
                         # UI設定エラーは許容
                         pass
 
+    @unittest.skipIf(main_ui is None, "main_ui module not available")
     @patch("tkinter.messagebox.showinfo")
     def test_ui_interactions(self, mock_messagebox):
         """UIインタラクション機能のテスト。"""

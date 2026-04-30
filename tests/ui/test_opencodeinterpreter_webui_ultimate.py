@@ -104,6 +104,7 @@ if __name__ == "__main__":
                 func = getattr(opencodeinterpreter_webui, func_name)
                 self.assertTrue(callable(func))
 
+    @unittest.skipIf(opencodeinterpreter_webui is None, "OpenCodeInterpreter WebUI module not available")
     @patch("gradio.Interface")
     @patch("gradio.Blocks")
     def test_advanced_interface_creation(self, mock_blocks, mock_interface):

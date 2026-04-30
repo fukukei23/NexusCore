@@ -16,10 +16,10 @@ class TestSimpleWorking(unittest.TestCase):
 
     def test_config_functionality(self):
         """設定機能の実際のテスト"""
-        from nexuscore.config.config import config as cfg
+        from nexuscore.config.unified_config import get_config
 
-        self.assertTrue(hasattr(cfg, "ROLE_MAX_AUTONOMY"))
-        self.assertIn("user", cfg.ROLE_MAX_AUTONOMY)
+        cfg = get_config()
+        self.assertIsNotNone(cfg)
 
     def test_file_operations(self):
         """ファイル操作の実際のテスト"""

@@ -84,10 +84,9 @@ def test_pause_saves_state_and_resume_continues_from_next_phase(
     authority_runner.set_resume_orchestrator(orch2)
     resumed = authority_runner.resume_run("run-123")
 
-    # Contract entrypoint MVP returns RUNNING after RESUMING->RUNNING transition.
-    # (Orchestrator execution is intentionally not performed here.)
+    # Resume executes remaining phases (implementation, testing, review).
     assert resumed["status"] == "RUNNING"
-    assert orch2.calls == []
+    assert orch2.calls == ["implementation", "testing", "review"]
 
 
 def test_session_controller_should_not_gate_on_stop_before_phases(

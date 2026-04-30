@@ -14,6 +14,10 @@ import os
 import sys
 from unittest.mock import MagicMock, Mock, patch
 
+import pytest
+
+google_genai = pytest.importorskip("google.generativeai")
+
 # Ensure google.generativeai is available as a mock for import
 # Individual tests use patch.dict(sys.modules) to control the mock precisely
 if "google.generativeai" not in sys.modules:
@@ -61,7 +65,8 @@ class TestGeminiProviderInit:
     def test_init_with_api_key_uses_real_mode(self, mock_real_enabled):
         """Should use real mode when API key is set"""
         genai = _make_genai_mock()
-        with patch.dict(sys.modules, {"google.generativeai": genai}):
+        google_mock = MagicMock()
+        with patch.dict(sys.modules, {"google": google_mock, "google.generativeai": genai}):
             provider = GeminiLLM("gemini-2.5-flash")
             assert provider.real_calls is True
             assert provider.client == "ok"
@@ -103,7 +108,7 @@ class TestGeminiProviderExecute:
         mock_model.generate_content.return_value = _make_response("Gemini response")
         genai.GenerativeModel.return_value = mock_model
 
-        with patch.dict(sys.modules, {"google.generativeai": genai}):
+        with patch.dict(sys.modules, {"google": MagicMock(), "google.generativeai": genai}):
             provider = GeminiLLM("gemini-2.5-flash")
             assert provider.real_calls is True
 
@@ -128,7 +133,7 @@ class TestGeminiProviderExecute:
         mock_model.generate_content.return_value = _make_response("response")
         genai.GenerativeModel.return_value = mock_model
 
-        with patch.dict(sys.modules, {"google.generativeai": genai}):
+        with patch.dict(sys.modules, {"google": MagicMock(), "google.generativeai": genai}):
             provider = GeminiLLM("gemini-2.5-flash")
 
             provider.execute("prompt", "system", temperature=0.7)
@@ -149,7 +154,7 @@ class TestGeminiProviderExecute:
         mock_model.generate_content.return_value = _make_response("response")
         genai.GenerativeModel.return_value = mock_model
 
-        with patch.dict(sys.modules, {"google.generativeai": genai}):
+        with patch.dict(sys.modules, {"google": MagicMock(), "google.generativeai": genai}):
             provider = GeminiLLM("gemini-2.5-flash")
 
             provider.execute("prompt", "system")
@@ -166,7 +171,7 @@ class TestGeminiProviderExecute:
         mock_model.generate_content.return_value = _make_response('{"key": "value"}')
         genai.GenerativeModel.return_value = mock_model
 
-        with patch.dict(sys.modules, {"google.generativeai": genai}):
+        with patch.dict(sys.modules, {"google": MagicMock(), "google.generativeai": genai}):
             provider = GeminiLLM("gemini-2.5-flash")
 
             provider.execute("prompt", "system", as_json=True)
