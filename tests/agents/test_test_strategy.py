@@ -9,6 +9,10 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+import pytest
+
+pytest.importorskip("yaml")
+
 from nexuscore.utils.test_strategy import (
     ModuleTestStrategy,
     TestStrategyManager,

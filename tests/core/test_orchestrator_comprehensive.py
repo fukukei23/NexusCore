@@ -37,7 +37,7 @@ _AGENT_MOCK_KEYS = [
     "nexuscore.agents.policy_agent",
     "nexuscore.agents.postmortem_agent",
     "nexuscore.agents.knowledge_curator_agent",
-    "nexuscore.agents.patch_applier",
+    "nexuscore.services.patch_applier",
 ]
 _agent_sys_modules_saved: dict[str, object] = {}
 for _key in _AGENT_MOCK_KEYS:
