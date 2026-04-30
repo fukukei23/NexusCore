@@ -27,8 +27,8 @@ class TestMoonshotProviderInit:
         assert provider.api_key is None
 
     @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.moonshot_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.moonshot_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_init_with_api_key_uses_real_mode(self, mock_factory, mock_real_enabled):
         """Should use real mode when API key is set"""
         mock_session = Mock()
@@ -44,8 +44,8 @@ class TestMoonshotProviderInit:
         {"KIMI_API_KEY": "test-key", "KIMI_BASE_URL": "https://custom.moonshot.com"},
         clear=True,
     )
-    @patch("nexuscore.llm.providers.moonshot_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.moonshot_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_init_with_custom_base_url(self, mock_factory, mock_real_enabled):
         """Should support custom base URL"""
         mock_session = Mock()
@@ -56,8 +56,8 @@ class TestMoonshotProviderInit:
         assert provider.base_url == "https://custom.moonshot.com"
 
     @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.moonshot_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.moonshot_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_init_without_http_factory_falls_back_to_stub(self, mock_factory, mock_real_enabled):
         """Should fall back to stub mode when HTTP factory unavailable"""
         mock_factory.available = True
@@ -80,8 +80,8 @@ class TestMoonshotProviderExecute:
         assert len(result) > 0
 
     @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.moonshot_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.moonshot_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_real_mode_calls_api(self, mock_factory, mock_real_enabled):
         """Should call Moonshot API in real mode"""
         mock_session = Mock()
@@ -108,8 +108,8 @@ class TestMoonshotProviderExecute:
         assert call_args[1]["json"]["messages"][1]["content"] == "test prompt"
 
     @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.moonshot_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.moonshot_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_with_custom_temperature(self, mock_factory, mock_real_enabled):
         """Should support custom temperature"""
         mock_session = Mock()
@@ -132,8 +132,8 @@ class TestMoonshotProviderExecute:
     @patch.dict(
         os.environ, {"KIMI_API_KEY": "test-key", "NEXUS_DEFAULT_MAX_OUT_TOKENS": "2000"}, clear=True
     )
-    @patch("nexuscore.llm.providers.moonshot_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.moonshot_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_with_max_tokens(self, mock_factory, mock_real_enabled):
         """Should support max_tokens parameter"""
         mock_session = Mock()
@@ -154,8 +154,8 @@ class TestMoonshotProviderExecute:
         assert call_args[1]["json"]["max_tokens"] == 2000
 
     @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.moonshot_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.moonshot_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_with_json_mode(self, mock_factory, mock_real_enabled):
         """Should support JSON mode"""
         mock_session = Mock()
@@ -180,8 +180,8 @@ class TestMoonshotProviderErrorHandling:
     """Test Moonshot provider error handling"""
 
     @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.moonshot_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.moonshot_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_handles_http_error(self, mock_factory, mock_real_enabled):
         """Should handle HTTP errors gracefully"""
         mock_session = Mock()
@@ -200,8 +200,8 @@ class TestMoonshotProviderErrorHandling:
         assert len(result) > 0
 
     @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.moonshot_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.moonshot_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_handles_rate_limit(self, mock_factory, mock_real_enabled):
         """Should handle rate limit errors"""
         mock_session = Mock()
@@ -219,8 +219,8 @@ class TestMoonshotProviderErrorHandling:
         assert isinstance(result, str)
 
     @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.moonshot_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.moonshot_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_handles_malformed_response(self, mock_factory, mock_real_enabled):
         """Should handle malformed API responses"""
         mock_session = Mock()

@@ -23,8 +23,8 @@ class TestGLMLLMInit:
         mock_factory = MagicMock()
         mock_factory.available = True
         mock_factory.create_session.return_value = mock_session
-        with patch("nexuscore.llm.providers.glm_provider.HTTP_CLIENT_FACTORY", mock_factory):
-            with patch("nexuscore.llm.providers.glm_provider._real_call_enabled", return_value=True):
+        with patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY", mock_factory):
+            with patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True):
                 llm = GLMLLM("glm-4-plus")
                 assert llm.real_calls is True
                 assert llm.session == mock_session
@@ -33,8 +33,8 @@ class TestGLMLLMInit:
     def test_env_model_override(self):
         mock_factory = MagicMock()
         mock_factory.available = False
-        with patch("nexuscore.llm.providers.glm_provider.HTTP_CLIENT_FACTORY", mock_factory):
-            with patch("nexuscore.llm.providers.glm_provider._real_call_enabled", return_value=False):
+        with patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY", mock_factory):
+            with patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=False):
                 llm = GLMLLM("glm-4-plus")
                 assert llm.model_name == "custom-model"
 
@@ -43,8 +43,8 @@ class TestGLMLLMInit:
         mock_factory = MagicMock()
         mock_factory.available = True
         mock_factory.create_session.return_value = None
-        with patch("nexuscore.llm.providers.glm_provider.HTTP_CLIENT_FACTORY", mock_factory):
-            with patch("nexuscore.llm.providers.glm_provider._real_call_enabled", return_value=True):
+        with patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY", mock_factory):
+            with patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True):
                 llm = GLMLLM("glm-4-plus")
                 assert llm.real_calls is False
 
@@ -52,8 +52,8 @@ class TestGLMLLMInit:
     def test_custom_base_url(self):
         mock_factory = MagicMock()
         mock_factory.available = False
-        with patch("nexuscore.llm.providers.glm_provider.HTTP_CLIENT_FACTORY", mock_factory):
-            with patch("nexuscore.llm.providers.glm_provider._real_call_enabled", return_value=False):
+        with patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY", mock_factory):
+            with patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=False):
                 llm = GLMLLM("glm-4-plus")
                 assert llm.base_url == "https://custom.api/v1"
 
@@ -61,8 +61,8 @@ class TestGLMLLMInit:
     def test_glm_api_base_takes_priority(self):
         mock_factory = MagicMock()
         mock_factory.available = False
-        with patch("nexuscore.llm.providers.glm_provider.HTTP_CLIENT_FACTORY", mock_factory):
-            with patch("nexuscore.llm.providers.glm_provider._real_call_enabled", return_value=False):
+        with patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY", mock_factory):
+            with patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=False):
                 llm = GLMLLM("glm-4-plus")
                 assert llm.base_url == "https://api.base/v2"
 
