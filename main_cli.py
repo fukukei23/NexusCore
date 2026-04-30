@@ -235,7 +235,7 @@ def main():
         guardian = GuardianAgent(api_key=guardian_api_key, model=guardian_model)
         policy_agent = PolicyAgent(policy_rules_path=os.path.join(project_root, "config", "policy_rules.json"))
         postmortem_agent = PostmortemAgent()
-        knowledge_curator_agent = KnowledgeCuratorAgent(api_key=guardian_api_key, model=guardian_model)
+        knowledge_curator_agent = KnowledgeCuratorAgent()
         patch_applier = PatchApplier()
         llm_router = LLMRouter()
 

@@ -65,6 +65,7 @@ class TestOpenCodeInterpreterWebUI(unittest.TestCase):
                 func = getattr(opencodeinterpreter_webui, func_name)
                 self.assertTrue(callable(func))
 
+    @unittest.skipIf(opencodeinterpreter_webui is None, "OpenCodeInterpreter WebUI module not available")
     @patch("gradio.Interface")
     def test_gradio_interface_creation(self, mock_interface):
         """Gradioインターフェース作成のテスト。"""
@@ -107,6 +108,7 @@ class TestOpenCodeInterpreterWebUI(unittest.TestCase):
                         # コード実行エラーは許容
                         pass
 
+    @unittest.skipIf(opencodeinterpreter_webui is None, "OpenCodeInterpreter WebUI module not available")
     @patch("gradio.Blocks")
     def test_blocks_creation(self, mock_blocks):
         """Gradio Blocks作成のテスト。"""

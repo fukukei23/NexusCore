@@ -122,7 +122,7 @@ def get_orchestrator(project_path: str | None = None, language: str = "ja") -> O
         policy_rules_path=os.path.join(str(project_root), "config", "policy_rules.json")
     )
     postmortem_agent = PostmortemAgent()
-    knowledge_curator_agent = KnowledgeCuratorAgent(api_key=guardian_api_key, model=guardian_model)
+    knowledge_curator_agent = KnowledgeCuratorAgent()
     patch_applier = PatchApplier()
     llm_router = LLMRouter()
 
