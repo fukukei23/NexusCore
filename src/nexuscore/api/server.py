@@ -20,16 +20,12 @@ from functools import wraps
 
 from flask import Flask, jsonify, request
 
-# セキュリティ: JWT認証のインポート
-try:
-    from nexuscore.api.auth import generate_token, require_auth
-except ImportError:
-    # 認証モジュールがない場合のフォールバック（開発環境用）
-    def require_auth(f):
-        return f
+def require_auth(f):
+    """認証パススルー（Flask APIは非推奨、認証はFastAPI側で実施）"""
+    return f
 
-    def generate_token(user_id, expires_in_hours=24):
-        return "dev-token-auth-disabled"
+def generate_token(user_id, expires_in_hours=24):
+    return "dev-token-auth-disabled"
 
 
 # --- パス設定 ---

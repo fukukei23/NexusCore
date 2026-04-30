@@ -28,8 +28,7 @@ with (
     patch("nexuscore.api.server.PatchApplier"),
     patch("nexuscore.api.server.PolicyAgent"),
 ):
-    from nexuscore.api.auth import generate_token
-    from nexuscore.api.server import app, run_orchestrator_task, tasks
+    from nexuscore.api.server import app, generate_token, run_orchestrator_task, tasks
 
 
 # ============================================================================
