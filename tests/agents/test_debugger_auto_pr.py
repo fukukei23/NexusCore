@@ -25,7 +25,7 @@ def mock_llm():
 @pytest.fixture
 def mock_pr_creator():
     """GitHubPRCreator のクラスレベルモック（lazy import 対応）"""
-    with patch("nexuscore.agents.github_pr_creator.GitHubPRCreator") as cls:
+    with patch("nexuscore.utils.github_pr_creator.GitHubPRCreator") as cls:
         instance = MagicMock()
         cls.return_value = instance
         yield cls, instance
@@ -373,7 +373,7 @@ class TestGitHubPRCreatorExtensions:
         creator = GitHubPRCreator(token="fake")
         mock_resp = MagicMock()
         mock_resp.raise_for_status = MagicMock()
-        with patch("nexuscore.agents.github_pr_creator.requests.request", return_value=mock_resp):
+        with patch("nexuscore.utils.github_pr_creator.requests.request", return_value=mock_resp):
             resp = creator._request_with_retry("GET", "http://example.com")
             assert resp == mock_resp
 
@@ -383,9 +383,9 @@ class TestGitHubPRCreatorExtensions:
         import requests as req
         mock_resp = MagicMock()
         mock_resp.raise_for_status = MagicMock()
-        with patch("nexuscore.agents.github_pr_creator.requests.request",
+        with patch("nexuscore.utils.github_pr_creator.requests.request",
                    side_effect=[req.RequestException("timeout"), mock_resp]), \
-             patch("nexuscore.agents.github_pr_creator.time.sleep"):
+             patch("nexuscore.utils.github_pr_creator.time.sleep"):
             resp = creator._request_with_retry("GET", "http://example.com")
             assert resp == mock_resp
 
@@ -393,8 +393,8 @@ class TestGitHubPRCreatorExtensions:
         from nexuscore.utils.github_pr_creator import GitHubPRCreator
         import requests as req
         creator = GitHubPRCreator(token="fake")
-        with patch("nexuscore.agents.github_pr_creator.requests.request",
+        with patch("nexuscore.utils.github_pr_creator.requests.request",
                    side_effect=req.RequestException("fail")), \
-             patch("nexuscore.agents.github_pr_creator.time.sleep"):
+             patch("nexuscore.utils.github_pr_creator.time.sleep"):
             with pytest.raises(RuntimeError, match="failed after 3 retries"):
                 creator._request_with_retry("GET", "http://example.com")

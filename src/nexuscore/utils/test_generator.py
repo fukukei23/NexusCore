@@ -25,7 +25,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import requests
-from dotenv import load_dotenv
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
 
 from nexuscore.utils.test_utils import (
     create_fallback_test_file,
@@ -34,7 +38,8 @@ from nexuscore.utils.test_utils import (
     validate_test_code,
 )
 
-load_dotenv()
+if load_dotenv:
+    load_dotenv()
 logger = logging.getLogger(__name__)
 
 

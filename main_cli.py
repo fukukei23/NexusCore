@@ -42,7 +42,7 @@ from nexuscore.agents.guardian_agent import GuardianAgent
 from nexuscore.agents.policy_agent import PolicyAgent
 from nexuscore.agents.postmortem_agent import PostmortemAgent
 from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
-from nexuscore.agents.patch_applier import PatchApplier
+from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.llm.llm_router import LLMRouter
 # from nexuscore.utils.config import config # .envからの読み込みはdotenvで直接行う
 

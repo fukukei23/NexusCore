@@ -14,7 +14,10 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
+try:
+    import yaml
+except ImportError:
+    yaml = None
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +120,8 @@ class TestStrategyManager:
 
         try:
             with self.config_path.open("r", encoding="utf-8") as f:
+                if yaml is None:
+                    raise ImportError("pyyaml required for test strategy loading")
                 data = yaml.safe_load(f)
 
             modules = {}

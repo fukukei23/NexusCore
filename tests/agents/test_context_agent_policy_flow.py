@@ -19,7 +19,7 @@ def test_request_human_dev_policy_uses_policy_interface(monkeypatch):
             return {"method": "ui"}
 
     monkeypatch.setattr(ContextAgent, "_find_project_root", lambda self: str(Path.cwd()))
-    monkeypatch.setattr("nexuscore.agents.context_agent.PolicyInterface", DummyPI)
+    monkeypatch.setattr("nexuscore.analyzer.context_agent.PolicyInterface", DummyPI)
     agent = ContextAgent()
     policy = agent.request_human_dev_policy()
     assert policy["method"] == "ui"
