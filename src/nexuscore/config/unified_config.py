@@ -127,6 +127,7 @@ class NexusConfig:
     autonomy: AutonomyConfig
     llm: LLMConfig
     self_healing: dict[str, Any] = field(default_factory=dict)
+    webapp_base_url: str = "http://localhost:5000"
 
     @classmethod
     def from_env(cls, config_file: Path | None = None) -> NexusConfig:
@@ -150,6 +151,7 @@ class NexusConfig:
             autonomy=AutonomyConfig.from_env(),
             llm=LLMConfig.from_env(),
             self_healing=sh_config,
+            webapp_base_url=os.getenv("WEBAPP_BASE_URL", "http://localhost:5000"),
         )
 
         # 設定の妥当性を検証

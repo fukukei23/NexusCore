@@ -11,7 +11,7 @@ import os
 import uuid
 from typing import Any
 
-from nexuscore.config.config import AppConfig
+from nexuscore.config.unified_config import get_config
 from nexuscore.core.orchestrator import Orchestrator
 from nexuscore.core.agent_factory import assemble_agent_team
 from nexuscore.core.session_control import SessionController
@@ -42,10 +42,11 @@ def create_orchestrator_instance(
         }
     }
 
-    # デフォルトの constitution に AppConfig の設定をマージ
+    # デフォルトの constitution に設定をマージ
     try:
+        _cfg = get_config()
         constitution["automation_policy"].update(
-            AppConfig.BASELINE_AUTOMATION_POLICY.get("autonomy_level", autonomy_level)
+            {"autonomy_level": autonomy_level}
         )
     except Exception:
         pass  # 失敗してもデフォルト値で進む

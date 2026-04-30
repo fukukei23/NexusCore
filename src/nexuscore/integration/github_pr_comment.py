@@ -31,15 +31,12 @@ except ImportError:
     ExecutionLog = None
     db = None
 
-# Config は必須
 try:
-    from nexuscore.config.config import AppConfig
+    from nexuscore.config.unified_config import get_config as _get_config
+    _webapp_base_url = _get_config().webapp_base_url
 except ImportError:
-    # フォールバック
     import os
-
-    class AppConfig:  # type: ignore
-        WEBAPP_BASE_URL = os.getenv("WEBAPP_BASE_URL", "http://localhost:5000")
+    _webapp_base_url = os.getenv("WEBAPP_BASE_URL", "http://localhost:5000")
 
 
 class PRCommentContext(BaseModel):
@@ -274,7 +271,7 @@ def build_run_logs_url(project_id: int, run: object) -> str:
     """
     Run ログの URL を構築する
     """
-    base = AppConfig.WEBAPP_BASE_URL.rstrip("/")
+    base = _webapp_base_url.rstrip("/")
     if hasattr(run, "run_id"):
         return f"{base}/logs/runs/{run.run_id}"
     elif hasattr(run, "id"):
@@ -287,7 +284,7 @@ def build_project_logs_url(project_id: int) -> str:
     """
     プロジェクトログの URL を構築する
     """
-    base = AppConfig.WEBAPP_BASE_URL.rstrip("/")
+    base = _webapp_base_url.rstrip("/")
     return f"{base}/logs/projects/{project_id}"
 
 
@@ -295,7 +292,7 @@ def build_project_dashboard_url(project_id: int) -> str:
     """
     プロジェクトダッシュボードの URL を構築する
     """
-    base = AppConfig.WEBAPP_BASE_URL.rstrip("/")
+    base = _webapp_base_url.rstrip("/")
     return f"{base}/dashboard/projects/{project_id}"
 
 

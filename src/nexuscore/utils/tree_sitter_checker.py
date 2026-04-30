@@ -78,22 +78,7 @@ logger = logging.getLogger(__name__)
 # ==============================================================================
 
 
-class AnalysisResult:
-    """解析結果データクラス"""
-
-    def __init__(self, success: bool = False, **kwargs):
-        self.success = success
-        self.timestamp = datetime.now().isoformat()
-        self.data = kwargs
-
-    def __getitem__(self, key):
-        return self.data.get(key)
-
-    def to_dict(self):
-        return {"success": self.success, "timestamp": self.timestamp, **self.data}
-
-    def to_json(self, indent=2):
-        return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
+from nexuscore.analyzer.unified_analyzer import AnalysisResult
 
 
 class SemanticAnalyzer:

@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 
 from celery import Celery
 
-from nexuscore.config.config import AppConfig
+from nexuscore.config.unified_config import get_config
 
 celery: Celery | None = None
 run_orchestrator_task: Callable | None = None
@@ -33,12 +33,11 @@ def make_celery(flask_app) -> Celery:
     if celery is not None:
         return celery
 
+    _cfg = get_config()
     celery_app = Celery(
         flask_app.import_name,
-        broker=AppConfig.CELERY_BROKER_URL
-        or os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0"),
-        backend=AppConfig.CELERY_RESULT_BACKEND
-        or os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1"),
+        broker=_cfg.celery.broker_url,
+        backend=_cfg.celery.result_backend,
     )
     celery_app.conf.update(flask_app.config)
 
