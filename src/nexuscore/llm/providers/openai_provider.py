@@ -12,7 +12,7 @@ from .base import BaseLLM
 
 class OpenAILLM(BaseLLM):
     """
-    gpt-5 / gpt-5-mini 等のOpenAI系モデル想定
+    gpt-5.5 / gpt-5 等のOpenAI系モデル想定
     (v2.3.5: BASE URL 誤植修正 + Retry)
     """
 

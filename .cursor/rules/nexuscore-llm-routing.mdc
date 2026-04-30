@@ -4,73 +4,82 @@ alwaysApply: true
 
 # NexusCore LLM Routing Rules
 
-## 1. モデル分類
-Primary:
-- glm-4-plus (GLM via Zhipu AI)
-- glm-5.1 (GLM via Zhipu AI)
+## 1. モデル分類（5プロバイダー / 9プロファイル）
 
-Secondary:
+Quality Tier:
+- gpt-5.5 (OpenAI)
+- claude-sonnet-4-6 (Anthropic)
+- gemini-3.1-pro (Google)
+
+Lightweight Tier:
+- glm-5.1 (Zhipu AI)
 - minimax-m2.7 (MiniMax)
 
-Lightweight:
-- glm-4-flash (GLM via Zhipu AI)
-
 ## 2. プロファイルマッピング
+
 code_generate:
-  - primary: glm_codex (glm-4-plus)
-  - secondary: minimax_analytical
+  - primary: gpt_codex (gpt-5.5)
+  - secondary: sonnet_code, glm_default
   - fallback: glm_default
 
 test_generate:
-  - primary: glm_codex (glm-4-plus)
-  - secondary: minimax_analytical
+  - primary: gpt_codex (gpt-5.5)
+  - secondary: sonnet_code, glm_default
   - fallback: glm_default
 
 code_review:
-  - primary: glm_strict (glm-4-plus)
-  - secondary: minimax_analytical
-  - fallback: glm_default
+  - primary: sonnet_review (claude-sonnet-4-6)
+  - secondary: gpt_strict, glm_strict
+  - fallback: glm_strict
 
 debug:
-  - primary: glm_codex (glm-4-plus)
-  - secondary: minimax_analytical
+  - primary: gpt_codex (gpt-5.5)
+  - secondary: sonnet_code, glm_default
   - fallback: glm_default
 
 self_heal:
-  - primary: glm_codex (glm-4-plus)
-  - secondary: minimax_analytical
+  - primary: gpt_codex (gpt-5.5)
+  - secondary: sonnet_code, glm_default
   - fallback: glm_default
 
 architect:
-  - primary: glm_strict (glm-4-plus)
-  - secondary: minimax_analytical
-  - fallback: glm_default
+  - primary: sonnet_review (claude-sonnet-4-6)
+  - secondary: gpt_strict, glm_strict
+  - fallback: glm_strict
 
 plan_generate:
-  - primary: minimax_analytical
-  - secondary: glm_strict
-  - fallback: glm_default
+  - primary: sonnet_review (claude-sonnet-4-6)
+  - secondary: gpt_strict, gemini_secondary, glm_strict
+  - fallback: glm_strict
 
 requirement:
-  - primary: glm_strict (glm-4-plus)
-  - secondary: minimax_analytical
-  - fallback: glm_default
+  - primary: sonnet_review (claude-sonnet-4-6)
+  - secondary: gpt_strict, glm_strict
+  - fallback: glm_strict
 
 general:
-  - primary: glm_default (glm-4-plus)
+  - primary: glm_default (glm-5.1)
   - secondary: minimax_default
-  - fallback: glm_nano
+  - fallback: glm_default
 
 routing_classify:
-  - primary: glm_nano (glm-4-flash)
-  - secondary: glm_default
-  - fallback: glm_nano
+  - primary: glm_default (glm-5.1)
+  - secondary: minimax_default
+  - fallback: glm_default
+
+analytical:
+  - primary: minimax_analytical (minimax-m2.7)
+  - secondary: gemini_secondary, glm_default
+  - fallback: glm_default
 
 ## 3. 環境変数
-- GLM_API_KEY: Zhipu AI API key
+- OPENAI_API_KEY: OpenAI API key
+- ANTHROPIC_API_KEY: Anthropic API key
+- GEMINI_API_KEY: Google Gemini API key
+- GLM_API_KEY: Zhipu AI API key (aliases: ZHIPU_API_KEY, GLM_KEY)
 - GLM_API_BASE: GLM base URL (default: https://open.bigmodel.cn/api/paas/v4)
-- GLM_MODEL: Model override (default: glm-4-plus)
-- MINIMAX_API_KEY: MiniMax API key
+- GLM_MODEL: Model override (default: glm-5.1)
+- MINIMAX_API_KEY: MiniMax API key (alias: MINIMAX_KEY)
 - MINIMAX_API_BASE: MiniMax base URL (default: https://api.minimax.chat/v1)
 - MINIMAX_MODEL: Model override (default: minimax-m2.7)
 
