@@ -38,65 +38,48 @@ from nexuscore.llm.routing_policy import (
 )
 from nexuscore.llm.runtime import HTTP_CLIENT_FACTORY, REQUEST_TIMEOUT
 
-# ---- Budget / Logger import (v1/v2 後方互換) ------------------------------
-# (v2.2.1 既存)
-# import logging (↑でインポート済み)
-# from pathlib import Path # (↑でインポート済み)
+# ---- Budget / Logger import ----------------------------------------------
 try:
-    # v1系: クラス BudgetManager（check_budget / track_cost）
-    from nexuscore.npe.budget import BudgetManager as _BudgetManagerV1
+    from nexuscore.npe import budget as _budget_mod
 
-    BUDGET_API = "v1"
+    BUDGET_API = "v2"
 
-    class BudgetManager(_BudgetManagerV1):
-        pass
+    class BudgetManager:
+        def __init__(self, daily_limit_usd: float | None = None, log_dir=None):
+            self._b = _budget_mod
 
-except Exception:
-    # v1が無い → v2（関数API）を探す
-    try:
-        from nexuscore.npe import budget as _budget_v2
-
-        BUDGET_API = "v2"
-
-        class BudgetManager:  # type: ignore[no-redef]  # v1互換の薄ラッパ
-            def __init__(self, daily_limit_usd: float | None = None, log_dir=None):
-                self._b = _budget_v2
-
-            def check_budget(self, model_name: str, est_input_tokens: int) -> tuple[bool, float]:
-                try:
-                    # (v1 IF -> v2 IF 変換)
-                    return self._b.preflight_check(
-                        model_name=model_name, est_input_tokens=est_input_tokens
-                    )
-                except Exception:
-                    return True, 0.0
-
-            def track_cost(self, model_name: str, input_tokens: int, output_tokens: int) -> float:
-                try:
-                    # (v1 IF -> v2 IF 変換)
-                    return self._b.record_usage(
-                        model_name=model_name,
-                        input_tokens=input_tokens,
-                        output_tokens=output_tokens,
-                    )
-                except Exception:
-                    return 0.0
-
-    except Exception:
-        # どちらも無い → No-Op で警告
-        BUDGET_API = "none"
-
-        class BudgetManager:  # type: ignore[no-redef]
-            def __init__(self, daily_limit_usd: float | None = None, log_dir=None):
-                logging.getLogger("LLMRouter").warning(
-                    "[Budget] No BudgetManager found (v1/v2). Running with NO budget guard!"
+        def check_budget(self, model_name: str, est_input_tokens: int) -> tuple[bool, float]:
+            try:
+                return self._b.preflight_check(
+                    model_name=model_name, est_input_tokens=est_input_tokens
                 )
-
-            def check_budget(self, model_name: str, est_input_tokens: int) -> tuple[bool, float]:
+            except Exception:
                 return True, 0.0
 
-            def track_cost(self, model_name: str, input_tokens: int, output_tokens: int) -> float:
+        def track_cost(self, model_name: str, input_tokens: int, output_tokens: int) -> float:
+            try:
+                return self._b.record_usage(
+                    model_name=model_name,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                )
+            except Exception:
                 return 0.0
+
+except Exception:
+    BUDGET_API = "none"
+
+    class BudgetManager:  # type: ignore[no-redef]
+        def __init__(self, daily_limit_usd: float | None = None, log_dir=None):
+            logging.getLogger("LLMRouter").warning(
+                "[Budget] No BudgetManager found. Running with NO budget guard!"
+            )
+
+        def check_budget(self, model_name: str, est_input_tokens: int) -> tuple[bool, float]:
+            return True, 0.0
+
+        def track_cost(self, model_name: str, input_tokens: int, output_tokens: int) -> float:
+            return 0.0
 
 
 # ロガー: v1/v2 で両対応
@@ -115,8 +98,10 @@ except Exception:
                 Path(log_file).parent.mkdir(parents=True, exist_ok=True)
                 with open(log_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-            except Exception:
-                pass  # ログ失敗は致命にしない
+            except Exception as e:
+                logging.getLogger("LLMRouter").warning(
+                    "[LogTransaction] Failed to write log file %s: %s", log_file, e
+                )
 
 
 # ---- (アダプタ・ブロックここまで) ----------------------------------------

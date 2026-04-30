@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 import os
 import threading
 from pathlib import Path
@@ -59,8 +60,8 @@ def log_transaction(log_data: dict, log_file: str | Path = DEFAULT_LOG):
         print("\n--- NPE AUDIT LOG ---")
         print(pretty)
         print("---------------------\n")
-    except Exception:
-        pass
+    except Exception as e:
+        logging.getLogger("npe.logger").warning("Console print failed: %s", e)
 
     with _lock:
         try:
@@ -79,7 +80,5 @@ def log_transaction(log_data: dict, log_file: str | Path = DEFAULT_LOG):
 
         provider = get_logging_provider()
         provider.enhance_transaction(log_data, log_file)
-    except Exception:
-        # DB書き込み失敗は既存の処理を止めない
-        # （プロバイダーが NoOp の場合も含む）
-        pass
+    except Exception as e:
+        logging.getLogger("npe.logger").warning("DB logging provider failed: %s", e)
