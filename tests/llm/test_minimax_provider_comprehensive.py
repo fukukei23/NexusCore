@@ -30,8 +30,8 @@ class TestMiniMaxProviderInit:
         assert provider.base_url == "https://api.minimax.chat/v1"
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_init_with_api_key_uses_real_mode(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         mock_factory.available = True
@@ -41,8 +41,8 @@ class TestMiniMaxProviderInit:
         assert provider.api_key == "test-key"
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key", "MINIMAX_API_BASE": "https://custom.minimax.com/v1"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_init_minimax_api_base_uses_custom_url(self, mock_factory, mock_real_enabled):
         mock_factory.available = True
         mock_factory.create_session.return_value = Mock()
@@ -50,8 +50,8 @@ class TestMiniMaxProviderInit:
         assert provider.base_url == "https://custom.minimax.com/v1"
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key", "MINIMAX_BASE_URL": "https://alt.minimax.io/v1"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_init_minimax_base_url_uses_custom_url(self, mock_factory, mock_real_enabled):
         mock_factory.available = True
         mock_factory.create_session.return_value = Mock()
@@ -59,8 +59,8 @@ class TestMiniMaxProviderInit:
         assert provider.base_url == "https://alt.minimax.io/v1"
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key", "MINIMAX_API_BASE": "https://custom.minimax.com/v1/"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_init_base_url_strips_trailing_slash(self, mock_factory, mock_real_enabled):
         mock_factory.available = True
         mock_factory.create_session.return_value = Mock()
@@ -68,8 +68,8 @@ class TestMiniMaxProviderInit:
         assert provider.base_url == "https://custom.minimax.com/v1"
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_init_session_none_falls_back_to_stub(self, mock_factory, mock_real_enabled):
         mock_factory.available = True
         mock_factory.create_session.return_value = None
@@ -77,8 +77,8 @@ class TestMiniMaxProviderInit:
         assert provider.real_calls is False
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_init_http_factory_unavailable_falls_back_to_stub(self, mock_factory, mock_real_enabled):
         mock_factory.available = False
         provider = MiniMaxLLM("minimax-m2.7")
@@ -100,8 +100,8 @@ class TestMiniMaxProviderExecute:
         assert provider.last_call_mode == "stub"
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_real_mode_returns_api_text(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         mock_response = Mock()
@@ -118,8 +118,8 @@ class TestMiniMaxProviderExecute:
         mock_session.post.assert_called_once()
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_sends_correct_messages(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         mock_response = Mock()
@@ -138,8 +138,8 @@ class TestMiniMaxProviderExecute:
         assert payload["messages"][1] == {"role": "user", "content": "my prompt"}
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_sends_auth_header(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         mock_response = Mock()
@@ -154,8 +154,8 @@ class TestMiniMaxProviderExecute:
         assert headers["Content-Type"] == "application/json"
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_with_custom_temperature(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         mock_response = Mock()
@@ -168,8 +168,8 @@ class TestMiniMaxProviderExecute:
         assert mock_session.post.call_args[1]["json"]["temperature"] == 0.9
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key", "NEXUS_DEFAULT_MAX_OUT_TOKENS": "4096"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_with_max_tokens_env(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         mock_response = Mock()
@@ -182,8 +182,8 @@ class TestMiniMaxProviderExecute:
         assert mock_session.post.call_args[1]["json"]["max_tokens"] == 4096
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_json_mode_sets_response_format(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         mock_response = Mock()
@@ -199,8 +199,8 @@ class TestMiniMaxProviderExecute:
         assert mock_session.post.call_args[1]["json"]["response_format"] == {"type": "json_object"}
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_multiple_choices_concatenated(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         mock_response = Mock()
@@ -219,8 +219,8 @@ class TestMiniMaxProviderExecute:
         assert result == "Part1 Part2"
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_real_mode_sets_last_call_mode(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         mock_response = Mock()
@@ -233,8 +233,8 @@ class TestMiniMaxProviderExecute:
         assert provider.last_call_mode == "real"
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_records_token_usage(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         mock_response = Mock()
@@ -254,8 +254,8 @@ class TestMiniMaxProviderExecute:
 
 class TestMiniMaxProviderErrorHandling:
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_http_error_falls_back_to_stub(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         err = RequestsHTTPError()
@@ -270,8 +270,8 @@ class TestMiniMaxProviderErrorHandling:
         assert provider.last_call_mode == "stub-fallback"
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_http_error_as_json_returns_json_string(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         err = RequestsHTTPError()
@@ -286,8 +286,8 @@ class TestMiniMaxProviderErrorHandling:
         assert parsed["mode"] == "minimax-stub-fallback"
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_general_exception_falls_back_to_stub(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         mock_session.post.side_effect = ConnectionError("fail")
@@ -299,8 +299,8 @@ class TestMiniMaxProviderErrorHandling:
         assert provider.last_call_mode == "stub-fallback"
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_empty_choices_falls_back_to_stub(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         mock_response = Mock()
@@ -314,8 +314,8 @@ class TestMiniMaxProviderErrorHandling:
         assert provider.last_call_mode == "stub-fallback"
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_no_choices_key_falls_back_to_stub(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         mock_response = Mock()
@@ -329,8 +329,8 @@ class TestMiniMaxProviderErrorHandling:
         assert provider.last_call_mode == "stub-fallback"
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_http_error_response_text_raises_is_handled(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         err = RequestsHTTPError()
@@ -368,8 +368,8 @@ class TestMiniMaxProviderStubDetails:
         assert not result.startswith("{")
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_fallback_json_contains_model_and_mode(self, mock_factory, mock_real_enabled):
         mock_session = Mock()
         mock_session.post.side_effect = ConnectionError("fail")
@@ -389,8 +389,8 @@ class TestCoverageGapLines26to27:
     """Cover lines 26-27: api_key is None but real_calls would be True."""
 
     @patch.dict(os.environ, {}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_no_api_key_but_real_enabled_falls_back(self, mock_factory, mock_real_enabled):
         mock_factory.available = True
         mock_factory.create_session.return_value = Mock()
@@ -402,8 +402,8 @@ class TestCoverageGapMaxTokens:
     """Cover lines 68-69: NEXUS_DEFAULT_MAX_OUT_TOKENS env var."""
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key", "NEXUS_DEFAULT_MAX_OUT_TOKENS": "512"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_max_tokens_from_env_in_real_call_payload(self, mock_factory, mock_real_enabled):
         mock_resp = Mock()
         mock_resp.json.return_value = {
@@ -423,8 +423,8 @@ class TestCoverageGapMaxTokens:
         assert payload["max_tokens"] == 512
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key", "NEXUS_DEFAULT_MAX_OUT_TOKENS": "abc"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_invalid_max_tokens_env_ignored(self, mock_factory, mock_real_enabled):
         mock_resp = Mock()
         mock_resp.json.return_value = {
@@ -447,8 +447,8 @@ class TestCoverageGapAsJsonResponseFormat:
     """Cover line 75-76: as_json=True adds response_format."""
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_as_json_adds_response_format_to_payload(self, mock_factory, mock_real_enabled):
         mock_resp = Mock()
         mock_resp.json.return_value = {
@@ -472,8 +472,8 @@ class TestCoverageGapTemperatureErrorBranch:
     """Cover branch 90->88: temperature TypeError/ValueError handling."""
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_invalid_temperature_type_error_handled(self, mock_factory, mock_real_enabled):
         mock_resp = Mock()
         mock_resp.json.return_value = {
@@ -493,8 +493,8 @@ class TestCoverageGapTemperatureErrorBranch:
         assert "temperature" not in payload
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True)
-    @patch("nexuscore.llm.providers.minimax_provider._real_call_enabled", return_value=True)
-    @patch("nexuscore.llm.providers.minimax_provider.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
+    @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_none_temperature_handled(self, mock_factory, mock_real_enabled):
         mock_resp = Mock()
         mock_resp.json.return_value = {

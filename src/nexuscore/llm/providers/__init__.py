@@ -6,6 +6,7 @@ from .glm_provider import GLMLLM
 from .local_provider import LocalLLM
 from .minimax_provider import MiniMaxLLM
 from .moonshot_provider import MoonshotLLM
+from .openai_compat import OpenAICompatLLM
 from .openai_provider import OpenAILLM
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "LocalLLM",
     "MiniMaxLLM",
     "MoonshotLLM",
+    "OpenAICompatLLM",
     "OpenAILLM",
 ]
