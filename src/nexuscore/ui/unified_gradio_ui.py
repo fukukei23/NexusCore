@@ -6,12 +6,34 @@
 
 from __future__ import annotations
 
+import glob
 import logging
+import os
+import shlex
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import gradio as gr
+
+# .secrets.env を読み込み
+from dotenv import load_dotenv
+
+_load_path = Path.home() / ".secrets.env"
+if _load_path.exists():
+    load_dotenv(_load_path)
+
+# LLMルーター
+try:
+    from nexuscore.llm.llm_router import LLMRouter
+
+    _router = LLMRouter()
+    HAS_LLM = True
+except Exception as e:
+    logging.getLogger(__name__).warning(f"LLMRouter init failed: {e}")
+    _router = None
+    HAS_LLM = False
 
 # 既存のモジュールをインポート
 try:
@@ -35,6 +57,36 @@ except ImportError:
     load_run_markdown = None
 
 logger = logging.getLogger(__name__)
+
+
+def list_test_files() -> list[str]:
+    """sandbox_output/, tests/, ルート直下の .py ファイル一覧を返す"""
+    files: list[str] = []
+    for pattern in [
+        "sandbox_output/**/*.py",
+        "tests/**/*.py",
+        "*.py",
+    ]:
+        for p in glob.glob(pattern, recursive=True):
+            files.append(p)
+    return sorted(set(files))
+
+
+def list_dirs_with_py() -> list[str]:
+    """.py ファイルを含むディレクトリ一覧を返す"""
+    dirs: set[str] = set()
+    for p in list_test_files():
+        dirs.add(str(Path(p).parent))
+    return sorted(dirs)
+
+
+def list_files_in_dir(directory: str) -> list[str]:
+    """指定ディレクトリ内の .py ファイル一覧"""
+    if not directory:
+        return []
+    return sorted(
+        str(Path(p).name) for p in list_test_files() if str(Path(p).parent) == directory
+    )
 
 
 @dataclass
@@ -125,15 +177,25 @@ def build_code_prompt_tab(state: gr.State) -> None:
             return "💡 プロンプトを入力してください。", current_state
 
         try:
-            # TODO: LLM を使ってコード生成（既存のコード生成ロジックを再利用）
-            # 暫定的にプレースホルダー
-            generated = f"""# Generated from: {prompt}
+            if HAS_LLM:
+                result = _router.complete(
+                    model="glm:glm-5.1",
+                    task="code_generate",
+                    system_prompt=(
+                        "あなたはPythonコード生成アシスタントです。"
+                        "ユーザーの要求に応じて、クリーンで実行可能なPythonコードのみを出力してください。"
+                        "説明文は不要です。コードブロックのみ返してください。"
+                    ),
+                    user_prompt=prompt,
+                )
+                generated = result.get("content", "") if result.get("ok") else f"❌ LLM Error: {result.get('reason', 'unknown')}"
+                # マークダウンコードブロックを除去
+                if generated.startswith("```"):
+                    lines = generated.split("\n")
+                    generated = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+            else:
+                generated = "❌ LLM Router が初期化されていません。APIキーを確認してください。"
 
-def placeholder_function():
-    \"\"\"Generated code placeholder\"\"\"
-    pass
-"""
-            # State を更新
             current_state.generated_code = generated
             if filename:
                 current_state.current_file_path = filename
@@ -234,15 +296,28 @@ def build_ai_revision_tab(state: gr.State) -> None:
             return "", "💡 コードと修正指示を入力してください。", current_state
 
         try:
-            # TODO: DebuggerAgent を使ってパッチ生成
-            # 暫定的にプレースホルダー
-            patch = f"""--- a/{current_state.current_file_path or 'file.py'}
-+++ b/{current_state.current_file_path or 'file.py'}
-@@ -1,1 +1,2 @@
- {code}
-+# Modified by AI: {prompt}
-"""
-            return patch, "✅ パッチを生成しました。", current_state
+            if HAS_LLM:
+                result = _router.complete(
+                    model="glm:glm-5.1",
+                    task="code_generate",
+                    system_prompt=(
+                        "あなたはPythonコード修正アシスタントです。"
+                        "ユーザーが提示したコードに対して、指定された修正を適用した完全なコードを出力してください。"
+                        "説明文は不要です。修正後のコードのみを返してください。"
+                    ),
+                    user_prompt=f"元のコード:\n```\n{code}\n```\n\n修正指示: {prompt}",
+                )
+                patch = result.get("content", "") if result.get("ok") else ""
+                if not patch:
+                    return "", f"❌ LLM Error: {result.get('reason', 'unknown')}", current_state
+                # マークダウンコードブロックを除去
+                if patch.startswith("```"):
+                    lines = patch.split("\n")
+                    patch = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+            else:
+                return "", "❌ LLM Router が初期化されていません。", current_state
+
+            return patch, "✅ 修正コードを生成しました。", current_state
         except Exception as e:
             logger.error(f"Patch generation failed: {e}", exc_info=True)
             return "", f"❌ エラー: {e}", current_state
@@ -302,10 +377,27 @@ def build_test_runner_tab(state: gr.State) -> None:
                     lines=1,
                 )
 
-                test_file_input = gr.Textbox(
-                    label="📄 テストファイル（オプション）",
-                    placeholder="例: tests/test_sample.py",
-                )
+                with gr.Row():
+                    test_file_input = gr.Textbox(
+                        label="📄 テストファイル",
+                        placeholder="例: tests/test_sample.py",
+                        scale=3,
+                    )
+                    refresh_btn = gr.Button("🔄", scale=1)
+
+                with gr.Row():
+                    dir_dropdown = gr.Dropdown(
+                        label="📁 フォルダ選択",
+                        choices=list_dirs_with_py(),
+                        interactive=True,
+                        scale=1,
+                    )
+                    file_dropdown = gr.Dropdown(
+                        label="📄 ファイル選択",
+                        choices=[],
+                        interactive=True,
+                        scale=1,
+                    )
 
                 run_test_button = gr.Button("▶️ テスト実行", variant="primary")
 
@@ -318,21 +410,36 @@ def build_test_runner_tab(state: gr.State) -> None:
 
                 test_status = gr.Markdown("**ステータス:** 未実行")
 
+        # フォルダ選択 → ファイル一覧更新
+        dir_dropdown.change(
+            fn=lambda d: gr.update(choices=list_files_in_dir(d)),
+            inputs=[dir_dropdown],
+            outputs=[file_dropdown],
+        )
+        # ファイル選択 → テキストボックスにフルパス反映
+        file_dropdown.change(
+            fn=lambda d, f: str(Path(d) / f) if d and f else "",
+            inputs=[dir_dropdown, file_dropdown],
+            outputs=[test_file_input],
+        )
+        # 更新ボタン → フォルダリスト再読み込み
+        refresh_btn.click(
+            fn=lambda: gr.update(choices=list_dirs_with_py()),
+            outputs=[dir_dropdown],
+        )
+
     def run_test_handler(
         command: str, test_file: str, current_state: AppState
     ) -> tuple[str, str, AppState]:
         """テストを実行"""
         try:
-            # テストコマンドを構築（リスト形式でコマンドインジェクション対策）
+            cmd_list = [sys.executable, "-m", "pytest", "-q"]
             if test_file.strip():
-                cmd_list = [command, test_file]
-            else:
-                cmd_list = [command]
+                cmd_list.append(test_file)
 
-            # テスト実行
             result = subprocess.run(
                 cmd_list,
-                shell=False,  # セキュリティ: コマンドインジェクション対策
+                shell=False,
                 capture_output=True,
                 text=True,
                 cwd=Path.cwd(),
@@ -535,14 +642,10 @@ def run_test_handler(
     コマンドインジェクション対策のため、shell=False と引数リスト形式を使用。
     """
     try:
-        # テストコマンドを構築（コマンドインジェクション対策: 引数リスト形式を使用）
-        cmd: list[str]
+        cmd = [sys.executable, "-m", "pytest", "-q"]
         if test_file and test_file.strip():
-            cmd = [command, test_file]
-        else:
-            cmd = [command]
+            cmd.append(test_file)
 
-        # テスト実行（shell=False で安全に実行）
         result = subprocess.run(
             cmd,
             shell=False,

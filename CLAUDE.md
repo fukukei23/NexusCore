@@ -34,7 +34,7 @@ make qa        # format + lint + typecheck + test
 
 # 実行
 python main_cli.py --project-path /tmp/test "タスク"
-python gradio_app.py   # Web UI (localhost:7860)
+python src/nexuscore/ui/unified_gradio_ui.py   # 統合UI (localhost:7860)
 ```
 
 ## LLMルーティング（2層構成）

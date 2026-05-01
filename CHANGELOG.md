@@ -1,0 +1,79 @@
+# Changelog
+
+NexusCoreプロジェクトの主要な変更履歴。
+
+## [Unreleased]
+
+### Added
+- 統合Gradio UI LLM連携（GLM-5.1直接ルーティング）
+- Test Runner 2段階ファイル選択UI（フォルダ→ファイル）
+- スクリーンショット保存先設定（ローカルSSD対応）
+
+### Changed
+- LLMプロファイル更新: GPT-4o → GPT-5.5, Gemini 2.5 → 3.1 Pro
+- 8プロバイダー対応（OpenAI, Anthropic, Google, GLM, MiniMax, DeepSeek, Moonshot, Local）
+- Test Runner: `sys.executable -m pytest` でvenv内実行を保証
+
+## [2026-04-30] - 監査リファクタリング + マルチプロバイダー化
+
+### Changed
+- 全120ファイル監査（HIGH 12 / MEDIUM 25 / LOW 8）
+- Phase 1-6対応: ~3,780行削減、5バグ修正
+- OpenAI互換プロバイダー統合（~309行削減）
+- デッドモジュール削除（archive/ 28ファイル、~5,370行）
+- Auth層クリーンアップ（FastAPI API Key統一）
+- 予算管理簡素化（BudgetManager 3層→2層）
+
+### Fixed
+- テスト失敗47件→0件に全面解消（4665 passed, 215 skipped）
+- resume_run が残りフェーズを実行しないバグ修正
+- silent fallback（except:pass）5箇所にlogging追加
+
+### Merged PRs
+- PR #100: Dead code removal & silent fallback cleanup
+- PR #101: Multi-provider LLM update (GPT-5.5, Gemini 3.1 Pro)
+
+## [2025-12-02] - セキュリティ・API強化
+
+### Added
+- FastAPI公開API（CR-FASTAPI-001, 002）
+- API認証・コマンドインジェクション対策（CR-001〜004）
+- Policies API リファクタリング（CR-005-1）
+- Orchestrator Phase分割（CR-006-1）
+
+### Security
+- コマンドインジェクション脆弱性修正（CR-001）
+- API Key認証導入（CR-002）
+- サンドボックスセキュリティ強化（CR-003）
+- 依存関係バージョンピン止め（CR-004）
+
+## [2025-11-28〜29] - SaaS基盤・Phase 3
+
+### Added
+- SaaS MVP基盤（DB/OAuth/Logging統合）
+- SaaS UX拡張・テーマシステム
+- UI拡張・Gradio統合
+- Phase 3 カバレッジ計測・CI統合
+- セマンティックDiff統合
+- テストジェネレーター安定化
+
+### Changed
+- Unified Analyzer キャッシュシステム導入
+
+## [2025-01-27] - Phase 3 テスト基盤
+
+### Added
+- テスト結果自動保存
+- Phase 3 カバレッジ測定・CI統合
+
+### Changed
+- テストジェネレーター安定化
+- セマンティックDiff統合
+
+## [Initial] - 初期リリース
+
+- 14専門エージェント基盤実装
+- オーケストレーター・品質ゲート
+- LLMルーター・予算管理
+- ミューテーションテスト
+- ガバナンス・CR管理
