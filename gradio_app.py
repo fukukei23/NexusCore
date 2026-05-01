@@ -18,7 +18,7 @@ def generate_test_code(code_str):
     func_name = extract_function_name(code_str)
     if not func_name:
         return "⚠️ 関数が見つかりません。先に正しい Python 関数を入力してください。"
-    
+
     test_code = f'''# test_sample.py
 import pytest
 from sample import {func_name}
@@ -33,6 +33,12 @@ def test_{func_name}():
 '''
     return test_code
 
+def save_test_py(test_code):
+    """生成されたテストコードを test_sample.py に保存"""
+    with open("test_sample.py", "w", encoding="utf-8") as f:
+        f.write(test_code.strip())
+    return "✅ test_sample.py に保存されました。"
+
 with gr.Blocks(title="Python関数→保存＋テスト生成") as demo:
     gr.Markdown("## 🧪 Python関数を入力 → sample.py に保存 → pytestコードを生成")
 
@@ -41,12 +47,14 @@ with gr.Blocks(title="Python関数→保存＋テスト生成") as demo:
     with gr.Row():
         save_btn = gr.Button("💾 sample.py に保存")
         gen_test_btn = gr.Button("🧪 テストコード生成")
+        save_test_btn = gr.Button("💾 test_sample.py に保存")
 
     save_output = gr.Textbox(label="保存メッセージ")
     test_output = gr.Code(label="✅ 自動生成されたユニットテスト", language="python")
 
     save_btn.click(fn=save_to_sample_py, inputs=code_input, outputs=save_output)
     gen_test_btn.click(fn=generate_test_code, inputs=code_input, outputs=test_output)
+    save_test_btn.click(fn=save_test_py, inputs=test_output, outputs=save_output)
 
 if __name__ == "__main__":
     demo.launch()

@@ -2,12 +2,14 @@
 
 > **多層品質ゲートを備えた自律型マルチエージェントAI開発フレームワーク**
 
-[![Tests](https://img.shields.io/badge/tests-4838%20passed-brightgreen)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-80.22%25-brightgreen)](docs/FINAL_COMPREHENSIVE_TEST_REPORT.md)
-[![Python](https://img.shields.io/badge/python-3.11+-blue)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-4864%20passed-brightgreen)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-80%25+-brightgreen)](docs/FINAL_COMPREHENSIVE_TEST_REPORT.md)
+[![Python](https://img.shields.io/badge/python-3.12+-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
 
 **NexusCore** は、ソフトウェア開発ライフサイクル全体を支援する自律型AIエージェント群を統合したフレームワークです。要件分析からアーキテクチャ設計、コード生成、テスト、品質保証まで、各フェーズを専門エージェントが担当します。
+
+![NexusCore Unified UI](docs/images/unified_ui.png)
 
 ---
 
@@ -33,18 +35,17 @@
 | Planner | 実装計画 |
 | Context | プロジェクトコンテキスト管理 |
 
-```
-Task → LLM Router → [OpenAI GPT | Anthropic Claude | DeepSeek | Google Gemini | Kimi | MiniMax]
-                      ↕
-                 Budget Manager（日次上限・フォールバック制御）
-```
-
-### 多層品質ゲート
+### LLMルーティング（2層構成）
 
 各タスクに最適なLLMを自動選択し、コストと品質のバランスを最適化します。
 
+| ティア | プロバイダー | モデル | 用途 |
+|---|---|---|---|
+| 品質 | OpenAI / Anthropic / Google | GPT-5.5 / Sonnet 4.6 / Gemini 3.1 Pro | コード生成・推論・設計 |
+| 軽量 | GLM / MiniMax / DeepSeek / Moonshot | GLM-5.1 / MiniMax M2.7 / DeepSeek / Moonshot | チャット・分類・分析 |
+
 ```
-Task → LLM Router → [OpenAI GPT | Anthropic Claude | DeepSeek | Google Gemini | Kimi]
+Task → LLM Router → [GPT-5.5 | Sonnet 4.6 | Gemini 3.1 Pro | GLM-5.1 | DeepSeek | Moonshot | MiniMax]
                       ↕
                  Budget Manager（日次上限・フォールバック制御）
 ```
@@ -73,9 +74,9 @@ User / Developer
        ↓
   ┌──────────────┐
   │ Agent Layer   │
-  │ 10+ Specialized Agents
+  │ 14 Specialized Agents
   └──────┬───────┘
-         ├→ LLM Router ──→ [GPT | Claude | DeepSeek | Gemini | Kimi]
+         ├→ LLM Router ──→ [GPT-5.5 | Sonnet 4.6 | Gemini 3.1 | GLM-5.1 | DeepSeek | Moonshot | MiniMax]
          │       ↕
          │   Budget Manager
          └→ Quality Gates
@@ -88,7 +89,7 @@ User / Developer
 | レイヤー | フレームワーク | 役割 |
 |---------|-------------|------|
 | 公開API | **FastAPI** (`/api/v1/*`) | 外部統合向けREST API。OpenAPI仕様・SDK自動生成対応 |
-| Web UI | **Gradio** | 統合UI（解析→修正→テスト→履歴） |
+| Web UI | **Gradio** | 統合UI（コード生成→修正→テスト→履歴） |
 
 - SDK自動生成: OpenAPI仕様書から Python / TypeScript 向けSDKを生成（`make sdk`）
 - 認証: API Key認証（`POST /api/v1/api-keys` で発行）
@@ -99,11 +100,21 @@ User / Developer
 
 | 指標 | 値 |
 |------|-----|
-| テストスイート | 392テストファイル |
+| テスト数 | 4,864テスト（4,665 passed / 215 skipped） |
 | テストカバレッジ | 80%+ |
 | エージェント数 | 14専門エージェント |
-| LLMプロバイダー | 6プロバイダー（OpenAI, Anthropic, DeepSeek, Google, Kimi, MiniMax） |
+| LLMプロバイダー | 8プロバイダー（OpenAI, Anthropic, Google, GLM, MiniMax, DeepSeek, Moonshot, Local） |
 | 品質ゲート | 2層（静的解析 + 動的テスト） |
+
+---
+
+## Roadmap
+
+- [ ] **SaaS化**: マルチテナント対応・サブスクリプション課金
+- [ ] **エージェントプラグインシステム**: サードパーティエージェントの追加機構
+- [ ] **リアルタイムコラボレーション**: WebSocketベースのマルチユーザー同時編集
+- [ ] **セルフホスト対応**: Docker Compose / K8s Helm Chart提供
+- [ ] **多言語対応**: UI・エージェントプロンプトの国際化
 
 ---
 
@@ -150,9 +161,10 @@ NexusCore/
 
 ### 前提条件
 
-- Python 3.11+
+- Python 3.12+
 - pip
 - Git
+- 最低1つのLLMプロバイダーAPIキー（下記参照）
 
 ### インストール
 
@@ -165,7 +177,14 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 pip install -r requirements.txt
 cp .env.template .env
-# .env にAPIキーを設定
+# .env に最低1つのLLM APIキーを設定:
+#   OPENAI_API_KEY     - GPT-5.5 (コード生成・推論)
+#   ANTHROPIC_API_KEY  - Claude Sonnet (レビュー・設計)
+#   GEMINI_API_KEY     - Gemini 3.1 Pro (分析)
+#   GLM_API_KEY        - GLM-5.1 (軽量タスク・デフォルト)
+#   MINIMAX_API_KEY    - MiniMax M2.7 (軽量タスク)
+#   DEEPSEEK_API_KEY   - DeepSeek (コード生成)
+#   MOONSHOT_API_KEY   - Moonshot (チャット)
 ```
 
 ### 基本的な使用例
@@ -197,8 +216,8 @@ python -m pytest tests/ --cov=src/nexuscore --cov-report=html
 
 | カテゴリ | 技術 |
 |---------|------|
-| 言語 | Python 3.11+ |
-| AI/LLM | OpenAI GPT, Anthropic Claude, DeepSeek, Google Gemini, Kimi, MiniMax |
+| 言語 | Python 3.12+ |
+| AI/LLM | OpenAI GPT-5.5, Anthropic Claude Sonnet 4.6, Google Gemini 3.1 Pro, GLM-5.1, MiniMax M2.7, DeepSeek, Moonshot |
 | API | FastAPI |
 | テスト | pytest, pytest-cov, カスタムミューテーションテスト |
 | 品質 | pylint, mypy, bandit |
@@ -219,6 +238,8 @@ python -m pytest tests/ --cov=src/nexuscore --cov-report=html
 | [API仕様](docs/api/README.md) | API仕様インデックス |
 | [CRテンプレート](docs/spec/SPEC_TEMPLATE.md) | 仕様書テンプレート |
 | [CI戦略](docs/CI_TEST_STRATEGY.md) | Safe/Full テスト分離 |
+| [完了レポート](docs/completion_reports/README.md) | 作業進捗・完了履歴一覧 |
+| [変更履歴](CHANGELOG.md) | バージョン別変更履歴 |
 
 ---
 
@@ -236,14 +257,17 @@ python -m pytest tests/ --cov=src/nexuscore --cov-report=html
 
 ## ライセンス
 
-MIT License - 詳細は [LICENSE](LICENSE) を参照してください。
+Apache License 2.0 - 詳細は [LICENSE](LICENSE) を参照してください。
 
 ---
 
 ## 謝辞
 
-- [OpenAI](https://openai.com/) - GPT
-- [Anthropic](https://anthropic.com/) - Claude
+- [OpenAI](https://openai.com/) - GPT-5.5
+- [Anthropic](https://anthropic.com/) - Claude Sonnet 4.6
+- [Google AI](https://ai.google/) - Gemini 3.1 Pro
+- [Zhipu AI](https://www.zhipuai.cn/) - GLM-5.1
 - [DeepSeek](https://deepseek.com/) - DeepSeek
-- [Google AI](https://ai.google/) - Gemini
+- [MiniMax](https://www.minimaxi.com/) - MiniMax M2.7
+- [Moonshot AI](https://www.moonshot.cn/) - Moonshot
 - [pytest](https://pytest.org/) - テストフレームワーク
