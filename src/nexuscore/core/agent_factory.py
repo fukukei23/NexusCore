@@ -5,53 +5,33 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from nexuscore.agents.architect_agent import ArchitectAgent
-from nexuscore.agents.coder_agent import CoderAgent
-from nexuscore.agents.debugger_agent import DebuggerAgent
-from nexuscore.agents.guardian_agent import GuardianAgent
-from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
-from nexuscore.agents.planner_agent import PlannerAgent
-from nexuscore.agents.policy_agent import PolicyAgent
-from nexuscore.agents.postmortem_agent import PostmortemAgent
-from nexuscore.agents.requirement_agent import RequirementAgent
-from nexuscore.agents.tester_agent import TesterAgent
 from nexuscore.llm.llm_router import LLMRouter
+from nexuscore.plugins.builtin_agents import PARAM_NAME_MAP, register_builtin_agents
+from nexuscore.plugins.registry import AgentRegistry
 from nexuscore.services.patch_applier import PatchApplier
 
 
 def assemble_agent_team(project_path: str) -> dict[str, Any]:
-    """Build the default agent team and LLMRouter for the Orchestrator."""
+    """Build the agent team using AgentRegistry for discovery."""
     logger = logging.getLogger("AgentAssembler")
-    logger.info("Assembling agent team for NexusCore Orchestrator v8.2...")
+
+    # Ensure built-ins are registered
+    if not AgentRegistry.list_all():
+        register_builtin_agents()
+        AgentRegistry.discover()
 
     llm_router = LLMRouter()
 
-    requirement_agent = RequirementAgent()
-    architect_agent = ArchitectAgent()
-    planner_agent = PlannerAgent()
-    coder_agent = CoderAgent()
-    tester_agent = TesterAgent()
-    debugger_agent = DebuggerAgent()
-    guardian_agent = GuardianAgent()
-    policy_agent = PolicyAgent()
-    postmortem_agent = PostmortemAgent()
-    knowledge_curator_agent = KnowledgeCuratorAgent()
-    patch_applier_agent = PatchApplier()
+    # Map Orchestrator parameter names to registry entries
+    agents: dict[str, Any] = {"llm_router": llm_router}
 
-    agents: dict[str, Any] = {
-        "requirement_agent": requirement_agent,
-        "architect_agent": architect_agent,
-        "planner_agent": planner_agent,
-        "coder_agent": coder_agent,
-        "tester_agent": tester_agent,
-        "debugger_agent": debugger_agent,
-        "guardian_agent": guardian_agent,
-        "policy_agent": policy_agent,
-        "postmortem_agent": postmortem_agent,
-        "knowledge_curator_agent": knowledge_curator_agent,
-        "patch_applier_agent": patch_applier_agent,
-        "llm_router": llm_router,
-    }
+    for param_name, registry_name in PARAM_NAME_MAP.items():
+        if registry_name == "patch_applier":
+            agents[param_name] = PatchApplier()
+        elif AgentRegistry.has(registry_name):
+            agents[param_name] = AgentRegistry.get(registry_name)()
+        else:
+            logger.warning("Agent '%s' not found in registry, skipping.", registry_name)
 
-    logger.info(f"Agent team assembled. total={len(agents)} (including llm_router).")
+    logger.info("Agent team assembled via Registry. total=%d (including llm_router).", len(agents))
     return agents
