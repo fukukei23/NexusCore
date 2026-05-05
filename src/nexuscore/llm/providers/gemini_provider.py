@@ -31,9 +31,8 @@ class GeminiLLM(BaseLLM):
                 self.client = "ok"
                 self.logger.info("GeminiLLM initialized in REAL-CALL mode.")
             except ImportError as e:
-                self.log_error(
-                    "REAL-CALL init failed: 'google-generativeai' not installed",
-                    e,
+                self.logger.warning(
+                    "google-generativeai not installed — falling back to stub mode (%s)", e,
                 )
                 self.client = None  # type: ignore[assignment]
                 self.real_calls = False
