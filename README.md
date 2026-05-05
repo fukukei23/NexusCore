@@ -15,6 +15,15 @@
 
 ![NexusCore Unified UI](docs/images/unified_ui.png)
 
+<details>
+<summary>UI Screenshots</summary>
+
+| Code Generation | Review | Workflow |
+|:---:|:---:|:---:|
+| ![Code Generation](docs/images/ui_code_generation.png) | ![Review](docs/images/ui_review.png) | ![Workflow](docs/images/ui_workflow.png) |
+
+</details>
+
 ---
 
 ## 特徴
