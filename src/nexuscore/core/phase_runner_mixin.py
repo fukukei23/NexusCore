@@ -12,14 +12,36 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from nexuscore.core.orchestrator_models import OrchestratorContext
 from nexuscore.npe.engine import guarded_llm_call
 
+if TYPE_CHECKING:
+    import logging
+
+    from nexuscore.agents.base_agent import BaseAgent
+    from nexuscore.core.session_controller import SessionController
+    from nexuscore.llm.router import LLMRouter
+
 
 class PhaseRunnerMixin:
-    """Mixin providing phase execution methods for Orchestrator."""
+    """Mixin providing phase execution methods for Orchestrator.
+
+    Expects the host class (Orchestrator) to provide:
+    logger, session_controller, llm_router, requirement_agent,
+    planner_agent, coder_agent, tester_agent, project_path.
+    """
+
+    if TYPE_CHECKING:
+        logger: logging.Logger
+        session_controller: SessionController | None
+        llm_router: LLMRouter
+        requirement_agent: BaseAgent
+        planner_agent: BaseAgent
+        coder_agent: BaseAgent
+        tester_agent: BaseAgent
+        project_path: str
 
     def _maybe_stop(self, phase: str, extra: dict[str, Any] | None = None) -> None:
         if not self.session_controller:

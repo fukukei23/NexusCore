@@ -127,7 +127,7 @@ class SlackNotifier:
 
         try:
             response = requests.post(
-                self.webhook_url,  # type: ignore[arg-type]
+                self.webhook_url,
                 json=payload,
                 timeout=10,
             )

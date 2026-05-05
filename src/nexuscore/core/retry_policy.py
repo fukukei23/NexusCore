@@ -274,7 +274,7 @@ def decide_retry(
         wait_seconds = _calculate_linear_backoff(base_interval)
     else:
         # backoff_type が "none" の場合（到達不能: max_attempts==0 は Step 3 で Abort済み）
-        wait_seconds = 0.0  # type: ignore[unreachable]
+        wait_seconds = 0.0
 
     # Step 5: Retry 判断をログに記録
     logger.info(

@@ -354,10 +354,10 @@ class SemanticAnalyzer:
                         success=False, error=str(e), file_path=str(file_path)
                     )
                 if HAS_EXTRAS:
-                    progress.update(1)
+                    progress.update(1)  # type: ignore[union-attr]
 
         if HAS_EXTRAS:
-            progress.close()
+            progress.close()  # type: ignore[union-attr]
 
         # TODO: プロファイリング統計 - 解析完了後の統計をログ出力
         if CONFIG["enable_profiling"]:
