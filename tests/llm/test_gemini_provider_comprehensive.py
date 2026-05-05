@@ -16,15 +16,21 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-google_genai = pytest.importorskip("google.generativeai")
+# google-generativeai is not required at install time — tests mock it via
+# sys.modules.  Provide a baseline mock so the module-level TYPE_CHECKING
+# import in gemini_provider.py resolves during collection.
+def _make_package_mock(name):
+    """Create a MagicMock that Python's import system recognises as a package."""
+    m = MagicMock()
+    m.__path__ = []
+    m.__package__ = name
+    m.__name__ = name
+    return m
 
-# Ensure google.generativeai is available as a mock for import
-# Individual tests use patch.dict(sys.modules) to control the mock precisely
-if "google.generativeai" not in sys.modules:
-    _mock_genai = MagicMock()
-    sys.modules["google.generativeai"] = _mock_genai
-    if "google" not in sys.modules:
-        sys.modules["google"] = MagicMock()
+if "google" not in sys.modules:
+    sys.modules["google"] = _make_package_mock("google")
+_genai_mock = MagicMock()
+sys.modules["google.generativeai"] = _genai_mock
 
 from nexuscore.llm.providers.gemini_provider import GeminiLLM
 
@@ -50,6 +56,29 @@ def _make_response(text="Gemini response"):
     return mock_response
 
 
+def _install_genai_mock(genai_mock):
+    """Replace google.generativeai mock in sys.modules AND on the parent module.
+
+    ``import google.generativeai`` returns ``sys.modules["google"].generativeai``,
+    not ``sys.modules["google.generativeai"]`` — so both must be set.
+    """
+    google = sys.modules.get("google")
+    if google is None or not hasattr(google, "__path__"):
+        google = _make_package_mock("google")
+        sys.modules["google"] = google
+    google.generativeai = genai_mock
+    sys.modules["google.generativeai"] = genai_mock
+    return genai_mock
+
+
+def _restore_genai_mock():
+    """Restore the module-level mock after a test."""
+    sys.modules["google.generativeai"] = _genai_mock
+    google = sys.modules.get("google")
+    if google is not None:
+        google.generativeai = _genai_mock
+
+
 class TestGeminiProviderInit:
     """Test Gemini provider initialization"""
 
@@ -65,26 +94,30 @@ class TestGeminiProviderInit:
     def test_init_with_api_key_uses_real_mode(self, mock_real_enabled):
         """Should use real mode when API key is set"""
         genai = _make_genai_mock()
-        google_mock = MagicMock()
-        with patch.dict(sys.modules, {"google": google_mock, "google.generativeai": genai}):
+        _install_genai_mock(genai)
+        try:
             provider = GeminiLLM("gemini-2.5-flash")
             assert provider.real_calls is True
             assert provider.client == "ok"
             genai.configure.assert_called_once_with(api_key="test-key")
+        finally:
+            _restore_genai_mock()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
     @patch("nexuscore.llm.providers.gemini_provider._real_call_enabled", return_value=True)
     def test_init_without_genai_library_falls_back_to_stub(self, mock_real_enabled):
         """Should fall back to stub mode when google-generativeai raises ImportError"""
-        # Create a module that raises ImportError on attribute access
         class _BrokenModule:
             def __getattr__(self, name):
                 raise ImportError("no google-generativeai")
 
-        with patch.dict(sys.modules, {"google.generativeai": _BrokenModule()}):
+        sys.modules["google.generativeai"] = _BrokenModule()
+        try:
             provider = GeminiLLM("gemini-2.5-flash")
             assert provider.real_calls is False
             assert provider.client is None
+        finally:
+            _restore_genai_mock()
 
 
 class TestGeminiProviderExecute:
@@ -107,8 +140,8 @@ class TestGeminiProviderExecute:
         mock_model = Mock()
         mock_model.generate_content.return_value = _make_response("Gemini response")
         genai.GenerativeModel.return_value = mock_model
-
-        with patch.dict(sys.modules, {"google": MagicMock(), "google.generativeai": genai}):
+        _install_genai_mock(genai)
+        try:
             provider = GeminiLLM("gemini-2.5-flash")
             assert provider.real_calls is True
 
@@ -123,6 +156,8 @@ class TestGeminiProviderExecute:
                 "test prompt",
                 generation_config={"temperature": 0.3, "response_mime_type": "text/plain"},
             )
+        finally:
+            _restore_genai_mock()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
     @patch("nexuscore.llm.providers.gemini_provider._real_call_enabled", return_value=True)
@@ -132,14 +167,16 @@ class TestGeminiProviderExecute:
         mock_model = Mock()
         mock_model.generate_content.return_value = _make_response("response")
         genai.GenerativeModel.return_value = mock_model
-
-        with patch.dict(sys.modules, {"google": MagicMock(), "google.generativeai": genai}):
+        _install_genai_mock(genai)
+        try:
             provider = GeminiLLM("gemini-2.5-flash")
 
             provider.execute("prompt", "system", temperature=0.7)
 
             call_args = mock_model.generate_content.call_args
             assert call_args[1]["generation_config"]["temperature"] == 0.7
+        finally:
+            _restore_genai_mock()
 
     @patch.dict(
         os.environ,
@@ -153,14 +190,16 @@ class TestGeminiProviderExecute:
         mock_model = Mock()
         mock_model.generate_content.return_value = _make_response("response")
         genai.GenerativeModel.return_value = mock_model
-
-        with patch.dict(sys.modules, {"google": MagicMock(), "google.generativeai": genai}):
+        _install_genai_mock(genai)
+        try:
             provider = GeminiLLM("gemini-2.5-flash")
 
             provider.execute("prompt", "system")
 
             call_args = mock_model.generate_content.call_args
             assert call_args[1]["generation_config"]["max_output_tokens"] == 2000
+        finally:
+            _restore_genai_mock()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
     @patch("nexuscore.llm.providers.gemini_provider._real_call_enabled", return_value=True)
@@ -170,14 +209,16 @@ class TestGeminiProviderExecute:
         mock_model = Mock()
         mock_model.generate_content.return_value = _make_response('{"key": "value"}')
         genai.GenerativeModel.return_value = mock_model
-
-        with patch.dict(sys.modules, {"google": MagicMock(), "google.generativeai": genai}):
+        _install_genai_mock(genai)
+        try:
             provider = GeminiLLM("gemini-2.5-flash")
 
             provider.execute("prompt", "system", as_json=True)
 
             call_args = mock_model.generate_content.call_args
             assert call_args[1]["generation_config"]["response_mime_type"] == "application/json"
+        finally:
+            _restore_genai_mock()
 
 
 class TestGeminiProviderErrorHandling:
@@ -191,15 +232,16 @@ class TestGeminiProviderErrorHandling:
         mock_model = Mock()
         mock_model.generate_content.side_effect = Exception("API Error")
         genai.GenerativeModel.return_value = mock_model
-
-        with patch.dict(sys.modules, {"google.generativeai": genai}):
+        _install_genai_mock(genai)
+        try:
             provider = GeminiLLM("gemini-2.5-flash")
 
             result = provider.execute("prompt", "system")
 
-            # Should fall back to stub content
             assert isinstance(result, str)
             assert len(result) > 0
+        finally:
+            _restore_genai_mock()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
     @patch("nexuscore.llm.providers.gemini_provider._real_call_enabled", return_value=True)
@@ -207,15 +249,16 @@ class TestGeminiProviderErrorHandling:
         """Should handle model initialization errors"""
         genai = _make_genai_mock()
         genai.GenerativeModel.side_effect = Exception("Init Error")
-
-        with patch.dict(sys.modules, {"google.generativeai": genai}):
+        _install_genai_mock(genai)
+        try:
             provider = GeminiLLM("gemini-2.5-flash")
 
             result = provider.execute("prompt", "system")
 
-            # Should fall back to stub content
             assert isinstance(result, str)
             assert "Init failed" in result or len(result) > 0
+        finally:
+            _restore_genai_mock()
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
     @patch("nexuscore.llm.providers.gemini_provider._real_call_enabled", return_value=True)
@@ -225,19 +268,18 @@ class TestGeminiProviderErrorHandling:
         mock_model = Mock()
         mock_response = Mock()
         mock_response.candidates = []
-        # resp.text must return empty string so the code falls to the
-        # "Gemini returned no text" branch instead of returning a Mock.
         mock_response.text = ""
         mock_model.generate_content.return_value = mock_response
         genai.GenerativeModel.return_value = mock_model
-
-        with patch.dict(sys.modules, {"google.generativeai": genai}):
+        _install_genai_mock(genai)
+        try:
             provider = GeminiLLM("gemini-2.5-flash")
 
             result = provider.execute("prompt", "system")
 
-            # Should fall back to stub content
             assert isinstance(result, str)
+        finally:
+            _restore_genai_mock()
 
 
 class TestGeminiProviderModels:
