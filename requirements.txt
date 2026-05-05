@@ -57,3 +57,6 @@ pyyaml>=6.0.0,<7.0.0  # For test strategy config and constitution file
 
 # --- Authentication (新規追加) ---
 pyjwt>=2.8.0,<3.0.0  # JWT認証用（タスク2で使用）
+
+# --- CLI Framework ---
+click>=8.0.0,<9.0.0  # CLI subcommand framework

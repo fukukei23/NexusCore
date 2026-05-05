@@ -1,3 +1,21 @@
+[project]
+name = "nexuscore"
+version = "8.2.0"
+description = "Multi-agent AI development framework with multi-tier quality gates"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+
+[project.scripts]
+nexus = "nexuscore.cli.app:main"
+
+[project.entry-points."nexuscore.agents"]
+# External agent plugins register here:
+# my_agent = "my_package:MyAgent"
+
+[project.entry-points."nexuscore.workflows"]
+# External workflow plugins register here:
+# my_workflow = "my_package:MyWorkflow"
+
 [tool.black]
 include = "\\.pyi?$"
 exclude = """
