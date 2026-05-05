@@ -31,9 +31,9 @@ from nexuscore.utils.vcs import GitController
 try:
     from nexuscore.guard.guardian_auto_reviewer import GuardianAutoReviewer, ReviewDecision, ReviewResult
 except ImportError:
-    GuardianAutoReviewer = None  # type: ignore
-    ReviewDecision = None  # type: ignore
-    ReviewResult = None  # type: ignore
+    GuardianAutoReviewer = None
+    ReviewDecision = None
+    ReviewResult = None
 
 
 class GuardianAgent(BaseAgent):
@@ -128,7 +128,7 @@ class GuardianAgent(BaseAgent):
             )
         except Exception as e:
             self.logger.error(f"Tier 2 quality gate failed: {e}", exc_info=True)
-            tier2_report = None
+            tier2_report = None  # type: ignore[assignment]
             violations.append(f"Tier 2実行エラー: {e}")
 
         # 総合判定

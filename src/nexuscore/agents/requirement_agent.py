@@ -177,8 +177,8 @@ Ensure the response is strictly valid JSON with filled arrays (no empty strings)
                 value=self.text["status_ready"], label="Status", interactive=False
             )
             chatbot = gr.Chatbot(
-                label="Chat History", height=500, type="messages"
-            )  # type="messages" を明示
+                label="Chat History", height=500, type="messages"  # type: ignore[call-arg]
+            )
             with gr.Row():
                 msg_input = gr.Textbox(placeholder=self.text["input_placeholder"], scale=4)
                 send_button = gr.Button(self.text["send_button"], scale=1)

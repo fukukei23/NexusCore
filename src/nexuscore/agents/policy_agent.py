@@ -49,7 +49,7 @@ class PolicyAgent(BaseAgent):
             )
             self.policies = []
 
-    def audit(self, files_to_check: list, project_path: str = None) -> dict:
+    def audit(self, files_to_check: list, project_path: str | None = None) -> dict:
         """
         与えられたファイル群を監査し、監査結果を返す。
         新スキーマ対応: enabled, priority, exception_rules, category, tags

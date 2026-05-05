@@ -15,8 +15,8 @@ try:  # pragma: no cover - exercised indirectly via providers
     from requests.adapters import HTTPAdapter
     from urllib3.util.retry import Retry
 except ImportError:  # pragma: no cover - fallback when requests isn't installed
-    requests = None  # type: ignore[assignment]
-    HTTPAdapter = None  # type: ignore[assignment, misc]
+    requests = None
+    HTTPAdapter = None
     Retry = None  # type: ignore[assignment, misc]
 
 logger = logging.getLogger("LLMHttpClient")

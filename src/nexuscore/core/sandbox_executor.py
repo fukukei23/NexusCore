@@ -21,12 +21,12 @@ from typing import Any
 try:
     import resource
 except ImportError:
-    resource = None  # type: ignore
+    resource = None  # type: ignore[assignment]
 
 try:
     import yaml
 except ImportError:
-    yaml = None  # type: ignore
+    yaml = None
 
 logger = logging.getLogger(__name__)
 
