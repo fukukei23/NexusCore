@@ -137,42 +137,38 @@ def test_clone_or_update_repo_with_git_clone(mock_subprocess, tmp_path):
     assert checkout_call[0][0][3] == "checkout"
 
 
-def test_run_tests_success(tmp_path):
+def test_run_tests_success(tmp_path, monkeypatch):
     """_run_testsが成功する場合のテスト"""
+    import sys
+    monkeypatch.setenv("NEXUS_SELF_HEALING_TEST_CMD", f"{sys.executable} -m pytest -q")
     service = SelfHealingService(project_root=str(tmp_path))
 
-    # テスト用のプロジェクトディレクトリを作成
     project_path = tmp_path / "test_project"
     project_path.mkdir()
 
-    # 簡単なPythonファイルを作成（テストが通るように）
     test_file = project_path / "test_example.py"
     test_file.write_text("def test_pass(): assert True\n", encoding="utf-8")
 
-    # pytestを実行
     ok, output = service._run_tests(project_path)
 
-    # テストが成功することを確認
     assert ok is True
     assert "test_pass" in output or "passed" in output.lower()
 
 
-def test_run_tests_failure(tmp_path):
+def test_run_tests_failure(tmp_path, monkeypatch):
     """_run_testsが失敗する場合のテスト"""
+    import sys
+    monkeypatch.setenv("NEXUS_SELF_HEALING_TEST_CMD", f"{sys.executable} -m pytest -q")
     service = SelfHealingService(project_root=str(tmp_path))
 
-    # テスト用のプロジェクトディレクトリを作成
     project_path = tmp_path / "test_project"
     project_path.mkdir()
 
-    # 失敗するテストファイルを作成
     test_file = project_path / "test_example.py"
     test_file.write_text("def test_fail(): assert False\n", encoding="utf-8")
 
-    # pytestを実行
     ok, output = service._run_tests(project_path)
 
-    # テストが失敗することを確認
     assert ok is False
     assert "FAILED" in output or "failed" in output.lower() or "assert False" in output
 

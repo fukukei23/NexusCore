@@ -11,6 +11,7 @@ from __future__ import annotations
 from unittest.mock import Mock, patch
 
 import pytest
+import sys
 
 try:
     import gradio as gr
@@ -148,13 +149,12 @@ def test_run_test_handler_empty_test_file():
 
 
 def test_run_test_handler_whitespace_only_test_file():
-    """正常系: test_file が空白のみの場合も無効とみなし、[command] のみになることを確認"""
+    """正常系: test_file が空白のみの場合も無効とみなし、コマンドのみになることを確認"""
     command = "pytest"
     test_file = "   "  # 空白のみ
     state = AppState()
 
     with patch("nexuscore.ui.unified_gradio_ui.subprocess.run") as mock_run:
-        # モックの戻り値を設定
         mock_result = Mock()
         mock_result.returncode = 0
         mock_result.stdout = "test output"
@@ -163,8 +163,8 @@ def test_run_test_handler_whitespace_only_test_file():
 
         output, status_md, updated_state = run_test_handler(command, test_file, state)
 
-        # subprocess.run が [command] のみで呼ばれたことを確認
         mock_run.assert_called_once()
         call_args = mock_run.call_args
-        assert call_args[0][0] == [command]  # コマンドリストが1要素のみ
+        expected_cmd = [sys.executable, "-m", "pytest", "-q"]
+        assert call_args[0][0] == expected_cmd
         assert call_args[1]["shell"] is False
