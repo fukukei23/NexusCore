@@ -1,13 +1,17 @@
 # NexusCore
 
-> **多層品質ゲートを備えた自律型マルチエージェントAI開発フレームワーク**
+> **Multi-agent AI development framework with multi-tier quality gates**
+>
+> NexusCore is an autonomous multi-agent system where 14 specialized AI agents collaborate across the entire software development lifecycle — from requirements analysis to architecture design, code generation, testing, and quality assurance. Features intelligent LLM routing across 8 providers and a 2-tier quality gate system.
 
-[![Tests](https://img.shields.io/badge/tests-4864%20passed-brightgreen)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-80%25+-brightgreen)](docs/FINAL_COMPREHENSIVE_TEST_REPORT.md)
-[![Python](https://img.shields.io/badge/python-3.12+-blue)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
+---
 
 **NexusCore** は、ソフトウェア開発ライフサイクル全体を支援する自律型AIエージェント群を統合したフレームワークです。要件分析からアーキテクチャ設計、コード生成、テスト、品質保証まで、各フェーズを専門エージェントが担当します。
+
+[![CI](https://github.com/fukukei23/NexusCore/actions/workflows/ci.yml/badge.svg)](https://github.com/fukukei23/NexusCore/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/fukukei23/NexusCore/branch/main/graph/badge.svg)](https://codecov.io/gh/fukukei23/NexusCore)
+[![Python](https://img.shields.io/badge/python-3.12+-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
 
 ![NexusCore Unified UI](docs/images/unified_ui.png)
 
@@ -65,6 +69,17 @@ Task → LLM Router → [GPT-5.5 | Sonnet 4.6 | Gemini 3.1 Pro | GLM-5.1 | DeepS
 
 ---
 
+## なぜNexusCoreを作ったか
+
+AIコーディングツール（Claude Code, Cursor等）が普及する中で、**「AIエージェントの出力をどう品質担保するか」** が最大の課題だと考えました。NexusCoreは、AIに実装を委ねつつ、人間が評価関数として機能する — そのためのインフラとして設計しました。
+
+- **27種のタスクを自動分類**し、最適なLLMにルーティング
+- **予算管理（NPE）** で日次上限・コスト超過を自動制御
+- **12種のポリシーエンジン** でセキュリティ・パフォーマンス問題を自動検出
+- **4,800+テストケース** でシステム動作を継続検証
+
+---
+
 ## アーキテクチャ
 
 ```
@@ -100,11 +115,11 @@ User / Developer
 
 | 指標 | 値 |
 |------|-----|
-| テスト数 | 4,864テスト（4,665 passed / 215 skipped） |
-| テストカバレッジ | 80%+ |
+| テスト数 | 4,800+ テストケース（CI自動検証） |
 | エージェント数 | 14専門エージェント |
 | LLMプロバイダー | 8プロバイダー（OpenAI, Anthropic, Google, GLM, MiniMax, DeepSeek, Moonshot, Local） |
 | 品質ゲート | 2層（静的解析 + 動的テスト） |
+| CI | GitHub Actions（push/PR時自動テスト + セキュリティスキャン） |
 
 ---
 

@@ -95,6 +95,8 @@ mutants/
 # テスト結果ファイル（自動生成）
 docs/reports/TEST_RESULTS_*.txt
 docs/reports/TEST_ERRORS_*.txt
+docs/archive/TEST_RESULTS_*.txt
+test_results/
 
 # ログ（logs/ ディレクトリ内のファイルは追跡しないが、ディレクトリ自体は保持）
 logs/*
