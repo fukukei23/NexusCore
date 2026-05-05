@@ -9,10 +9,12 @@ from __future__ import annotations
 import glob
 import logging
 import os
+import re
 import shlex
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 import gradio as gr
@@ -133,8 +135,13 @@ def build_code_prompt_tab(state: gr.State) -> None:
 
                 # ファイル名
                 filename_input = gr.Textbox(
-                    label="📄 ファイル名（オプション）",
-                    placeholder="例: prime_checker.py",
+                    label="📄 ファイル名（保存先: NexusCore/sandbox_output/）",
+                    placeholder="例: prime_checker.py（省略時: generated_code.py）",
+                )
+                save_result_display = gr.Textbox(
+                    label="💾 保存結果",
+                    interactive=False,
+                    visible=True,
                 )
 
                 generate_code_button = gr.Button("🔁 コード生成", variant="primary")
@@ -169,12 +176,25 @@ def build_code_prompt_tab(state: gr.State) -> None:
             outputs=[prompt_input],
         )
 
+    def _extract_filename_from_code(code: str) -> str:
+        """生成コードから関数名/クラス名を抽出してファイル名を生成する"""
+        # クラス名を優先
+        match = re.search(r"^class\s+(\w+)", code, re.MULTILINE)
+        if match:
+            return f"{match.group(1)}.py"
+        # 関数名
+        match = re.search(r"^def\s+(\w+)", code, re.MULTILINE)
+        if match:
+            return f"{match.group(1)}.py"
+        # どちらもなければタイムスタンプ
+        return f"generated_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py"
+
     def generate_code_handler(
         prompt: str, filename: str, current_state: AppState
-    ) -> tuple[str, AppState]:
+    ) -> tuple[str, str, AppState]:
         """プロンプトからコードを生成"""
         if not prompt.strip():
-            return "💡 プロンプトを入力してください。", current_state
+            return "💡 プロンプトを入力してください。", filename, current_state
 
         try:
             if HAS_LLM:
@@ -197,18 +217,54 @@ def build_code_prompt_tab(state: gr.State) -> None:
                 generated = "❌ LLM Router が初期化されていません。APIキーを確認してください。"
 
             current_state.generated_code = generated
-            if filename:
-                current_state.current_file_path = filename
 
-            return generated, current_state
+            # ファイル名が未入力の場合は自動生成
+            auto_filename = filename.strip() if filename.strip() else _extract_filename_from_code(generated)
+            current_state.current_file_path = auto_filename
+
+            return generated, auto_filename, current_state
         except Exception as e:
             logger.error(f"Code generation failed: {e}", exc_info=True)
-            return f"❌ エラー: {e}", current_state
+            return f"❌ エラー: {e}", filename, current_state
+
+    def _generate_test_code(code: str, module_stem: str) -> str:
+        """ソースコードからpytest形式のテストファイルを自動生成する"""
+        # 関数名を全て抽出（プライベート関数除く）
+        func_names = re.findall(r"^def\s+([a-zA-Z][a-zA-Z0-9_]*)\s*\(", code, re.MULTILINE)
+        # クラス名を抽出
+        class_names = re.findall(r"^class\s+([a-zA-Z][a-zA-Z0-9_]*)", code, re.MULTILINE)
+
+        lines = [
+            "import sys",
+            "import pytest",
+            "sys.path.insert(0, 'sandbox_output')",
+            f"from {module_stem} import *",
+            "",
+        ]
+
+        if not func_names and not class_names:
+            lines += [
+                "def test_module_loads():",
+                "    \"\"\"モジュールが正常にインポートできることを確認\"\"\"",
+                "    pass  # TODO: テストケースを追加してください",
+            ]
+        else:
+            for fn in func_names:
+                lines += [
+                    f"def test_{fn}():",
+                    f"    \"\"\"TODO: {fn}() のテストケースを追加してください\"\"\"",
+                    f"    # result = {fn}(...)",
+                    f"    # assert result == expected",
+                    f"    pass",
+                    "",
+                ]
+
+        return "\n".join(lines)
 
     def save_code_handler(
         code: str, filename: str, current_state: AppState
     ) -> tuple[str, AppState]:
-        """コードを保存"""
+        """コードを保存し、テストファイルも自動生成する"""
         if not code.strip():
             return "💡 コードが空です。", current_state
 
@@ -218,11 +274,22 @@ def build_code_prompt_tab(state: gr.State) -> None:
             save_path.parent.mkdir(parents=True, exist_ok=True)
             save_path.write_text(code, encoding="utf-8")
 
-            current_state.current_file_path = str(save_path)
+            # テストファイルを自動生成
+            module_stem = save_path.stem  # 例: is_prime
+            test_filename = f"test_{module_stem}.py"
+            test_path = Path("sandbox_output") / test_filename
+            test_code = _generate_test_code(code, module_stem)
+            test_path.write_text(test_code, encoding="utf-8")
+
+            current_state.current_file_path = str(test_path)  # Test Runnerにはテストファイルを渡す
             current_state.generated_code = code
             current_state.before_code[str(save_path)] = code
 
-            return f"✅ 保存しました: {save_path}", current_state
+            return (
+                f"✅ 保存しました: {save_path}\n"
+                f"🧪 テストファイル自動生成: {test_path}\n"
+                f"（Test Runnerで「保存したファイルを使う」を押すと自動入力されます）"
+            ), current_state
         except Exception as e:
             logger.error(f"Save failed: {e}", exc_info=True)
             return f"❌ エラー: {e}", current_state
@@ -230,13 +297,13 @@ def build_code_prompt_tab(state: gr.State) -> None:
     generate_code_button.click(
         fn=generate_code_handler,
         inputs=[prompt_input, filename_input, state],
-        outputs=[generated_code_output, state],
+        outputs=[generated_code_output, filename_input, state],
     )
 
     save_code_button.click(
         fn=save_code_handler,
         inputs=[generated_code_output, filename_input, state],
-        outputs=[gr.Textbox(visible=False), state],  # 保存結果は別途表示
+        outputs=[save_result_display, state],
     )
 
     # 戻り値なし（Gradio Blocks 内で直接構築）
@@ -257,6 +324,8 @@ def build_ai_revision_tab(state: gr.State) -> None:
 
         with gr.Row():
             with gr.Column():
+                load_code_btn = gr.Button("📂 Code/Promptで生成したコードを読み込む", variant="secondary")
+
                 code_input = gr.Code(
                     label="📝 修正対象コード",
                     language="python",
@@ -266,13 +335,13 @@ def build_ai_revision_tab(state: gr.State) -> None:
 
                 revision_prompt = gr.Textbox(
                     label="💬 修正指示",
-                    placeholder="例: エラーハンドリングを追加してください",
+                    placeholder="例: 型ヒントを追加してください / エラーハンドリングを追加してください",
                     lines=5,
                 )
 
                 with gr.Row():
-                    generate_patch_button = gr.Button("🔧 パッチ生成", variant="primary")
-                    apply_patch_button = gr.Button("✅ パッチ適用", variant="secondary")
+                    generate_patch_button = gr.Button("🔧 修正コードを生成", variant="primary")
+                    apply_patch_button = gr.Button("✅ ファイルに書き戻す", variant="secondary")
 
             with gr.Column():
                 patch_output = gr.Code(
@@ -288,12 +357,27 @@ def build_ai_revision_tab(state: gr.State) -> None:
                     interactive=False,
                 )
 
+    def load_generated_code(current_state: AppState) -> str:
+        """AppStateから生成済みコードを読み込む"""
+        code = current_state.generated_code or ""
+        if not code:
+            return "# Code/Promptタブでコードを生成してください"
+        return code
+
+    load_code_btn.click(
+        fn=load_generated_code,
+        inputs=[state],
+        outputs=[code_input],
+    )
+
     def generate_patch_handler(
-        code: str, prompt: str, current_state: AppState
+        code: str | None, prompt: str | None, current_state: AppState
     ) -> tuple[str, str, AppState]:
-        """パッチを生成"""
-        if not code.strip() or not prompt.strip():
-            return "", "💡 コードと修正指示を入力してください。", current_state
+        """修正コードを生成"""
+        code = (code or "").strip()
+        prompt = (prompt or "").strip()
+        if not code or not prompt:
+            return "", "💡 コードと修正指示を両方入力してください。", current_state
 
         try:
             if HAS_LLM:
@@ -305,38 +389,44 @@ def build_ai_revision_tab(state: gr.State) -> None:
                         "ユーザーが提示したコードに対して、指定された修正を適用した完全なコードを出力してください。"
                         "説明文は不要です。修正後のコードのみを返してください。"
                     ),
-                    user_prompt=f"元のコード:\n```\n{code}\n```\n\n修正指示: {prompt}",
+                    user_prompt=f"元のコード:\n```python\n{code}\n```\n\n修正指示: {prompt}",
                 )
-                patch = result.get("content", "") if result.get("ok") else ""
-                if not patch:
+                revised = result.get("content", "") if result.get("ok") else ""
+                if not revised:
                     return "", f"❌ LLM Error: {result.get('reason', 'unknown')}", current_state
                 # マークダウンコードブロックを除去
-                if patch.startswith("```"):
-                    lines = patch.split("\n")
-                    patch = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+                if revised.startswith("```"):
+                    lines = revised.split("\n")
+                    revised = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
             else:
                 return "", "❌ LLM Router が初期化されていません。", current_state
 
-            return patch, "✅ 修正コードを生成しました。", current_state
+            return revised, "✅ 修正コードを生成しました。「ファイルに書き戻す」で保存できます。", current_state
         except Exception as e:
             logger.error(f"Patch generation failed: {e}", exc_info=True)
             return "", f"❌ エラー: {e}", current_state
 
-    def apply_patch_handler(patch: str, current_state: AppState) -> tuple[str, AppState]:
-        """パッチを適用"""
-        if not patch.strip():
-            return "💡 パッチが空です。", current_state
+    def apply_patch_handler(patch: str | None, current_state: AppState) -> tuple[str, AppState]:
+        """修正コードをファイルに書き戻す"""
+        patch = (patch or "").strip()
+        if not patch:
+            return "💡 修正コードが空です。先に「修正コードを生成」してください。", current_state
 
         try:
-            # TODO: PatchApplier を使ってパッチ適用
-            # 暫定的にプレースホルダー
-            file_path = current_state.current_file_path
-            if file_path and Path(file_path).exists():
-                # パッチ適用のロジック（簡易版）
-                current_state.after_code[file_path] = "Modified code"
-                return "✅ パッチを適用しました。", current_state
+            # test_xxx.py ではなく元のソースファイルに書き戻す
+            test_path = current_state.current_file_path or ""
+            if test_path.startswith("sandbox_output/test_"):
+                source_name = test_path.replace("sandbox_output/test_", "sandbox_output/")
             else:
-                return "❌ ファイルが見つかりません。", current_state
+                source_name = test_path
+
+            file_path = Path(source_name) if source_name else None
+            if file_path and file_path.exists():
+                current_state.after_code[str(file_path)] = patch
+                file_path.write_text(patch, encoding="utf-8")
+                return f"✅ {file_path} に書き戻しました。", current_state
+            else:
+                return "❌ 書き戻し先ファイルが見つかりません。Code/Promptでコードを保存してから使ってください。", current_state
         except Exception as e:
             logger.error(f"Patch apply failed: {e}", exc_info=True)
             return f"❌ エラー: {e}", current_state
@@ -377,13 +467,15 @@ def build_test_runner_tab(state: gr.State) -> None:
                     lines=1,
                 )
 
+                use_saved_btn = gr.Button("📂 Code/Promptで保存したファイルを使う", variant="secondary")
+
                 with gr.Row():
                     test_file_input = gr.Textbox(
-                        label="📄 テストファイル",
-                        placeholder="例: tests/test_sample.py",
+                        label="📄 テストファイル（直接入力またはフォルダ/ファイルから選択）",
+                        placeholder="例: sandbox_output/generated_code.py",
                         scale=3,
                     )
-                    refresh_btn = gr.Button("🔄", scale=1)
+                    refresh_btn = gr.Button("🔄 一覧更新", scale=1)
 
                 with gr.Row():
                     dir_dropdown = gr.Dropdown(
@@ -409,6 +501,18 @@ def build_test_runner_tab(state: gr.State) -> None:
                 )
 
                 test_status = gr.Markdown("**ステータス:** 未実行")
+
+        # 「保存済みファイルを使う」ボタン → AppStateのcurrent_file_pathをtest_file_inputに反映
+        def load_saved_file(current_state: AppState) -> str:
+            if current_state.current_file_path:
+                return current_state.current_file_path
+            return "❌ まだファイルが保存されていません。Code/Promptタブでコードを保存してください。"
+
+        use_saved_btn.click(
+            fn=load_saved_file,
+            inputs=[state],
+            outputs=[test_file_input],
+        )
 
         # フォルダ選択 → ファイル一覧更新
         dir_dropdown.change(
@@ -674,7 +778,7 @@ def build_unified_ui() -> gr.Blocks:
     """
     統合 Gradio UI を構築
     """
-    with gr.Blocks(title="NexusCore Unified UI", theme=gr.themes.Soft()) as demo:
+    with gr.Blocks(title="NexusCore Unified UI") as demo:
         gr.Markdown("# 🤖 NexusCore Unified UI")
         gr.Markdown("解析→修正→テスト→履歴まで一画面で完結")
 
@@ -714,6 +818,7 @@ def launch_unified_ui(
         inbrowser=inbrowser,
         share=share,
         show_error=True,
+        theme=gr.themes.Soft(),
     )
 
 
