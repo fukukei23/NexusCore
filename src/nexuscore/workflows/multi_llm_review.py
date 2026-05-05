@@ -21,6 +21,8 @@ from typing import Any
 # 既存基盤
 from ..agents.base_agent import BaseAgent
 from ..llm.llm_router import LLMRouter  # 直接クライアントを生成するために使用
+from ..plugins.base_workflow import BaseWorkflow
+from ..plugins.workflow_registry import WorkflowRegistry
 
 # 任意（未導入でも動作可）
 try:
@@ -262,3 +264,53 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------- Workflow Plugin ---------------------------- #
+@WorkflowRegistry.register_workflow("multi_llm_review")
+class MultiLLMReviewWorkflow(BaseWorkflow):
+    """Multi-LLM consensus review workflow plugin.
+
+    Context keys:
+        task (str): Review requirement text.
+        items (list[dict]): Review targets with path/content/error keys.
+        models (list[str]): Model names in lightweight→high-accuracy order.
+        threshold (float): Confidence threshold (default 0.9).
+        max_extra (int): Max extra validations (default 1).
+        tokens (int): Max output tokens per model (default 512).
+    """
+
+    name = "multi_llm_review"
+    description = "Multi-LLM consensus review with confidence-based early stopping"
+
+    def execute(self, context: dict[str, Any]) -> dict[str, Any]:
+        task = context.get("task", "")
+        raw_items = context.get("items", [])
+        models = context.get("models", [])
+        threshold = context.get("threshold", DEFAULT_CONFIDENCE_THRESHOLD)
+        max_extra = context.get("max_extra", DEFAULT_MAX_EXTRA_VALIDATIONS)
+        tokens = context.get("tokens", DEFAULT_MAX_OUTPUT_TOKENS)
+
+        items = [ReviewItem(**it) if isinstance(it, dict) else it for it in raw_items]
+
+        loop = asyncio.new_event_loop()
+        try:
+            result: ConsensusResult = loop.run_until_complete(
+                run_consensus_review(
+                    task=task,
+                    items=items,
+                    models=models,
+                    confidence_threshold=threshold,
+                    max_extra_validations=max_extra,
+                    max_output_tokens=tokens,
+                )
+            )
+        finally:
+            loop.close()
+
+        return {
+            "issues": result.issues,
+            "confidence": result.confidence,
+            "file_fixes": result.file_fixes,
+            "contributing_models": result.contributing_models,
+        }

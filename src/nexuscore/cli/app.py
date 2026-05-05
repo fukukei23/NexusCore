@@ -30,6 +30,8 @@ def _ensure_discovery() -> None:
         register_builtin_agents()
         AgentRegistry.discover()
     if not WorkflowRegistry.list_all():
+        # Import built-in workflow modules to trigger decorator registration
+        importlib.import_module("nexuscore.workflows.multi_llm_review")
         WorkflowRegistry.discover()
 
 
