@@ -951,7 +951,7 @@ class TestUIBuilders:
 
     @patch("nexuscore.ui.unified_gradio_ui.gr")
     def test_build_unified_ui_uses_soft_theme(self, mock_gr):
-        """build_unified_uiがSoftテーマを使用"""
+        """build_unified_uiがBlocks()でthemeを使わず、launch()でthemeを渡す（Gradio 6）"""
         mock_gr.Blocks.return_value.__enter__.return_value = MagicMock()
         mock_gr.State.return_value = Mock()
         mock_soft_theme = Mock()
@@ -959,7 +959,9 @@ class TestUIBuilders:
 
         build_unified_ui()
 
-        mock_gr.themes.Soft.assert_called_once()
+        # Gradio 6: theme is NOT passed to Blocks()
+        blocks_call = mock_gr.Blocks.call_args
+        assert "theme" not in (blocks_call[1] if blocks_call else {})
 
     @patch("nexuscore.ui.unified_gradio_ui.build_unified_ui")
     def test_launch_unified_ui_show_error_true(self, mock_build):
