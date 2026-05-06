@@ -18,9 +18,9 @@
 | Metric | Value |
 |---|---|
 | Test Coverage | 80.22% |
-| Test Cases | 4,838 |
+| Test Cases | 4,895 |
 | LLM Providers | GLM-5.1 + MiniMax M2.7 (OpenAI SDK fully removed) |
-| Agents | 18+ specialized agents |
+| Agents | 14 specialized agents |
 | Core Modules | NPE (Security Engine), FKB (Fault Knowledge Base) |
 
 ---
