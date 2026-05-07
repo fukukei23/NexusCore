@@ -64,7 +64,7 @@ services:
     image: postgres:15-alpine
     environment:
       - POSTGRES_USER=nexuscore
-      - POSTGRES_PASSWORD=nexuscore
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
       - POSTGRES_DB=nexuscore
     ports:
       - "5432:5432"
