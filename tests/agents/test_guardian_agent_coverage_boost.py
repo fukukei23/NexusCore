@@ -12,7 +12,7 @@ class TestPrepareBranch:
         agent.logger = MagicMock()
         return agent
 
-    @patch("nexuscore.agents.guardian_agent.git")
+    @patch("nexuscore.agents._guardian_helpers.git_operations.git")
     def test_prepare_branch_success(self, mock_git):
         agent = self._make_agent()
         mock_repo = MagicMock()
@@ -21,7 +21,7 @@ class TestPrepareBranch:
         agent._prepare_branch("feature/test")
         mock_repo.git.checkout.assert_called_once_with("-B", "feature/test")
 
-    @patch("nexuscore.agents.guardian_agent.git")
+    @patch("nexuscore.agents._guardian_helpers.git_operations.git")
     def test_prepare_branch_repo_not_found(self, mock_git):
         agent = self._make_agent()
         mock_git.Repo.side_effect = Exception("not a git repo")
@@ -178,6 +178,7 @@ class TestCommitChanges:
         from nexuscore.agents.guardian_agent import GuardianAgent
         agent = GuardianAgent.__new__(GuardianAgent)
         agent.logger = MagicMock()
+        agent.model = ""
         return agent
 
     def _make_review_and_commit_args(self, **overrides):

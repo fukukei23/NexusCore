@@ -143,9 +143,9 @@ class TestGuardianAgentInit:
 
 
 class TestRunQualityGates:
-    @patch("nexuscore.agents.guardian_agent.MutationTesterAgent")
-    @patch("nexuscore.agents.guardian_agent.analyze_code_quality")
-    @patch("nexuscore.agents.guardian_agent.get_constitution")
+    @patch("nexuscore.agents._guardian_helpers.quality_gates.MutationTesterAgent")
+    @patch("nexuscore.agents._guardian_helpers.quality_gates.analyze_code_quality")
+    @patch("nexuscore.agents._guardian_helpers.quality_gates.get_constitution")
     def test_run_quality_gates_success(
         self,
         mock_get_const,
@@ -174,8 +174,8 @@ class TestRunQualityGates:
         assert result["tier2"] == mutation_report
         assert len(result["violations"]) == 0
 
-    @patch("nexuscore.agents.guardian_agent.MutationTesterAgent")
-    @patch("nexuscore.agents.guardian_agent.analyze_code_quality")
+    @patch("nexuscore.agents._guardian_helpers.quality_gates.MutationTesterAgent")
+    @patch("nexuscore.agents._guardian_helpers.quality_gates.analyze_code_quality")
     def test_run_quality_gates_tier1_failure(
         self,
         mock_analyze,
@@ -204,8 +204,8 @@ class TestRunQualityGates:
         assert result["overall_passed"] is False
         assert "テストカバレッジ不足" in result["violations"]
 
-    @patch("nexuscore.agents.guardian_agent.MutationTesterAgent")
-    @patch("nexuscore.agents.guardian_agent.analyze_code_quality")
+    @patch("nexuscore.agents._guardian_helpers.quality_gates.MutationTesterAgent")
+    @patch("nexuscore.agents._guardian_helpers.quality_gates.analyze_code_quality")
     def test_run_quality_gates_tier2_failure(
         self,
         mock_analyze,
@@ -235,8 +235,8 @@ class TestRunQualityGates:
         assert result["overall_passed"] is False
         assert any("ミューテーションスコア" in v for v in result["violations"])
 
-    @patch("nexuscore.agents.guardian_agent.MutationTesterAgent")
-    @patch("nexuscore.agents.guardian_agent.analyze_code_quality")
+    @patch("nexuscore.agents._guardian_helpers.quality_gates.MutationTesterAgent")
+    @patch("nexuscore.agents._guardian_helpers.quality_gates.analyze_code_quality")
     def test_run_quality_gates_tier1_exception(
         self, mock_analyze, mock_mutation_class, guardian, constitution, mutation_report
     ):
@@ -257,8 +257,8 @@ class TestRunQualityGates:
         assert isinstance(result["overall_passed"], bool)
         assert "tier1" in result or "tier2" in result
 
-    @patch("nexuscore.agents.guardian_agent.MutationTesterAgent")
-    @patch("nexuscore.agents.guardian_agent.analyze_code_quality")
+    @patch("nexuscore.agents._guardian_helpers.quality_gates.MutationTesterAgent")
+    @patch("nexuscore.agents._guardian_helpers.quality_gates.analyze_code_quality")
     def test_run_quality_gates_tier2_exception(
         self, mock_analyze, mock_mutation_class, guardian, constitution, quality_report
     ):

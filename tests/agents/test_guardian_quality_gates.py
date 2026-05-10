@@ -199,8 +199,8 @@ class TestGuardianQualityGates:
         """Tier 1とTier 2が両方合格する場合"""
         guardian = GuardianAgent()
 
-        with patch("nexuscore.agents.guardian_agent.analyze_code_quality") as mock_analyze:
-            with patch("nexuscore.agents.guardian_agent.MutationTesterAgent") as mock_mutation_cls:
+        with patch("nexuscore.agents._guardian_helpers.quality_gates.analyze_code_quality") as mock_analyze:
+            with patch("nexuscore.agents._guardian_helpers.quality_gates.MutationTesterAgent") as mock_mutation_cls:
                 mock_analyze.return_value = mock_quality_report_pass
                 mock_mutation_agent = Mock()
                 mock_mutation_agent.run_mutation_testing.return_value = mock_mutation_report_pass
@@ -223,8 +223,8 @@ class TestGuardianQualityGates:
         """Tier 1が不合格の場合"""
         guardian = GuardianAgent()
 
-        with patch("nexuscore.agents.guardian_agent.analyze_code_quality") as mock_analyze:
-            with patch("nexuscore.agents.guardian_agent.MutationTesterAgent") as mock_mutation_cls:
+        with patch("nexuscore.agents._guardian_helpers.quality_gates.analyze_code_quality") as mock_analyze:
+            with patch("nexuscore.agents._guardian_helpers.quality_gates.MutationTesterAgent") as mock_mutation_cls:
                 mock_analyze.return_value = mock_quality_report_fail
                 mock_mutation_agent = Mock()
                 mock_mutation_agent.run_mutation_testing.return_value = mock_mutation_report_pass
@@ -246,8 +246,8 @@ class TestGuardianQualityGates:
         """Tier 2が不合格の場合"""
         guardian = GuardianAgent()
 
-        with patch("nexuscore.agents.guardian_agent.analyze_code_quality") as mock_analyze:
-            with patch("nexuscore.agents.guardian_agent.MutationTesterAgent") as mock_mutation_cls:
+        with patch("nexuscore.agents._guardian_helpers.quality_gates.analyze_code_quality") as mock_analyze:
+            with patch("nexuscore.agents._guardian_helpers.quality_gates.MutationTesterAgent") as mock_mutation_cls:
                 mock_analyze.return_value = mock_quality_report_pass
                 mock_mutation_agent = Mock()
                 mock_mutation_agent.run_mutation_testing.return_value = mock_mutation_report_fail
