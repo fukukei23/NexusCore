@@ -231,31 +231,31 @@ class TestStopBeforePhasesForAuthorityLevel:
 
 
 class TestRunLockLease:
-    @patch("nexuscore.orchestrator.authority_runner.release_run_lock")
-    @patch("nexuscore.orchestrator.authority_runner.try_acquire_run_lock", return_value=(True, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.lock_lease.release_run_lock")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.lock_lease.try_acquire_run_lock", return_value=(True, None))
     def test_enter_acquires_lock(self, mock_acquire, mock_release):
         lease = RunLockLease("run-1")
         with lease:
             mock_acquire.assert_called_once_with("run-1")
 
-    @patch("nexuscore.orchestrator.authority_runner.release_run_lock")
-    @patch("nexuscore.orchestrator.authority_runner.try_acquire_run_lock", return_value=(False, "busy"))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.lock_lease.release_run_lock")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.lock_lease.try_acquire_run_lock", return_value=(False, "busy"))
     def test_enter_failure_raises(self, mock_acquire, mock_release):
         lease = RunLockLease("run-1")
         with pytest.raises(RuntimeError, match="Failed to acquire lock"):
             with lease:
                 pass
 
-    @patch("nexuscore.orchestrator.authority_runner.release_run_lock")
-    @patch("nexuscore.orchestrator.authority_runner.try_acquire_run_lock", return_value=(True, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.lock_lease.release_run_lock")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.lock_lease.try_acquire_run_lock", return_value=(True, None))
     def test_exit_releases_lock(self, mock_acquire, mock_release):
         lease = RunLockLease("run-1")
         with lease:
             pass
         mock_release.assert_called_once_with("run-1")
 
-    @patch("nexuscore.orchestrator.authority_runner.release_run_lock")
-    @patch("nexuscore.orchestrator.authority_runner.try_acquire_run_lock", return_value=(True, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.lock_lease.release_run_lock")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.lock_lease.try_acquire_run_lock", return_value=(True, None))
     def test_exit_no_release_if_not_acquired(self, mock_acquire, mock_release):
         lease = RunLockLease("run-1")
         lease._lock_acquired = False
@@ -282,8 +282,8 @@ class TestRunLockLease:
         lease = RunLockLease("run-1", refresh_interval_seconds=10.0)
         assert lease.refresh_interval == 10.0
 
-    @patch("nexuscore.orchestrator.authority_runner.release_run_lock")
-    @patch("nexuscore.orchestrator.authority_runner.try_acquire_run_lock", return_value=(True, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.lock_lease.release_run_lock")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.lock_lease.try_acquire_run_lock", return_value=(True, None))
     def test_refresh_thread_starts(self, mock_acquire, mock_release):
         lease = RunLockLease("run-1", refresh_interval_seconds=999)
         with lease:
@@ -296,7 +296,7 @@ class TestRunLockLease:
         lease._refresh_failed.clear()
         # Simulate refresh failure
         with patch(
-            "nexuscore.orchestrator.authority_runner.refresh_run_lock",
+            "nexuscore.orchestrator._authority_runner_helpers.lock_lease.refresh_run_lock",
             return_value=(False, "expired", {"ttl": 0}),
         ):
             lease._refresh_loop()
@@ -308,7 +308,7 @@ class TestRunLockLease:
         lease = RunLockLease("run-1")
         lease._stop_refresh.set()
         # Should return immediately without calling refresh
-        with patch("nexuscore.orchestrator.authority_runner.refresh_run_lock") as mock_refresh:
+        with patch("nexuscore.orchestrator._authority_runner_helpers.lock_lease.refresh_run_lock") as mock_refresh:
             lease._refresh_loop()
             mock_refresh.assert_not_called()
 
@@ -697,89 +697,89 @@ class TestSessionControllerHelpers:
 class TestResumeRun:
     """resume_runの9-stepフローとエラーパス"""
 
-    @patch("nexuscore.orchestrator.authority_runner.save_state")
-    @patch("nexuscore.orchestrator.authority_runner.build_explainability", return_value={"what": "test"})
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.save_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.build_explainability", return_value={"what": "test"})
     def test_not_found_returns_failed(self, mock_expl, mock_save):
         """Step 1: load_state で FileNotFoundError"""
-        with patch("nexuscore.orchestrator.authority_runner.load_state", side_effect=FileNotFoundError):
+        with patch("nexuscore.orchestrator._authority_runner_helpers.resume.load_state", side_effect=FileNotFoundError):
             result = resume_run("missing-run")
 
         assert result["status"] == "FAILED"
         assert result["run_id"] == "missing-run"
         assert "explainability" in result
 
-    @patch("nexuscore.orchestrator.authority_runner.update_state")
-    @patch("nexuscore.orchestrator.authority_runner.build_explainability", return_value={})
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.update_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.build_explainability", return_value={})
     def test_schema_invalid_returns_failed(self, mock_expl, mock_update):
         """Step 2: schema gate failure"""
         state = {"run_id": "r1", "status": "PAUSED"}
-        with patch("nexuscore.orchestrator.authority_runner.load_state", return_value=state), \
-             patch("nexuscore.orchestrator.authority_runner.validate_run_state", return_value=(False, "BAD_SCHEMA", "Invalid")):
+        with patch("nexuscore.orchestrator._authority_runner_helpers.resume.load_state", return_value=state), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.validate_run_state", return_value=(False, "BAD_SCHEMA", "Invalid")):
             result = resume_run("r1")
 
         assert result["status"] == "FAILED"
         assert result["run_id"] == "r1"
 
-    @patch("nexuscore.orchestrator.authority_runner.build_explainability", return_value={})
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.build_explainability", return_value={})
     def test_integrity_fail_returns_failed(self, mock_expl):
         """Step 3: integrity gate failure"""
         state = {"run_id": "r1", "status": "PAUSED"}
-        with patch("nexuscore.orchestrator.authority_runner.load_state", return_value=state), \
-             patch("nexuscore.orchestrator.authority_runner.validate_run_state", return_value=(True, None, None)), \
-             patch("nexuscore.orchestrator.authority_runner.verify_integrity", return_value=(False, "TAMPERED", "Hash mismatch")):
+        with patch("nexuscore.orchestrator._authority_runner_helpers.resume.load_state", return_value=state), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.validate_run_state", return_value=(True, None, None)), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.verify_integrity", return_value=(False, "TAMPERED", "Hash mismatch")):
             result = resume_run("r1")
 
         assert result["status"] == "FAILED"
         assert result["run_id"] == "r1"
 
-    @patch("nexuscore.orchestrator.authority_runner.update_state")
-    @patch("nexuscore.orchestrator.authority_runner.build_explainability", return_value={})
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.update_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.build_explainability", return_value={})
     def test_not_paused_returns_failed(self, mock_expl, mock_update):
         """Step 4: status gate - not PAUSED"""
         state = {"run_id": "r1", "status": "RUNNING"}
-        with patch("nexuscore.orchestrator.authority_runner.load_state", return_value=state), \
-             patch("nexuscore.orchestrator.authority_runner.validate_run_state", return_value=(True, None, None)), \
-             patch("nexuscore.orchestrator.authority_runner.verify_integrity", return_value=(True, None, None)):
+        with patch("nexuscore.orchestrator._authority_runner_helpers.resume.load_state", return_value=state), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.validate_run_state", return_value=(True, None, None)), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.verify_integrity", return_value=(True, None, None)):
             result = resume_run("r1")
 
         assert result["status"] == "FAILED"
 
-    @patch("nexuscore.orchestrator.authority_runner.update_state")
-    @patch("nexuscore.orchestrator.authority_runner.build_explainability", return_value={})
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.update_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.build_explainability", return_value={})
     def test_lowercase_paused_normalized(self, mock_expl, mock_update):
         """Step 4: lowercase 'paused' normalized to 'PAUSED'"""
         state = {"run_id": "r1", "status": "paused"}
-        with patch("nexuscore.orchestrator.authority_runner.load_state", return_value=state), \
-             patch("nexuscore.orchestrator.authority_runner.validate_run_state", return_value=(True, None, None)), \
-             patch("nexuscore.orchestrator.authority_runner.verify_integrity", return_value=(True, None, None)), \
-             patch("nexuscore.orchestrator.authority_runner.try_acquire_run_lock", return_value=(False, "conflict")):
+        with patch("nexuscore.orchestrator._authority_runner_helpers.resume.load_state", return_value=state), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.validate_run_state", return_value=(True, None, None)), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.verify_integrity", return_value=(True, None, None)), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.try_acquire_run_lock", return_value=(False, "conflict")):
             result = resume_run("r1")
             # Should reach lock conflict (not status gate failure)
             assert result["status"] == "CONFLICT"
 
-    @patch("nexuscore.orchestrator.authority_runner.build_explainability", return_value={})
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.build_explainability", return_value={})
     def test_lock_conflict_returns_conflict(self, mock_expl):
         """Step 5: lock conflict"""
         state = {"run_id": "r1", "status": "PAUSED"}
-        with patch("nexuscore.orchestrator.authority_runner.load_state", return_value=state), \
-             patch("nexuscore.orchestrator.authority_runner.validate_run_state", return_value=(True, None, None)), \
-             patch("nexuscore.orchestrator.authority_runner.verify_integrity", return_value=(True, None, None)), \
-             patch("nexuscore.orchestrator.authority_runner.try_acquire_run_lock", return_value=(False, "already locked")):
+        with patch("nexuscore.orchestrator._authority_runner_helpers.resume.load_state", return_value=state), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.validate_run_state", return_value=(True, None, None)), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.verify_integrity", return_value=(True, None, None)), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.try_acquire_run_lock", return_value=(False, "already locked")):
             result = resume_run("r1")
 
         assert result["status"] == "CONFLICT"
 
-    @patch("nexuscore.orchestrator.authority_runner.update_state")
-    @patch("nexuscore.orchestrator.authority_runner.release_run_lock")
-    @patch("nexuscore.orchestrator.authority_runner.try_acquire_run_lock", return_value=(True, None))
-    @patch("nexuscore.orchestrator.authority_runner.verify_integrity", return_value=(True, None, None))
-    @patch("nexuscore.orchestrator.authority_runner.validate_run_state", return_value=(True, None, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.update_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.release_run_lock")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.try_acquire_run_lock", return_value=(True, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.verify_integrity", return_value=(True, None, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.validate_run_state", return_value=(True, None, None))
     def test_no_orchestrator_returns_failed(self, mock_val, mock_int, mock_lock, mock_release, mock_update):
         """Step 7: no orchestrator configured → FAILED (exception caught)"""
         state = {"run_id": "r1", "status": "PAUSED"}
-        with patch("nexuscore.orchestrator.authority_runner.load_state", return_value=state):
+        with patch("nexuscore.orchestrator._authority_runner_helpers.resume.load_state", return_value=state):
             # Reset globals
-            import nexuscore.orchestrator.authority_runner as ar
+            import nexuscore.orchestrator._authority_runner_helpers.resume as ar
             old_factory = ar._RESUME_ORCHESTRATOR_FACTORY
             old_orch = ar._RESUME_ORCHESTRATOR
             ar._RESUME_ORCHESTRATOR_FACTORY = None
@@ -792,19 +792,19 @@ class TestResumeRun:
                 ar._RESUME_ORCHESTRATOR_FACTORY = old_factory
                 ar._RESUME_ORCHESTRATOR = old_orch
 
-    @patch("nexuscore.orchestrator.authority_runner.update_state")
-    @patch("nexuscore.orchestrator.authority_runner.release_run_lock")
-    @patch("nexuscore.orchestrator.authority_runner.try_acquire_run_lock", return_value=(True, None))
-    @patch("nexuscore.orchestrator.authority_runner.verify_integrity", return_value=(True, None, None))
-    @patch("nexuscore.orchestrator.authority_runner.validate_run_state", return_value=(True, None, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.update_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.release_run_lock")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.try_acquire_run_lock", return_value=(True, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.verify_integrity", return_value=(True, None, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.validate_run_state", return_value=(True, None, None))
     @patch("nexuscore.orchestrator.run_lock._get_lock_refresh_seconds", return_value=0.01)
     def test_normal_resume_returns_running(self, mock_refresh, mock_val, mock_int, mock_lock, mock_release, mock_update):
         """Steps 1-9: normal resume path"""
         state = {"run_id": "r1", "status": "PAUSED", "authority_level": "partial"}
         mock_orch = MagicMock()
 
-        with patch("nexuscore.orchestrator.authority_runner.load_state", return_value=state), \
-             patch("nexuscore.orchestrator.authority_runner.RunLockLease") as mock_lease_cls:
+        with patch("nexuscore.orchestrator._authority_runner_helpers.resume.load_state", return_value=state), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.RunLockLease") as mock_lease_cls:
             mock_lease = MagicMock()
             mock_lease.is_refresh_failed.return_value = False
             mock_lease.__enter__ = MagicMock(return_value=mock_lease)
@@ -816,19 +816,19 @@ class TestResumeRun:
         assert result["status"] == "RUNNING"
         assert result["run_id"] == "r1"
 
-    @patch("nexuscore.orchestrator.authority_runner.update_state")
-    @patch("nexuscore.orchestrator.authority_runner.release_run_lock")
-    @patch("nexuscore.orchestrator.authority_runner.try_acquire_run_lock", return_value=(True, None))
-    @patch("nexuscore.orchestrator.authority_runner.verify_integrity", return_value=(True, None, None))
-    @patch("nexuscore.orchestrator.authority_runner.validate_run_state", return_value=(True, None, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.update_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.release_run_lock")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.try_acquire_run_lock", return_value=(True, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.verify_integrity", return_value=(True, None, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.validate_run_state", return_value=(True, None, None))
     @patch("nexuscore.orchestrator.run_lock._get_lock_refresh_seconds", return_value=0.01)
     def test_refresh_fail_returns_aborted(self, mock_refresh, mock_val, mock_int, mock_lock, mock_release, mock_update):
         """Refresh failure → ABORTED"""
         state = {"run_id": "r1", "status": "PAUSED"}
         mock_orch = MagicMock()
 
-        with patch("nexuscore.orchestrator.authority_runner.load_state", return_value=state), \
-             patch("nexuscore.orchestrator.authority_runner.RunLockLease") as mock_lease_cls:
+        with patch("nexuscore.orchestrator._authority_runner_helpers.resume.load_state", return_value=state), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.RunLockLease") as mock_lease_cls:
             mock_lease = MagicMock()
             mock_lease.is_refresh_failed.return_value = True
             mock_lease.get_refresh_failure.return_value = ("timeout", {"ttl": 0})
@@ -840,12 +840,12 @@ class TestResumeRun:
 
         assert result["status"] == "ABORTED"
 
-    @patch("nexuscore.orchestrator.authority_runner.update_state")
-    @patch("nexuscore.orchestrator.authority_runner.build_explainability", return_value={})
-    @patch("nexuscore.orchestrator.authority_runner.release_run_lock")
-    @patch("nexuscore.orchestrator.authority_runner.try_acquire_run_lock", return_value=(True, None))
-    @patch("nexuscore.orchestrator.authority_runner.verify_integrity", return_value=(True, None, None))
-    @patch("nexuscore.orchestrator.authority_runner.validate_run_state", return_value=(True, None, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.update_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.build_explainability", return_value={})
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.release_run_lock")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.try_acquire_run_lock", return_value=(True, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.verify_integrity", return_value=(True, None, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.validate_run_state", return_value=(True, None, None))
     @patch("nexuscore.orchestrator.run_lock._get_lock_refresh_seconds", return_value=0.01)
     def test_exception_returns_failed(self, mock_refresh, mock_val, mock_int, mock_lock, mock_release, mock_update, mock_expl):
         """Unexpected exception → FAILED"""
@@ -854,8 +854,8 @@ class TestResumeRun:
         def boom():
             raise RuntimeError("boom")
 
-        with patch("nexuscore.orchestrator.authority_runner.load_state", return_value=state), \
-             patch("nexuscore.orchestrator.authority_runner.RunLockLease") as mock_lease_cls:
+        with patch("nexuscore.orchestrator._authority_runner_helpers.resume.load_state", return_value=state), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.RunLockLease") as mock_lease_cls:
             mock_lease = MagicMock()
             mock_lease.is_refresh_failed.return_value = False
             mock_lease.__enter__ = MagicMock(return_value=mock_lease)
@@ -866,11 +866,11 @@ class TestResumeRun:
 
         assert result["status"] == "FAILED"
 
-    @patch("nexuscore.orchestrator.authority_runner.update_state")
-    @patch("nexuscore.orchestrator.authority_runner.release_run_lock")
-    @patch("nexuscore.orchestrator.authority_runner.try_acquire_run_lock", return_value=(True, None))
-    @patch("nexuscore.orchestrator.authority_runner.verify_integrity", return_value=(True, None, None))
-    @patch("nexuscore.orchestrator.authority_runner.validate_run_state", return_value=(True, None, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.update_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.release_run_lock")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.try_acquire_run_lock", return_value=(True, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.verify_integrity", return_value=(True, None, None))
+    @patch("nexuscore.orchestrator._authority_runner_helpers.resume.validate_run_state", return_value=(True, None, None))
     @patch("nexuscore.orchestrator.run_lock._get_lock_refresh_seconds", return_value=0.01)
     def test_uses_factory_over_global(self, mock_refresh, mock_val, mock_int, mock_lock, mock_release, mock_update):
         """orchestrator_factory が優先される"""
@@ -878,15 +878,15 @@ class TestResumeRun:
         factory_orch = MagicMock()
         global_orch = MagicMock()
 
-        with patch("nexuscore.orchestrator.authority_runner.load_state", return_value=state), \
-             patch("nexuscore.orchestrator.authority_runner.RunLockLease") as mock_lease_cls:
+        with patch("nexuscore.orchestrator._authority_runner_helpers.resume.load_state", return_value=state), \
+             patch("nexuscore.orchestrator._authority_runner_helpers.resume.RunLockLease") as mock_lease_cls:
             mock_lease = MagicMock()
             mock_lease.is_refresh_failed.return_value = False
             mock_lease.__enter__ = MagicMock(return_value=mock_lease)
             mock_lease.__exit__ = MagicMock(return_value=False)
             mock_lease_cls.return_value = mock_lease
 
-            import nexuscore.orchestrator.authority_runner as ar
+            import nexuscore.orchestrator._authority_runner_helpers.resume as ar
             old = ar._RESUME_ORCHESTRATOR
             ar._RESUME_ORCHESTRATOR = global_orch
             try:
@@ -905,7 +905,7 @@ class TestResumeRun:
 
 class TestResumeOrchestratorSetters:
     def test_set_resume_orchestrator(self):
-        import nexuscore.orchestrator.authority_runner as ar
+        import nexuscore.orchestrator._authority_runner_helpers.resume as ar
         old = ar._RESUME_ORCHESTRATOR
         mock = MagicMock()
         try:
@@ -915,7 +915,7 @@ class TestResumeOrchestratorSetters:
             ar._RESUME_ORCHESTRATOR = old
 
     def test_set_resume_orchestrator_factory(self):
-        import nexuscore.orchestrator.authority_runner as ar
+        import nexuscore.orchestrator._authority_runner_helpers.resume as ar
         old = ar._RESUME_ORCHESTRATOR_FACTORY
         factory = lambda: MagicMock()
         try:
@@ -925,7 +925,7 @@ class TestResumeOrchestratorSetters:
             ar._RESUME_ORCHESTRATOR_FACTORY = old
 
     def test_factory_overrides_previous(self):
-        import nexuscore.orchestrator.authority_runner as ar
+        import nexuscore.orchestrator._authority_runner_helpers.resume as ar
         old = ar._RESUME_ORCHESTRATOR_FACTORY
         try:
             set_resume_orchestrator_factory(lambda: "first")

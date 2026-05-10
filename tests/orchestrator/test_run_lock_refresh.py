@@ -183,16 +183,16 @@ def test_refresh_failure_triggers_safe_stop(monkeypatch: Any, tmp_path: Any) -> 
     save_state(state)
 
     # Patch refresh_run_lock to fail (simulating refresh failure during execution)
-    # authority_runner imports refresh_run_lock, so we need to patch it in authority_runner module
-    import nexuscore.orchestrator.authority_runner as authority_runner_module
+    # RunLockLease imports refresh_run_lock from lock_lease module
+    import nexuscore.orchestrator._authority_runner_helpers.lock_lease as lock_lease_mod
 
     def failing_refresh(run_id: str):
         """Refresh that always fails (simulating a failure during execution)."""
         return False, "LOCK_REFRESH_FAILED", {"error": "Simulated refresh failure"}
 
-    # Patch in authority_runner module (where RunLockLease actually uses it)
-    original_refresh_func = authority_runner_module.refresh_run_lock
-    authority_runner_module.refresh_run_lock = failing_refresh
+    # Patch in lock_lease module (where RunLockLease actually uses it)
+    original_refresh_func = lock_lease_mod.refresh_run_lock
+    lock_lease_mod.refresh_run_lock = failing_refresh
 
     # Mock orchestrator with a slow start (to allow refresh to occur and fail)
     # Sleep longer than refresh interval (0.2s) to ensure refresh loop runs at least once
@@ -225,5 +225,5 @@ def test_refresh_failure_triggers_safe_stop(monkeypatch: Any, tmp_path: Any) -> 
         assert "inspect_lock_dir_permissions" in result["explainability"]["next_action"]
     finally:
         # Restore original function
-        authority_runner_module.refresh_run_lock = original_refresh_func
+        lock_lease_mod.refresh_run_lock = original_refresh_func
         release_run_lock(run_id)

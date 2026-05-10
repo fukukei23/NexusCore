@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from nexuscore.orchestrator import authority_runner
+from nexuscore.orchestrator._authority_runner_helpers import resume as resume_mod
 from nexuscore.orchestrator.run_state_store import load_state, save_state
 
 
@@ -25,7 +26,7 @@ def test_resume_status_transition_and_orchestrator_rebuild(monkeypatch: Any, tmp
 
     # Spy on update_state calls to confirm RESUMING -> RUNNING transitions.
     seen_statuses: list[str] = []
-    real_update_state = authority_runner.update_state  # type: ignore[attr-defined]
+    real_update_state = resume_mod.update_state
 
     def _spy_update_state(arg: Any, **kwargs: Any) -> Any:
         if isinstance(arg, dict):
@@ -38,7 +39,7 @@ def test_resume_status_transition_and_orchestrator_rebuild(monkeypatch: Any, tmp
                 seen_statuses.append(st)
         return real_update_state(arg, **kwargs)
 
-    monkeypatch.setattr(authority_runner, "update_state", _spy_update_state)
+    monkeypatch.setattr(resume_mod, "update_state", _spy_update_state)
 
     # Orchestrator factory must be used (new instance per resume).
     factory_calls: list[str] = []
