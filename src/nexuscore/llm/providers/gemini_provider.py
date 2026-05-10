@@ -86,7 +86,7 @@ class GeminiLLM(BaseLLM):
                 if not text:
                     try:
                         text = getattr(resp, "text", "") or ""
-                    except Exception:
+                    except (AttributeError, ValueError):
                         text = ""
 
                 if not text:
@@ -95,7 +95,7 @@ class GeminiLLM(BaseLLM):
                         finish_reason = getattr(
                             getattr(resp, "candidates", [None])[0], "finish_reason", None
                         )
-                    except Exception:
+                    except (AttributeError, IndexError):
                         pass
                     self.logger.warning(
                         "Gemini returned no text (finish_reason=%s). Fallback to stub.",

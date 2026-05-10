@@ -30,9 +30,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# リソース制限の定数
-_MEMORY_LIMIT_MB = 512
-_CPU_TIME_LIMIT_SEC = 30
+# リソース制限（環境変数で上書き可能）
+_MEMORY_LIMIT_MB = int(os.getenv("NEXUS_SANDBOX_MEMORY_MB", "512"))
+_CPU_TIME_LIMIT_SEC = int(os.getenv("NEXUS_SANDBOX_CPU_SEC", "30"))
 
 # 危険モジュールのブロックリスト
 _FORBIDDEN_MODULE_NAMES = {"os", "subprocess", "shutil", "socket", "pathlib"}
@@ -56,11 +56,11 @@ def _apply_resource_limits() -> None:
         return
 
     try:
-        # メモリ上限（仮想メモリ）: 512MB
+        # メモリ上限（仮想メモリ）: 環境変数 NEXUS_SANDBOX_MEMORY_MB（デフォルト512MB）
         memory_limit_bytes = _MEMORY_LIMIT_MB * 1024 * 1024
         resource.setrlimit(resource.RLIMIT_AS, (memory_limit_bytes, memory_limit_bytes))
 
-        # CPU時間上限: 30秒
+        # CPU時間上限: 環境変数 NEXUS_SANDBOX_CPU_SEC（デフォルト30秒）
         resource.setrlimit(resource.RLIMIT_CPU, (_CPU_TIME_LIMIT_SEC, _CPU_TIME_LIMIT_SEC))
 
         logger.debug(

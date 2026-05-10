@@ -49,14 +49,14 @@ def _cost(model: str, kind: str) -> float:
 def _env_float(name: str, default: float) -> float:
     try:
         return float(os.getenv(name, default))
-    except Exception:
+    except (ValueError, TypeError):
         return default
 
 
 def _env_int(name: str, default: int) -> int:
     try:
         return int(os.getenv(name, default))
-    except Exception:
+    except (ValueError, TypeError):
         return default
 
 
@@ -109,10 +109,10 @@ def _read_today_total() -> float:
                         row = json.loads(line)
                         if row.get("day") == day:
                             total += float(row.get("cost_jpy", 0.0))
-                    except Exception as e:
+                    except (json.JSONDecodeError, KeyError, ValueError) as e:
                         logging.getLogger("npe.budget").warning("Skipping malformed ledger line: %s", e)
                         continue
-        except Exception:
+        except OSError:
             return total
     return total
 
@@ -134,9 +134,9 @@ def record_usage(
         try:
             with USAGE_LEDGER.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except Exception:
-            # 失敗時はコンソールに出すだけ（致命にしない）
-            print("[NPE-Budget] WARN: failed to append usage_ledger")
+        except OSError as e:
+            # 失敗時はログに出す（致命にしない）
+            logging.getLogger("npe.budget").warning("Failed to append usage_ledger: %s", e)
 
 
 def preflight_check(
@@ -229,5 +229,5 @@ def record_estimate(model: str, task: str, decision: BudgetDecision) -> None:
         try:
             with USAGE_LEDGER.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except Exception:
-            print("[NPE-Budget] WARN: failed to append preflight ledger")
+        except OSError as e:
+            logging.getLogger("npe.budget").warning("Failed to append preflight ledger: %s", e)

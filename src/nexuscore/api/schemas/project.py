@@ -5,9 +5,31 @@ FastAPI の Project エンドポイント用の Pydantic モデル定義。
 既存の Flask 実装 (`src/nexuscore/webapp/api_external.py`) の仕様に準拠。
 """
 
+import re
 from datetime import datetime
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+_SAFE_PATH_RE = re.compile(r"\.\.|\0")
+_URL_SCHEMES = {"http", "https", "git", "ssh"}
+
+
+def _validate_path_no_traversal(value: str | None) -> str | None:
+    if value is None:
+        return value
+    if _SAFE_PATH_RE.search(value):
+        raise ValueError("Path traversal characters are not allowed")
+    return value
+
+
+def _validate_repo_url(value: str | None) -> str | None:
+    if value is None or value == "":
+        return value
+    parsed = urlparse(value)
+    if parsed.scheme and parsed.scheme not in _URL_SCHEMES:
+        raise ValueError(f"Unsupported URL scheme: {parsed.scheme}. Allowed: {', '.join(sorted(_URL_SCHEMES))}")
+    return value
 
 
 class ProjectBase(BaseModel):
@@ -25,6 +47,16 @@ class ProjectBase(BaseModel):
     repo_url: str | None = Field(None, description="リポジトリURL")
     local_path: str = Field(..., description="ローカルパス", min_length=1)
     context_bundle_path: str | None = Field(None, description="コンテキストバンドルパス")
+
+    @field_validator("local_path", "context_bundle_path")
+    @classmethod
+    def validate_no_path_traversal(cls, v: str | None) -> str | None:
+        return _validate_path_no_traversal(v)
+
+    @field_validator("repo_url")
+    @classmethod
+    def validate_repo_url_format(cls, v: str | None) -> str | None:
+        return _validate_repo_url(v)
 
 
 class ProjectCreateRequest(ProjectBase):
