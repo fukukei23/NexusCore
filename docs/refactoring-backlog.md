@@ -250,3 +250,9 @@ P2-1~P2-4 は独立実行可能（P0/P1に依存しない）
 3. 1エンドポイントずつ移行し、テストで動作確認
 4. 全エンドポイント移行後、Flask依存を削除
 5. `requirements.txt` から `flask` を削除（段階的に）
+
+---
+
+## v1バックログ完了（2026-05-10）
+
+全10項目完了。次期バックログは → [REFACTORING_BACKLOG_V2.md](refactoring/REFACTORING_BACKLOG_V2.md)
