@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import json
 import os
 
-from nexuscore.llm.helpers import DEFAULT_STUB_CONTENT, _real_call_enabled, _strip_jsonish
+from nexuscore.llm.helpers import _real_call_enabled, _strip_jsonish
 from nexuscore.llm.http_client import RequestsHTTPError
 from nexuscore.llm.runtime import HTTP_CLIENT_FACTORY, REQUEST_TIMEOUT
 
@@ -132,26 +131,13 @@ class OpenAICompatLLM(BaseLLM):
                 except Exception:
                     pass
                 self.log_error("REAL-CALL HTTP error", e, body)
-                self.last_call_mode = "stub-fallback"
-                return self._stub_response(as_json, "stub-fallback")
+                return self._stub_fallback_response(self.stub_label, as_json=as_json)
 
             except Exception as e:
                 self.log_error("REAL-CALL failed", e)
-                self.last_call_mode = "stub-fallback"
-                return self._stub_response(as_json, "stub-fallback")
+                return self._stub_fallback_response(self.stub_label, as_json=as_json)
 
-        self.last_call_mode = "stub"
-        return self._stub_response(as_json, "stub")
-
-    def _stub_response(self, as_json: bool, mode_suffix: str) -> str:
-        fake = {
-            "model": self.model_name,
-            "mode": f"{self.stub_label}-{mode_suffix}",
-            "as_json": as_json,
-            "preview": f"This is a stubbed {self.provider_name} model response.",
-            "content": DEFAULT_STUB_CONTENT,
-        }
-        return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+        return self._stub_response(self.stub_label, as_json=as_json)
 
 
 __all__ = ["OpenAICompatLLM"]

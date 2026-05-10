@@ -12,7 +12,11 @@ NexusCore のプロジェクト固有変更履歴。
 
 ### Changed
 - P0-1: `_get_user_id_from_auth()` のDRY解消 — 3ファイルの重複定義を `dependencies/auth.py` に統合
+- P0-1: `sandbox_executor.py` のハードコード値（メモリ/CPU制限）を環境変数化
+- P0-2: `npe/budget.py`, `gemini_provider.py` の broad `except Exception:` を具体的例外型に修正
 - P0-3: `deps/orchestrator.py` → `dependencies/orchestrator.py` に統合、`deps/` ディレクトリ削除
+- P0-3(v2): `self_healing_service.py`（1,006行）を3モジュールに分割（`git_operations`, `test_runner`, `patch_workflow`）
+- P0-4: `ProjectCreateRequest` にパストラバーサル防止・URL検証のPydantic validator追加
 - P1-2: `unified_gradio_ui.py`（826行）を6モジュールに分割（_state, _llm_init, code_prompt_tab, ai_revision_tab, test_runner_tab, history_diff_tab）
 - P1-3: `orchestrator_inline.py` を `orchestrator_helper.py` に統合、inline.py は後方互換re-exportのみ
 - P2-1: `orchestrator/explainability.py` にモジュール・関数docstringを追加

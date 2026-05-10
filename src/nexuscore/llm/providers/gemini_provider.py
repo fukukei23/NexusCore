@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import json
 import os
 from typing import TYPE_CHECKING, cast
 
-from nexuscore.llm.helpers import DEFAULT_STUB_CONTENT, _real_call_enabled, _strip_jsonish
+from nexuscore.llm.helpers import _real_call_enabled, _strip_jsonish
 
 from .base import BaseLLM
 
@@ -54,13 +53,7 @@ class GeminiLLM(BaseLLM):
                 )
             except Exception as e:
                 self.log_error("init failed (system)", e)
-                self.last_call_mode = "stub-fallback"
-                fake = {
-                    "model": self.model_name,
-                    "mode": "gemini-stub-fallback",
-                    "preview": "Init failed. Fallback to stub.",
-                }
-                return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+                return self._stub_fallback_response("gemini", preview="Init failed. Fallback to stub.", as_json=as_json)
 
             gen_cfg = {"temperature": float(temperature)}
             max_out = os.getenv("NEXUS_DEFAULT_MAX_OUT_TOKENS")
@@ -101,38 +94,16 @@ class GeminiLLM(BaseLLM):
                         "Gemini returned no text (finish_reason=%s). Fallback to stub.",
                         finish_reason,
                     )
-                    self.last_call_mode = "stub-fallback"
-                    fake = {
-                        "model": self.model_name,
-                        "mode": "gemini-stub-fallback",
-                        "preview": "No text returned (possibly blocked).",
-                        "content": DEFAULT_STUB_CONTENT,
-                    }
-                    return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+                    return self._stub_fallback_response("gemini", preview="No text returned (possibly blocked).", as_json=as_json)
 
                 self.last_call_mode = "real"
                 return _strip_jsonish(text) if as_json else text
 
             except Exception as e:
                 self.log_error("REAL-CALL failed", e)
-                self.last_call_mode = "stub-fallback"
-                fake = {
-                    "model": self.model_name,
-                    "mode": "gemini-stub-fallback",
-                    "preview": "Real call failed. Fallback to stub.",
-                    "content": DEFAULT_STUB_CONTENT,
-                }
-                return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+                return self._stub_fallback_response("gemini", as_json=as_json)
 
-        self.last_call_mode = "stub"
-        fake = {
-            "model": self.model_name,
-            "mode": "gemini-stub",
-            "as_json": as_json,
-            "preview": "This is a stubbed Gemini model response.",
-            "content": DEFAULT_STUB_CONTENT,
-        }
-        return json.dumps(fake, ensure_ascii=False) if as_json else fake["preview"]
+        return self._stub_response("gemini", as_json=as_json)
 
 
 __all__ = ["GeminiLLM"]
