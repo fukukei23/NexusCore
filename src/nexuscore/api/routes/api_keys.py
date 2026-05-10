@@ -10,7 +10,7 @@ import logging
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.exc import SQLAlchemyError
 
-from ..dependencies.auth import AuthenticatedUser, get_current_user
+from ..dependencies.auth import AuthenticatedUser, get_current_user, get_user_id_from_auth
 from ..schemas.api_keys import (
     ApiKeyIssueRequest,
     ApiKeyIssueResponse,
@@ -30,27 +30,6 @@ logger = logging.getLogger(__name__)
 
 # API Key 発行数の上限（1ユーザーあたり）
 MAX_API_KEYS_PER_USER = 5
-
-
-def _get_user_id_from_auth(current_user: AuthenticatedUser) -> int:
-    """
-    認証済みユーザーからユーザーIDを取得するアダプター
-
-    Args:
-        current_user: 認証済みユーザー情報
-
-    Returns:
-        int: ユーザーID
-
-    Raises:
-        HTTPException: ユーザーIDが無効な場合（500）
-    """
-    try:
-        user_id = int(current_user.user_id)
-        return user_id
-    except (ValueError, TypeError):
-        logger.error(f"Invalid user_id in AuthenticatedUser: {current_user.user_id}")
-        raise make_internal_error("Invalid user ID in authentication token") from None
 
 
 @router.post(
@@ -103,7 +82,7 @@ async def issue_api_key(
         from nexuscore.webapp import db
         from nexuscore.webapp.models import ApiKey
 
-        user_id = _get_user_id_from_auth(current_user)
+        user_id = get_user_id_from_auth(current_user)
 
         # Flask アプリコンテキストが必要な場合の処理
         # FastAPI から Flask の DB セッションを使用するため
@@ -198,7 +177,7 @@ async def list_api_keys(
     try:
         from nexuscore.webapp.models import ApiKey
 
-        user_id = _get_user_id_from_auth(current_user)
+        user_id = get_user_id_from_auth(current_user)
 
         # ユーザーの API Key 一覧を取得
         api_keys = ApiKey.query.filter_by(user_id=user_id).order_by(ApiKey.created_at.desc()).all()
@@ -264,7 +243,7 @@ async def revoke_api_key(
         from nexuscore.webapp import db
         from nexuscore.webapp.models import ApiKey
 
-        user_id = _get_user_id_from_auth(current_user)
+        user_id = get_user_id_from_auth(current_user)
 
         # API Key を取得
         api_key = ApiKey.query.filter_by(id=api_key_id).first()

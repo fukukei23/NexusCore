@@ -16,7 +16,7 @@ from nexuscore.api.routes.run_view import (
 # 関数内importのモックパス
 LOAD_STATE_PATH = "nexuscore.orchestrator.run_state_store.load_state"
 AUTHORITY_RUNNER_PATH = "nexuscore.orchestrator.authority_runner"
-GET_ORCH_PATH = "nexuscore.api.deps.orchestrator.get_orchestrator"
+GET_ORCH_PATH = "nexuscore.api.dependencies.orchestrator.get_orchestrator"
 
 
 @pytest.fixture

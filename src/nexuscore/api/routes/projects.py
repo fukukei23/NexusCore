@@ -11,7 +11,7 @@ import os
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import desc
 
-from ..dependencies.auth import AuthenticatedUser, get_current_user
+from ..dependencies.auth import AuthenticatedUser, get_current_user, get_user_id_from_auth
 from ..schemas.error import ErrorResponse
 from ..schemas.project import (
     ProjectCreateRequest,
@@ -34,30 +34,6 @@ from ..utils.errors import (
 router = APIRouter(tags=["projects"])
 
 logger = logging.getLogger(__name__)
-
-
-def _get_user_id_from_auth(current_user: AuthenticatedUser) -> int:
-    """
-    認証済みユーザーからユーザーIDを取得するアダプター
-
-    既存のFlask実装では `g.current_api_user.id` を使用しているが、
-    FastAPI版では `AuthenticatedUser` から取得する必要がある。
-
-    Args:
-        current_user: 認証済みユーザー情報（user_id にユーザーIDが含まれる）
-
-    Returns:
-        int: ユーザーID
-
-    Raises:
-        HTTPException: ユーザーIDが無効な場合（500）
-    """
-    try:
-        user_id = int(current_user.user_id)
-        return user_id
-    except (ValueError, TypeError):
-        logger.error(f"Invalid user_id in AuthenticatedUser: {current_user.user_id}")
-        raise make_internal_error("Invalid user ID in authentication token") from None
 
 
 @router.get(
@@ -106,7 +82,7 @@ async def list_projects(
     try:
         from nexuscore.webapp.models import Project
 
-        user_id = _get_user_id_from_auth(current_user)
+        user_id = get_user_id_from_auth(current_user)
 
         projects = (
             Project.query.filter_by(owner_id=user_id).order_by(desc(Project.created_at)).all()
@@ -190,7 +166,7 @@ async def create_project(
         from nexuscore.webapp import db
         from nexuscore.webapp.models import Project
 
-        user_id = _get_user_id_from_auth(current_user)
+        user_id = get_user_id_from_auth(current_user)
 
         # プロジェクトを作成
         project = Project(
@@ -269,7 +245,7 @@ async def get_project(
     try:
         from nexuscore.webapp.models import Project
 
-        user_id = _get_user_id_from_auth(current_user)
+        user_id = get_user_id_from_auth(current_user)
 
         # プロジェクトの所有権を確認
         project = Project.query.filter_by(id=project_id, owner_id=user_id).first()
@@ -361,7 +337,7 @@ async def trigger_project_run(
         from nexuscore.webapp.models import Project, Run
         from nexuscore.webapp.orchestrator_inline import run_orchestrator_inline
 
-        user_id = _get_user_id_from_auth(current_user)
+        user_id = get_user_id_from_auth(current_user)
 
         # プロジェクトの所有権を確認
         project = Project.query.filter_by(id=project_id, owner_id=user_id).first()
@@ -488,7 +464,7 @@ async def get_latest_run(
     try:
         from nexuscore.webapp.models import Project, Run
 
-        user_id = _get_user_id_from_auth(current_user)
+        user_id = get_user_id_from_auth(current_user)
 
         # プロジェクトの所有権を確認
         project = Project.query.filter_by(id=project_id, owner_id=user_id).first()

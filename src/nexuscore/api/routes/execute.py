@@ -58,17 +58,9 @@ from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.agents.postmortem_agent import PostmortemAgent
 from nexuscore.llm.llm_router import LLMRouter
 
-# --- グローバル変数（既存の Flask 実装と共有） ---
-# 既存の Flask 実装 (`server.py`) の `tasks` 辞書を共有するため、
-# モジュールから直接インポートする
-try:
-    from nexuscore.api import server
-
-    tasks = server.tasks  # 既存のFlask実装と共有
-except ImportError:
-    # フォールバック: モジュールが見つからない場合は新規作成
-    tasks = {}
-    logging.warning("Could not import server.tasks, using local tasks dict")
+# --- グローバル変数 ---
+# server.py (deprecated Flask) から移行済み。tasks はこのモジュールで管理。
+tasks = {}
 
 llm_router = LLMRouter()
 

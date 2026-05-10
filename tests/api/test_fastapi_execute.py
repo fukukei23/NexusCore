@@ -129,10 +129,10 @@ def test_status_endpoint_returns_task_state(client: TestClient, mock_auth_token)
     既存の Flask テスト (`test_get_task_status_found`) に準拠
     """
     # テスト用のタスクを追加
-    from nexuscore.api import server
+    from nexuscore.api.routes.execute import tasks
 
     test_task_id = "test-task-123"
-    server.tasks[test_task_id] = {"status": "running", "message": "Test message"}
+    tasks[test_task_id] = {"status": "running", "message": "Test message"}
 
     try:
         response = client.get(
@@ -144,8 +144,8 @@ def test_status_endpoint_returns_task_state(client: TestClient, mock_auth_token)
         assert data["message"] == "Test message"
     finally:
         # クリーンアップ
-        if test_task_id in server.tasks:
-            del server.tasks[test_task_id]
+        if test_task_id in tasks:
+            del tasks[test_task_id]
 
 
 def test_status_endpoint_returns_404_for_nonexistent_task(client: TestClient, mock_auth_token):
@@ -231,10 +231,10 @@ def test_status_response_structure(client: TestClient, mock_auth_token):
     ステータスレスポンスの構造テスト
     既存の Flask テスト (`test_get_task_status_response_structure`) に準拠
     """
-    from nexuscore.api import server
+    from nexuscore.api.routes.execute import tasks
 
     test_task_id = "test-structure-123"
-    server.tasks[test_task_id] = {
+    tasks[test_task_id] = {
         "status": "running",
         "message": "Test message",
         "extra_field": "extra_value",
@@ -255,8 +255,8 @@ def test_status_response_structure(client: TestClient, mock_auth_token):
         # 追加フィールドも許容される（ExecuteStatusResponse の extra="allow" により）
         assert "extra_field" in data
     finally:
-        if test_task_id in server.tasks:
-            del server.tasks[test_task_id]
+        if test_task_id in tasks:
+            del tasks[test_task_id]
 
 
 def test_execute_task_id_uniqueness(client: TestClient, auth_headers: dict):

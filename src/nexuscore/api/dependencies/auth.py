@@ -263,3 +263,11 @@ def get_current_user_optional(
         raise make_unauthorized_error("Invalid or missing API key")
 
     return AuthenticatedUser(user_id="api_user", roles=["api_user"])
+
+
+def get_user_id_from_auth(current_user: AuthenticatedUser) -> int:
+    """認証済みユーザーからユーザーIDを取得するアダプター
+
+    FastAPI版では AuthenticatedUser.user_id (str) を int に変換する。
+    """
+    return int(current_user.user_id)

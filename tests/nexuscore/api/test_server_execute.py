@@ -1,12 +1,13 @@
 """
-CR-002: /api/v1/execute エンドポイントの認証テスト
+CR-002: /api/v1/execute エンドポイントの認証テスト（Flask版）
 
-認証なし API の保護をテストする。
+NOTE: server.py (Flask) has been archived. FastAPI equivalents exist in test_fastapi_execute.py.
+This test is skipped.
 """
 
 import pytest
 
-from nexuscore.api.server import app
+pytest.skip("Flask server.py archived; use FastAPI tests", allow_module_level=True)
 
 
 @pytest.fixture

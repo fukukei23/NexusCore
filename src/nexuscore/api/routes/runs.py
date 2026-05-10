@@ -12,7 +12,7 @@ import logging
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import desc
 
-from ..dependencies.auth import AuthenticatedUser, get_current_user
+from ..dependencies.auth import AuthenticatedUser, get_current_user, get_user_id_from_auth
 from ..schemas.error import ErrorResponse
 from ..schemas.run import RunListResponse, RunResponse, RunSummary
 from ..utils.errors import (
@@ -23,30 +23,6 @@ from ..utils.errors import (
 router = APIRouter(tags=["run-records"], prefix="/run-records")
 
 logger = logging.getLogger(__name__)
-
-
-def _get_user_id_from_auth(current_user: AuthenticatedUser) -> int:
-    """
-    認証済みユーザーからユーザーIDを取得するアダプター
-
-    既存のFlask実装では `g.current_api_user.id` を使用しているが、
-    FastAPI版では `AuthenticatedUser` から取得する必要がある。
-
-    Args:
-        current_user: 認証済みユーザー情報（user_id にユーザーIDが含まれる）
-
-    Returns:
-        int: ユーザーID
-
-    Raises:
-        HTTPException: ユーザーIDが無効な場合（500）
-    """
-    try:
-        user_id = int(current_user.user_id)
-        return user_id
-    except (ValueError, TypeError):
-        logger.error(f"Invalid user_id in AuthenticatedUser: {current_user.user_id}")
-        raise make_internal_error("Invalid user ID in authentication token") from None
 
 
 @router.get(
@@ -101,7 +77,7 @@ async def list_runs(
     try:
         from nexuscore.webapp.models import Project, Run
 
-        user_id = _get_user_id_from_auth(current_user)
+        user_id = get_user_id_from_auth(current_user)
 
         # ユーザーが所有するプロジェクトのRunのみ取得
         query = Run.query.join(Project).filter(Project.owner_id == user_id)
@@ -184,7 +160,7 @@ async def get_run(
     try:
         from nexuscore.webapp.models import Project, Run
 
-        user_id = _get_user_id_from_auth(current_user)
+        user_id = get_user_id_from_auth(current_user)
 
         # Runを取得し、所有権を確認
         run = (

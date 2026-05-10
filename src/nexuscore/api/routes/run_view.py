@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 from starlette.requests import Request
 
 from ..dependencies.auth import AuthenticatedUser, get_current_user
-from ..deps.orchestrator import get_orchestrator
+from ..dependencies.orchestrator import get_orchestrator
 from ..schemas.error import ErrorResponse
 from ..schemas.run_view import RunCreateRequest, RunViewResponse
 from ..utils.errors import make_not_found_error

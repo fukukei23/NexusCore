@@ -139,11 +139,11 @@ def test_status_api_requires_authentication(client: TestClient, mock_api_key):
     """
     status API で認証が通るテスト
     """
-    # テスト用のタスクを追加
-    from nexuscore.api import server
+    # テスト用のタスクを追加（execute.py の tasks を使用）
+    from nexuscore.api.routes.execute import tasks
 
     test_task_id = "test-task-123"
-    server.tasks[test_task_id] = {"status": "running", "message": "Test message"}
+    tasks[test_task_id] = {"status": "running", "message": "Test message"}
 
     try:
         # 正しい API Key でリクエスト
@@ -170,8 +170,8 @@ def test_status_api_requires_authentication(client: TestClient, mock_api_key):
             assert response.status_code == 401
     finally:
         # クリーンアップ
-        if test_task_id in server.tasks:
-            del server.tasks[test_task_id]
+        if test_task_id in tasks:
+            del tasks[test_task_id]
 
 
 def test_health_api_no_authentication_required(client: TestClient, mock_api_key):
