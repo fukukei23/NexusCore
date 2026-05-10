@@ -7,6 +7,9 @@ NexusCore のプロジェクト固有変更履歴。
 
 ## [8.2.0] - 2026-05-10
 
+### Added
+- P1-1: GitHub OAuth認証ルーター（`api/routes/auth.py`）をFastAPIで新規実装 — Starlette OAuthクライアント、SessionMiddleware対応
+
 ### Changed
 - P0-1: `_get_user_id_from_auth()` のDRY解消 — 3ファイルの重複定義を `dependencies/auth.py` に統合
 - P0-3: `deps/orchestrator.py` → `dependencies/orchestrator.py` に統合、`deps/` ディレクトリ削除
@@ -19,3 +22,4 @@ NexusCore のプロジェクト固有変更履歴。
 ### Removed
 - P0-2: `api/server.py`（非推奨Flask 303行）を `archive/` に移動。`execute.py` の `tasks` 参照をローカル変数に変更
 - P2-2: `utils/math_ops.py`（`add()` のみ、未使用）および関連テストを削除
+- P1-1: `views_api_test.py`（シミュレーションのみ）を `archive/` に移動

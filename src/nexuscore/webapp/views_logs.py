@@ -11,7 +11,7 @@ WebApp HTML UI view.
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, render_template, request
 from sqlalchemy import desc
 
 from nexuscore.webapp.auth import get_current_user, require_auth
@@ -62,6 +62,7 @@ def project_logs(project_id: int):
                 "level": log.level,
                 "message": log.message,
                 "payload_json": log.payload_json,
+                "payload_preview": str(log.payload_json)[:100] if log.payload_json else "",
                 "created_at": log.created_at.isoformat(),
             }
         )
@@ -79,42 +80,13 @@ def project_logs(project_id: int):
             }
         )
 
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head><title>NexusCore - Logs: {project.name}</title></head>
-    <body>
-        <h1>Logs: {project.name}</h1>
-        <p>Filters: source={source_filter or 'all'}, level={level_filter or 'all'}</p>
-        <hr>
-        <table border="1">
-            <tr>
-                <th>Time</th>
-                <th>Source</th>
-                <th>Level</th>
-                <th>Message</th>
-                <th>Details</th>
-            </tr>
-    """
-    for log in logs_data:
-        payload_preview = str(log["payload_json"])[:100] if log["payload_json"] else ""
-        html += f"""
-            <tr>
-                <td>{log['created_at']}</td>
-                <td>{log['source']}</td>
-                <td>{log['level']}</td>
-                <td>{log['message'][:100]}</td>
-                <td><details><summary>JSON</summary><pre>{payload_preview}</pre></details></td>
-            </tr>
-        """
-    html += """
-        </table>
-        <hr>
-        <a href="/projects/">Back to Projects</a>
-    </body>
-    </html>
-    """
-    return html
+    return render_template(
+        "logs/project_logs.html",
+        project=project,
+        logs_data=logs_data,
+        source_filter=source_filter,
+        level_filter=level_filter,
+    )
 
 
 @bp.route("/runs/<string:run_id>")
@@ -232,6 +204,7 @@ def run_logs(run_id: str):
                 "level": log.level,
                 "message": log.message,
                 "payload_json": log.payload_json,
+                "payload_preview": str(log.payload_json)[:100] if log.payload_json else "",
                 "created_at": log.created_at.isoformat(),
             }
         )
@@ -263,180 +236,21 @@ def run_logs(run_id: str):
             }
         )
 
-    # 4.5: Self-Healing メトリクスを含むHTMLレスポンス
-    status_badge = _render_run_status_badge(run.status)
-
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>NexusCore - Run: {run_id[:8]}...</title>
-        <style>
-            body {{
-                font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                margin: 0;
-                padding: 16px;
-                background-color: #f3f4f6;
-            }}
-            .header {{
-                margin-bottom: 24px;
-            }}
-            .metrics-grid {{
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                gap: 16px;
-                margin-bottom: 24px;
-            }}
-            .card {{
-                background-color: #ffffff;
-                border-radius: 12px;
-                padding: 16px;
-                box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
-            }}
-            .card h2 {{
-                font-size: 1rem;
-                margin-top: 0;
-                margin-bottom: 8px;
-            }}
-            .metric-row {{
-                display: flex;
-                justify-content: space-between;
-                margin-top: 8px;
-                font-size: 0.85rem;
-            }}
-            .metric-label {{
-                color: #6b7280;
-            }}
-            .metric-value {{
-                font-weight: 600;
-            }}
-            .status-badge {{
-                display: inline-flex;
-                align-items: center;
-                padding: 2px 6px;
-                border-radius: 999px;
-                font-size: 0.75rem;
-                font-weight: 600;
-                color: #fff;
-            }}
-            .status-success {{ background-color: #27ae60; }}
-            .status-failed {{ background-color: #c0392b; }}
-            .status-running {{ background-color: #2980b9; }}
-            .status-pending {{ background-color: #7f8c8d; }}
-            table {{
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 16px;
-            }}
-            table th, table td {{
-                padding: 8px;
-                border-bottom: 1px solid #e5e7eb;
-                text-align: left;
-            }}
-            table th {{
-                background-color: #f9fafb;
-            }}
-            .btn-link {{
-                display: inline-block;
-                margin-top: 12px;
-                padding: 6px 12px;
-                border-radius: 6px;
-                background-color: #2563eb;
-                color: #ffffff;
-                text-decoration: none;
-                font-size: 0.85rem;
-            }}
-            .btn-link:hover {{
-                background-color: #1d4ed8;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <h1>Run: {run_id[:8]}...</h1>
-            <p>Status: {status_badge}</p>
-            <p>Started: {run.started_at.isoformat() if run.started_at else 'N/A'}</p>
-            <p>Finished: {run.finished_at.isoformat() if run.finished_at else 'N/A'}</p>
-        </div>
-
-        <!-- 4.5: Self-Healing Metrics -->
-        <div class="metrics-grid">
-            <div class="card">
-                <h2>Self-Healing Metrics</h2>
-                <div class="metric-row">
-                    <span class="metric-label">Model:</span>
-                    <span class="metric-value">{model_name or 'N/A'}</span>
-                </div>
-                <div class="metric-row">
-                    <span class="metric-label">Exec Time:</span>
-                    <span class="metric-value">{duration_str}</span>
-                </div>
-                <div class="metric-row">
-                    <span class="metric-label">Retry Count:</span>
-                    <span class="metric-value">{retry_count}</span>
-                </div>
-                <div class="metric-row">
-                    <span class="metric-label">Files Changed:</span>
-                    <span class="metric-value">{files_changed}</span>
-                </div>
-                <div class="metric-row">
-                    <span class="metric-label">Cost:</span>
-                    <span class="metric-value">${cost_usd:.4f} USD</span>
-                </div>
-                {f'<div class="metric-row"><span class="metric-label">Last Error:</span><span class="metric-value">{last_error_class}</span></div>' if last_error_class else ''}
-            </div>
-
-            {f'''<div class="card">
-                <h2>Guardian Review</h2>
-                <p><strong>Decision:</strong> {guardian_review.get('decision', 'N/A')}</p>
-                <p><strong>Reason:</strong> {guardian_review.get('reason', 'N/A')[:200]}</p>
-            </div>''' if guardian_review else ''}
-
-            {f'''<div class="card">
-                <h2>AI Diff Summary</h2>
-                <pre style="white-space: pre-wrap; font-size: 0.85rem;">{diff_summary[:500]}</pre>
-            </div>''' if diff_summary else ''}
-        </div>
-
-        <!-- Observability Links -->
-        <div class="card">
-            <h2>Observability</h2>
-            <p>
-                <a href="/logs/runs/{run_id}" class="btn-link">ExecutionLog 画面</a>
-                <a href="/projects/{project.id}" class="btn-link">Project Detail</a>
-            </p>
-            <p>
-                <a href="/dashboard/projects/{project.id}" class="btn-link">Project Dashboard</a>
-            </p>
-        </div>
-
-        <hr>
-        <h2>Execution Logs</h2>
-        <table>
-            <tr>
-                <th>Time</th>
-                <th>Source</th>
-                <th>Level</th>
-                <th>Message</th>
-                <th>Details</th>
-            </tr>
-    """
-    for log in logs_data:
-        payload_preview = str(log["payload_json"])[:100] if log["payload_json"] else ""
-        html += f"""
-            <tr>
-                <td>{log['created_at']}</td>
-                <td>{log['source']}</td>
-                <td>{log['level']}</td>
-                <td>{log['message'][:100]}</td>
-                <td><details><summary>JSON</summary><pre>{payload_preview}</pre></details></td>
-            </tr>
-        """
-    html += """
-        </table>
-        <hr>
-        <a href="/projects/">Back to Projects</a>
-    </body>
-    </html>
-    """
-    return html
+    return render_template(
+        "logs/run_logs.html",
+        run_id=run_id,
+        run=run,
+        project_id=project.id,
+        status_badge_html=_render_run_status_badge(run.status),
+        started_str=run.started_at.isoformat() if run.started_at else "N/A",
+        finished_str=run.finished_at.isoformat() if run.finished_at else "N/A",
+        model_name=model_name,
+        duration_str=duration_str,
+        retry_count=retry_count,
+        files_changed=files_changed,
+        cost_usd=cost_usd,
+        last_error_class=last_error_class,
+        guardian_review=guardian_review,
+        diff_summary=diff_summary,
+        logs_data=logs_data,
+    )

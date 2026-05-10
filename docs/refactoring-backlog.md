@@ -5,7 +5,7 @@
 > 基準: P0 = 影響大/工数小、P1 = 影響大/工数中、P2 = 影響中/工数中
 > コア層品質: avg 4.08/5（104ファイル、~734KB） -- 高品質
 > API/CLI層品質: avg 3.7/5（39ファイル、~330KB） -- 改善余地あり
-> **P0/P2/P1-2/P1-3 完了** — 残り: P1-1（Flask→FastAPI移行 2-3日）
+> **P0/P2/P1-1/P1-2/P1-3 完了** — バックログ全項目完了
 
 ---
 
@@ -60,6 +60,8 @@
 
 ### P1-1. Flask -> FastAPI移行の完了
 
+- **完了**: 2026-05-10
+- **結果**: OAuth認証3エンドポイントをFastAPI版 `api/routes/auth.py` に移行。UIビュー（dashboard/logs/projects）は「FastAPI migration 対象外」とコード内に明記済みのためFlaskのまま保持。`views_api_test.py` はシミュレーションのみのため archive/ に移動。
 - **問題**: `src/nexuscore/webapp/` 配下にFlask由来のviews群が残存し、FastAPI（`src/nexuscore/api/`）と混在状態
 - **影響**: フレームワーク二重化によるメンテナンスコスト増大
 - **対象ファイル**:

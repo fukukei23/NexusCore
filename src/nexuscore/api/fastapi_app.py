@@ -11,13 +11,18 @@ NexusCore API の FastAPI ベース実装。
 - 認証依存関係は src/nexuscore/api/dependencies/ 配下に配置
 """
 
+import os
+
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from starlette.middleware.sessions import SessionMiddleware
+
 from .routes import (
     api_keys,
+    auth,
     badges,
     execute,
     github_webhook,
@@ -48,6 +53,9 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
         openapi_url="/api/openapi.json",
     )
 
+    # セッションミドルウェア（OAuth認証用）
+    app.add_middleware(SessionMiddleware, secret_key=os.getenv("SESSION_SECRET", "nexuscore-dev-secret"))
+
     # Flask アプリケーションを作成（DB アクセスに必要）
     from nexuscore.webapp import create_app as create_flask_app
 
@@ -69,6 +77,12 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
         with flask_app.app_context():
             response = await call_next(request)
             return response
+
+    # OAuth認証初期化（FastAPI版）
+    auth.init_oauth(app)
+
+    # Auth router をマウント（GitHub OAuth、/api/v1/auth）
+    app.include_router(auth.router, prefix="/api/v1")
 
     # Health check router をマウント
     app.include_router(health.router, prefix="/api/v1")
