@@ -320,11 +320,31 @@ src/nexuscore/
 │   ├── diff_tools.py          # Diff generation
 │   └── test_generator.py     # Test generation utilities
 │
-└── webapp/                    # Web interface
-    ├── orchestrator.py        # Main orchestration logic
-    ├── api_*.py               # API endpoints
-    └── views_*.py             # Web views
+└── webapp/                    # SaaS管理UI（Flask HTML画面）
+    ├── auth.py                # GitHub OAuth認証（Flask Blueprint、旧版）
+    ├── views_dashboard.py     # ダッシュボード画面
+    ├── views_projects.py      # プロジェクト管理画面
+    ├── views_logs.py          # ログ閲覧画面
+    └── models.py              # SQLAlchemyモデル
 ```
+
+### Web層アーキテクチャ（Flask / FastAPI 責務分離）
+
+NexusCoreは2つのWebフレームワークを用途に応じて使い分けます:
+
+| 層 | フレームワーク | パス | 役割 | 移行対象 |
+|---|---|---|---|---|
+| 公開API | FastAPI | `/api/v1/*` | 外部統合向けJSON API | — |
+| OAuth認証 | FastAPI | `/api/v1/auth/*` | GitHub OAuth認証 | 完了 |
+| 統合UI | Gradio | `:7860` | コード生成→テスト→履歴フロー | — |
+| 管理UI | Flask | `/projects/*`, `/dashboard/*`, `/logs/*` | ブラウザ向けHTML画面 | **対象外** |
+
+**Flask管理UIがFastAPI移行対象外の理由:**
+
+1. **レスポンスが全てインラインHTML** — JSON APIはFastAPI（`api/routes/`）が既に提供済み
+2. **データアクセスがDB直叩き** — SQLAlchemyで直接クエリ。API層を経由しない
+3. **責務分離の設計意図** — Flask = 人間向けブラウザUI、FastAPI = 機械向けJSON API
+4. **コード内に明記済み** — 各viewsファイルに「FastAPI API migrationの対象外」とコメントあり
 
 ## Key Design Patterns
 
@@ -376,8 +396,9 @@ src/nexuscore/
 - GitPython
 
 **Web Framework:**
-- Flask (webapp)
-- Gradio (policy interface)
+- FastAPI (public API: `/api/v1/*`, OAuth: `/api/v1/auth/*`)
+- Flask (SaaS管理UI: `/projects/*`, `/dashboard/*`, `/logs/*`)
+- Gradio (統合UI)
 
 **Other:**
 - patch-ng (unified diff parsing)

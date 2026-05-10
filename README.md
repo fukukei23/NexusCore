@@ -114,9 +114,24 @@ User / Developer
 |---------|-------------|------|
 | 公開API | **FastAPI** (`/api/v1/*`) | 外部統合向けREST API。OpenAPI仕様・SDK自動生成対応 |
 | Web UI | **Gradio** | 統合UI（コード生成→修正→テスト→履歴） |
+| SaaS管理UI | **Flask** (`/projects/*`, `/dashboard/*`, `/logs/*`) | ブラウザ向けHTML管理画面（DB直接アクセス） |
+| OAuth認証 | **FastAPI** (`/api/v1/auth/*`) | GitHub OAuth認証（Starlette Authlib） |
 
 - SDK自動生成: OpenAPI仕様書から Python / TypeScript 向けSDKを生成（`make sdk`）
-- 認証: API Key認証（`POST /api/v1/api-keys` で発行）
+- 認証: API Key認証（`POST /api/v1/api-keys` で発行）+ GitHub OAuth（ブラウザUI向け）
+
+<details>
+<summary>Flask UI と FastAPI API の責務分離について</summary>
+
+**Flask管理UI（`webapp/`）はFastAPIへの移行対象外です。** 理由:
+
+1. **レスポンスが全てインラインHTML** — APIとしてのJSON提供はFastAPI（`api/routes/`）が担当。Flask UIは人間向けブラウザ画面のみ
+2. **データアクセスがDB直叩き** — FastAPI routesを経由せず、SQLAlchemyで直接クエリ。API層とUI層の責務分離
+3. **Gradio UI（`ui/`）が別ルートで存在** — コード生成→テスト→履歴の統合フローはGradio、プロジェクト管理やログ閲覧はFlask HTML UI
+
+今後のリファクタリング計画で「Flask→FastAPI移行」という項目が上がった場合、移行すべきは**API的機能（OAuth認証等）のみ**。HTML画面は移行不要です。
+
+</details>
 
 ---
 
@@ -242,7 +257,7 @@ python -m pytest tests/ --cov=src/nexuscore --cov-report=html
 |---------|------|
 | 言語 | Python 3.12+ |
 | AI/LLM | OpenAI GPT-5.5, Anthropic Claude Sonnet 4.6, Google Gemini 3.1 Pro, GLM-5.1, MiniMax M2.7, DeepSeek, Moonshot |
-| API | FastAPI |
+| API | FastAPI（公開API）+ Flask（管理UI）|
 | テスト | pytest, pytest-cov, カスタムミューテーションテスト |
 | 品質 | pylint, mypy, bandit |
 | Web UI | Gradio |
