@@ -65,6 +65,12 @@ python src/nexuscore/ui/unified_gradio_ui.py   # 統合UI (localhost:7860)
 feat: / fix: / docs: / test: / refactor: / perf: / chore:
 ```
 
+## 変更記録ルール
+
+- 機能追加・バグ修正・リファクタリングなどの変更をコミットした際、`docs/CHANGELOG.md` に追記すること
+- フォーマットは Keep a Changelog 準拠（Added / Changed / Fixed / Removed / Deprecated）
+- セッション終了時またはタスク完了時に更新
+
 ## 詳細ドキュメント
 
 | 内容 | 場所 |

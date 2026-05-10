@@ -22,7 +22,7 @@ from ..dependencies.orchestrator import get_orchestrator
 from ..schemas.error import ErrorResponse
 from ..schemas.run_view import RunCreateRequest, RunViewResponse
 from ..utils.errors import make_not_found_error
-from ..utils.run_view import build_run_view_response
+from ..utils.run_view_adapter import build_run_view_response
 
 # Canonical router (primary endpoints)
 canonical_router = APIRouter(tags=["runs"])

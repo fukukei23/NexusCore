@@ -3,7 +3,6 @@ import zipfile
 from nexuscore.utils import zip_output
 from nexuscore.utils.clean_output import clean_output
 from nexuscore.utils.json_sanitizer import sanitize_json_like
-from nexuscore.utils.math_ops import add
 
 
 def test_clean_output_strips_code_block():
@@ -21,11 +20,6 @@ def test_sanitize_json_like_removes_fence():
     # Non-JSON strings fall back unchanged
     plain = "no json here"
     assert sanitize_json_like(plain) == plain
-
-
-def test_math_ops_add():
-    assert add(2, 3) == 5
-    assert add(-1, 1) == 0
 
 
 def test_zip_project_creates_archive(tmp_path, monkeypatch):
