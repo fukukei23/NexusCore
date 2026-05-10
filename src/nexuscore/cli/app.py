@@ -59,17 +59,52 @@ def run(requirement: str, project_path: str, language: str, verbose: bool) -> No
     if src_path not in sys.path:
         sys.path.insert(0, src_path)
 
-    from nexuscore.core.agent_factory import assemble_agent_team
-    from nexuscore.core.orchestrator import Orchestrator
+    try:
+        from nexuscore.core.agent_factory import assemble_agent_team
+        from nexuscore.core.orchestrator import Orchestrator
+    except ImportError as e:
+        click.echo(f"Error: Failed to load NexusCore modules. Run 'pip install -e .' first.", err=True)
+        if verbose:
+            click.echo(f"  Details: {e}", err=True)
+        raise SystemExit(1)
+
+    if not os.path.isdir(project_path):
+        click.echo(f"Error: Project path '{project_path}' does not exist.", err=True)
+        click.echo("  Hint: Provide a valid directory with --project-path", err=True)
+        raise SystemExit(1)
 
     click.echo(f"Starting NexusCore with requirement: {requirement}")
     click.echo(f"Project path: {project_path}")
 
-    agents = assemble_agent_team(project_path)
-    orchestrator = Orchestrator(**agents)
+    try:
+        agents = assemble_agent_team(project_path)
+        orchestrator = Orchestrator(**agents)
 
-    result = orchestrator.run_full_project(requirement, language)
-    click.echo(f"Result: {result.get('status', 'unknown')}")
+        result = orchestrator.run_full_project(requirement, language)
+        click.echo(f"Result: {result.get('status', 'unknown')}")
+    except FileNotFoundError as e:
+        click.echo(f"Error: Required file not found: {e}", err=True)
+        click.echo("  Hint: Check that the project directory contains the expected files.", err=True)
+        raise SystemExit(1)
+    except KeyError as e:
+        click.echo(f"Error: Configuration error — missing key: {e}", err=True)
+        click.echo("  Hint: Check your .env file and ensure all required API keys are set.", err=True)
+        raise SystemExit(1)
+    except ConnectionError as e:
+        click.echo(f"Error: Connection failed — {e}", err=True)
+        click.echo("  Hint: Check your network connection and API endpoint configuration.", err=True)
+        raise SystemExit(1)
+    except KeyboardInterrupt:
+        click.echo("\nOperation cancelled by user.", err=True)
+        raise SystemExit(130)
+    except Exception as e:
+        click.echo(f"Error: {type(e).__name__}: {e}", err=True)
+        if verbose:
+            import traceback
+            click.echo(traceback.format_exc(), err=True)
+        else:
+            click.echo("  Run with --verbose for full details.", err=True)
+        raise SystemExit(1)
 
 
 @main.command("agents")

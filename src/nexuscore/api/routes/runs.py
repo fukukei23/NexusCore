@@ -107,7 +107,7 @@ async def list_runs(
         raise make_internal_error("Database models not available") from None
     except Exception as e:
         logger.error(f"Failed to list runs: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to list runs: {str(e)}") from e
+        raise make_internal_error("Failed to list runs. Please try again later.") from e
 
 
 @router.get(
@@ -191,4 +191,4 @@ async def get_run(
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise
         logger.error(f"Failed to get run: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to get run: {str(e)}") from e
+        raise make_internal_error("Failed to get run details. Please try again later.") from e

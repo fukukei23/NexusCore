@@ -107,7 +107,7 @@ async def list_projects(
         raise make_internal_error("Database models not available") from None
     except Exception as e:
         logger.error(f"Failed to list projects: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to list projects: {str(e)}") from e
+        raise make_internal_error("Failed to list projects. Please try again later.") from e
 
 
 @router.post(
@@ -196,7 +196,7 @@ async def create_project(
     except Exception as e:
         logger.error(f"Failed to create project: {e}", exc_info=True)
         db.session.rollback()
-        raise make_internal_error(f"Failed to create project: {str(e)}") from e
+        raise make_internal_error("Failed to create project. Please try again later.") from e
 
 
 @router.get(
@@ -268,7 +268,7 @@ async def get_project(
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise
         logger.error(f"Failed to get project: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to get project: {str(e)}") from e
+        raise make_internal_error("Failed to get project details. Please try again later.") from e
 
 
 @router.post(
@@ -407,7 +407,7 @@ async def trigger_project_run(
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise
         logger.error(f"Failed to trigger project run: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to trigger project run: {str(e)}") from e
+        raise make_internal_error("Failed to trigger project run. Please try again later.") from e
 
 
 @router.get(
@@ -493,4 +493,4 @@ async def get_latest_run(
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise
         logger.error(f"Failed to get latest run: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to get latest run: {str(e)}") from e
+        raise make_internal_error("Failed to get latest run. Please try again later.") from e

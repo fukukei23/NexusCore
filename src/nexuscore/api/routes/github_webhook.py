@@ -161,7 +161,7 @@ async def github_webhook_endpoint(
         logger.error(f"Failed to parse payload: {e}", exc_info=True)
         return GitHubWebhookResponse(
             accepted=False,
-            reason=f"Failed to parse payload: {str(e)}",
+            reason="Failed to parse payload. Please check the request format.",
         )
 
     # Self-Healing を実行
@@ -196,7 +196,7 @@ async def github_webhook_endpoint(
         logger.error(f"GitHub webhook handling failed: {e}", exc_info=True)
         return GitHubWebhookResponse(
             accepted=False,
-            error=str(e),
+            error="Webhook processing failed. Please try again later.",
         )
 
 

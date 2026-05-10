@@ -117,7 +117,7 @@ async def get_run_view(
         logger.error(f"Failed to get run view: {e}", exc_info=True)
         from ..utils.errors import make_internal_error
 
-        raise make_internal_error(f"Failed to get run view: {str(e)}") from e
+        raise make_internal_error("Failed to get run view. Please try again later.") from e
 
 
 @canonical_router.post(
@@ -217,7 +217,7 @@ async def resume_run_view(
         logger.error(f"Failed to resume run: {e}", exc_info=True)
         from ..utils.errors import make_internal_error
 
-        raise make_internal_error(f"Failed to resume run: {str(e)}") from e
+        raise make_internal_error("Failed to resume run. Please try again later.") from e
 
 
 @canonical_router.post(
@@ -302,7 +302,7 @@ async def create_run_view(
         logger.error(f"Failed to create run: {e}", exc_info=True)
         from ..utils.errors import make_internal_error
 
-        raise make_internal_error(f"Failed to create run: {str(e)}") from e
+        raise make_internal_error("Failed to create run. Please try again later.") from e
 
 
 # Deprecated endpoints (delegate to canonical handlers)

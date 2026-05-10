@@ -103,7 +103,7 @@ async def project_success_rate_badge(project_id: int) -> BadgeResponse:
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise
         logger.error(f"Failed to get success rate badge: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to get success rate badge: {str(e)}") from e
+        raise make_internal_error("Failed to get success rate badge. Please try again later.") from e
 
 
 @router.get(
@@ -194,4 +194,4 @@ async def project_last_run_badge(project_id: int) -> BadgeResponse:
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise
         logger.error(f"Failed to get last run badge: {e}", exc_info=True)
-        raise make_internal_error(f"Failed to get last run badge: {str(e)}") from e
+        raise make_internal_error("Failed to get last run badge. Please try again later.") from e

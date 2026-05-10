@@ -108,9 +108,10 @@ async def github_callback(request: Request):
         return RedirectResponse(url="/projects/")
 
     except Exception as e:
+        logger.error(f"OAuth callback failed: {e}", exc_info=True)
         return JSONResponse(
             status_code=500,
-            content={"error": f"OAuth callback failed: {str(e)}"},
+            content={"error": {"code": "INTERNAL_ERROR", "message": "Authentication failed. Please try logging in again."}},
         )
 
 
