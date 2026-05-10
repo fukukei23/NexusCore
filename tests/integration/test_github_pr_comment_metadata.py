@@ -207,9 +207,9 @@ class TestCollectRunMetrics:
 
         # webapp モデルをモック
         with (
-            patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", True),
-            patch("nexuscore.integration.github_pr_comment.PatchRecord") as MockPatchRecord,
-            patch("nexuscore.integration.github_pr_comment.ExecutionLog") as MockExecutionLog,
+            patch("nexuscore.integration.github_pr_comment._metrics.HAS_WEBAPP", True),
+            patch("nexuscore.integration.github_pr_comment._metrics.PatchRecord") as MockPatchRecord,
+            patch("nexuscore.integration.github_pr_comment._metrics.ExecutionLog") as MockExecutionLog,
         ):
 
             MockPatchRecord.query.filter_by.return_value.all.return_value = [mock_patch]
@@ -255,10 +255,10 @@ class TestBuildPrCommentWithMetadata:
 
         # webapp モデルをモック
         with (
-            patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", True),
-            patch("nexuscore.integration.github_pr_comment.PatchRecord") as MockPatchRecord,
-            patch("nexuscore.integration.github_pr_comment.ExecutionLog") as MockExecutionLog,
-            patch("nexuscore.integration.github_pr_comment.Run") as MockRun,
+            patch("nexuscore.integration.github_pr_comment._metrics.HAS_WEBAPP", True),
+            patch("nexuscore.integration.github_pr_comment._metrics.PatchRecord") as MockPatchRecord,
+            patch("nexuscore.integration.github_pr_comment._metrics.ExecutionLog") as MockExecutionLog,
+            patch("nexuscore.integration.github_pr_comment._metrics.Run") as MockRun,
         ):
 
             MockPatchRecord.query.filter_by.return_value.all.return_value = []

@@ -139,12 +139,12 @@ class TestCollectRunMetrics:
     @pytest.fixture
     def enable_webapp(self):
         """HAS_WEBAPP を有効化"""
-        with patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", True):
+        with patch("nexuscore.integration.github_pr_comment._metrics.HAS_WEBAPP", True):
             yield
 
     def test_collect_run_metrics_without_webapp(self):
         """Webapp が利用できない場合"""
-        with patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", False):
+        with patch("nexuscore.integration.github_pr_comment._metrics.HAS_WEBAPP", False):
             result = _collect_run_metrics(Mock())
 
         assert result["duration_str"] == "N/A"
@@ -163,10 +163,10 @@ class TestCollectRunMetrics:
         mock_query = Mock()
         mock_query.filter_by.return_value.all.return_value = [mock_patch1, mock_patch2]
 
-        with patch("nexuscore.integration.github_pr_comment.PatchRecord") as mock_patch_cls:
+        with patch("nexuscore.integration.github_pr_comment._metrics.PatchRecord") as mock_patch_cls:
             mock_patch_cls.query = mock_query
 
-            with patch("nexuscore.integration.github_pr_comment.ExecutionLog") as mock_log_cls:
+            with patch("nexuscore.integration.github_pr_comment._metrics.ExecutionLog") as mock_log_cls:
                 mock_log_cls.query.filter_by.return_value.all.return_value = []
 
                 result = _collect_run_metrics(mock_run)
@@ -182,12 +182,12 @@ class TestComputeRecentSuccessRate:
     @pytest.fixture
     def enable_webapp(self):
         """HAS_WEBAPP を有効化"""
-        with patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", True):
+        with patch("nexuscore.integration.github_pr_comment._metrics.HAS_WEBAPP", True):
             yield
 
     def test_compute_recent_success_rate_without_webapp(self):
         """Webapp が利用できない場合は0.0"""
-        with patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", False):
+        with patch("nexuscore.integration.github_pr_comment._metrics.HAS_WEBAPP", False):
             result = _compute_recent_success_rate(1)
 
         assert result == 0.0
@@ -201,7 +201,7 @@ class TestComputeRecentSuccessRate:
             mock_runs
         )
 
-        with patch("nexuscore.integration.github_pr_comment.Run") as mock_run:
+        with patch("nexuscore.integration.github_pr_comment._metrics.Run") as mock_run:
             mock_run.query = mock_query
             mock_run.project_id = None  # Mock attribute
 
@@ -223,7 +223,7 @@ class TestComputeRecentSuccessRate:
             mock_runs
         )
 
-        with patch("nexuscore.integration.github_pr_comment.Run") as mock_run:
+        with patch("nexuscore.integration.github_pr_comment._metrics.Run") as mock_run:
             mock_run.query = mock_query
             mock_run.project_id = None
 
@@ -453,7 +453,7 @@ class TestBuildPrComment:
     @pytest.fixture
     def enable_webapp(self):
         """HAS_WEBAPP を有効化"""
-        with patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", True):
+        with patch("nexuscore.integration.github_pr_comment._metrics.HAS_WEBAPP", True):
             yield
 
     def test_build_pr_comment_basic(self):
@@ -528,9 +528,9 @@ class TestBuildPrComment:
             repo_full_name="owner/repo",
         )
 
-        with patch("nexuscore.integration.github_pr_comment._collect_run_metrics") as mock_metrics:
+        with patch("nexuscore.integration.github_pr_comment._builder._collect_run_metrics") as mock_metrics:
             with patch(
-                "nexuscore.integration.github_pr_comment._compute_recent_success_rate"
+                "nexuscore.integration.github_pr_comment._builder._compute_recent_success_rate"
             ) as mock_rate:
                 mock_metrics.return_value = {
                     "duration_str": "2m 30s",
@@ -556,7 +556,7 @@ class TestEdgeCases:
 
     def test_format_duration_without_webapp_attrs(self):
         """Webapp属性がないオブジェクト"""
-        with patch("nexuscore.integration.github_pr_comment.HAS_WEBAPP", False):
+        with patch("nexuscore.integration.github_pr_comment._metrics.HAS_WEBAPP", False):
             result = _format_duration(Mock())
 
         assert result == "N/A"
