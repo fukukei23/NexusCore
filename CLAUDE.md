@@ -37,6 +37,17 @@ python main_cli.py --project-path /tmp/test "タスク"
 python src/nexuscore/ui/unified_gradio_ui.py   # 統合UI (localhost:7860)
 ```
 
+## サーバー起動
+
+```bash
+# FastAPI サーバー（SDK生成・REST API）
+make server    # uvicorn → http://127.0.0.1:8000
+               # OpenAPI docs: http://127.0.0.1:8000/api/docs
+
+# 統合UI (Gradio)
+PYTHONPATH=src python src/nexuscore/ui/unified_gradio_ui.py   # http://localhost:7860
+```
+
 ## LLMルーティング（2層構成）
 
 | ティア | プロバイダー | モデル | 用途 |
