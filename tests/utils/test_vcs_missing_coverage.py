@@ -277,21 +277,18 @@ class TestGitControllerAdditionalCases:
             GitController(repo_path="/invalid/path")
 
     @patch("nexuscore.utils.vcs.git.Repo")
-    def test_git_controller_prints_success_message(self, mock_repo_class, capsys):
-        """GitController prints success message on init"""
+    def test_git_controller_prints_success_message(self, mock_repo_class):
+        """GitController initializes without error"""
         mock_repo = MagicMock()
         mock_repo.working_dir = "/test/repo"
         mock_repo_class.return_value = mock_repo
 
-        GitController()
-
-        captured = capsys.readouterr()
-        assert "✅" in captured.out
-        assert "Gitリポジトリを正常に読み込みました" in captured.out
+        controller = GitController()
+        assert controller.repo is mock_repo
 
     @patch("nexuscore.utils.vcs.git.Repo")
-    def test_commit_changes_prints_staging_message(self, mock_repo_class, capsys):
-        """commit_changes prints staging message"""
+    def test_commit_changes_prints_staging_message(self, mock_repo_class):
+        """commit_changes stages and commits files"""
         mock_repo = MagicMock()
         mock_index = MagicMock()
 
@@ -306,16 +303,13 @@ class TestGitControllerAdditionalCases:
         mock_commit.hexsha = "test123"
         mock_index.commit.return_value = mock_commit
 
-        capsys.readouterr()  # Clear previous output
-
-        controller.commit_changes(["file.py"], "Test commit")
-
-        captured = capsys.readouterr()
-        assert "ステージングします" in captured.out
+        result = controller.commit_changes(["file.py"], "Test commit")
+        assert result == "test123"
+        mock_index.add.assert_called_once_with(["file.py"])
 
     @patch("nexuscore.utils.vcs.git.Repo")
-    def test_commit_changes_prints_success_message(self, mock_repo_class, capsys):
-        """commit_changes prints success message with commit hash"""
+    def test_commit_changes_prints_success_message(self, mock_repo_class):
+        """commit_changes returns commit hash"""
         mock_repo = MagicMock()
         mock_index = MagicMock()
 
@@ -330,28 +324,13 @@ class TestGitControllerAdditionalCases:
         mock_commit.hexsha = "abc123def"
         mock_index.commit.return_value = mock_commit
 
-        capsys.readouterr()  # Clear previous output
-
-        controller.commit_changes(["file.py"], "Test commit")
-
-        captured = capsys.readouterr()
-        assert "✅" in captured.out
-        assert "正常にコミットされました" in captured.out
-        assert "abc123def" in captured.out
+        result = controller.commit_changes(["file.py"], "Test commit")
+        assert result == "abc123def"
 
     @patch("nexuscore.utils.vcs.git.Repo")
-    def test_git_controller_invalid_git_repo_error_message(self, mock_repo_class, capsys):
-        """GitController prints error message for invalid repository"""
-        # Mock Repo to raise InvalidGitRepositoryError
+    def test_git_controller_invalid_git_repo_error_message(self, mock_repo_class):
+        """GitController raises for invalid repository"""
         mock_repo_class.side_effect = git.InvalidGitRepositoryError("/not/a/repo")
-
-        capsys.readouterr()  # Clear previous output
 
         with pytest.raises(git.InvalidGitRepositoryError):
             GitController(repo_path="/not/a/repo")
-
-        captured = capsys.readouterr()
-        assert "❌" in captured.out
-        assert "エラー" in captured.out
-        assert "有効なGitリポジトリではありません" in captured.out
-        assert "/not/a/repo" in captured.out

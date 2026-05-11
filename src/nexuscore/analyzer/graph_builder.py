@@ -6,12 +6,15 @@
 # 依存関係: pip install networkx
 # ==============================================================================
 
+import logging
 import sys
+
+_logger = logging.getLogger(__name__)
 
 try:
     import networkx as nx
 except ImportError:
-    print("networkx is not installed. Please run: pip install networkx", file=sys.stderr)
+    _logger.warning("networkx is not installed. Please run: pip install networkx")
     nx = None
 
 from nexuscore.analyzer.unified_analyzer import AnalysisResult

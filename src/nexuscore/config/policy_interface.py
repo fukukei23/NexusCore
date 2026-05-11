@@ -6,9 +6,12 @@ Policy Interface - 開発方針設定UI（安全性強化版）
 
 from __future__ import annotations
 
+import logging
 import queue
 import threading
 from datetime import datetime
+
+_logger = logging.getLogger(__name__)
 
 # Lazy import flag: Gradio is loaded inside methods, not at module level
 GRADIO_AVAILABLE = True
@@ -134,14 +137,14 @@ class PolicyInterface:
 
         # 安全性チェック追加
         if not GRADIO_AVAILABLE or gr is None:
-            print("📝 Gradio未利用：デフォルト設定を使用")
+            _logger.info("Gradio未利用：デフォルト設定を使用")
             return self._get_safe_default_policy()
 
         try:
             interface = self.create_gradio_interface()
 
-            print("🌐 ブラウザでUIを開いています...")
-            print("   設定完了後、ブラウザを閉じてください")
+            _logger.info("ブラウザでUIを開いています...")
+            _logger.info("   設定完了後、ブラウザを閉じてください")
 
             # 別スレッドでGradio起動
             def launch_gradio():
@@ -154,7 +157,7 @@ class PolicyInterface:
                         quiet=True,
                     )
                 except Exception as e:
-                    print(f"⚠️ Gradio起動エラー: {e}")
+                    _logger.error("Gradio起動エラー: %s", e)
 
             thread = threading.Thread(target=launch_gradio)
             thread.daemon = True
@@ -163,26 +166,26 @@ class PolicyInterface:
             # ユーザー入力を待機
             try:
                 result = self.result_queue.get(timeout=timeout)
-                print("✅ 設定を受信しました")
+                _logger.info("設定を受信しました")
                 return result
             except queue.Empty:
-                print("⚠️ タイムアウト: デフォルト設定を使用します")
+                _logger.warning("タイムアウト: デフォルト設定を使用します")
                 return self._get_safe_default_policy()
             except KeyboardInterrupt:
-                print("⚠️ 中断されました: デフォルト設定を使用します")
+                _logger.warning("中断されました: デフォルト設定を使用します")
                 return self._get_safe_default_policy()
 
         except Exception as e:
-            print(f"⚠️ UI起動失敗: {e}")
+            _logger.error("UI起動失敗: %s", e)
             return self._get_safe_default_policy()
         finally:
             # 確実にGradioを閉じる
             if self.interface:
                 try:
                     self.interface.close()
-                    print("🚪 Gradioインターフェースを閉じました。")
+                    _logger.info("Gradioインターフェースを閉じました。")
                 except Exception as e:
-                    print(f"⚠️ Gradioを閉じる際にエラーが発生: {e}")
+                    _logger.warning("Gradioを閉じる際にエラーが発生: %s", e)
 
     def _get_default_policy(self) -> dict:
         """デフォルト開発方針を取得（互換性維持）"""
@@ -201,11 +204,13 @@ class PolicyInterface:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
     # テスト実行
-    print("🧪 Policy Interface テスト開始")
+    _logger.info("Policy Interface テスト開始")
     interface = PolicyInterface()
 
     result = interface.launch_and_wait_for_input(timeout=30)
-    print("受信した設定:")
-    print(result)
-    print("✅ テスト完了")
+    _logger.info("受信した設定: %s", result)
+    _logger.info("テスト完了")

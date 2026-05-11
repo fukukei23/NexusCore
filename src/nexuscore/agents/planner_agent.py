@@ -30,7 +30,7 @@ except ImportError:
     class BaseAgent:  # type: ignore[no-redef]
         def __init__(self, *args, **kwargs):
             self.logger = logging.getLogger(self.__class__.__name__)
-            print("警告: BaseAgentが見つかりません。（フォールバック）")
+            self.logger.warning("BaseAgentが見つかりません。（フォールバック）")
 
         def execute_llm_task(self, prompt: str, as_json: bool = False) -> str:
             return "[]"

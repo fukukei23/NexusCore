@@ -14,9 +14,7 @@ from __future__ import annotations
 import gradio as gr
 
 from ._state import AppState
-from ._llm_init import HAS_LLM, HAS_SELF_HEALING, HAS_WHISPER, _router, transcribe_audio
 from .ai_revision_tab import build_ai_revision_tab
-from .test_runner_tab import build_test_runner_tab as _build_test_runner_tab
 
 
 def run_test_handler(command: str, test_file: str, current_state: AppState):

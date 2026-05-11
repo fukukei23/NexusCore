@@ -45,6 +45,8 @@ DEFAULT_MAX_OUTPUT_TOKENS = int(os.getenv("NEXUS_DEFAULT_MAX_OUT_TOKENS", "512")
 DEFAULT_TEMP = float(os.getenv("NEXUS_ROUTER_TEMPERATURE", "0.2"))
 COST_CAP = float(os.getenv("NEXUS_REVIEW_COST_CAP_USD", "0.02"))  # ここは使わず、明示モデル優先
 
+_logger = logging.getLogger(__name__)
+
 
 # ---------------------------- データ構造 ---------------------------- #
 @dataclass

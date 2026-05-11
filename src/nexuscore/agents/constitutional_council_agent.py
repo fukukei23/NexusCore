@@ -352,7 +352,7 @@ Analyze the case files in light of the current constitution and propose exactly 
     # CLI menu (for manual ops)
     # -------------------------------
     def cli_menu(self):
-        print("\n--- [Constitutional Council CLI] ---")
+        logger.info("--- [Constitutional Council CLI] ---")
         while True:
             try:
                 pending_files = sorted(
@@ -360,14 +360,14 @@ Analyze the case files in light of the current constitution and propose exactly 
                     key=lambda f: f.stat().st_mtime,
                 )
             except Exception as e:
-                print(f"Error reading amendments directory: {e}")
+                logger.error("Error reading amendments directory: %s", e)
                 break
 
             if not pending_files:
-                print("保留中の改正案はありません。(No pending amendments.)")
+                logger.info("保留中の改正案はありません。(No pending amendments.)")
                 break
 
-            print("\n=== 保留中の改正案一覧 (Pending Amendments) ===")
+            logger.info("=== 保留中の改正案一覧 (Pending Amendments) ===")
             for idx, f in enumerate(pending_files):
                 try:
                     with f.open("r", encoding="utf-8") as fp:
@@ -375,11 +375,11 @@ Analyze the case files in light of the current constitution and propose exactly 
                         summary = proposal.get(
                             "description", proposal.get("delete_policy_id", "N/A")
                         )
-                        print(f"[{idx}] {f.name} (Summary: {str(summary)[:50]}...)")
+                        logger.info("[%d] %s (Summary: %s...)", idx, f.name, str(summary)[:50])
                 except Exception as e:
-                    print(f"[{idx}] {f.name} (Error reading content: {e})")
+                    logger.error("[%d] %s (Error reading content: %s)", idx, f.name, e)
 
-            print("------------------------------------------")
+            logger.info("------------------------------------------")
             choice = (
                 input("番号を選択 (a:承認, r:却下, q:終了) [例: a 0] -> ").strip().lower().split()
             )
@@ -388,35 +388,33 @@ Analyze the case files in light of the current constitution and propose exactly 
 
             action = choice[0]
             if action == "q":
-                print("CLIを終了します。")
+                logger.info("CLIを終了します。")
                 break
 
             if len(choice) != 2 or not choice[1].isdigit():
-                print("無効な入力です。例: 'a 0' または 'r 1'")
+                logger.warning("無効な入力です。例: 'a 0' または 'r 1'")
                 continue
 
             idx = int(choice[1])
             if idx not in range(len(pending_files)):
-                print("無効な番号です。")
+                logger.warning("無効な番号です。")
                 continue
 
             target_file = pending_files[idx]
             if action == "a":
-                print(f"承認中: {target_file.name}...")
-                print(
-                    "承認成功。"
-                    if self.approve_amendment(target_file)
-                    else "承認失敗。ログを確認してください。"
-                )
+                logger.info("承認中: %s...", target_file.name)
+                if self.approve_amendment(target_file):
+                    logger.info("承認成功。")
+                else:
+                    logger.error("承認失敗。ログを確認してください。")
             elif action == "r":
-                print(f"却下中: {target_file.name}...")
-                print(
-                    "却下成功。"
-                    if self.reject_amendment(target_file)
-                    else "却下失敗。ログを確認してください。"
-                )
+                logger.info("却下中: %s...", target_file.name)
+                if self.reject_amendment(target_file):
+                    logger.info("却下成功。")
+                else:
+                    logger.error("却下失敗。ログを確認してください。")
             else:
-                print("無効なアクションです。(a, r, q のみ)")
+                logger.warning("無効なアクションです。(a, r, q のみ)")
 
     # -------------------------------
     # Minimal Flask Web UI
@@ -600,10 +598,10 @@ if __name__ == "__main__":
     council_agent = ConstitutionalCouncilAgent()
 
     if len(sys.argv) > 1 and sys.argv[1] == "web":
-        print("Starting Web UI mode...")
+        logger.info("Starting Web UI mode...")
         if os.getenv("FLASK_SECRET_KEY") is None:
-            print("WARNING: 'FLASK_SECRET_KEY' not set. Using insecure fallback key.")
+            logger.warning("WARNING: 'FLASK_SECRET_KEY' not set. Using insecure fallback key.")
         council_agent.run_web_ui()
     else:
-        print("Starting CLI mode...")
+        logger.info("Starting CLI mode...")
         council_agent.cli_menu()

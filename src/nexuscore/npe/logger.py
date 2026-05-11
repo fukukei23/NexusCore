@@ -38,6 +38,7 @@ def _rotate_if_needed(path: Path) -> None:
                 newer.rename(older)
         path.rename(path.with_suffix(path.suffix + ".1"))
     except Exception as e:
+        # Intentional print: logging infrastructure itself may not be available during rotation failure
         print(f"[NPE-Logger] WARN: rotation failed: {e}")
 
 
@@ -55,6 +56,8 @@ def log_transaction(log_data: dict, log_file: str | Path = DEFAULT_LOG):
     entry_compact = json.dumps(log_data, ensure_ascii=False)
 
     # コンソール（開発者の可視性）
+    # Intentional print: audit log entries are written directly to console
+    # for maximum visibility regardless of logging configuration state
     try:
         pretty = json.dumps(log_data, indent=2, ensure_ascii=False)
         print("\n--- NPE AUDIT LOG ---")
@@ -70,6 +73,8 @@ def log_transaction(log_data: dict, log_file: str | Path = DEFAULT_LOG):
                 f.write(entry_compact + "\n")
         except Exception as e:
             # ファイルに書けない状況でも"監査の消失"を避ける
+            # Intentional print: absolute last-resort fallback when file I/O fails;
+            # the audit trail must not be silently lost
             print(f"[NPE-Logger] CRITICAL: failed to write audit file '{log_file}': {e}")
             print(entry_compact)
 

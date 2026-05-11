@@ -13,7 +13,6 @@ from ._guardian_helpers.git_operations import generate_commit_message, prepare_b
 from ._guardian_helpers.quality_gates import (
     format_quality_gates_summary,
     review_code as _review_code_standalone,
-    review_unified_diff as _review_unified_diff_standalone,
     run_quality_gates,
 )
 from nexuscore.config.constitution_loader import get_constitution
@@ -49,7 +48,7 @@ class GuardianAgent(BaseAgent):
             self.vcs = GitController()
         except git.InvalidGitRepositoryError:
             self.vcs = None
-            print("⚠️ GuardianAgent: Gitリポジトリが見つからないため、コミット機能は無効です。")
+            self.logger.warning("GuardianAgent: Gitリポジトリが見つからないため、コミット機能は無効です。")
 
     def _budget(self, step: str) -> None:
         try:

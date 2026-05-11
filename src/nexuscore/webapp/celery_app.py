@@ -81,8 +81,6 @@ def init_celery() -> Celery:
 # Celery タスク定義
 # ==============================================================================
 
-from datetime import datetime
-
 from nexuscore.core.job_state_machine import JobStateMachine
 from nexuscore.core.run_history import RunHistoryLogger
 from nexuscore.core.session_control import SessionController

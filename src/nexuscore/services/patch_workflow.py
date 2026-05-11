@@ -13,8 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from nexuscore.config.self_healing_config import SelfHealingConfig
-from nexuscore.core.diff_preview import summarize_diff_files, wrap_diff_as_markdown
-from nexuscore.core.stacktrace_mapper import extract_candidate_files
+from nexuscore.core.diff_preview import summarize_diff_files
 from nexuscore.diff.semantic_diff import compute_semantic_diff
 
 logger = logging.getLogger(__name__)

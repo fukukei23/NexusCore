@@ -5,6 +5,7 @@ Context Agent - 完全版（simple版の安定性 + 元版の全機能）
 """
 
 import json
+import logging
 import os
 import sys
 from datetime import datetime
@@ -12,10 +13,12 @@ from pathlib import Path
 
 from nexuscore.analyzer.context_analyzer import ContextAnalyzer
 
+_logger = logging.getLogger(__name__)
+
 try:
     from nexuscore.config.policy_interface import PolicyInterface
 except ImportError:
-    print("⚠️ policy_interface.pyが見つかりません。コマンドライン入力のみ利用可能です。")
+    _logger.warning("policy_interface.pyが見つかりません。コマンドライン入力のみ利用可能です。")
     PolicyInterface = None
 
 
@@ -39,9 +42,9 @@ class ContextAgent:
             self.analyzer = ContextAnalyzer(self.project_root)
             # PolicyInterfaceが正常にインポートできた場合のみインスタンス化
             self.policy_interface = PolicyInterface() if PolicyInterface else None
-            print("✅ 完全版Context Agent初期化完了")
+            _logger.info("完全版Context Agent初期化完了")
         except Exception as e:
-            print(f"⚠️ 高度機能初期化失敗、基本機能で継続: {e}")
+            _logger.warning("高度機能初期化失敗、基本機能で継続: %s", e)
             self.analyzer = None
             self.policy_interface = None
 
@@ -59,15 +62,15 @@ class ContextAgent:
         try:
             with open(self.context_cache_file, encoding="utf-8") as f:
                 context = json.load(f)
-                print(f"✅ キャッシュされたコンテキストをロードしました: {self.context_cache_file}")
+                _logger.info("キャッシュされたコンテキストをロードしました: %s", self.context_cache_file)
                 return context
         except Exception as e:
-            print(f"⚠️ コンテキストキャッシュの読み込みに失敗: {e}")
+            _logger.warning("コンテキストキャッシュの読み込みに失敗: %s", e)
             return self.create_new_context()
 
     def create_new_context(self) -> dict:
         """新規コンテキスト作成（安全版 + 高度機能）"""
-        print("🔍 新規コンテキストを作成中...")
+        _logger.info("新規コンテキストを作成中...")
 
         # simple版の安全な基本解析
         base_context = self._create_safe_base_context()
@@ -78,15 +81,15 @@ class ContextAgent:
                 enhanced_context = self._create_enhanced_context()
                 # 安全な基本情報 + 高度情報を統合
                 auto_context = {**base_context, **enhanced_context}
-                print("✅ 高度解析完了")
+                _logger.info("高度解析完了")
             except Exception as e:
-                print(f"⚠️ 高度解析失敗、基本解析を使用: {e}")
+                _logger.warning("高度解析失敗、基本解析を使用: %s", e)
                 auto_context = base_context
         else:
             auto_context = base_context
 
         # 人間確認が必要な項目
-        print("\n❓ 開発方針の設定...")
+        _logger.info("開発方針の設定...")
         dev_policy = self.request_human_dev_policy()
 
         context = {**auto_context, "dev_policy": dev_policy}
@@ -186,14 +189,14 @@ class ContextAgent:
             try:
                 return self.policy_interface.launch_and_wait_for_input(timeout=180)
             except Exception as e:
-                print(f"⚠️ Gradio UI失敗、コマンドライン版を使用: {e}")
+                _logger.warning("Gradio UI失敗、コマンドライン版を使用: %s", e)
 
         # コマンドライン版（simple版と同様）
         return self._command_line_policy_setup()
 
     def _command_line_policy_setup(self) -> dict:
         """コマンドライン版開発方針設定"""
-        print("\n🤖 Context Agent: 開発方針を設定してください")
+        _logger.info("Context Agent: 開発方針を設定してください")
 
         test_policy = self._ask_choice(
             "テストファイルでのインポート方針は？",
@@ -228,9 +231,9 @@ class ContextAgent:
 
     def _ask_choice(self, question: str, choices: list, default: int = 0) -> str:
         """単一選択の質問"""
-        print(f"\n{question}")
+        _logger.info("\n%s", question)
         for i, choice in enumerate(choices):
-            print(f"  {i}: {choice}")
+            _logger.info("  %s: %s", i, choice)
 
         while True:
             try:
@@ -243,17 +246,17 @@ class ContextAgent:
                 if 0 <= idx < len(choices):
                     return choices[idx]
                 else:
-                    print(f"0から{len(choices)-1}の範囲で入力してください")
+                    _logger.info("0から%sの範囲で入力してください", len(choices) - 1)
             except ValueError:
-                print("数字を入力してください")
+                _logger.info("数字を入力してください")
 
     def _ask_multiple_choice(
         self, question: str, choices: list, default: list | None = None
     ) -> list:
         """複数選択の質問"""
-        print(f"\n{question}")
+        _logger.info("\n%s", question)
         for i, choice in enumerate(choices):
-            print(f"  {i}: {choice}")
+            _logger.info("  %s: %s", i, choice)
 
         default_str = " ".join(str(i) for i in (default or []))
         answer = input(
@@ -274,9 +277,9 @@ class ContextAgent:
         try:
             with open(self.context_cache_file, "w", encoding="utf-8") as f:
                 json.dump(context, f, indent=2, ensure_ascii=False)
-            print(f"✅ コンテキストを保存しました: {self.context_cache_file}")
+            _logger.info("コンテキストを保存しました: %s", self.context_cache_file)
         except Exception as e:
-            print(f"❌ コンテキスト保存エラー: {e}")
+            _logger.error("コンテキスト保存エラー: %s", e)
 
     def get_context(self) -> dict:
         """現在のコンテキストを取得"""
@@ -284,7 +287,7 @@ class ContextAgent:
 
     def update_context(self) -> dict:
         """コンテキストを更新（安全版）"""
-        print("🔄 コンテキストを更新中...")
+        _logger.info("コンテキストを更新中...")
 
         # 基本情報の更新
         base_update = self._create_safe_base_context()
@@ -300,7 +303,7 @@ class ContextAgent:
                     "last_updated": datetime.now().isoformat(),
                 }
             except Exception as e:
-                print(f"⚠️ 高度更新失敗、基本更新を使用: {e}")
+                _logger.warning("高度更新失敗、基本更新を使用: %s", e)
                 updated_context = {
                     **self.context_profile,
                     **base_update,
@@ -315,7 +318,7 @@ class ContextAgent:
 
         self.context_profile = updated_context
         self.save_context(updated_context)
-        print("✅ コンテキスト更新完了")
+        _logger.info("コンテキスト更新完了")
         return updated_context
 
     def get_error_prevention_rules(self) -> dict:
@@ -390,15 +393,15 @@ class ContextAgent:
 
 if __name__ == "__main__":
     # テスト実行
-    print("🚀 完全版Context Agent テスト開始")
+    _logger.info("完全版Context Agent テスト開始")
     agent = ContextAgent()
-    print("\n📊 現在のコンテキスト:")
+    _logger.info("現在のコンテキスト:")
     context = agent.get_context()
-    print(json.dumps(context, indent=2, ensure_ascii=False))
+    _logger.info("%s", json.dumps(context, indent=2, ensure_ascii=False))
 
-    print("\n🛡️ エラー予防ルール:")
+    _logger.info("エラー予防ルール:")
     rules = agent.get_error_prevention_rules()
     for rule, value in rules.items():
-        print(f"  {rule}: {value}")
+        _logger.info("  %s: %s", rule, value)
 
-    print("\n✅ 完全版Context Agent 完了！")
+    _logger.info("完全版Context Agent 完了！")

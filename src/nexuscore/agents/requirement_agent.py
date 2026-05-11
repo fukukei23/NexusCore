@@ -19,12 +19,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 import uuid
 from collections.abc import Generator
 
 # Gradio は lazy import（launch_gradio_ui() 内でのみ import）で UI 依存を分離
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 # --- 依存 ---
 try:
@@ -37,7 +40,7 @@ except ImportError:
 
     class BaseAgent:  # type: ignore[no-redef]
         def __init__(self, *args, **kwargs):
-            print("警告: BaseAgentが見つかりません。")
+            _logger.warning("BaseAgent not found; using fallback stub.")
 
         def execute_llm_task(self, prompt: str, as_json: bool = False) -> str:
             return "{}"

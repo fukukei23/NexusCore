@@ -4,10 +4,13 @@ Context Analyzer - 安全版（simple版の安定性を統合）
 📁 C:\Users\USER\tools\NexusCore\src\nexuscore\agents\context_analyzer.py
 """
 
+import logging
 import os
 import platform
 import sys
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 
 class ContextAnalyzer:
@@ -73,13 +76,13 @@ class ContextAnalyzer:
             frameworks = self._safe_parse_requirements()
             tech_stack["frameworks"].extend(frameworks)
         except Exception as e:
-            print(f"⚠️ requirements.txt解析エラー: {e}")
+            _logger.warning("requirements.txt解析エラー: %s", e)
 
         # 安全なツール検出
         try:
             tech_stack["tools"] = self._safe_detect_tools()
         except Exception as e:
-            print(f"⚠️ ツール検出エラー: {e}")
+            _logger.warning("ツール検出エラー: %s", e)
 
         return tech_stack
 
@@ -96,7 +99,7 @@ class ContextAnalyzer:
             try:
                 # ファイルサイズチェック
                 if os.path.getsize(req_file) > self.max_file_size:
-                    print("⚠️ requirements.txtが大きすぎます")
+                    _logger.warning("requirements.txtが大きすぎます")
                     return ["gradio", "openai"]  # フォールバック
 
                 with open(req_file, encoding="utf-8") as f:
@@ -121,7 +124,7 @@ class ContextAnalyzer:
                 return list(set(frameworks))[:20]  # 最大20個
 
             except Exception as e:
-                print(f"⚠️ requirements.txt読み込みエラー: {e}")
+                _logger.warning("requirements.txt読み込みエラー: %s", e)
                 return ["gradio", "openai"]
 
         return []
@@ -147,7 +150,7 @@ class ContextAnalyzer:
                 if os.path.exists(file_path):
                     tools.append(tool)
         except Exception as e:
-            print(f"⚠️ ツールファイル検索エラー: {e}")
+            _logger.warning("ツールファイル検索エラー: %s", e)
 
         return tools
 
@@ -190,7 +193,7 @@ class ContextAnalyzer:
                 # ファイル数制限
                 file_count += len(files)
                 if file_count > self.max_files:
-                    print(f"⚠️ ファイル数が制限を超過しました: {file_count}")
+                    _logger.warning("ファイル数が制限を超過しました: %d", file_count)
                     break
 
                 structure["total_files"] += len(files)
@@ -206,7 +209,7 @@ class ContextAnalyzer:
                         structure["test_dirs"].append(rel_path)
 
         except Exception as e:
-            print(f"⚠️ ファイル構造スキャンエラー: {e}")
+            _logger.warning("ファイル構造スキャンエラー: %s", e)
 
         return structure
 
@@ -229,7 +232,7 @@ class ContextAnalyzer:
             self._safe_scan_imports(dependencies)
 
         except Exception as e:
-            print(f"⚠️ 依存関係解析エラー: {e}")
+            _logger.warning("依存関係解析エラー: %s", e)
             # フォールバック
             dependencies["external"] = ["gradio", "openai", "pytest"]
             dependencies["internal"] = ["nexuscore"]
@@ -280,7 +283,7 @@ class ContextAnalyzer:
                         scanned_files += 1
 
         except Exception as e:
-            print(f"⚠️ インポートスキャンエラー: {e}")
+            _logger.warning("インポートスキャンエラー: %s", e)
 
     def _categorize_import(self, module: str, dependencies: dict):
         """インポートの分類"""
@@ -316,7 +319,7 @@ class ContextAnalyzer:
                 "package_managers": self._safe_detect_package_managers(),
             }
         except Exception as e:
-            print(f"⚠️ 環境検出エラー: {e}")
+            _logger.warning("環境検出エラー: %s", e)
             env_info = {
                 "python_version": "3.11+",
                 "platform": os.name,
@@ -384,23 +387,26 @@ class ContextAnalyzer:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
     # 安全テスト実行
-    print("🔍 安全版Context Analyzer テスト開始")
+    _logger.info("安全版Context Analyzer テスト開始")
     analyzer = ContextAnalyzer(os.getcwd())
 
     try:
         tech_stack = analyzer.detect_tech_stack()
-        print(f"✅ 技術スタック: {tech_stack['frameworks']}")
+        _logger.info("技術スタック: %s", tech_stack["frameworks"])
 
         structure = analyzer.scan_file_structure()
-        print(f"✅ ファイル構造: {structure['total_files']}ファイル")
+        _logger.info("ファイル構造: %dファイル", structure["total_files"])
 
         deps = analyzer.parse_dependencies()
-        print(f"✅ 依存関係: {len(deps['external'])}個")
+        _logger.info("依存関係: %d個", len(deps["external"]))
 
         env = analyzer.detect_environment()
-        print(f"✅ 環境: {env['platform']}")
+        _logger.info("環境: %s", env["platform"])
 
-        print("\n✅ 安全版Context Analyzer 完了！")
+        _logger.info("安全版Context Analyzer 完了！")
     except Exception as e:
-        print(f"❌ テストエラー: {e}")
+        _logger.error("テストエラー: %s", e)

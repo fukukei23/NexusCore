@@ -63,7 +63,7 @@ def run(requirement: str, project_path: str, language: str, verbose: bool) -> No
         from nexuscore.core.agent_factory import assemble_agent_team
         from nexuscore.core.orchestrator import Orchestrator
     except ImportError as e:
-        click.echo(f"Error: Failed to load NexusCore modules. Run 'pip install -e .' first.", err=True)
+        click.echo("Error: Failed to load NexusCore modules. Run 'pip install -e .' first.", err=True)
         if verbose:
             click.echo(f"  Details: {e}", err=True)
         raise SystemExit(1)

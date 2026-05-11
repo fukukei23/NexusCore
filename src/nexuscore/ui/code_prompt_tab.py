@@ -142,8 +142,8 @@ def build_code_prompt_tab(state: gr.State) -> None:
                     f"def test_{fn}():",
                     f'    """TODO: {fn}() のテストケースを追加してください"""',
                     f"    # result = {fn}(...)",
-                    f"    # assert result == expected",
-                    f"    pass",
+                    "    # assert result == expected",
+                    "    pass",
                     "",
                 ]
 

@@ -9,9 +9,12 @@ Webappが不要になる。
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 
 class LoggingProvider(ABC):
@@ -78,7 +81,7 @@ def register_logging_provider(provider: LoggingProvider) -> None:
     """
     global _logging_provider
     _logging_provider = provider
-    print(f"[LoggingProvider] Registered: {provider.get_provider_name()}")
+    _logger.info("Registered logging provider: %s", provider.get_provider_name())
 
 
 def get_logging_provider() -> LoggingProvider:

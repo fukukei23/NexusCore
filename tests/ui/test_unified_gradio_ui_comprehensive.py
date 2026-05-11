@@ -448,29 +448,10 @@ class TestRunTestHandler:
 # Tab 1: Code/Prompt ハンドラーテスト
 # ============================================================================
 class TestCodePromptHandlers:
-    @patch("nexuscore.ui.unified_gradio_ui.transcribe_audio")
-    def test_transcribe_handler_success(self, mock_transcribe):
-        """音声文字起こし成功"""
-        from nexuscore.ui import unified_gradio_ui
-
-        # HAS_WHISPERを一時的にTrue
-        original_has_whisper = unified_gradio_ui.HAS_WHISPER
-        unified_gradio_ui.HAS_WHISPER = True
-        unified_gradio_ui.transcribe_audio = mock_transcribe
-
-        mock_transcribe.return_value = "Transcribed text"
-
-        # transcribe_handlerは build_code_prompt_tab 内で定義されているので、
-        # ここでは同等のロジックをテスト
-        audio_path = "/path/to/audio.wav"
-
-        try:
-            result = mock_transcribe(audio_path)
-            assert result == "Transcribed text"
-        except Exception as e:
-            result = f"❌ エラー: {e}"
-
-        unified_gradio_ui.HAS_WHISPER = original_has_whisper
+    def test_transcribe_handler_success(self):
+        """音声文字起こし機能はP2-6で未使用importとして削除済み"""
+        # transcribe_audio, HAS_WHISPER removed as dead code (P2-6)
+        pass
 
     def test_generate_code_handler_empty_prompt(self):
         """空のプロンプトでコード生成"""
@@ -779,45 +760,12 @@ class TestHistoryDiffHandlers:
             assert "入力してください" in result
 
     def test_trigger_self_healing_handler_no_service(self):
-        """Self-Healing Serviceが利用不可"""
-        from nexuscore.ui import unified_gradio_ui
-
-        original = unified_gradio_ui.HAS_SELF_HEALING
-        unified_gradio_ui.HAS_SELF_HEALING = False
-
-        if not unified_gradio_ui.HAS_SELF_HEALING:
-            result = "❌ Self-Healing Service が利用できません。"
-            assert "利用できません" in result
-
-        unified_gradio_ui.HAS_SELF_HEALING = original
+        """Self-Healing Serviceが利用不可 — HAS_SELF_HEALING removed in P2-6"""
+        pass
 
     def test_trigger_self_healing_handler_valid_inputs(self):
-        """有効な入力でSelf-Healing実行（モック）"""
-        from nexuscore.ui import unified_gradio_ui
-
-        original = unified_gradio_ui.HAS_SELF_HEALING
-        unified_gradio_ui.HAS_SELF_HEALING = True
-
-        AppState()
-
-        # モック結果
-        result_dict = {
-            "status": "success",
-            "summary": "Fixed 3 issues",
-            "run_id": "sh-test-run",
-            "duration_seconds": 45.5,
-        }
-
-        result_text = f"""Status: {result_dict.get('status', 'unknown')}
-Summary: {result_dict.get('summary', 'N/A')}
-Run ID: {result_dict.get('run_id', 'N/A')}
-Duration: {result_dict.get('duration_seconds', 0):.2f}s
-"""
-
-        assert "Status: success" in result_text
-        assert "Run ID: sh-test-run" in result_text
-
-        unified_gradio_ui.HAS_SELF_HEALING = original
+        """有効な入力でSelf-Healing実行 — HAS_SELF_HEALING removed in P2-6"""
+        pass
 
     def test_load_run_handler_updates_state(self):
         """Run読み込み後のstate更新"""
@@ -981,16 +929,14 @@ class TestUIBuilders:
 # ============================================================================
 class TestModuleImports:
     def test_has_whisper_flag(self):
-        """HAS_WHISPER フラグの存在確認"""
+        """HAS_WHISPER removed as dead code in P2-6"""
         from nexuscore.ui import unified_gradio_ui
-
-        assert hasattr(unified_gradio_ui, "HAS_WHISPER")
+        assert not hasattr(unified_gradio_ui, "HAS_WHISPER")
 
     def test_has_self_healing_flag(self):
-        """HAS_SELF_HEALING フラグの存在確認"""
+        """HAS_SELF_HEALING removed as dead code in P2-6"""
         from nexuscore.ui import unified_gradio_ui
-
-        assert hasattr(unified_gradio_ui, "HAS_SELF_HEALING")
+        assert not hasattr(unified_gradio_ui, "HAS_SELF_HEALING")
 
     def test_appstate_class_exists(self):
         """AppStateクラスの存在確認"""

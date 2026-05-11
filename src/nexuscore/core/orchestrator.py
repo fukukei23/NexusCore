@@ -36,7 +36,7 @@ try:
     if str(src_dir) not in sys.path:
         sys.path.insert(0, str(src_dir))
 except Exception:
-    print("[orchestrator] Warning: could not determine src directory.", file=sys.stderr)
+    logging.getLogger(__name__).warning("Could not determine src directory.")
 
 # ------------------------------------------------------------------------------
 # 依存モジュール (Agents / NPE / Router / Utils)

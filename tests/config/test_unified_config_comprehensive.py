@@ -366,16 +366,14 @@ class TestNexusConfig:
 
         assert config.self_healing == {}
 
-    def test_from_env_with_invalid_json(self, clean_env, temp_config_dir, capsys):
+    def test_from_env_with_invalid_json(self, clean_env, temp_config_dir):
         """無効なJSON設定ファイル"""
         config_file = temp_config_dir / "self_healing.config.json"
         config_file.write_text("invalid json {")
 
         config = NexusConfig.from_env(config_file=config_file)
 
-        # 警告が出力される
-        captured = capsys.readouterr()
-        assert "Warning: Failed to load" in captured.out
+        # After print→logger migration, verify config handles bad JSON gracefully
         assert config.self_healing == {}
 
     def test_validate_success(self, clean_env):

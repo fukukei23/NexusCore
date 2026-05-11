@@ -1,6 +1,9 @@
+import logging
 import os
 import zipfile
 from datetime import datetime
+
+_logger = logging.getLogger(__name__)
 
 
 def zip_project(output_dir="deploy_output"):
@@ -15,4 +18,5 @@ def zip_project(output_dir="deploy_output"):
                 filepath = os.path.join(foldername, filename)
                 arcname = os.path.relpath(filepath, ".")
                 zipf.write(filepath, arcname)
+    _logger.info("Project saved to %s", zip_filename)
     print(f"✅ プロジェクトが {zip_filename} に保存されました")

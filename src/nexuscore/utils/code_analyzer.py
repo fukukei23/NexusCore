@@ -1,11 +1,14 @@
 # src/utils/code_analyzer.py
 
 import json
+import logging
 import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 # ==============================================================================
 # Data Classes
@@ -69,7 +72,7 @@ class QualityReport:
 
 def run_pylint(file_path: str) -> float:
     """指定されたファイルに対してPylintを実行し、スコアを返す"""
-    print(f"🔬 Running Pylint on {file_path}...")
+    _logger.info("Running Pylint on %s...", file_path)
     command = ["pylint", file_path]
     try:
         result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
@@ -77,31 +80,31 @@ def run_pylint(file_path: str) -> float:
         match = re.search(r"Your code has been rated at (\d+\.\d+)/10", output)
         if match:
             score = float(match.group(1))
-            print(f"✅ Pylint score: {score}/10")
+            _logger.info("Pylint score: %s/10", score)
             return score
-        print("⚠️ Pylint score not found in output.")
+        _logger.warning("Pylint score not found in output.")
         return 0.0
     except Exception as e:
-        print(f"🚨 An error occurred while running Pylint: {e}")
+        _logger.error("An error occurred while running Pylint: %s", e)
         return 0.0
 
 
 def run_mypy(file_path: str) -> tuple[bool, str]:
     """指定されたファイルに対してMyPyを実行し、(成功フラグ, 結果メッセージ)を返す"""
-    print(f"🔬 Running MyPy on {file_path}...")
+    _logger.info("Running MyPy on %s...", file_path)
     command = ["mypy", file_path]
     try:
         result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
         output = result.stdout + result.stderr
         if "Success: no issues found" in output:
-            print("✅ MyPy found no issues.")
+            _logger.info("MyPy found no issues.")
             return True, "Passed"
         else:
             error_summary = "\n".join(line for line in output.splitlines() if "error:" in line)
-            print("❌ MyPy found issues.")
+            _logger.error("MyPy found issues.")
             return False, error_summary
     except Exception as e:
-        print(f"🚨 An error occurred while running MyPy: {e}")
+        _logger.error("An error occurred while running MyPy: %s", e)
         return False, str(e)
 
 
@@ -112,7 +115,7 @@ def run_bandit(target_path: str) -> tuple[bool, list[dict[str, Any]]]:
     Returns:
         tuple[bool, List[Dict]]: (合格フラグ, 問題の辞書リスト)
     """
-    print(f"🔬 Running Bandit security scan on {target_path}...")
+    _logger.info("Running Bandit security scan on %s...", target_path)
     command = ["bandit", "-r", target_path, "-f", "json"]
     try:
         result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
@@ -124,17 +127,17 @@ def run_bandit(target_path: str) -> tuple[bool, list[dict[str, Any]]]:
         ]
 
         if not high_medium_issues:
-            print("✅ Bandit: No high or medium severity issues found.")
+            _logger.info("Bandit: No high or medium severity issues found.")
             return True, []
         else:
-            print(f"❌ Bandit found {len(high_medium_issues)} security issues.")
+            _logger.error("Bandit found %d security issues.", len(high_medium_issues))
             return False, high_medium_issues
 
     except json.JSONDecodeError:
-        print("✅ Bandit: No security issues reported.")
+        _logger.info("Bandit: No security issues reported.")
         return True, []
     except Exception as e:
-        print(f"🚨 An error occurred while running Bandit: {e}")
+        _logger.error("An error occurred while running Bandit: %s", e)
         return False, []
 
 
@@ -143,7 +146,7 @@ def run_pytest_cov(project_path: str) -> float:
     指定されたプロジェクトパスを基準にテストとカバレッジ計測を実行する。
     設定はpyproject.tomlから読み込まれる。
     """
-    print(f"🔬 Running pytest-cov on {project_path}...")
+    _logger.info("Running pytest-cov on %s...", project_path)
     # 設定ファイルがあるので、コマンドはシンプルに 'pytest' だけで良い
     command = ["pytest"]
     try:
@@ -159,12 +162,12 @@ def run_pytest_cov(project_path: str) -> float:
         match = re.search(r"TOTAL\s+\d+\s+\d+\s+(\d+)%", output)
         if match:
             coverage = float(match.group(1))
-            print(f"✅ Pytest-cov coverage: {coverage}%")
+            _logger.info("Pytest-cov coverage: %s%%", coverage)
             return coverage
-        print(f"⚠️ Pytest-cov coverage not found. Output:\n{output}")
+        _logger.warning("Pytest-cov coverage not found. Output:\n%s", output)
         return 0.0
     except Exception as e:
-        print(f"🚨 An error occurred while running pytest-cov: {e}")
+        _logger.error("An error occurred while running pytest-cov: %s", e)
         return 0.0
 
 
@@ -191,17 +194,13 @@ def analyze_code_quality(
     Returns:
         QualityReport: 詳細な検査結果
     """
-    import logging
-
-    logger = logging.getLogger(__name__)
-
     # Step 1: 憲法から基準値を抽出
     tier1_config = constitution.get("quality_gates", {}).get("tier1", {})
     min_coverage = tier1_config.get("test_coverage_min", 90)
     min_pylint = tier1_config.get("pylint_score_min", 8.0)
     max_severity = tier1_config.get("bandit_severity_max", "MEDIUM")
 
-    logger.info(f"品質ゲート開始: Coverage≥{min_coverage}%, Pylint≥{min_pylint}")
+    _logger.info("品質ゲート開始: Coverage≥%s%%, Pylint≥%s", min_coverage, min_pylint)
 
     violations = []
 

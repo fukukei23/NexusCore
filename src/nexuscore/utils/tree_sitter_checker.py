@@ -16,7 +16,6 @@ import time
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from concurrent.futures import TimeoutError as FutureTimeoutError
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 

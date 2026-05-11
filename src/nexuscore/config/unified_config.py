@@ -15,10 +15,13 @@ Usage:
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -169,7 +172,7 @@ class NexusConfig:
             try:
                 return json.loads(config_file.read_text())
             except Exception as e:
-                print(f"Warning: Failed to load {config_file}: {e}")
+                _logger.warning("Failed to load %s: %s", config_file, e)
                 return {}
         return {}
 

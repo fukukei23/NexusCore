@@ -26,6 +26,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+_logger = logging.getLogger(__name__)
+
 from nexuscore.llm.helpers import (
     normalize_model,
 )
@@ -729,7 +731,7 @@ if __name__ == "__main__":
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    print("--- LLMRouter Smoke Test (v2.3.5-robust) ---")
+    _logger.info("--- LLMRouter Smoke Test (v2.3.5-robust) ---")
 
     router = None
     try:
@@ -745,42 +747,42 @@ if __name__ == "__main__":
         # $env:GEMINI_API_KEY="AIzaSy..."
 
         router = LLMRouter()
-        print("\nTASK MAP:", json.dumps(router.task_model_map, indent=2, ensure_ascii=False))
+        _logger.info("TASK MAP: %s", json.dumps(router.task_model_map, indent=2, ensure_ascii=False))
 
         # --- Test 1: Debugging (default: gpt-5) ---
         sample_prompt_debug = "pytestの失敗ログを分析し、原因を特定して修正案を提示してください。"
-        print(f"\nSample Prompt (Debug): {sample_prompt_debug[:80]}...")
+        _logger.info("Sample Prompt (Debug): %s...", sample_prompt_debug[:80])
         llm_client_debug = router.get_llm_for_task(sample_prompt_debug)
-        print(f"--> Selected Client: {type(llm_client_debug.inner).__name__}")
-        print(f"    Model: {llm_client_debug.model_name}")
-        print(f"    Task Type (router classified): {llm_client_debug.task_type}")
+        _logger.info("--> Selected Client: %s", type(llm_client_debug.inner).__name__)
+        _logger.info("    Model: %s", llm_client_debug.model_name)
+        _logger.info("    Task Type (router classified): %s", llm_client_debug.task_type)
 
         resp_debug = llm_client_debug.execute(
             prompt=sample_prompt_debug,
             system_prompt="You are a world-class debugging assistant.",
             as_json=False,
         )
-        print("\nLLM Response (Stub or Real):\n", resp_debug[:200], "...")
+        _logger.info("LLM Response (Stub or Real):\n%s...", resp_debug[:200])
 
         # --- Test 2: JSON (default: gpt-5) ---
         sample_prompt_json = "項目A:foo\n項目B:bar をJSONに"
-        print(f"\nSample Prompt (JSON): {sample_prompt_json[:80]}...")
+        _logger.info("Sample Prompt (JSON): %s...", sample_prompt_json[:80])
         llm_client_json = router.get_llm_for_task(sample_prompt_json)
-        print(f"--> Selected Client: {type(llm_client_json.inner).__name__}")
-        print(f"    Model: {llm_client_json.model_name}")
-        print(f"    Task Type (router classified): {llm_client_json.task_type}")
+        _logger.info("--> Selected Client: %s", type(llm_client_json.inner).__name__)
+        _logger.info("    Model: %s", llm_client_json.model_name)
+        _logger.info("    Task Type (router classified): %s", llm_client_json.task_type)
 
         resp_json = llm_client_json.execute(
             prompt=sample_prompt_json,
             system_prompt="You output JSON only.",
             as_json=True,
         )
-        print("\nLLM Response (Stub or Real, JSON):\n", resp_json[:200], "...")
+        _logger.info("LLM Response (Stub or Real, JSON):\n%s...", resp_json[:200])
 
     except Exception as e:
-        print(f"\n[SmokeTest] Unexpected error: {e}")
+        _logger.error("[SmokeTest] Unexpected error: %s", e)
 
-    print("\n--- SmokeTest Finished ---")
+    _logger.info("--- SmokeTest Finished ---")
     if router:
-        print(f"--- (To see logs, check: {router.call_log_path}) ---")
-        print(f"--- (Real calls use 3 retries on 429/5xx, timeout={REQUEST_TIMEOUT}s) ---")
+        _logger.info("--- (To see logs, check: %s) ---", router.call_log_path)
+        _logger.info("--- (Real calls use 3 retries on 429/5xx, timeout=%ss) ---", REQUEST_TIMEOUT)
