@@ -16,9 +16,18 @@ import json
 from typing import Any
 
 from flask import Blueprint, jsonify, render_template, request
+from sqlalchemy import desc, func
 
 from nexuscore.webapp import db
 from nexuscore.webapp.auth import get_current_user, require_auth
+from nexuscore.webapp.db_helpers import (
+    project_latest_run,
+    run_llm_cost,
+    run_patch_files,
+    user_project_or_404,
+    user_projects_query,
+    user_runs_stats,
+)
 from nexuscore.webapp.models import ExecutionLog, PatchRecord, Project, Run
 from nexuscore.webapp.views_projects import (
     _compute_run_duration,
@@ -43,24 +52,15 @@ def dashboard():
     project_id = request.args.get("project_id", type=int)
 
     if project_id:
-        project = Project.query.filter_by(id=project_id, owner_id=user.id).first_or_404()
+        project = user_project_or_404(user.id, project_id)
         projects = [project]
     else:
-        projects = Project.query.filter_by(owner_id=user.id).all()
+        projects = user_projects_query(user.id).all()
 
-    # 集計データ
-    total_runs = Run.query.join(Project).filter(Project.owner_id == user.id).count()
-    success_runs = (
-        Run.query.join(Project).filter(Project.owner_id == user.id, Run.status == "SUCCESS").count()
-    )
-    failed_runs = (
-        Run.query.join(Project).filter(Project.owner_id == user.id, Run.status == "FAILED").count()
-    )
+    # 集計データ — 1クエリで取得
+    stats = user_runs_stats(user.id)
 
     # LLMごとの call_count, cost_sum（簡易版）
-    # SQLiteではJSON操作がサポートされていないため、try-exceptで囲む
-    from sqlalchemy import func
-
     try:
         llm_stats = (
             db.session.query(
@@ -75,7 +75,6 @@ def dashboard():
             .all()
         )
     except Exception:
-        # SQLiteなどJSON操作が未サポートのDBでは空リストを返す
         llm_stats = []
 
     if request.headers.get("Accept", "").startswith("application/json"):
@@ -83,10 +82,10 @@ def dashboard():
             {
                 "projects": [{"id": p.id, "name": p.name} for p in projects],
                 "stats": {
-                    "total_runs": total_runs,
-                    "success_runs": success_runs,
-                    "failed_runs": failed_runs,
-                    "success_rate": (success_runs / total_runs * 100) if total_runs > 0 else 0,
+                    "total_runs": stats["total"],
+                    "success_runs": stats["success"],
+                    "failed_runs": stats["failed"],
+                    "success_rate": (stats["success"] / stats["total"] * 100) if stats["total"] > 0 else 0,
                 },
                 "llm_stats": [
                     {
@@ -102,10 +101,10 @@ def dashboard():
     return render_template(
         "dashboard/index.html",
         user_login=user.github_login,
-        total_runs=total_runs,
-        success_runs=success_runs,
-        failed_runs=failed_runs,
-        success_rate=(success_runs / total_runs * 100) if total_runs > 0 else 0,
+        total_runs=stats["total"],
+        success_runs=stats["success"],
+        failed_runs=stats["failed"],
+        success_rate=(stats["success"] / stats["total"] * 100) if stats["total"] > 0 else 0,
         llm_stats=llm_stats,
         projects=projects,
     )
@@ -121,16 +120,13 @@ def project_dashboard(project_id: int):
     Data access: Direct DB access (no API call)
     FastAPI equivalent: N/A (internal UI only)
     """
-    from sqlalchemy import desc
-
     user = get_current_user()
-    project = Project.query.filter_by(id=project_id, owner_id=user.id).first_or_404()
+    project = user_project_or_404(user.id, project_id)
 
-    # 統計情報を集計
-    all_runs = Run.query.filter_by(project_id=project.id).all()
-    total_runs = len(all_runs)
-    success_runs = sum(1 for r in all_runs if r.status == "SUCCESS")
-    failed_runs = sum(1 for r in all_runs if r.status == "FAILED")
+    # 統計情報を集計 — DB集計クエリでN+1解消
+    total_runs = Run.query.filter_by(project_id=project.id).count()
+    success_runs = Run.query.filter_by(project_id=project.id, status="SUCCESS").count()
+    failed_runs = Run.query.filter_by(project_id=project.id, status="FAILED").count()
 
     # 過去30回の成功率
     recent_runs = (
@@ -147,42 +143,17 @@ def project_dashboard(project_id: int):
     }
 
     # 最新Run
-    latest_run = Run.query.filter_by(project_id=project.id).order_by(desc(Run.created_at)).first()
+    latest_run = project_latest_run(project.id)
 
     # 最新Runのメトリクス
     latest_run_metrics: dict[str, Any] | None = None
     if latest_run:
-        # パッチ情報
-        patches = PatchRecord.query.filter_by(run_id=latest_run.id).all()
-        patch_files = {p.file_path for p in patches}
-
-        # LLMログ
-        logs = ExecutionLog.query.filter_by(run_id=latest_run.id, source="NPE").all()
-        llm_call_count = len(logs)
-        total_cost = 0.0
-
-        for lg in logs:
-            payload = lg.payload_json or {}
-            if isinstance(payload, str):
-                try:
-                    payload = json.loads(payload)
-                except Exception:
-                    payload = {}
-
-            cost = (
-                payload.get("estimated_cost")
-                or payload.get("cost_jpy")
-                or payload.get("usage", {}).get("cost_jpy", 0.0)
-            )
-            try:
-                total_cost += float(cost)
-            except Exception:
-                pass
-
+        patch_files = run_patch_files(latest_run.id)
+        llm_call_count, total_cost, _ = run_llm_cost(latest_run.id)
         duration_sec = _compute_run_duration(latest_run)
 
         latest_run_metrics = {
-            "patch_count": len(patches),
+            "patch_count": len(patch_files) if isinstance(patch_files, set) else 0,
             "affected_files": len(patch_files),
             "llm_call_count_total": llm_call_count,
             "estimated_cost_total": total_cost,
@@ -190,45 +161,7 @@ def project_dashboard(project_id: int):
         }
 
     # LLMコスト内訳
-    llm_breakdown: dict[str, dict[str, Any]] = {}
-    if latest_run:
-        logs = ExecutionLog.query.filter_by(run_id=latest_run.id, source="NPE").all()
-        for lg in logs:
-            payload = lg.payload_json or {}
-            if isinstance(payload, str):
-                try:
-                    payload = json.loads(payload)
-                except Exception:
-                    payload = {}
-
-            model = payload.get("model") or payload.get("model_name") or "unknown"
-            usage = payload.get("usage", {})
-
-            if model not in llm_breakdown:
-                llm_breakdown[model] = {
-                    "call_count": 0,
-                    "token_prompt": 0,
-                    "token_completion": 0,
-                    "token_total": 0,
-                    "cost_total": 0.0,
-                }
-
-            llm_breakdown[model]["call_count"] += 1
-            llm_breakdown[model]["token_prompt"] += usage.get("prompt_tokens", 0)
-            llm_breakdown[model]["token_completion"] += usage.get("completion_tokens", 0)
-            llm_breakdown[model]["token_total"] += usage.get("prompt_tokens", 0) + usage.get(
-                "completion_tokens", 0
-            )
-
-            cost = (
-                payload.get("estimated_cost")
-                or payload.get("cost_jpy")
-                or usage.get("cost_jpy", 0.0)
-            )
-            try:
-                llm_breakdown[model]["cost_total"] += float(cost)
-            except Exception:
-                pass
+    _, _, llm_breakdown = run_llm_cost(latest_run.id) if latest_run else (0, 0.0, {})
 
     # 直近のRun一覧（最大10件）
     recent_runs_list = (
@@ -267,7 +200,7 @@ def gradio_dashboard(project_id: int):
     FastAPI equivalent: N/A (internal UI only)
     """
     user = get_current_user()
-    project = Project.query.filter_by(id=project_id, owner_id=user.id).first_or_404()
+    project = user_project_or_404(user.id, project_id)
 
     # Gradio アプリのURL（別ポートで起動している前提）
     gradio_url = f"http://localhost:7860/?project_id={project_id}"

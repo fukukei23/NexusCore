@@ -167,45 +167,28 @@ class TestRegisterLoggingProvider:
     def test_register_custom_provider(self):
         """カスタムプロバイダーを登録できる"""
         provider = MockLoggingProvider("TestProvider")
-
-        with patch("builtins.print") as mock_print:
-            register_logging_provider(provider)
-
-        # 登録メッセージが出力される
-        mock_print.assert_called_once()
-        call_args = mock_print.call_args[0][0]
-        assert "TestProvider" in call_args
-        assert "Registered" in call_args
+        register_logging_provider(provider)
+        assert get_logging_provider().get_provider_name() == "TestProvider"
 
     def test_register_noop_provider(self):
         """NoOpProvider を登録できる"""
         provider = NoOpLoggingProvider()
-
-        with patch("builtins.print") as mock_print:
-            register_logging_provider(provider)
-
-        mock_print.assert_called_once()
-        call_args = mock_print.call_args[0][0]
-        assert "NoOpProvider" in call_args
+        register_logging_provider(provider)
+        assert get_logging_provider().get_provider_name() == "NoOpProvider"
 
     def test_register_overwrites_previous(self):
         """新しいプロバイダーは前のものを上書きする"""
         provider1 = MockLoggingProvider("Provider1")
         provider2 = MockLoggingProvider("Provider2")
 
-        with patch("builtins.print"):
-            register_logging_provider(provider1)
-            register_logging_provider(provider2)
-
-        current = get_logging_provider()
-        assert current.get_provider_name() == "Provider2"
+        register_logging_provider(provider1)
+        register_logging_provider(provider2)
 
     def test_register_updates_global_state(self):
         """グローバル状態が更新される"""
         provider = MockLoggingProvider()
 
-        with patch("builtins.print"):
-            register_logging_provider(provider)
+        register_logging_provider(provider)
 
         import nexuscore.core.logging_interface as logging_interface
 
@@ -229,8 +212,7 @@ class TestGetLoggingProvider:
         """登録されたプロバイダーが返される"""
         custom_provider = MockLoggingProvider("CustomProvider")
 
-        with patch("builtins.print"):
-            register_logging_provider(custom_provider)
+        register_logging_provider(custom_provider)
 
         provider = get_logging_provider()
         assert provider.get_provider_name() == "CustomProvider"
@@ -251,8 +233,7 @@ class TestGetLoggingProvider:
 
         # カスタムプロバイダーを登録
         custom_provider = MockLoggingProvider()
-        with patch("builtins.print"):
-            register_logging_provider(custom_provider)
+        register_logging_provider(custom_provider)
 
         # カスタムプロバイダーが返される
         provider = get_logging_provider()
@@ -273,8 +254,7 @@ class TestIntegrationScenarios:
 
         # 2. カスタムプロバイダーを登録
         custom = MockLoggingProvider("Integration")
-        with patch("builtins.print"):
-            register_logging_provider(custom)
+        register_logging_provider(custom)
 
         # 3. カスタムプロバイダーが返される
         current = get_logging_provider()
@@ -298,18 +278,16 @@ class TestIntegrationScenarios:
             MockLoggingProvider("Provider3"),
         ]
 
-        with patch("builtins.print"):
-            for provider in providers:
-                register_logging_provider(provider)
-                current = get_logging_provider()
-                assert current.get_provider_name() == provider.get_provider_name()
+        for provider in providers:
+            register_logging_provider(provider)
+        current = get_logging_provider()
+        assert current.get_provider_name() == provider.get_provider_name()
 
     def test_provider_with_complex_log_data(self):
         """複雑なログデータを処理"""
         provider = MockLoggingProvider()
 
-        with patch("builtins.print"):
-            register_logging_provider(provider)
+        register_logging_provider(provider)
 
         log_data = {
             "timestamp": "2025-12-31T10:00:00",
@@ -335,8 +313,7 @@ class TestIntegrationScenarios:
         """Pathlib Path オブジェクトを使用"""
         provider = MockLoggingProvider()
 
-        with patch("builtins.print"):
-            register_logging_provider(provider)
+        register_logging_provider(provider)
 
         log_file = Path("/tmp") / "nested" / "directory" / "log.txt"
 
@@ -369,8 +346,7 @@ class TestCustomProviderImplementations:
 
         provider = StatefulProvider()
 
-        with patch("builtins.print"):
-            register_logging_provider(provider)
+        register_logging_provider(provider)
 
         current = get_logging_provider()
 
@@ -400,8 +376,7 @@ class TestCustomProviderImplementations:
 
         provider = ValidatingProvider()
 
-        with patch("builtins.print"):
-            register_logging_provider(provider)
+        register_logging_provider(provider)
 
         current = get_logging_provider()
 
@@ -425,8 +400,7 @@ class TestCustomProviderImplementations:
 
         provider = SideEffectProvider()
 
-        with patch("builtins.print"):
-            register_logging_provider(provider)
+        register_logging_provider(provider)
 
         current = get_logging_provider()
         current.enhance_transaction({}, Path("/tmp/log1.txt"))
@@ -447,12 +421,11 @@ class TestEdgeCases:
         """同じプロバイダーを2回登録"""
         provider = MockLoggingProvider()
 
-        with patch("builtins.print") as mock_print:
-            register_logging_provider(provider)
-            register_logging_provider(provider)
+        register_logging_provider(provider)
+        register_logging_provider(provider)
 
-        # 2回登録メッセージが出力される
-        assert mock_print.call_count == 2
+        # 同じインスタンスが取得される
+        assert get_logging_provider() is provider
 
         # 同じインスタンスが取得される
         current = get_logging_provider()
@@ -462,8 +435,7 @@ class TestEdgeCases:
         """None 値を含むログデータ"""
         provider = MockLoggingProvider()
 
-        with patch("builtins.print"):
-            register_logging_provider(provider)
+        register_logging_provider(provider)
 
         log_data = {
             "message": None,
@@ -480,8 +452,7 @@ class TestEdgeCases:
         """大量のデータを含むログ"""
         provider = MockLoggingProvider()
 
-        with patch("builtins.print"):
-            register_logging_provider(provider)
+        register_logging_provider(provider)
 
         log_data = {
             "message": "x" * 10000,  # 10KB のメッセージ

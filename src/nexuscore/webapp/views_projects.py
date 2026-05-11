@@ -30,6 +30,14 @@ from sqlalchemy import desc
 
 from nexuscore.webapp import db
 from nexuscore.webapp.auth import get_current_user, require_auth
+from nexuscore.webapp.db_helpers import (
+    project_latest_run,
+    projects_with_latest_run,
+    run_logs_payload,
+    run_patch_files,
+    user_project_or_404,
+    user_projects_query,
+)
 from nexuscore.webapp.models import Project, Run
 
 bp = Blueprint("views_projects", __name__, url_prefix="/projects")
@@ -124,19 +132,15 @@ def list_projects():
     Data access: Direct DB access (no API call)
     FastAPI equivalent: GET /api/v1/projects (for external clients)
     """
-    from sqlalchemy import desc
-
     from nexuscore.integration.github_pr_comment import _compute_recent_success_rate
 
     user = get_current_user()
-    projects = Project.query.filter_by(owner_id=user.id).order_by(desc(Project.updated_at)).all()
+    projects = projects_with_latest_run(user.id)
 
     # 各プロジェクトの最新Run情報とメトリクスを取得
     projects_data = []
     for project in projects:
-        latest_run = (
-            Run.query.filter_by(project_id=project.id).order_by(desc(Run.created_at)).first()
-        )
+        latest_run = project_latest_run(project.id)
 
         # 4.5: 最近30件の成功率を計算
         success_rate = _compute_recent_success_rate(project.id, limit=30)
@@ -147,23 +151,7 @@ def list_projects():
             duration_sec = _compute_run_duration(latest_run)
             duration_str = _format_duration(duration_sec) if duration_sec else "N/A"
 
-            # 4.4: details から retry_count と last_error_class を取得
-            from nexuscore.webapp.models import ExecutionLog
-
-            logs = ExecutionLog.query.filter_by(run_id=latest_run.id).all()
-            retry_count = 0
-            last_error_class = None
-            for log in logs:
-                payload = log.payload_json or {}
-                if isinstance(payload, str):
-                    try:
-                        payload = json.loads(payload)
-                    except Exception:
-                        payload = {}
-                if payload.get("retry_count"):
-                    retry_count = max(retry_count, payload.get("retry_count", 0))
-                if payload.get("last_error_class"):
-                    last_error_class = payload.get("last_error_class")
+            retry_count, last_error_class = run_logs_payload(latest_run.id)
 
             latest_run_metrics = {
                 "duration_str": duration_str,
@@ -217,20 +205,21 @@ def project_detail(project_id: int):
     FastAPI equivalent: GET /api/v1/projects/{id} (for external clients)
     """
     user = get_current_user()
-    project = Project.query.filter_by(id=project_id, owner_id=user.id).first_or_404()
+    project = user_project_or_404(user.id, project_id)
 
-    # 直近のRun一覧（最大50件）
-    runs = Run.query.filter_by(project_id=project.id).order_by(desc(Run.created_at)).limit(50).all()
+    # 直近のRun一覧（最大50件）— execution_logs を eager load して N+1 解消
+    from nexuscore.webapp.db_helpers import project_runs_with_logs
+
+    runs = project_runs_with_logs(project.id, limit=50)
 
     runs_data = []
     for run in runs:
-        # 成功/失敗数の集計（簡易版）
-        from nexuscore.webapp.models import ExecutionLog
-
-        success_count = ExecutionLog.query.filter_by(
-            run_id=run.id, level="INFO", source="ORCHESTRATOR"
-        ).count()
-        failure_count = ExecutionLog.query.filter_by(run_id=run.id, level="ERROR").count()
+        # 成功/失敗数の集計 — eager loaded execution_logs を使用
+        success_count = sum(
+            1 for lg in run.execution_logs
+            if lg.level == "INFO" and lg.source == "ORCHESTRATOR"
+        )
+        failure_count = sum(1 for lg in run.execution_logs if lg.level == "ERROR")
 
         # 実行時間を計算
         duration_sec = _compute_run_duration(run)
@@ -337,7 +326,7 @@ def trigger_run(project_id: int):
     """
 
     user = get_current_user()
-    project = Project.query.filter_by(id=project_id, owner_id=user.id).first_or_404()
+    project = user_project_or_404(user.id, project_id)
 
     # リクエストボディからパラメータを取得
     data = request.get_json() or {}
