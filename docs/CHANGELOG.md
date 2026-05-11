@@ -7,6 +7,9 @@ NexusCore のプロジェクト固有変更履歴。
 
 ## [8.2.2] - 2026-05-12
 
+### Fixed
+- テストスイートハング修正: `pytest.ini` の `addopts` に `-m "not integration" --timeout=120` を追加 — `test_integration_llm.py`（実際のLLM API呼び出し）をデフォルトで除外
+
 ### Changed
 - P1-1: APIルートのHTTPException判定を `isinstance(e, HTTPException)` に統一、バックグラウンドタスクのエラー分類を追加（ValueError/ConnectionError/ImportError）
 - P1-2: `authority_runner.py` を3モジュールに分割（`context.py`, `state.py`, `phase_logging.py`）— 428→293行
