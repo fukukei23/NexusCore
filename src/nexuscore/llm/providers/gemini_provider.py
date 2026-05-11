@@ -39,70 +39,58 @@ class GeminiLLM(BaseLLM):
             self.client = None  # type: ignore[assignment]
             self.logger.info("GeminiLLM initialized in STUB mode (reason: missing key or dry-run).")
 
-    def execute(self, prompt: str, system_prompt: str, **kwargs) -> str:
+    def _build_real_call(self, prompt: str, system_prompt: str, **kwargs):
+        """Return a callable that performs the real SDK call."""
         temperature = kwargs.get("temperature", 0.3)
         as_json = kwargs.get("as_json", False)
 
+        import google.generativeai as genai
+
+        model = genai.GenerativeModel(
+            self.model_name,
+            system_instruction=system_prompt,
+        )
+
+        gen_cfg = {"temperature": float(temperature)}
+        max_out = os.getenv("NEXUS_DEFAULT_MAX_OUT_TOKENS")
+        if max_out:
+            try:
+                gen_cfg["max_output_tokens"] = int(max_out)
+            except ValueError:
+                pass
+        gen_cfg["response_mime_type"] = "application/json" if as_json else "text/plain"  # type: ignore[assignment]
+
+        def _call():
+            resp = model.generate_content(
+                prompt,
+                generation_config=cast("GenerationConfigDict", gen_cfg),
+            )
+            text = ""
+            for cand in getattr(resp, "candidates", []) or []:
+                parts = getattr(getattr(cand, "content", None), "parts", []) or []
+                for part in parts:
+                    if hasattr(part, "text") and part.text:
+                        text += part.text
+            if not text:
+                try:
+                    text = getattr(resp, "text", "") or ""
+                except (AttributeError, ValueError):
+                    text = ""
+            if not text:
+                raise RuntimeError("Gemini returned no text (possibly blocked)")
+            return _strip_jsonish(text) if as_json else text
+
+        return _call
+
+    def execute(self, prompt: str, system_prompt: str, **kwargs) -> str:
+        as_json = kwargs.get("as_json", False)
         if self.real_calls and self.client:
             try:
-                import google.generativeai as genai
-
-                model = genai.GenerativeModel(
-                    self.model_name,
-                    system_instruction=system_prompt,
-                )
+                call_fn = self._build_real_call(prompt, system_prompt, **kwargs)
             except Exception as e:
                 self.log_error("init failed (system)", e)
                 return self._stub_fallback_response("gemini", preview="Init failed. Fallback to stub.", as_json=as_json)
-
-            gen_cfg = {"temperature": float(temperature)}
-            max_out = os.getenv("NEXUS_DEFAULT_MAX_OUT_TOKENS")
-            if max_out:
-                try:
-                    gen_cfg["max_output_tokens"] = int(max_out)
-                except ValueError:
-                    pass
-            gen_cfg["response_mime_type"] = "application/json" if as_json else "text/plain"  # type: ignore[assignment]
-
-            try:
-                resp = model.generate_content(
-                    prompt,
-                    generation_config=cast("GenerationConfigDict", gen_cfg),
-                )
-
-                text = ""
-                for cand in getattr(resp, "candidates", []) or []:
-                    parts = getattr(getattr(cand, "content", None), "parts", []) or []
-                    for part in parts:
-                        if hasattr(part, "text") and part.text:
-                            text += part.text
-                if not text:
-                    try:
-                        text = getattr(resp, "text", "") or ""
-                    except (AttributeError, ValueError):
-                        text = ""
-
-                if not text:
-                    finish_reason = None
-                    try:
-                        finish_reason = getattr(
-                            getattr(resp, "candidates", [None])[0], "finish_reason", None
-                        )
-                    except (AttributeError, IndexError):
-                        pass
-                    self.logger.warning(
-                        "Gemini returned no text (finish_reason=%s). Fallback to stub.",
-                        finish_reason,
-                    )
-                    return self._stub_fallback_response("gemini", preview="No text returned (possibly blocked).", as_json=as_json)
-
-                self.last_call_mode = "real"
-                return _strip_jsonish(text) if as_json else text
-
-            except Exception as e:
-                self.log_error("REAL-CALL failed", e)
-                return self._stub_fallback_response("gemini", as_json=as_json)
-
+            return self.execute_real_or_fallback("gemini", call_fn, as_json=as_json)
         return self._stub_response("gemini", as_json=as_json)
 
 

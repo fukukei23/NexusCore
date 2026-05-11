@@ -35,61 +35,52 @@ class AnthropicLLM(BaseLLM):
                 "AnthropicLLM initialized in STUB mode (reason: missing key or dry-run)."
             )
 
-    def execute(self, prompt: str, system_prompt: str, **kwargs) -> str:
+    def _build_real_call(self, prompt: str, system_prompt: str, **kwargs):
+        """Return a callable that performs the real HTTP call."""
         temperature = kwargs.get("temperature", 0.3)
         as_json = kwargs.get("as_json", False)
         max_out = kwargs.get("max_tokens") or os.getenv("NEXUS_DEFAULT_MAX_OUT_TOKENS")
+
+        url = f"{self.base_url}/v1/messages"
+        headers = {
+            "x-api-key": self.api_key,
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01",
+        }
+        payload = {
+            "model": self.model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "system": system_prompt,
+            "temperature": float(temperature),
+        }
+        if max_out:
+            payload["max_tokens"] = int(max_out)
+
+        def _call():
+            resp = self.session.post(url, headers=headers, json=payload, timeout=REQUEST_TIMEOUT)
+            resp.raise_for_status()
+            data = resp.json()
+            content_blocks = data.get("content") or []
+            text_parts = []
+            for block in content_blocks:
+                if isinstance(block, dict) and block.get("type") == "text" and block.get("text"):
+                    text_parts.append(str(block["text"]))
+            text = "\n".join(text_parts).strip()
+            usage = data.get("usage") or {}
+            self.record_usage(
+                prompt_tokens=usage.get("input_tokens"),
+                completion_tokens=usage.get("output_tokens"),
+            )
+            if not text:
+                raise RuntimeError("Anthropic returned no text.")
+            return _strip_jsonish(text) if as_json else text
+
+        return _call
+
+    def execute(self, prompt: str, system_prompt: str, **kwargs) -> str:
+        as_json = kwargs.get("as_json", False)
         if self.real_calls and self.session:
-            try:
-                url = f"{self.base_url}/v1/messages"
-                headers = {
-                    "x-api-key": self.api_key,
-                    "Content-Type": "application/json",
-                    "anthropic-version": "2023-06-01",
-                }
-                payload = {
-                    "model": self.model_name,
-                    "messages": [
-                        {"role": "user", "content": prompt},
-                    ],
-                    "system": system_prompt,
-                    "temperature": float(temperature),
-                }
-                if max_out:
-                    payload["max_tokens"] = int(max_out)
-                resp = self.session.post(
-                    url,
-                    headers=headers,
-                    json=payload,
-                    timeout=REQUEST_TIMEOUT,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                content_blocks = data.get("content") or []
-                text_parts = []
-                for block in content_blocks:
-                    if (
-                        isinstance(block, dict)
-                        and block.get("type") == "text"
-                        and block.get("text")
-                    ):
-                        text_parts.append(str(block["text"]))
-                text = "\n".join(text_parts).strip()
-
-                usage = data.get("usage") or {}
-                self.record_usage(
-                    prompt_tokens=usage.get("input_tokens"),
-                    completion_tokens=usage.get("output_tokens"),
-                )
-
-                if not text:
-                    raise RuntimeError("Anthropic returned no text.")
-                self.last_call_mode = "real"
-                return _strip_jsonish(text) if as_json else text
-            except Exception as e:
-                self.log_error("REAL-CALL failed (after retries)", e)
-                return self._stub_fallback_response("anthropic", as_json=as_json)
-
+            return self.execute_real_or_fallback("anthropic", self._build_real_call(prompt, system_prompt, **kwargs), as_json=as_json)
         return self._stub_response("anthropic", as_json=as_json)
 
 

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from nexuscore.llm.helpers import DEFAULT_STUB_CONTENT, normalize_model
+from nexuscore.llm.http_client import RequestsHTTPError
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from requests import Session
@@ -90,6 +92,40 @@ class BaseLLM:
         self, prompt: str, system_prompt: str, **kwargs
     ) -> str:  # pragma: no cover - interface
         raise NotImplementedError("Subclasses must implement execute()")
+
+    def execute_real_or_fallback(
+        self,
+        provider_name: str,
+        real_call_fn: Callable[[], str],
+        as_json: bool = False,
+    ) -> str:
+        """Execute a real LLM call with standardized error handling.
+
+        Wraps the common try/except pattern: real call → HTTP error log →
+        generic error log → stub fallback. Providers should use this
+        instead of duplicating the error handling boilerplate.
+
+        Args:
+            provider_name: Display name for log messages (e.g. "openai").
+            real_call_fn: Callable that performs the actual HTTP/SDK call
+                and returns the response text.
+            as_json: Whether to return JSON-formatted stub on fallback.
+        """
+        try:
+            result = real_call_fn()
+            self.last_call_mode = "real"
+            return result
+        except RequestsHTTPError as e:
+            body = ""
+            try:
+                body = e.response.text
+            except Exception:
+                pass
+            self.log_error("REAL-CALL HTTP error (after retries)", e, body)
+            return self._stub_fallback_response(provider_name, as_json=as_json)
+        except Exception as e:
+            self.log_error("REAL-CALL failed (after retries)", e)
+            return self._stub_fallback_response(provider_name, as_json=as_json)
 
 
 __all__ = ["BaseLLM"]
