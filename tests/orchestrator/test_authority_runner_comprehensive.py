@@ -598,7 +598,7 @@ class TestContextSnapshot:
 
 
 class TestPersistRunState:
-    @patch("nexuscore.orchestrator.authority_runner.save_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.state.save_state")
     def test_paused_maps_to_PAUSED(self, mock_save):
         _persist_run_state(
             run_id="r1", status="paused", authority_level="partial",
@@ -607,7 +607,7 @@ class TestPersistRunState:
         state = mock_save.call_args[0][0]
         assert state["status"] == "PAUSED"
 
-    @patch("nexuscore.orchestrator.authority_runner.save_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.state.save_state")
     def test_completed_maps_to_SUCCEEDED(self, mock_save):
         _persist_run_state(
             run_id="r1", status="completed", authority_level=None,
@@ -616,7 +616,7 @@ class TestPersistRunState:
         state = mock_save.call_args[0][0]
         assert state["status"] == "SUCCEEDED"
 
-    @patch("nexuscore.orchestrator.authority_runner.save_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.state.save_state")
     def test_running_stays_running(self, mock_save):
         _persist_run_state(
             run_id="r1", status="RUNNING", authority_level="full",
@@ -625,7 +625,7 @@ class TestPersistRunState:
         state = mock_save.call_args[0][0]
         assert state["status"] == "RUNNING"
 
-    @patch("nexuscore.orchestrator.authority_runner.save_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.state.save_state")
     def test_includes_context_snapshot(self, mock_save):
         snap = {"user_requirement": "test"}
         _persist_run_state(
@@ -635,7 +635,7 @@ class TestPersistRunState:
         state = mock_save.call_args[0][0]
         assert state["context_snapshot"] == snap
 
-    @patch("nexuscore.orchestrator.authority_runner.save_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.state.save_state")
     def test_no_context_snapshot_key_when_none(self, mock_save):
         _persist_run_state(
             run_id="r1", status="paused", authority_level=None,
@@ -644,7 +644,7 @@ class TestPersistRunState:
         state = mock_save.call_args[0][0]
         assert "context_snapshot" not in state
 
-    @patch("nexuscore.orchestrator.authority_runner.save_state")
+    @patch("nexuscore.orchestrator._authority_runner_helpers.state.save_state")
     def test_schema_version(self, mock_save):
         _persist_run_state(
             run_id="r1", status="paused", authority_level=None,

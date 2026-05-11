@@ -10,8 +10,6 @@ on an orchestrator instance (duck-typed).
 
 from __future__ import annotations
 
-import logging
-import os
 import time
 import uuid
 from collections.abc import Callable, Sequence
@@ -27,18 +25,26 @@ except ImportError:
 
 from .constants import AuthorityLevel
 from .explainability import build_explainability  # noqa: F401
-from .run_state_store import save_state
 
+from ._authority_runner_helpers.context import default_context_factory
 from ._authority_runner_helpers.lock_lease import RunLockLease  # noqa: F401
+from ._authority_runner_helpers.phase_logging import log_phase_done, log_phase_pause, log_phase_start
 from ._authority_runner_helpers.resume import (  # noqa: F401
     _execute_remaining_phases,
     resume_run,
     set_resume_orchestrator,
     set_resume_orchestrator_factory,
 )
+from ._authority_runner_helpers.state import (
+    apply_context_snapshot,
+    extract_context_snapshot,
+    get_or_create_session_controller,
+    persist_run_state,
+    set_stop_policy,
+)
 
 # Backward-compatible re-exports for tests and external callers
-from .run_state_store import load_state, update_state  # noqa: F401
+from .run_state_store import load_state, save_state, update_state  # noqa: F401
 
 
 PHASES_ORDER: tuple[str, ...] = (
@@ -76,55 +82,6 @@ class RunnerConfig:
     allowed_phases: Sequence[str] | None = None
 
 
-def _default_context_factory(
-    *,
-    user_requirement: str,
-    language: str,
-    fast_lane: bool,
-    run_db_id: int | None,
-) -> Any:
-    try:
-        from nexuscore.core.orchestrator_models import OrchestratorContext
-
-        return OrchestratorContext(
-            task_id=uuid.uuid4().hex,
-            user_requirement=user_requirement,
-            language=language,
-            fast_lane=fast_lane,
-            run_db_id=run_db_id,
-        )
-    except Exception:
-        @dataclass
-        class _FallbackContext:
-            task_id: str
-            user_requirement: str
-            language: str
-            fast_lane: bool
-            run_db_id: int | None
-            specs: dict[str, Any]
-            plan: dict[str, Any]
-            architecture: dict[str, Any]
-            implementation: dict[str, Any]
-            testing: dict[str, Any]
-            review: dict[str, Any]
-            phase_log: list[str]
-
-        return _FallbackContext(
-            task_id=uuid.uuid4().hex,
-            user_requirement=user_requirement,
-            language=language,
-            fast_lane=fast_lane,
-            run_db_id=run_db_id,
-            specs={},
-            plan={},
-            architecture={},
-            implementation={},
-            testing={},
-            review={},
-            phase_log=[],
-        )
-
-
 def run_with_authority_level(
     orchestrator: Any,
     user_requirement: str,
@@ -148,7 +105,7 @@ def run_with_authority_level(
     if invalid:
         raise ValueError(f"Unknown phase(s): {invalid}")
 
-    factory = context_factory or _default_context_factory
+    factory = context_factory or default_context_factory
     context = factory(
         user_requirement=user_requirement,
         language=language,
@@ -162,10 +119,10 @@ def run_with_authority_level(
         method = getattr(orchestrator, method_name, None)
         if not callable(method):
             raise AttributeError(f"Orchestrator does not provide required method: {method_name}")
-        _log_phase_start(phase, phases)
+        log_phase_start(phase, phases)
         t0 = time.monotonic()
         context = method(context)
-        _log_phase_done(phase, t0)
+        log_phase_done(phase, t0)
         if _HAS_TQDM and hasattr(phase_iter, "set_postfix"):
             phase_iter.set_postfix_str(phase)
 
@@ -191,11 +148,11 @@ def run_with_authority(
         except Exception:
             pass
 
-    stop_before_phases = stop_before_phases_for_authority_level(authority_level)
+    stop_before = stop_before_phases_for_authority_level(authority_level)
 
     execution_context: dict[str, Any] = {
         "authority_level": authority_level,
-        "stop_before_phases": list(stop_before_phases),
+        "stop_before_phases": list(stop_before),
         "user_requirement": user_requirement,
         "language": language,
     }
@@ -207,7 +164,7 @@ def run_with_authority(
         fast_lane=fast_lane,
         run_db_id=run_db_id,
         execution_context=execution_context,
-        stop_before_phases=stop_before_phases,
+        stop_before_phases=stop_before,
     )
 
 
@@ -261,8 +218,7 @@ def _invoke_orchestrator(
         )
         return result
 
-    context_factory = _default_context_factory
-    context = context_factory(
+    context = _default_context_factory(
         user_requirement=user_requirement,
         language=language,
         fast_lane=fast_lane,
@@ -325,104 +281,13 @@ def _invoke_orchestrator(
     return result
 
 
-def _extract_context_snapshot(context: Any) -> dict[str, Any]:
-    snapshot: dict[str, Any] = {}
-    for key in ("user_requirement", "language", "fast_lane", "run_db_id"):
-        if hasattr(context, key):
-            snapshot[key] = getattr(context, key)
-    for key in ("specs", "plan", "architecture", "implementation", "testing", "review"):
-        val = getattr(context, key, None)
-        if isinstance(val, dict):
-            snapshot[key] = val
-    return snapshot
-
-
-def _apply_context_snapshot(context: Any, snapshot: dict[str, Any]) -> None:
-    for key, val in snapshot.items():
-        try:
-            setattr(context, key, val)
-        except Exception:
-            continue
-
-
-def _persist_run_state(
-    *,
-    run_id: str,
-    status: str,
-    authority_level: str | None,
-    next_phase: str | None,
-    execution_context: dict[str, Any],
-    context_snapshot: dict[str, Any] | None,
-) -> None:
-    status_map = {
-        "paused": "PAUSED",
-        "completed": "SUCCEEDED",
-    }
-    persisted_status = status_map.get(status, status)
-    state: dict[str, Any] = {
-        "schema_version": "1.0",
-        "run_id": run_id,
-        "status": persisted_status,
-        "authority_level": authority_level,
-        "next_phase": next_phase,
-        "execution_context": execution_context,
-    }
-    if context_snapshot is not None:
-        state["context_snapshot"] = context_snapshot
-    save_state(state)
-
-
-def _get_or_create_session_controller(orchestrator: Any) -> Any:
-    sc = getattr(orchestrator, "session_controller", None)
-    if sc is not None:
-        return sc
-
-    try:
-        from nexuscore.core.session_control import SessionController
-    except Exception:
-        return None
-
-    project_path = getattr(orchestrator, "project_path", None)
-    root_dir = ".nexus/sessions"
-    if isinstance(project_path, str) and project_path:
-        root_dir = os.path.join(project_path, ".nexus", "sessions")
-
-    sc = SessionController(session_id=uuid.uuid4().hex, root_dir=root_dir)
-    try:
-        orchestrator.session_controller = sc
-    except Exception:
-        pass
-    return sc
-
-
-def _set_stop_policy(session_controller: Any, stop_before_phases: list[str]) -> None:
-    if session_controller is None:
-        return
-    if hasattr(session_controller, "set_stop_before_phases"):
-        try:
-            session_controller.set_stop_before_phases(list(stop_before_phases))
-            return
-        except Exception:
-            return
-    try:
-        session_controller.stop_before_phases = list(stop_before_phases)
-    except Exception:
-        pass
-
-
-_phase_logger = logging.getLogger(__name__)
-
-
-def _log_phase_start(phase: str, all_phases: Sequence[str]) -> None:
-    idx = list(all_phases).index(phase) + 1 if phase in all_phases else "?"
-    total = len(all_phases)
-    _phase_logger.info("[%s/%s] Phase: %s — starting", idx, total, phase)
-
-
-def _log_phase_done(phase: str, start_time: float) -> None:
-    elapsed = time.monotonic() - start_time
-    _phase_logger.info("Phase: %s — done (%.1fs)", phase, elapsed)
-
-
-def _log_phase_pause(phase: str) -> None:
-    _phase_logger.info("Phase: %s — pausing before execution (stop_before)", phase)
+# -- Backward-compatible aliases for tests that patch private names --
+_default_context_factory = default_context_factory
+_extract_context_snapshot = extract_context_snapshot
+_apply_context_snapshot = apply_context_snapshot
+_get_or_create_session_controller = get_or_create_session_controller
+_set_stop_policy = set_stop_policy
+_persist_run_state = persist_run_state
+_log_phase_start = log_phase_start
+_log_phase_done = log_phase_done
+_log_phase_pause = log_phase_pause
