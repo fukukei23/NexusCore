@@ -10,11 +10,20 @@ on an orchestrator instance (duck-typed).
 
 from __future__ import annotations
 
+import logging
 import os
+import time
 import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
+
+try:
+    from tqdm import tqdm
+
+    _HAS_TQDM = True
+except ImportError:
+    _HAS_TQDM = False
 
 from .constants import AuthorityLevel
 from .explainability import build_explainability  # noqa: F401
@@ -147,12 +156,18 @@ def run_with_authority_level(
         run_db_id=run_db_id,
     )
 
-    for phase in phases:
+    phase_iter = tqdm(phases, desc="NexusCore phases", unit="phase") if _HAS_TQDM else phases
+    for phase in phase_iter:
         method_name = PHASE_TO_METHOD[phase]
         method = getattr(orchestrator, method_name, None)
         if not callable(method):
             raise AttributeError(f"Orchestrator does not provide required method: {method_name}")
+        _log_phase_start(phase, phases)
+        t0 = time.monotonic()
         context = method(context)
+        _log_phase_done(phase, t0)
+        if _HAS_TQDM and hasattr(phase_iter, "set_postfix"):
+            phase_iter.set_postfix_str(phase)
 
     return context
 
@@ -254,7 +269,8 @@ def _invoke_orchestrator(
         run_db_id=run_db_id,
     )
 
-    for phase in PHASES_ORDER:
+    phase_iter = tqdm(PHASES_ORDER, desc="NexusCore phases", unit="phase") if _HAS_TQDM else PHASES_ORDER
+    for phase in phase_iter:
         try:
             session_controller.checkpoint(
                 phase=phase,
@@ -264,6 +280,7 @@ def _invoke_orchestrator(
             pass
 
         if phase in stop_before_phases:
+            _log_phase_pause(phase)
             result = {
                 "status": "paused",
                 "next_phase": phase,
@@ -284,7 +301,12 @@ def _invoke_orchestrator(
         method = getattr(orchestrator, method_name, None)
         if not callable(method):
             raise AttributeError(f"Orchestrator does not provide required method: {method_name}")
+        _log_phase_start(phase, PHASES_ORDER)
+        t0 = time.monotonic()
         context = method(context)
+        _log_phase_done(phase, t0)
+        if _HAS_TQDM and hasattr(phase_iter, "set_postfix"):
+            phase_iter.set_postfix_str(phase)
 
     result = {
         "status": "completed",
@@ -386,3 +408,21 @@ def _set_stop_policy(session_controller: Any, stop_before_phases: list[str]) -> 
         session_controller.stop_before_phases = list(stop_before_phases)
     except Exception:
         pass
+
+
+_phase_logger = logging.getLogger(__name__)
+
+
+def _log_phase_start(phase: str, all_phases: Sequence[str]) -> None:
+    idx = list(all_phases).index(phase) + 1 if phase in all_phases else "?"
+    total = len(all_phases)
+    _phase_logger.info("[%s/%s] Phase: %s — starting", idx, total, phase)
+
+
+def _log_phase_done(phase: str, start_time: float) -> None:
+    elapsed = time.monotonic() - start_time
+    _phase_logger.info("Phase: %s — done (%.1fs)", phase, elapsed)
+
+
+def _log_phase_pause(phase: str) -> None:
+    _phase_logger.info("Phase: %s — pausing before execution (stop_before)", phase)
