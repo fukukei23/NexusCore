@@ -5,6 +5,21 @@ NexusCore のプロジェクト固有変更履歴。
 
 ---
 
+## [8.2.1] - 2026-05-11
+
+### Added
+- P2-2: Settings UI Gradioタブ追加（`ui/settings_tab.py`） — LLM プロバイダー状態・プロファイル情報・タスクルーティングの読み取り専用ダッシュボード
+- P2-3: フェーズ実行に tqdm 進捗バーとタイミングログを追加（`orchestrator/authority_runner.py`）
+- P2-5: `webapp/db_helpers.py` 新規作成 — Webapp DBクエリ共通ヘルパー（13関数）
+- P2-1: subqueryload でN+1クエリ解消、DB count()クエリでPython集計排除
+
+### Changed
+- P2-6: 12ファイルの未使用import除去（28→12、残りは意図的re-export）
+- P2-4: 15ファイル160件の print()→logger 移行（残り37件は意図的）
+- P2-5: views_projects/dashboard/logs の重複クエリパターンを共通ヘルパー化
+
+---
+
 ## [8.2.0] - 2026-05-10
 
 ### Added
