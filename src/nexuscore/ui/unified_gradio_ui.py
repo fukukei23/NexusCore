@@ -1,12 +1,13 @@
 """
 4.5: 統合 Gradio UI
 
-「解析→修正→テスト→履歴」まで一画面で閉じるタブ構成
+「解析→修正→テスト→履歴→設定」まで一画面で閉じるタブ構成
 各タブは個別モジュールに分割済み:
   - code_prompt_tab.py
   - ai_revision_tab.py
   - test_runner_tab.py
   - history_diff_tab.py
+  - settings_tab.py
 """
 
 from __future__ import annotations
@@ -38,6 +39,7 @@ def run_test_handler(command: str, test_file: str, current_state: AppState):
         return f"❌ エラー: {e}", "**ステータス:** ❌ エラー", current_state
 from .code_prompt_tab import build_code_prompt_tab
 from .history_diff_tab import build_history_diff_tab
+from .settings_tab import build_settings_tab
 from .test_runner_tab import build_test_runner_tab
 
 
@@ -61,6 +63,9 @@ def build_unified_ui() -> gr.Blocks:
 
             with gr.Tab("History & Diff"):
                 build_history_diff_tab(app_state)
+
+            with gr.Tab("Settings"):
+                build_settings_tab(app_state)
 
     return demo
 
