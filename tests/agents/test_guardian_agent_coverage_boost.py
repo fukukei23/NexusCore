@@ -31,64 +31,49 @@ class TestPrepareBranch:
 
 
 class TestGenerateMultiFileDiffSummary:
-    def _make_agent(self):
-        from nexuscore.agents.guardian_agent import GuardianAgent
-        agent = GuardianAgent.__new__(GuardianAgent)
-        agent.logger = MagicMock()
-        return agent
+    def _call(self, file_diffs, **kwargs):
+        from nexuscore.agents._guardian_helpers.diff_summary import _generate_multi_file_diff_summary
+        execute_llm_fn = kwargs.get("execute_llm_fn", MagicMock())
+        logger = kwargs.get("logger", MagicMock())
+        return _generate_multi_file_diff_summary(execute_llm_fn, file_diffs, logger=logger)
 
     def test_empty_file_diffs(self):
-        agent = self._make_agent()
-        result = agent._generate_multi_file_diff_summary({})
+        result = self._call({})
         assert result == {}
 
     def test_skips_empty_before_or_after(self):
-        agent = self._make_agent()
         file_diffs = {
             "a.py": {"before": "", "after": "code"},
             "b.py": {"before": "code", "after": ""},
         }
-        result = agent._generate_multi_file_diff_summary(file_diffs)
+        result = self._call(file_diffs)
         assert "before/after" in result["a.py"]
         assert "before/after" in result["b.py"]
 
-    def test_generates_summary_for_valid_diffs(self):
-        agent = self._make_agent()
-        with patch.object(agent, "generate_diff_summary", return_value="要約テスト"):
-            result = agent._generate_multi_file_diff_summary(
-                {"a.py": {"before": "old", "after": "new"}}
-            )
-            assert result["a.py"] == "要約テスト"
+    @patch("nexuscore.agents._guardian_helpers.diff_summary.generate_diff_summary", return_value="要約テスト")
+    def test_generates_summary_for_valid_diffs(self, mock_gen):
+        result = self._call({"a.py": {"before": "old", "after": "new"}})
+        assert result["a.py"] == "要約テスト"
 
-    def test_handles_exception_in_summary_generation(self):
-        agent = self._make_agent()
-        with patch.object(agent, "generate_diff_summary", side_effect=RuntimeError("fail")):
-            result = agent._generate_multi_file_diff_summary(
-                {"a.py": {"before": "old", "after": "new"}}
-            )
-            assert "失敗" in result["a.py"]
+    @patch("nexuscore.agents._guardian_helpers.diff_summary.generate_diff_summary", side_effect=RuntimeError("fail"))
+    def test_handles_exception_in_summary_generation(self, mock_gen):
+        logger = MagicMock()
+        result = self._call({"a.py": {"before": "old", "after": "new"}}, logger=logger)
+        assert "失敗" in result["a.py"]
 
-    def test_passes_semantic_diffs(self):
-        agent = self._make_agent()
-        with patch.object(agent, "generate_diff_summary", return_value="summary") as mock:
-            result = agent._generate_multi_file_diff_summary(
-                {"a.py": {"before": "old", "after": "new"}},
-                semantic_diffs={"a.py": {"type": "refactor"}},
-            )
-            mock.assert_called_once_with(
-                before_code="old",
-                after_code="new",
-                semantic_diffs={"a.py": {"type": "refactor"}},
-                model="gpt-4.1",
-            )
+    @patch("nexuscore.agents._guardian_helpers.diff_summary.generate_diff_summary", return_value="summary")
+    def test_passes_semantic_diffs(self, mock_gen):
+        result = self._call(
+            {"a.py": {"before": "old", "after": "new"}},
+            semantic_diffs={"a.py": {"type": "refactor"}},
+        )
+        assert result["a.py"] == "summary"
+        mock_gen.assert_called_once()
 
-    def test_non_string_summary_falls_back(self):
-        agent = self._make_agent()
-        with patch.object(agent, "generate_diff_summary", return_value=None):
-            result = agent._generate_multi_file_diff_summary(
-                {"a.py": {"before": "old", "after": "new"}}
-            )
-            assert result["a.py"] == "要約生成に失敗しました"
+    @patch("nexuscore.agents._guardian_helpers.diff_summary.generate_diff_summary", return_value=None)
+    def test_non_string_summary_falls_back(self, mock_gen):
+        result = self._call({"a.py": {"before": "old", "after": "new"}})
+        assert result["a.py"] == "要約生成に失敗しました"
 
 
 class TestGenerateDiffSummaryEdge:
@@ -217,7 +202,10 @@ class TestCommitChanges:
         agent = self._make_agent()
         agent.vcs = MagicMock()
         with patch.object(agent, "review", return_value={"decision": "APPROVE"}):
-            with patch.object(agent, "_prepare_branch", side_effect=RuntimeError("branch fail")):
+            with patch(
+                "nexuscore.agents._guardian_helpers.commit_workflow.prepare_branch",
+                side_effect=RuntimeError("branch fail"),
+            ):
                 result = agent.review_and_commit(
                     **self._make_review_and_commit_args(),
                     allow_commit=True,
@@ -231,7 +219,10 @@ class TestCommitChanges:
         mock_vcs.commit_changes.return_value = "abc123"
         agent.vcs = mock_vcs
         with patch.object(agent, "review", return_value={"decision": "APPROVE"}):
-            with patch.object(agent, "_generate_commit_message", return_value="fix: bug"):
+            with patch(
+                "nexuscore.agents._guardian_helpers.commit_workflow.generate_commit_message",
+                return_value="fix: bug",
+            ):
                 result = agent.review_and_commit(
                     **self._make_review_and_commit_args(),
                     allow_commit=True,
