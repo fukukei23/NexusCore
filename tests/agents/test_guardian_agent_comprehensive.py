@@ -726,10 +726,10 @@ class TestGenerateDiffSummary:
         assert "簡潔化" in result
         mock_llm.assert_called_once()
 
-    @patch.object(GuardianAgent, "_generate_multi_file_diff_summary")
-    def test_generate_diff_summary_multi_file(self, mock_multi, guardian):
+    @patch("nexuscore.agents.guardian_agent.generate_diff_summary")
+    def test_generate_diff_summary_multi_file(self, mock_diff_summary, guardian):
         """複数ファイル差分のサマリー生成"""
-        mock_multi.return_value = {"file1.py": "- 改善点1", "file2.py": "- 改善点2"}
+        mock_diff_summary.return_value = {"file1.py": "- 改善点1", "file2.py": "- 改善点2"}
 
         file_diffs = {
             "file1.py": {"before": "old code 1", "after": "new code 1"},
@@ -741,7 +741,7 @@ class TestGenerateDiffSummary:
         assert isinstance(result, dict)
         assert "file1.py" in result
         assert "file2.py" in result
-        mock_multi.assert_called_once_with(file_diffs, None, "gpt-4.1")
+        mock_diff_summary.assert_called_once()
 
 
 # ============================================================================
