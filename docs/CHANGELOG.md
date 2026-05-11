@@ -5,6 +5,16 @@ NexusCore のプロジェクト固有変更履歴。
 
 ---
 
+## [8.2.2] - 2026-05-12
+
+### Changed
+- P1-1: APIルートのHTTPException判定を `isinstance(e, HTTPException)` に統一、バックグラウンドタスクのエラー分類を追加（ValueError/ConnectionError/ImportError）
+- P1-2: `authority_runner.py` を3モジュールに分割（`context.py`, `state.py`, `phase_logging.py`）— 428→293行
+- P1-3: LLMリトライロジック共通化 — `BaseLLM.execute_real_or_fallback()` 抽出、3プロバイダーを `_build_real_call()` クロージャパターンに統一
+- P1-5: `GuardianAgent` を2モジュールに分割（`commit_workflow.py`, `review_executor.py`）— 388→317行
+
+---
+
 ## [8.2.1] - 2026-05-11
 
 ### Added
