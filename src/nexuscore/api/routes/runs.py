@@ -9,7 +9,7 @@ Run管理用の FastAPI エンドポイント（DBベース）。
 
 import logging
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc
 
 from ..dependencies.auth import AuthenticatedUser, get_current_user, get_user_id_from_auth
@@ -187,8 +187,7 @@ async def get_run(
         )
 
     except Exception as e:
-        # HTTPException はそのまま再発生（make_error で生成されたもの）
-        if isinstance(e, Exception) and hasattr(e, "status_code"):
+        if isinstance(e, HTTPException):
             raise
         logger.error(f"Failed to get run: {e}", exc_info=True)
         raise make_internal_error("Failed to get run details. Please try again later.") from e

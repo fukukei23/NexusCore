@@ -8,7 +8,7 @@ Projects エンドポイント
 import logging
 import os
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import desc
 
 from ..dependencies.auth import AuthenticatedUser, get_current_user, get_user_id_from_auth
@@ -264,8 +264,7 @@ async def get_project(
         )
 
     except Exception as e:
-        # HTTPException はそのまま再発生（make_error で生成されたもの）
-        if isinstance(e, Exception) and hasattr(e, "status_code"):
+        if isinstance(e, HTTPException):
             raise
         logger.error(f"Failed to get project: {e}", exc_info=True)
         raise make_internal_error("Failed to get project details. Please try again later.") from e
@@ -403,8 +402,7 @@ async def trigger_project_run(
         )
 
     except Exception as e:
-        # HTTPException はそのまま再発生（make_error で生成されたもの）
-        if isinstance(e, Exception) and hasattr(e, "status_code"):
+        if isinstance(e, HTTPException):
             raise
         logger.error(f"Failed to trigger project run: {e}", exc_info=True)
         raise make_internal_error("Failed to trigger project run. Please try again later.") from e
@@ -489,8 +487,7 @@ async def get_latest_run(
         )
 
     except Exception as e:
-        # HTTPException はそのまま再発生（make_error で生成されたもの）
-        if isinstance(e, Exception) and hasattr(e, "status_code"):
+        if isinstance(e, HTTPException):
             raise
         logger.error(f"Failed to get latest run: {e}", exc_info=True)
         raise make_internal_error("Failed to get latest run. Please try again later.") from e

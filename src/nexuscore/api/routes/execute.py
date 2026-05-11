@@ -146,6 +146,15 @@ def run_orchestrator_task(task_id: str, requirement: str, project_path: str, con
         }
         logger.info(f"Task {task_id} completed successfully.")
 
+    except ValueError as e:
+        logger.error(f"Configuration error in task {task_id}: {e}")
+        tasks[task_id] = {"status": "error", "message": f"Configuration error: {e}. Check your .env file and API keys."}
+    except ConnectionError as e:
+        logger.error(f"Connection error in task {task_id}: {e}")
+        tasks[task_id] = {"status": "error", "message": f"Connection failed: {e}. Check your network and API endpoints."}
+    except ImportError as e:
+        logger.error(f"Import error in task {task_id}: {e}")
+        tasks[task_id] = {"status": "error", "message": f"Module not found: {e}. Run 'pip install -e .' to install dependencies."}
     except Exception as e:
         logger.critical(f"An error occurred in task {task_id}: {e}", exc_info=True)
         tasks[task_id] = {"status": "error", "message": f"orchestrator failed: {e}"}
