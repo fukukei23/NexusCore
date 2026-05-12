@@ -81,7 +81,7 @@ def test_list_projects_success(client: TestClient, mock_api_key, mock_db_models)
             return column
         return sa_desc(column)
 
-    with patch("nexuscore.api.routes.projects.desc", side_effect=mock_desc):
+    with patch("nexuscore.api.routes._projects_crud.desc", side_effect=mock_desc):
         mock_query = MagicMock()
         mock_query.filter_by.return_value.order_by.return_value.all.return_value = [
             mock_project1,

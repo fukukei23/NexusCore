@@ -132,7 +132,7 @@ def test_trigger_project_run_sync_mode(mock_db_session, mock_project, mock_run, 
 
     # os.getenv を直接パッチ（モジュールレベルでインポートされている os をパッチ）
     # projects.py の trigger_project_run 関数内で使用される os.getenv をパッチ
-    import nexuscore.api.routes.projects as projects_module
+    import nexuscore.api.routes._projects_runs as projects_module
 
     with (
         patch.object(projects_module.os, "getenv") as mock_getenv,
@@ -239,7 +239,7 @@ def test_get_latest_run_success(mock_db_session, mock_project, mock_run):
     with (
         patch("nexuscore.webapp.models.Project") as MockProject,
         patch("nexuscore.webapp.models.Run") as MockRun,
-        patch("nexuscore.api.routes.projects.desc") as mock_desc,
+        patch("nexuscore.api.routes._projects_runs.desc") as mock_desc,
     ):
 
         # プロジェクトのクエリをモック
@@ -273,7 +273,7 @@ def test_get_latest_run_no_runs(mock_db_session, mock_project):
     with (
         patch("nexuscore.webapp.models.Project") as MockProject,
         patch("nexuscore.webapp.models.Run") as MockRun,
-        patch("nexuscore.api.routes.projects.desc") as mock_desc,
+        patch("nexuscore.api.routes._projects_runs.desc") as mock_desc,
     ):
 
         # プロジェクトのクエリをモック

@@ -90,7 +90,7 @@ def test_get_projects_with_api_key(client: TestClient, mock_api_key, mock_db_mod
             return column
         return sa_desc(column)
 
-    with patch("nexuscore.api.routes.projects.desc", side_effect=mock_desc):
+    with patch("nexuscore.api.routes._projects_crud.desc", side_effect=mock_desc):
         mock_query = MagicMock()
         mock_query.filter_by.return_value.order_by.return_value.all.return_value = [
             mock_db_models["project"]
@@ -183,7 +183,7 @@ def test_get_latest_run_with_api_key(client: TestClient, mock_api_key, mock_db_m
     mock_run.finished_at = datetime(2025, 1, 1, 0, 5, 0)
 
     # desc() をモック（test_fastapi_project_runs.py と同じパターン）
-    with patch("nexuscore.api.routes.projects.desc") as mock_desc:
+    with patch("nexuscore.api.routes._projects_runs.desc") as mock_desc:
         mock_desc.return_value = MagicMock()
 
         # Run のクエリチェーンをモック
@@ -215,7 +215,7 @@ def test_get_latest_run_without_runs(client: TestClient, mock_api_key, mock_db_m
     ]
 
     # desc() をモック（test_fastapi_project_runs.py と同じパターン）
-    with patch("nexuscore.api.routes.projects.desc") as mock_desc:
+    with patch("nexuscore.api.routes._projects_runs.desc") as mock_desc:
         mock_desc.return_value = MagicMock()
 
         # Run が見つからない場合

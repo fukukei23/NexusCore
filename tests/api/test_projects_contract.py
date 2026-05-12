@@ -78,7 +78,7 @@ def test_get_projects_response_shape(client: TestClient, mock_api_key, mock_db_m
             return column
         return sa_desc(column)
 
-    with patch("nexuscore.api.routes.projects.desc", side_effect=mock_desc):
+    with patch("nexuscore.api.routes._projects_crud.desc", side_effect=mock_desc):
         mock_query = MagicMock()
         mock_query.filter_by.return_value.order_by.return_value.all.return_value = [
             mock_db_models["project"]
@@ -122,7 +122,7 @@ def test_get_latest_run_response_shape_with_run(client: TestClient, mock_api_key
     mock_run.started_at = datetime(2025, 1, 1, 0, 0, 0)
     mock_run.finished_at = datetime(2025, 1, 1, 0, 5, 0)
 
-    with patch("nexuscore.api.routes.projects.desc") as mock_desc:
+    with patch("nexuscore.api.routes._projects_runs.desc") as mock_desc:
         mock_desc.return_value = MagicMock()
 
         mock_query_chain = MagicMock()
@@ -158,7 +158,7 @@ def test_get_latest_run_response_shape_without_run(
         "project"
     ]
 
-    with patch("nexuscore.api.routes.projects.desc") as mock_desc:
+    with patch("nexuscore.api.routes._projects_runs.desc") as mock_desc:
         mock_desc.return_value = MagicMock()
 
         mock_query_chain = MagicMock()

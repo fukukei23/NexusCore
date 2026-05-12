@@ -7,8 +7,9 @@
 
 | イシュー | タイトル | 優先度 | 状態 |
 |---|---|---|---|
-| [FUK-5](https://linear.app/fukukei/issue/FUK-5/) | 型アノテーション強化（Jタスク） | Low | Backlog |
-| [FUK-6](https://linear.app/fukukei/issue/FUK-6/) | Gemini providerテスト失敗の解消 | Medium | Backlog |
+| [FUK-8](https://linear.app/fukukei/issue/FUK-8/) | `api/routes/projects.py` 分割（493行） | Low | Backlog |
+
+<!-- FUK-5, FUK-6, FUK-7: 完了・除外済み -->
 
 ## 完了済みタスク（履歴）
 
