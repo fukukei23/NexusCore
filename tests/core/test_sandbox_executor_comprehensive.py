@@ -37,7 +37,7 @@ except ImportError:
 class TestLoadSandboxPolicy:
     def test_load_policy_default_when_yaml_not_available(self):
         """YAMLがない場合のデフォルトポリシー"""
-        with patch("nexuscore.core.sandbox_executor.yaml", None):
+        with patch("nexuscore.core.sandbox._config.yaml", None):
             policy = load_sandbox_policy()
 
             assert "resource_limits" in policy

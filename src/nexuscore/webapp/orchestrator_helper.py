@@ -114,8 +114,8 @@ def run_orchestrator_sync(
 
 
 def run_orchestrator_inline(
-    run: "Run",
-    project: "Project",
+    run: "Run",  # type: ignore[name-defined]
+    project: "Project",  # type: ignore[name-defined]
     requirement: str,
     autonomy_level: int = 1,
     fast_lane: bool = False,

@@ -48,18 +48,21 @@ class TestTextLocalization:
 # ---------------------------------------------------------------------------
 
 class TestStateMachine:
-    def test_transition_returns_tuples(self):
+    @patch.object(RequirementAgent, "execute_llm_task")
+    def test_transition_returns_tuples(self, mock_execute):
+        mock_execute.return_value = "テスト応答"
         agent = RequirementAgent()
         sm = StateMachine(agent)
         result = sm.transition("test")
         assert isinstance(result, list)
-        assert result[0] == (None, "仕様を生成します。")
+        assert len(result) == 1
+        assert isinstance(result[0], tuple)
 
-    def test_transition_sets_finalizing(self):
+    def test_transition_sets_collecting_from_init(self):
         agent = RequirementAgent()
         sm = StateMachine(agent)
         sm.transition()
-        assert sm.state["state"] == "FINALIZING"
+        assert sm.state["state"] == "COLLECTING"
 
 
 # ---------------------------------------------------------------------------

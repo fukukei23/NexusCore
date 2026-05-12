@@ -77,7 +77,7 @@ def paginate_query(query: Query, order_column=None, per_page: int = 50) -> tuple
     per_page = int(request.args.get("per_page", per_page))
     if order_column is not None:
         query = query.order_by(desc(order_column))
-    result = query.paginate(page=page, per_page=per_page, error_out=False)
+    result = query.paginate(page=page, per_page=per_page, error_out=False)  # type: ignore[attr-defined]
     pagination = {
         "page": page,
         "per_page": per_page,

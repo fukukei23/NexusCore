@@ -32,18 +32,11 @@ _logger = logging.getLogger(__name__)
 # --- 依存 ---
 try:
     from ..utils.json_sanitizer import sanitize_json_like
-    from .base_agent import BaseAgent
 except ImportError:
-    # --- フォールバック ---
     def sanitize_json_like(payload: Any) -> Any:  # type: ignore[misc]
         return payload
 
-    class BaseAgent:  # type: ignore[no-redef]
-        def __init__(self, *args, **kwargs):
-            _logger.warning("BaseAgent not found; using fallback stub.")
-
-        def execute_llm_task(self, prompt: str, as_json: bool = False) -> str:
-            return "{}"
+from ._fallbacks import BaseAgent
 
 
 # (TextLocalization と StateMachine クラスは変更なし)
@@ -90,13 +83,52 @@ class TextLocalization:
 
 
 class StateMachine:
+    STATES = ("INIT", "COLLECTING", "SUGGESTING", "FINALIZING")
+
     def __init__(self, agent: RequirementAgent):
         self.agent = agent
         self.state = self.agent._get_initial_state()
 
-    def transition(self, user_input: str | None = None):
-        self.state["state"] = "FINALIZING"
-        return [(None, "仕様を生成します。")]  # 仮実装
+    def _build_prompt(self, history: list[dict[str, Any]], user_input: str) -> str:
+        history_text = "\n".join(
+            f"{'User' if h['role'] == 'user' else 'Assistant'}: {h['content']}"
+            for h in history[-10:]
+        )
+        return f"""You are a requirements analyst. Based on the conversation, respond appropriately.
+
+Current state: {self.state["state"]}
+User input: {user_input}
+
+Conversation so far:
+{history_text}
+
+If in COLLECTING state: Ask clarifying questions or confirm understanding.
+If in SUGGESTING state: Propose concrete features and ask for approval.
+Respond concisely in {'Japanese' if self.agent.language == 'ja' else 'English'}."""
+
+    def transition(self, user_input: str | None = None) -> list[tuple[Any, str]]:
+        current = self.state["state"]
+
+        if current == "INIT":
+            self.state["state"] = "COLLECTING"
+        elif current == "COLLECTING":
+            self.state["state"] = "SUGGESTING"
+        elif current == "SUGGESTING":
+            self.state["state"] = "FINALIZING"
+
+        if user_input:
+            self.state["history"].append({"role": "user", "content": user_input})
+
+        if current in ("INIT", "COLLECTING", "SUGGESTING"):
+            try:
+                prompt = self._build_prompt(self.state["history"], user_input or "")
+                response = self.agent.execute_llm_task(prompt)
+            except Exception:
+                response = "要件をお聞かせください。" if self.agent.language == "ja" else "Please tell me your requirements."
+            self.state["history"].append({"role": "assistant", "content": response})
+            return [(None, response)]
+
+        return [(None, "仕様を生成します。")]
 
 
 class RequirementAgent(BaseAgent):

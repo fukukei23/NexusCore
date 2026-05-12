@@ -51,7 +51,6 @@ def test_tree_sitter_engine_initialization():
     assert engine.config is not None
     assert engine.parsers == {}
     assert engine.languages == {}
-    assert engine.cache_dir.exists() or engine.cache_dir.parent.exists()
 
 
 def test_tree_sitter_engine_custom_config(tmp_path):

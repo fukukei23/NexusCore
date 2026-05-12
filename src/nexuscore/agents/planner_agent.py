@@ -21,22 +21,11 @@ from typing import Any
 
 try:
     from ..utils.json_sanitizer import sanitize_json_like
-    from .base_agent import BaseAgent
 except ImportError:
-    # --- フォールバック定義 ---
     def sanitize_json_like(payload: Any) -> Any:  # type: ignore[misc]
         return payload
 
-    class BaseAgent:  # type: ignore[no-redef]
-        def __init__(self, *args, **kwargs):
-            self.logger = logging.getLogger(self.__class__.__name__)
-            self.logger.warning("BaseAgentが見つかりません。（フォールバック）")
-
-        def execute_llm_task(self, prompt: str, as_json: bool = False) -> str:
-            return "[]"
-
-        def _call_llm(self, prompt: str, system_prompt: str, as_json: bool = False) -> str:
-            return self.execute_llm_task(prompt, as_json)
+from ._fallbacks import BaseAgent
 
 
 class PlannerAgent(BaseAgent):

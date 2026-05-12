@@ -375,18 +375,26 @@ class TestIntegrationScenarios:
         assert len(result["features"]) == 3
         assert agent.final_requirements == result
 
-    def test_state_machine_integration(self):
+    @patch.object(RequirementAgent, "execute_llm_task")
+    def test_state_machine_integration(self, mock_execute):
         """StateMachineとの統合"""
+        mock_execute.return_value = "ご要件を承りました。"
         agent = RequirementAgent()
         fsm = StateMachine(agent)
 
         # 初期状態
         assert fsm.state["state"] == "INIT"
 
-        # 遷移
+        # INIT → COLLECTING
         fsm.transition("要件を入力")
+        assert fsm.state["state"] == "COLLECTING"
 
-        # 状態が更新される
+        # COLLECTING → SUGGESTING
+        fsm.transition("追加要件")
+        assert fsm.state["state"] == "SUGGESTING"
+
+        # SUGGESTING → FINALIZING
+        fsm.transition("はい")
         assert fsm.state["state"] == "FINALIZING"
 
 
@@ -544,25 +552,23 @@ class TestRequirementAgentEdgeCases:
         # final_requirementsが更新される
         assert agent.final_requirements["summary"] == "v2"
 
-    def test_state_machine_multiple_transitions(self):
+    @patch.object(RequirementAgent, "execute_llm_task")
+    def test_state_machine_multiple_transitions(self, mock_execute):
         """StateMachineの複数回遷移"""
+        mock_execute.return_value = "了解しました。"
         agent = RequirementAgent()
         fsm = StateMachine(agent)
 
         # 初期状態
         assert fsm.state["state"] == "INIT"
 
-        # 1回目の遷移
+        # INIT → COLLECTING
         fsm.transition("入力1")
-        state1 = fsm.state["state"]
+        assert fsm.state["state"] == "COLLECTING"
 
-        # 2回目の遷移（状態は変わらない可能性があるが、エラーにならない）
+        # COLLECTING → SUGGESTING
         fsm.transition("入力2")
-        state2 = fsm.state["state"]
-
-        # どちらも有効な状態
-        assert state1 in ["INIT", "FINALIZING", "SUGGESTING"]
-        assert state2 in ["INIT", "FINALIZING", "SUGGESTING"]
+        assert fsm.state["state"] == "SUGGESTING"
 
 
 class TestRequirementAgentAdvancedScenarios:

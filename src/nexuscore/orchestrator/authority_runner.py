@@ -124,7 +124,7 @@ def run_with_authority_level(
         context = method(context)
         log_phase_done(phase, t0)
         if _HAS_TQDM and hasattr(phase_iter, "set_postfix"):
-            phase_iter.set_postfix_str(phase)
+            phase_iter.set_postfix_str(phase)  # type: ignore[union-attr]
 
     return context
 
@@ -262,7 +262,7 @@ def _invoke_orchestrator(
         context = method(context)
         _log_phase_done(phase, t0)
         if _HAS_TQDM and hasattr(phase_iter, "set_postfix"):
-            phase_iter.set_postfix_str(phase)
+            phase_iter.set_postfix_str(phase)  # type: ignore[union-attr]
 
     result = {
         "status": "completed",

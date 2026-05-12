@@ -37,14 +37,19 @@ class TestTextLocalization:
 class TestStateMachine:
     """StateMachine のテスト"""
 
-    def test_transition_sets_finalizing(self):
+    @patch("nexuscore.agents.requirement_agent.RequirementAgent.execute_llm_task")
+    def test_transition_sets_finalizing(self, mock_execute):
         from nexuscore.agents.requirement_agent import RequirementAgent, StateMachine
 
+        mock_execute.return_value = "了解しました。"
         agent = RequirementAgent()
         sm = StateMachine(agent)
-        result = sm.transition("test input")
+        sm.transition("input1")
+        assert sm.state["state"] == "COLLECTING"
+        sm.transition("input2")
+        assert sm.state["state"] == "SUGGESTING"
+        sm.transition("input3")
         assert sm.state["state"] == "FINALIZING"
-        assert len(result) == 1
 
     def test_transition_without_input(self):
         from nexuscore.agents.requirement_agent import RequirementAgent, StateMachine
@@ -52,7 +57,7 @@ class TestStateMachine:
         agent = RequirementAgent()
         sm = StateMachine(agent)
         result = sm.transition()
-        assert sm.state["state"] == "FINALIZING"
+        assert sm.state["state"] == "COLLECTING"
 
 
 class TestRequirementAgentInit:

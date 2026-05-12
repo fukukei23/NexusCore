@@ -128,7 +128,7 @@ class TestAutoReviewWarning:
 
         # Need actual ReviewDecision enum for comparison
         try:
-            from nexuscore.agents.guardian_auto_reviewer import ReviewDecision
+            from nexuscore.guard.guardian_auto_reviewer import ReviewDecision
             manual_decision = ReviewDecision.MANUAL_REVIEW
         except ImportError:
             pytest.skip("ReviewDecision not available")

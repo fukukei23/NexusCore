@@ -16,7 +16,7 @@ guardian_auto_reviewer.py の包括的テスト
 import pytest
 
 try:
-    from nexuscore.agents.guardian_auto_reviewer import (
+    from nexuscore.guard.guardian_auto_reviewer import (
         FileChange,  # noqa: F401
         GuardianAutoReviewer,
         Hunk,

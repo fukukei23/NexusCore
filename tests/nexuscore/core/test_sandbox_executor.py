@@ -29,7 +29,7 @@ def test_apply_resource_limits_on_posix(monkeypatch):
     """POSIX環境でリソース制限が適用されることを確認"""
     monkeypatch.setattr(os, "name", "posix")
 
-    with patch("nexuscore.core.sandbox_executor.resource") as mock_resource:
+    with patch("nexuscore.core.sandbox._config.resource") as mock_resource:
         mock_resource.RLIMIT_AS = 9  # 仮の値
         mock_resource.RLIMIT_CPU = 0  # 仮の値
 
@@ -62,7 +62,7 @@ def test_apply_resource_limits_on_non_posix(monkeypatch):
     """非POSIX環境ではリソース制限が適用されないことを確認"""
     monkeypatch.setattr(os, "name", "nt")
 
-    with patch("nexuscore.core.sandbox_executor.resource") as mock_resource:
+    with patch("nexuscore.core.sandbox._config.resource") as mock_resource:
         _apply_resource_limits()
 
         # setrlimit が呼ばれないことを確認
@@ -72,7 +72,7 @@ def test_apply_resource_limits_on_non_posix(monkeypatch):
 def test_apply_resource_limits_when_resource_unavailable(monkeypatch):
     """resourceモジュールが利用できない場合は例外を投げないことを確認"""
     monkeypatch.setattr(os, "name", "posix")
-    monkeypatch.setattr("nexuscore.core.sandbox_executor.resource", None)
+    monkeypatch.setattr("nexuscore.core.sandbox._config.resource", None)
 
     # 例外が発生しないことを確認
     _apply_resource_limits()
@@ -82,7 +82,7 @@ def test_apply_resource_limits_on_resource_error(monkeypatch):
     """resource.setrlimit がエラーを投げても例外を投げないことを確認"""
     monkeypatch.setattr(os, "name", "posix")
 
-    with patch("nexuscore.core.sandbox_executor.resource") as mock_resource:
+    with patch("nexuscore.core.sandbox._config.resource") as mock_resource:
         mock_resource.RLIMIT_AS = 9
         mock_resource.RLIMIT_CPU = 0
         mock_resource.setrlimit.side_effect = OSError("Permission denied")

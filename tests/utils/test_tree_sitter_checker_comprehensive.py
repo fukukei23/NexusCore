@@ -123,7 +123,7 @@ class TestSemanticAnalyzerInit:
 class TestCheckAvailability:
     """Test check_availability method"""
 
-    @patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", False)
+    @patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", False)
     def test_check_availability_no_tree_sitter(self):
         """Check availability when tree-sitter not installed"""
         analyzer = SemanticAnalyzer()
@@ -138,11 +138,11 @@ class TestCheckAvailability:
         mock_get_parser = MagicMock(return_value=MagicMock())
 
         with (
-            patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True),
+            patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True),
             patch.dict(
                 "sys.modules", {"tree_sitter_language_pack": MagicMock(get_parser=mock_get_parser)}
             ),
-            patch("nexuscore.utils.tree_sitter_checker.get_parser", mock_get_parser, create=True),
+            patch("nexuscore.utils.tree_sitter._analyzer.get_parser", mock_get_parser, create=True),
         ):
 
             analyzer = SemanticAnalyzer()
@@ -156,11 +156,11 @@ class TestCheckAvailability:
         mock_get_parser = MagicMock(side_effect=Exception("Setup failed"))
 
         with (
-            patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True),
+            patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True),
             patch.dict(
                 "sys.modules", {"tree_sitter_language_pack": MagicMock(get_parser=mock_get_parser)}
             ),
-            patch("nexuscore.utils.tree_sitter_checker.get_parser", mock_get_parser, create=True),
+            patch("nexuscore.utils.tree_sitter._analyzer.get_parser", mock_get_parser, create=True),
         ):
 
             analyzer = SemanticAnalyzer()
@@ -178,7 +178,7 @@ class TestCheckAvailability:
 class TestSetupParsers:
     """Test setup_parsers method"""
 
-    @patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", False)
+    @patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", False)
     def test_setup_parsers_not_available(self):
         """Setup fails when tree-sitter not available"""
         analyzer = SemanticAnalyzer()
@@ -193,12 +193,12 @@ class TestSetupParsers:
         mock_get_parser_func = MagicMock(return_value=MagicMock())
 
         with (
-            patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True),
+            patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True),
             patch(
-                "nexuscore.utils.tree_sitter_checker.get_parser", mock_get_parser_func, create=True
+                "nexuscore.utils.tree_sitter._analyzer.get_parser", mock_get_parser_func, create=True
             ),
             patch(
-                "nexuscore.utils.tree_sitter_checker.get_language", mock_get_language, create=True
+                "nexuscore.utils.tree_sitter._analyzer.get_language", mock_get_language, create=True
             ),
         ):
 
@@ -220,14 +220,14 @@ class TestSetupParsers:
         mock_get_language = MagicMock(return_value=MagicMock())
 
         with (
-            patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True),
+            patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True),
             patch(
-                "nexuscore.utils.tree_sitter_checker.get_parser",
+                "nexuscore.utils.tree_sitter._analyzer.get_parser",
                 side_effect=get_parser_side_effect,
                 create=True,
             ),
             patch(
-                "nexuscore.utils.tree_sitter_checker.get_language", mock_get_language, create=True
+                "nexuscore.utils.tree_sitter._analyzer.get_language", mock_get_language, create=True
             ),
         ):
 
@@ -243,12 +243,12 @@ class TestSetupParsers:
         mock_get_language = MagicMock(return_value=MagicMock())
 
         with (
-            patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True),
+            patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True),
             patch(
-                "nexuscore.utils.tree_sitter_checker.get_parser", mock_get_parser_func, create=True
+                "nexuscore.utils.tree_sitter._analyzer.get_parser", mock_get_parser_func, create=True
             ),
             patch(
-                "nexuscore.utils.tree_sitter_checker.get_language", mock_get_language, create=True
+                "nexuscore.utils.tree_sitter._analyzer.get_language", mock_get_language, create=True
             ),
         ):
 
@@ -278,7 +278,7 @@ class TestExtractSymbols:
 
         assert result == {}
 
-    @patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True)
+    @patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True)
     def test_extract_symbols_python(self):
         """Extract symbols from Python code"""
         analyzer = SemanticAnalyzer()
@@ -302,7 +302,7 @@ class TestExtractSymbols:
         assert isinstance(result, dict)
         # Should have attempted to extract symbols
 
-    @patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True)
+    @patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True)
     def test_extract_symbols_query_exception(self):
         """Handles query exceptions gracefully"""
         analyzer = SemanticAnalyzer()
@@ -386,7 +386,7 @@ class TestAnalyzeSourceCode:
         assert result.success is False
         assert "not available" in result["error"].lower()
 
-    @patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True)
+    @patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True)
     def test_analyze_source_code_success(self):
         """Successfully analyze source code"""
         analyzer = SemanticAnalyzer(enable_cache=False)
@@ -409,7 +409,7 @@ class TestAnalyzeSourceCode:
         assert result["language"] == "python"
         assert "source_stats" in result.to_dict()
 
-    @patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True)
+    @patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True)
     def test_analyze_source_code_with_errors(self):
         """Detect syntax errors"""
         analyzer = SemanticAnalyzer(enable_cache=False)
@@ -431,7 +431,7 @@ class TestAnalyzeSourceCode:
         assert result.success is True  # Analysis succeeds
         assert result["errors"]["has_syntax_errors"] is True
 
-    @patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True)
+    @patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True)
     def test_analyze_source_code_cache_hit(self):
         """Returns cached result on cache hit"""
         analyzer = SemanticAnalyzer(enable_cache=True)
@@ -456,7 +456,7 @@ class TestAnalyzeSourceCode:
         assert analyzer._profiling_stats["cache_hits"] == 1
         assert result1.to_dict() == result2.to_dict()
 
-    @patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True)
+    @patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True)
     def test_analyze_source_code_exception(self):
         """Handles parse exception"""
         analyzer = SemanticAnalyzer()
@@ -471,7 +471,7 @@ class TestAnalyzeSourceCode:
         assert result.success is False
         assert "Parse failed" in result["error"]
 
-    @patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True)
+    @patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True)
     @patch.dict(CONFIG, {"enable_profiling": True})
     def test_analyze_source_code_profiling(self):
         """Records profiling stats"""
@@ -523,7 +523,7 @@ class TestAnalyzeFile:
         assert result.success is False
         assert "Unsupported" in result["error"]
 
-    @patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True)
+    @patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True)
     def test_analyze_file_success(self, tmp_path):
         """Successfully analyze file"""
         analyzer = SemanticAnalyzer()
@@ -563,7 +563,7 @@ class TestAnalyzeProject:
     def test_analyze_project_empty(self, tmp_path):
         """Analyze empty project"""
         with (
-            patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True),
+            patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True),
             patch("tqdm.tqdm", side_effect=lambda x, **kwargs: x),
         ):
 
@@ -786,7 +786,7 @@ class TestReportGenerator:
 class TestTreeSitterCheckerIntegration:
     """Integration tests for tree_sitter_checker module"""
 
-    @patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True)
+    @patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True)
     def test_end_to_end_single_file(self, tmp_path):
         """End-to-end analysis of single file"""
         analyzer = SemanticAnalyzer()
@@ -867,7 +867,7 @@ class TestTreeSitterCheckerEdgeCases:
 
         assert isinstance(content_hash, str)
 
-    @patch("nexuscore.utils.tree_sitter_checker.TREE_SITTER_AVAILABLE", True)
+    @patch("nexuscore.utils.tree_sitter._config.TREE_SITTER_AVAILABLE", True)
     def test_analyzer_empty_source(self):
         """Handle empty source code"""
         analyzer = SemanticAnalyzer()

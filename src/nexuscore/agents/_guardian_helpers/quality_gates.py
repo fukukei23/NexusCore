@@ -19,9 +19,9 @@ try:
         ReviewResult,
     )
 except ImportError:
-    GuardianAutoReviewer = None  # type: ignore[assignment,misc]
-    ReviewDecision = None  # type: ignore[assignment,misc]
-    ReviewResult = None  # type: ignore[assignment,misc]
+    GuardianAutoReviewer = None
+    ReviewDecision = None
+    ReviewResult = None
 
 
 def run_quality_gates(
@@ -46,7 +46,7 @@ def run_quality_gates(
     except Exception as e:
         if logger:
             logger.error(f"Tier 1 quality gate failed: {e}", exc_info=True)
-        tier1_report = None  # type: ignore[assignment]
+        tier1_report = None
         violations.append(f"Tier 1実行エラー: {e}")
 
     try:

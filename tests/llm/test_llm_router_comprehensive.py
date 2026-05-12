@@ -334,7 +334,7 @@ def test_routed_llm_execute_success():
 
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.0):
-            with patch("nexuscore.llm.llm_router.log_transaction"):
+            with patch("nexuscore.llm._routed_llm.log_transaction"):
                 result = routed.execute("Test prompt", "System prompt")
 
                 assert result is not None
@@ -363,7 +363,7 @@ def test_routed_llm_execute_temperature_override():
 
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.0):
-            with patch("nexuscore.llm.llm_router.log_transaction"):
+            with patch("nexuscore.llm._routed_llm.log_transaction"):
                 # execute内でtemperatureが渡されることを確認
                 routed.execute("Test prompt", "System prompt", temperature=0.2)
 
@@ -381,7 +381,7 @@ def test_routed_llm_execute_token_estimation():
 
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.0):
-            with patch("nexuscore.llm.llm_router.log_transaction"):
+            with patch("nexuscore.llm._routed_llm.log_transaction"):
                 result = routed.execute("Test prompt", "System prompt")
 
                 # 推定トークンが使用されることを確認（実測値がない場合）
@@ -397,7 +397,7 @@ def test_routed_llm_execute_logging():
 
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.0):
-            with patch("nexuscore.llm.llm_router.log_transaction") as mock_log:
+            with patch("nexuscore.llm._routed_llm.log_transaction") as mock_log:
                 routed.execute("Test prompt", "System prompt")
 
                 # ログが記録されることを確認
@@ -466,7 +466,7 @@ def test_routed_llm_execute_with_usage_tracking():
 
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.0):
-            with patch("nexuscore.llm.llm_router.log_transaction"):
+            with patch("nexuscore.llm._routed_llm.log_transaction"):
                 result = routed.execute("Test prompt", "System prompt")
 
                 # 実測値が使用されることを確認
@@ -483,7 +483,7 @@ def test_routed_llm_execute_estimated_tokens_when_no_usage():
 
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.0):
-            with patch("nexuscore.llm.llm_router.log_transaction"):
+            with patch("nexuscore.llm._routed_llm.log_transaction"):
                 result = routed.execute("Test prompt", "System prompt")
 
                 # 推定値が使用されることを確認
@@ -664,7 +664,7 @@ def test_routed_llm_execute_temperature_override_from_router():
 
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.0):
-            with patch("nexuscore.llm.llm_router.log_transaction"):
+            with patch("nexuscore.llm._routed_llm.log_transaction"):
                 routed.execute("Test prompt", "System prompt")
 
                 # 温度上書きが適用されることを確認（execute内でkwargsに追加される）
@@ -681,7 +681,7 @@ def test_routed_llm_execute_last_usage_reset():
 
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.0):
-            with patch("nexuscore.llm.llm_router.log_transaction"):
+            with patch("nexuscore.llm._routed_llm.log_transaction"):
                 routed.execute("Test prompt", "System prompt")
 
                 # _last_usageがリセットされることを確認（execute内でNoneに設定される）
@@ -699,7 +699,7 @@ def test_routed_llm_execute_last_mode_tracking():
 
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.0):
-            with patch("nexuscore.llm.llm_router.log_transaction"):
+            with patch("nexuscore.llm._routed_llm.log_transaction"):
                 routed.execute("Test prompt", "System prompt")
 
                 # router.last_modeが更新されることを確認
@@ -716,7 +716,7 @@ def test_routed_llm_execute_output_tokens_estimation():
 
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.0) as mock_track:
-            with patch("nexuscore.llm.llm_router.log_transaction"):
+            with patch("nexuscore.llm._routed_llm.log_transaction"):
                 routed.execute(
                     "Test prompt", "System prompt", **{"output": "Long response text" * 10}
                 )
@@ -736,7 +736,7 @@ def test_routed_llm_execute_log_transaction_called():
 
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.0):
-            with patch("nexuscore.llm.llm_router.log_transaction") as mock_log:
+            with patch("nexuscore.llm._routed_llm.log_transaction") as mock_log:
                 routed.execute("Test prompt", "System prompt")
 
                 # log_transactionが呼ばれることを確認
@@ -936,7 +936,7 @@ def test_routed_llm_execute_with_no_last_usage():
 
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.001) as mock_track:
-            with patch("nexuscore.llm.llm_router.log_transaction"):
+            with patch("nexuscore.llm._routed_llm.log_transaction"):
                 routed.execute("Short test prompt", "System prompt")
 
                 # 推定トークンが使用される
@@ -958,7 +958,7 @@ def test_routed_llm_execute_with_partial_usage_data():
     # したがって推定トークンが使用される
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.001) as mock_track:
-            with patch("nexuscore.llm.llm_router.log_transaction"):
+            with patch("nexuscore.llm._routed_llm.log_transaction"):
                 routed.execute("Test prompt", "System")
 
                 # 推定トークンが使用される（_last_usageがリセットされるため）
@@ -979,7 +979,7 @@ def test_routed_llm_execute_with_zero_output_tokens():
 
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.001) as mock_track:
-            with patch("nexuscore.llm.llm_router.log_transaction"):
+            with patch("nexuscore.llm._routed_llm.log_transaction"):
                 routed.execute("Test", "Sys")
 
                 # completion_tokensが0なので推定値が使用される
@@ -1096,7 +1096,7 @@ def test_routed_llm_execute_with_temperature_override_in_kwargs():
 
     with patch.object(router.budget_manager, "check_budget", return_value=(True, 0.0)):
         with patch.object(router.budget_manager, "track_cost", return_value=0.0):
-            with patch("nexuscore.llm.llm_router.log_transaction"):
+            with patch("nexuscore.llm._routed_llm.log_transaction"):
                 # kwargsにtemperature指定（上書きされない）
                 routed.execute("Test", "Sys", temperature=0.8)
 

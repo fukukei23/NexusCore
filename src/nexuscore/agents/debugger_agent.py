@@ -24,10 +24,7 @@ import re
 import sys
 from typing import Any
 
-try:
-    from .base_agent import BaseAgent
-except ImportError:
-    BaseAgent = None  # type: ignore[misc, assignment]
+from ._fallbacks import BaseAgent
 
 # knowledge_base: プロジェクトルートの database/knowledge_base を参照。CWD に依存しないようリトライする。
 knowledge_base = None
@@ -65,19 +62,6 @@ except ImportError:
         from database.knowledge_base import knowledge_base  # type: ignore[assignment]
     except ImportError:
         pass
-
-if BaseAgent is None:
-
-    class BaseAgent:  # type: ignore[no-redef]
-        def __init__(self, *args, **kwargs):
-            self.logger = logging.getLogger(self.__class__.__name__)
-
-        def execute_llm_task(self, prompt: str, as_json: bool = False) -> str:
-            return ""
-
-        def _call_llm(self, prompt: str, system_prompt: str, as_json: bool = False) -> str:
-            return self.execute_llm_task(prompt, as_json)
-
 
 class DebuggerAgent(BaseAgent):
     """

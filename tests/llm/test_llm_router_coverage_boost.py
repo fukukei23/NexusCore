@@ -105,7 +105,7 @@ class TestApplyDetectedModels:
 # --- _detect_and_update_models tests ---
 
 class TestDetectAndUpdateModels:
-    @patch("nexuscore.llm.llm_router.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm._model_detection.HTTP_CLIENT_FACTORY")
     @patch.dict(os.environ, {"OPENAI_API_KEY": "fake-key", "GEMINI_API_KEY": "fake-gemini"})
     def test_openai_models_detected(self, mock_factory):
         router = _make_router()
@@ -120,7 +120,7 @@ class TestDetectAndUpdateModels:
         router._detect_and_update_models()
         mock_session.get.assert_called()
 
-    @patch("nexuscore.llm.llm_router.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm._model_detection.HTTP_CLIENT_FACTORY")
     @patch.dict(os.environ, {"GEMINI_API_KEY": "fake-gemini"})
     def test_gemini_403_handled(self, mock_factory):
         router = _make_router()
@@ -134,7 +134,7 @@ class TestDetectAndUpdateModels:
         router._detect_and_update_models()
         router.logger.warning.assert_called()
 
-    @patch("nexuscore.llm.llm_router.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm._model_detection.HTTP_CLIENT_FACTORY")
     @patch.dict(os.environ, {"OPENAI_API_KEY": "fake-key"})
     def test_openai_api_exception_handled(self, mock_factory):
         router = _make_router()
@@ -146,7 +146,7 @@ class TestDetectAndUpdateModels:
         router._detect_and_update_models()
         router.logger.warning.assert_called()
 
-    @patch("nexuscore.llm.llm_router.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm._model_detection.HTTP_CLIENT_FACTORY")
     def test_no_api_keys_skips_detection(self, mock_factory):
         router = _make_router()
         mock_factory.available = True
@@ -156,7 +156,7 @@ class TestDetectAndUpdateModels:
                 os.environ.pop(key, None)
             router._detect_and_update_models()
 
-    @patch("nexuscore.llm.llm_router.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm._model_detection.HTTP_CLIENT_FACTORY")
     @patch.dict(os.environ, {"GEMINI_API_KEY": "fake-gemini"})
     def test_gemini_models_detected(self, mock_factory):
         router = _make_router()
@@ -176,7 +176,7 @@ class TestDetectAndUpdateModels:
         router._detect_and_update_models()
         assert router.task_model_map["analytical"]["primary"] == "google:gemini-2.5-pro"
 
-    @patch("nexuscore.llm.llm_router.HTTP_CLIENT_FACTORY")
+    @patch("nexuscore.llm._model_detection.HTTP_CLIENT_FACTORY")
     @patch.dict(os.environ, {"GEMINI_API_KEY": "fake-gemini"})
     def test_gemini_filters_non_generate_content(self, mock_factory):
         router = _make_router()
