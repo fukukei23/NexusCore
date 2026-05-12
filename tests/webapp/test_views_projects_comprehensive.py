@@ -113,34 +113,34 @@ class TestHelperFunctions:
 
     def test_format_duration_with_seconds(self, app):
         """_format_duration()が秒を正しくフォーマットする"""
-        from nexuscore.webapp.views_projects import _format_duration
+        from nexuscore.webapp._projects_helpers import _format_duration
 
         assert _format_duration(45) == "45s"
         assert _format_duration(59) == "59s"
 
     def test_format_duration_with_minutes(self, app):
         """_format_duration()が分を正しくフォーマットする"""
-        from nexuscore.webapp.views_projects import _format_duration
+        from nexuscore.webapp._projects_helpers import _format_duration
 
         assert _format_duration(90) == "1m 30s"
         assert _format_duration(3599) == "59m 59s"
 
     def test_format_duration_with_hours(self, app):
         """_format_duration()が時間を正しくフォーマットする"""
-        from nexuscore.webapp.views_projects import _format_duration
+        from nexuscore.webapp._projects_helpers import _format_duration
 
         assert _format_duration(3600) == "1h 0m"
         assert _format_duration(7200) == "2h 0m"
 
     def test_format_duration_with_none(self, app):
         """_format_duration()がNoneの場合は"-"を返す"""
-        from nexuscore.webapp.views_projects import _format_duration
+        from nexuscore.webapp._projects_helpers import _format_duration
 
         assert _format_duration(None) == "-"
 
     def test_compute_run_duration_with_both_times(self, app, test_run):
         """_compute_run_duration()が実行時間を計算する"""
-        from nexuscore.webapp.views_projects import _compute_run_duration
+        from nexuscore.webapp._projects_helpers import _compute_run_duration
 
         duration = _compute_run_duration(test_run)
         assert duration is not None
@@ -148,7 +148,7 @@ class TestHelperFunctions:
 
     def test_compute_run_duration_without_times(self, app, test_project):
         """_compute_run_duration()がタイムスタンプなしの場合Noneを返す"""
-        from nexuscore.webapp.views_projects import _compute_run_duration
+        from nexuscore.webapp._projects_helpers import _compute_run_duration
 
         run = Run(
             project_id=test_project.id,
@@ -163,7 +163,7 @@ class TestHelperFunctions:
 
     def test_render_run_status_badge_success(self, app):
         """_render_run_status_badge()がSUCCESSバッジを生成する"""
-        from nexuscore.webapp.views_projects import _render_run_status_badge
+        from nexuscore.webapp._projects_helpers import _render_run_status_badge
 
         result = _render_run_status_badge("SUCCESS")
         assert "status-success" in result
@@ -172,7 +172,7 @@ class TestHelperFunctions:
 
     def test_render_run_status_badge_failed(self, app):
         """_render_run_status_badge()がFAILEDバッジを生成する"""
-        from nexuscore.webapp.views_projects import _render_run_status_badge
+        from nexuscore.webapp._projects_helpers import _render_run_status_badge
 
         result = _render_run_status_badge("FAILED")
         assert "status-failed" in result
@@ -181,7 +181,7 @@ class TestHelperFunctions:
 
     def test_render_run_status_badge_running(self, app):
         """_render_run_status_badge()がRUNNINGバッジを生成する"""
-        from nexuscore.webapp.views_projects import _render_run_status_badge
+        from nexuscore.webapp._projects_helpers import _render_run_status_badge
 
         result = _render_run_status_badge("RUNNING")
         assert "status-running" in result
@@ -190,7 +190,7 @@ class TestHelperFunctions:
 
     def test_render_run_status_badge_pending(self, app):
         """_render_run_status_badge()がPENDINGバッジを生成する"""
-        from nexuscore.webapp.views_projects import _render_run_status_badge
+        from nexuscore.webapp._projects_helpers import _render_run_status_badge
 
         result = _render_run_status_badge("PENDING")
         assert "status-pending" in result
@@ -198,7 +198,7 @@ class TestHelperFunctions:
 
     def test_render_run_table_with_runs(self, app, test_project, test_run):
         """render_run_table()がRun一覧テーブルを生成する"""
-        from nexuscore.webapp.views_projects import render_run_table
+        from nexuscore.webapp._projects_helpers import render_run_table
 
         result = render_run_table(test_project, [test_run])
 
@@ -208,7 +208,7 @@ class TestHelperFunctions:
 
     def test_render_run_table_with_no_runs(self, app, test_project):
         """render_run_table()がRun 0件でも動作する"""
-        from nexuscore.webapp.views_projects import render_run_table
+        from nexuscore.webapp._projects_helpers import render_run_table
 
         result = render_run_table(test_project, [])
 

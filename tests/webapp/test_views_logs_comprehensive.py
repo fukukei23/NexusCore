@@ -122,9 +122,9 @@ def authenticated_client(client, test_user):
 MOCK_PATCHES = [
     "nexuscore.integration.github_pr_comment._collect_run_metrics",
     "nexuscore.integration.run_report_generator.get_markdown_report_path",
-    "nexuscore.webapp.views_projects._compute_run_duration",
-    "nexuscore.webapp.views_projects._format_duration",
-    "nexuscore.webapp.views_projects._render_run_status_badge",
+    "nexuscore.webapp._projects_helpers._compute_run_duration",
+    "nexuscore.webapp._projects_helpers._format_duration",
+    "nexuscore.webapp._projects_helpers._render_run_status_badge",
 ]
 
 
@@ -277,9 +277,9 @@ class TestRunLogs:
         headers = kwargs.pop("headers", {})
         mock_path = "nexuscore.integration.github_pr_comment._collect_run_metrics"
         mock_report = "nexuscore.integration.run_report_generator.get_markdown_report_path"
-        mock_duration = "nexuscore.webapp.views_projects._compute_run_duration"
-        mock_format = "nexuscore.webapp.views_projects._format_duration"
-        mock_badge = "nexuscore.webapp.views_projects._render_run_status_badge"
+        mock_duration = "nexuscore.webapp._projects_helpers._compute_run_duration"
+        mock_format = "nexuscore.webapp._projects_helpers._format_duration"
+        mock_badge = "nexuscore.webapp._projects_helpers._render_run_status_badge"
 
         fake_path = MagicMock()
         fake_path.exists.return_value = False

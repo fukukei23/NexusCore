@@ -29,25 +29,25 @@ class TestFormatDuration:
     """_format_duration(duration_sec: float | None) -> str — None→'-'"""
 
     def test_none_returns_dash(self):
-        from nexuscore.webapp.views_projects import _format_duration
+        from nexuscore.webapp._projects_helpers import _format_duration
         assert _format_duration(None) == "-"
 
     def test_zero(self):
-        from nexuscore.webapp.views_projects import _format_duration
+        from nexuscore.webapp._projects_helpers import _format_duration
         assert _format_duration(0) == "0s"
 
     def test_seconds_only(self):
-        from nexuscore.webapp.views_projects import _format_duration
+        from nexuscore.webapp._projects_helpers import _format_duration
         assert _format_duration(45) == "45s"
 
     def test_minutes_and_seconds(self):
-        from nexuscore.webapp.views_projects import _format_duration
+        from nexuscore.webapp._projects_helpers import _format_duration
         result = _format_duration(125)
         assert "2m" in result and "5s" in result
 
     def test_hours_no_seconds(self):
         """3661 → 1h 1m (hours+minutes only, no seconds)"""
-        from nexuscore.webapp.views_projects import _format_duration
+        from nexuscore.webapp._projects_helpers import _format_duration
         result = _format_duration(3661)
         assert "1h" in result and "1m" in result
 
@@ -62,13 +62,13 @@ class TestComputeRunDuration:
         return run
 
     def test_no_times(self):
-        from nexuscore.webapp.views_projects import _compute_run_duration
+        from nexuscore.webapp._projects_helpers import _compute_run_duration
         from datetime import datetime
         run = self._make_run(started_at=None, finished_at=None)
         assert _compute_run_duration(run) is None
 
     def test_only_start(self):
-        from nexuscore.webapp.views_projects import _compute_run_duration
+        from nexuscore.webapp._projects_helpers import _compute_run_duration
         from datetime import datetime
         run = MagicMock()
         run.started_at = datetime(2026, 1, 1, 10, 0)
@@ -78,7 +78,7 @@ class TestComputeRunDuration:
         assert _compute_run_duration(run) is None
 
     def test_both_datetimes(self):
-        from nexuscore.webapp.views_projects import _compute_run_duration
+        from nexuscore.webapp._projects_helpers import _compute_run_duration
         from datetime import datetime
         start = datetime(2026, 1, 1, 10, 0, 0)
         end = datetime(2026, 1, 1, 10, 5, 30)
@@ -91,12 +91,12 @@ class TestRenderRunStatusBadge:
 
     @pytest.mark.parametrize("status", ["RUNNING", "SUCCESS", "FAILED", "PENDING"])
     def test_known_statuses(self, status):
-        from nexuscore.webapp.views_projects import _render_run_status_badge
+        from nexuscore.webapp._projects_helpers import _render_run_status_badge
         result = _render_run_status_badge(status)
         assert status in result
 
     def test_unknown_status(self):
-        from nexuscore.webapp.views_projects import _render_run_status_badge
+        from nexuscore.webapp._projects_helpers import _render_run_status_badge
         result = _render_run_status_badge("WEIRD")
         assert "WEIRD" in result
 
@@ -105,13 +105,13 @@ class TestRenderRunTable:
     """render_run_table(project: Project, runs: Sequence[Run]) -> str"""
 
     def test_empty_runs(self):
-        from nexuscore.webapp.views_projects import render_run_table
+        from nexuscore.webapp._projects_helpers import render_run_table
         project = MagicMock()
         result = render_run_table(project, [])
         assert isinstance(result, str)
 
     def test_with_runs(self):
-        from nexuscore.webapp.views_projects import render_run_table
+        from nexuscore.webapp._projects_helpers import render_run_table
         from datetime import datetime
         project = MagicMock()
         run = MagicMock()
