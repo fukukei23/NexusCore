@@ -48,7 +48,7 @@ class TestGLMLLMInit:
                 llm = GLMLLM("glm-4-plus")
                 assert llm.real_calls is False
 
-    @patch.dict(os.environ, {"GLM_API_KEY": "fake-key", "GLM_BASE_URL": "https://custom.api/v1"})
+    @patch.dict(os.environ, {"GLM_API_KEY": "fake-key", "GLM_BASE_URL": "https://custom.api/v1", "GLM_API_BASE": ""})
     def test_custom_base_url(self):
         mock_factory = MagicMock()
         mock_factory.available = False
