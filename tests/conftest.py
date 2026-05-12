@@ -16,6 +16,10 @@ from typing import Any
 import pytest
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption("--run-integration", action="store_true", default=False, help="Run integration tests")
+
+
 # ============================================================================
 # sys.modules 隔離: テスト間のモック汚染を防止
 # 多数のテストファイルがモジュールレベルで sys.modules に MagicMock を注入し、
