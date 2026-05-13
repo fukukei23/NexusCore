@@ -1,12 +1,3 @@
-"""
-ロギングプロバイダーインターフェース
-
-Core層とWebapp層の依存関係を切り離すための抽象化層。
-Core/NPE層はこのインターフェースのみに依存し、Webapp層の具体的な実装は
-実行時に依存性注入される。これにより循環インポートを回避し、CLI実行時に
-Webappが不要になる。
-"""
-
 from __future__ import annotations
 
 import logging

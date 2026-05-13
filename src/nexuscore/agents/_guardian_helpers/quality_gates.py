@@ -1,7 +1,3 @@
-"""
-Quality gate execution and code review helpers for GuardianAgent.
-"""
-
 from __future__ import annotations
 
 import json

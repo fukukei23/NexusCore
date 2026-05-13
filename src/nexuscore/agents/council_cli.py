@@ -1,9 +1,3 @@
-"""CLI interface for ConstitutionalCouncilAgent.
-
-Provides an interactive command-line menu for reviewing, approving,
-and rejecting constitutional amendment proposals.
-"""
-
 from __future__ import annotations
 
 import json

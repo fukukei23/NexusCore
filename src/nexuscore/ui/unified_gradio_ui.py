@@ -1,15 +1,3 @@
-"""
-4.5: 統合 Gradio UI
-
-「解析→修正→テスト→履歴→設定」まで一画面で閉じるタブ構成
-各タブは個別モジュールに分割済み:
-  - code_prompt_tab.py
-  - ai_revision_tab.py
-  - test_runner_tab.py
-  - history_diff_tab.py
-  - settings_tab.py
-"""
-
 from __future__ import annotations
 
 import gradio as gr

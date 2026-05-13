@@ -1,11 +1,3 @@
-# =============================================================================
-# Self-healing validation gates
-#
-# Each function returns (blocked: bool, finalize_kwargs: dict | None).
-# blocked=True means the pipeline should stop and return finalize_kwargs.
-# blocked=None means the pipeline should continue.
-# =============================================================================
-
 from __future__ import annotations
 
 from typing import Any

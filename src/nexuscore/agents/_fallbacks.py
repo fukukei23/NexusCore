@@ -1,5 +1,3 @@
-"""BaseAgent import fallback for agents that need standalone operation."""
-
 from __future__ import annotations
 
 import logging

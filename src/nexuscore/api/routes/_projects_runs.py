@@ -1,7 +1,3 @@
-"""
-Projects Run エンドポイント（trigger_run / get_latest_run）
-"""
-
 import logging
 import os
 import uuid

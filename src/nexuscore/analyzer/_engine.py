@@ -1,5 +1,3 @@
-"""Core parsing engine and result data class for the analyzer."""
-
 from __future__ import annotations
 
 import json

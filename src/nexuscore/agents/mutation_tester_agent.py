@@ -1,13 +1,3 @@
-# ==============================================================================
-# ファイル: src/nexuscore/agents/mutation_tester_agent.py
-# 目的  : Tier 2品質ゲート - テストの質をミューテーションテストで検証
-# ==============================================================================
-"""
-MutationTesterAgent: Tier 2品質ゲートの実装
-
-split: models + runner extracted → agent is orchestration only.
-"""
-
 from __future__ import annotations
 
 from typing import Any

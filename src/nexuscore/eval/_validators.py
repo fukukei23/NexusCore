@@ -1,5 +1,3 @@
-"""NexusEval validators — JSON parsing, schema/rules validation, stability measurement."""
-
 from __future__ import annotations
 
 import json

@@ -1,10 +1,3 @@
-"""
-Context factory for authority_runner.
-
-Creates OrchestratorContext instances (or a lightweight fallback dataclass
-when the model module is unavailable).
-"""
-
 from __future__ import annotations
 
 import uuid

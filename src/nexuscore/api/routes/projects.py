@@ -1,12 +1,3 @@
-"""
-Projects エンドポイント
-
-プロジェクト管理用の FastAPI エンドポイント。
-既存の Flask 実装 (`src/nexuscore/webapp/api_external.py`) と互換性を保つ。
-
-split: CRUD + Runs（_projects_crud / _projects_runs）
-"""
-
 from fastapi import APIRouter
 
 from ._projects_crud import router as crud_router

@@ -1,5 +1,3 @@
-"""Shared configuration and tree-sitter availability for the analyzer package."""
-
 from __future__ import annotations
 
 import logging

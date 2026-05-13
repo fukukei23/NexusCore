@@ -1,5 +1,3 @@
-"""Sandbox configuration, resource limits, security checks, and policy loading."""
-
 from __future__ import annotations
 
 import logging

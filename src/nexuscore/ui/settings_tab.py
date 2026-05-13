@@ -1,5 +1,3 @@
-"""Tab 5: Settings — LLM プロバイダー状態・プロファイル情報の読み取り専用ダッシュボード。"""
-
 from __future__ import annotations
 
 import logging

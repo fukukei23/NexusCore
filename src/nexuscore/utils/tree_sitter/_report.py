@@ -1,7 +1,3 @@
-# =============================================================================
-# ReportGenerator — analysis report output
-# =============================================================================
-
 from collections import Counter
 from typing import Any
 

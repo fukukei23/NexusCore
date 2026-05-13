@@ -1,9 +1,3 @@
-"""
-Markdown formatting functions for PR comments.
-
-Extracted from github_pr_comment.py for single-responsibility.
-"""
-
 from __future__ import annotations
 
 import logging

@@ -1,9 +1,3 @@
-"""
-NexusCore SaaS基盤 - Celery アプリ初期化
-
-Flask アプリと連携した Celery インスタンスを作成する。
-"""
-
 from __future__ import annotations
 
 import os

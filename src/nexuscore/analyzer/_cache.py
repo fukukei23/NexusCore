@@ -1,5 +1,3 @@
-"""File-based cache for analysis results."""
-
 from __future__ import annotations
 
 import hashlib

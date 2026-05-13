@@ -1,7 +1,3 @@
-# =============================================================================
-# Coverage measurement and subprocess-based test execution
-# =============================================================================
-
 from __future__ import annotations
 
 import json

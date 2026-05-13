@@ -1,9 +1,3 @@
-"""
-NexusCore SaaS基盤 - サンドボックス実行の安定化
-
-split: config + limits + policy extracted → executor is class + orchestration only.
-"""
-
 from __future__ import annotations
 
 import enum

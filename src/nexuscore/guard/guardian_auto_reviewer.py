@@ -1,5 +1,3 @@
-"""Guardian auto-reviewer — models extracted, class remains here."""
-
 from __future__ import annotations
 
 import json

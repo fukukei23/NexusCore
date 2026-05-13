@@ -1,7 +1,3 @@
-# =============================================================================
-# Test generation: LLM prompt construction and response parsing
-# =============================================================================
-
 import json
 import logging
 

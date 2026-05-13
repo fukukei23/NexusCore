@@ -1,15 +1,3 @@
-# =============================================================================
-# FILE:        src/nexuscore/llm/llm_router.py
-# REGISTRY:    nexuscore.llm.llm_router.LLMRouter
-# DATE:        2025年11月7日
-# VERSION:     2.4.0 (split: RoutedLLM + utils extracted)
-#
-# 概要:
-# - v2.3.6 の全機能を維持しつつ、RoutedLLM を _routed_llm.py に、
-#   _estimate_tokens を _router_utils.py に分離。
-# - 後方互換のため RoutedLLM, BudgetManager, log_transaction を re-export。
-# =============================================================================
-
 from __future__ import annotations
 
 import logging

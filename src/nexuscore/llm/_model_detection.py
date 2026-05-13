@@ -1,10 +1,3 @@
-"""Runtime model detection for LLMRouter.
-
-Detects available OpenAI/Gemini models via their list APIs and updates
-the task model map to use models that actually exist in the account.
-Extracted from llm_router.py for maintainability.
-"""
-
 from __future__ import annotations
 
 import logging

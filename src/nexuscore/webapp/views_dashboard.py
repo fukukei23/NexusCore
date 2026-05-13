@@ -1,15 +1,3 @@
-"""
-NexusCore SaaS基盤 - ダッシュボードビュー
-
-WebApp HTML UI view.
-
-データ取得は FastAPI 経由ではなく、services / DB direct access を使用する。
-本画面は FastAPI API migration の対象外（責務分離のため）。
-
-既存の Orchestrator / NPE とは独立して動作する。
-Gradio UI との統合もここで行う。
-"""
-
 from __future__ import annotations
 
 import json

@@ -1,10 +1,3 @@
-"""
-Project API リクエスト・レスポンススキーマ
-
-FastAPI の Project エンドポイント用の Pydantic モデル定義。
-既存の Flask 実装 (`src/nexuscore/webapp/api_external.py`) の仕様に準拠。
-"""
-
 import re
 from datetime import datetime
 from urllib.parse import urlparse

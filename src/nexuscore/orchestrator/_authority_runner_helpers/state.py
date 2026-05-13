@@ -1,10 +1,3 @@
-"""
-State persistence and session management helpers for authority_runner.
-
-Extracted from authority_runner.py to reduce the main module size and
-improve testability of state management logic.
-"""
-
 from __future__ import annotations
 
 import os

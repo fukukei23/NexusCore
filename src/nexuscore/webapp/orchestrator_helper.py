@@ -1,9 +1,3 @@
-"""
-NexusCore Webapp - Orchestrator ヘルパー関数
-
-Orchestrator のインスタンス化と実行を簡易化するヘルパー関数。
-"""
-
 from __future__ import annotations
 
 import logging

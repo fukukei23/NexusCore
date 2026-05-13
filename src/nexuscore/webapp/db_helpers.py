@@ -1,10 +1,3 @@
-"""
-Webapp DB クエリ共通化ヘルパー
-
-P2-5: filter_by(owner_id=user.id) パターンの共通化
-P2-1: N+1 クエリ解消用の eager loading ヘルパー
-"""
-
 from __future__ import annotations
 
 from flask import request

@@ -1,11 +1,3 @@
-"""
-patch_workflow.py
-
-Self-Healing Service 用のパッチ生成・検証ワークフロー。
-ファイル収集、パッチ生成、テスト変更ガード、Guardian review、
-dry-run チェック、semantic diff 生成を担当。
-"""
-
 from __future__ import annotations
 
 import logging

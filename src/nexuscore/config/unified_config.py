@@ -1,17 +1,3 @@
-"""
-NexusCore 統一設定システム
-
-すべての設定を一元管理し、環境変数とファイルベース設定を統合する。
-これにより、4つの独立した設定システムを1つに統合し、設定の妥当性検証を実現する。
-
-Usage:
-    from nexuscore.config.unified_config import get_config
-
-    config = get_config()
-    print(config.database.uri)
-    print(config.llm.default_model)
-"""
-
 from __future__ import annotations
 
 import json

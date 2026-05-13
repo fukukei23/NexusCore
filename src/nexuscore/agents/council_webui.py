@@ -1,9 +1,3 @@
-"""Flask Web UI for ConstitutionalCouncilAgent.
-
-Provides a browser-based interface for reviewing, approving,
-and rejecting constitutional amendment proposals.
-"""
-
 from __future__ import annotations
 
 import json

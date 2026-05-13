@@ -1,10 +1,3 @@
-"""
-git_operations.py
-
-Self-Healing Service 用の Git 操作ユーティリティ。
-リポジトリの clone / checkout と、変更ファイル一覧の取得を担当。
-"""
-
 from __future__ import annotations
 
 import logging

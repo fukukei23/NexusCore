@@ -1,9 +1,3 @@
-"""Budget and logging adapters for LLMRouter.
-
-Auto-detects NPE v1/v2/none and provides a unified interface.
-Extracted from llm_router.py for maintainability.
-"""
-
 from __future__ import annotations
 
 import json

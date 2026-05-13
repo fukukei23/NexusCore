@@ -1,9 +1,3 @@
-"""
-NexusEval: JSON構造出力評価器
-
-split: models + validators extracted → evaluator is orchestration only.
-"""
-
 from __future__ import annotations
 
 from typing import Any

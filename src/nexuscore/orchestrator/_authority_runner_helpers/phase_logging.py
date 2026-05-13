@@ -1,10 +1,3 @@
-"""
-Structured phase-logging helpers for authority_runner.
-
-Extracted to keep the main module focused on orchestration flow
-and to allow reuse from both primary and resume code paths.
-"""
-
 from __future__ import annotations
 
 import logging

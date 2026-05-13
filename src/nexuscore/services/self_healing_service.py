@@ -1,18 +1,3 @@
-"""
-self_healing_service.py
-
-Self-Healing Code Review MVP のオーケストレーターサービス。
-
-実際の処理は以下のモジュールに委譲:
-  - git_operations: リポジトリの clone / checkout
-  - test_runner: テストコマンド実行（sandbox + retry 対応）
-  - patch_workflow: パッチ生成・検証・Guardian review
-  - _finalize: 結果記録・セッション制御
-  - _validation: 検証ゲート（test modification / guardian / dry-run）
-
-本モジュールは全体のワークフロー制御のみを担当。
-"""
-
 from __future__ import annotations
 
 import logging

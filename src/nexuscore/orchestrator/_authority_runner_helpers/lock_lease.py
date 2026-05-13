@@ -1,7 +1,3 @@
-"""
-RunLockLease: context manager for holding a run lock during execution (Mode B).
-"""
-
 from __future__ import annotations
 
 import threading

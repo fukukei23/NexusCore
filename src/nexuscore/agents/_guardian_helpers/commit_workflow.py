@@ -1,9 +1,3 @@
-"""
-Commit execution workflow extracted from GuardianAgent.review_and_commit().
-
-Handles branch preparation, commit message generation, and the actual commit.
-"""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any

@@ -1,5 +1,3 @@
-"""Deprecated RunView API endpoints (backward compatibility)."""
-
 from __future__ import annotations
 
 import logging

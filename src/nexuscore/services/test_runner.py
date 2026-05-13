@@ -1,10 +1,3 @@
-"""
-test_runner.py
-
-Self-Healing Service 用のテスト実行ユーティリティ。
-sandbox_executor を利用したリトライ対応テスト実行を担当。
-"""
-
 from __future__ import annotations
 
 import logging

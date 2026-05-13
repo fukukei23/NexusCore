@@ -1,7 +1,3 @@
-"""
-Resume execution controller for paused runs.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable

@@ -1,10 +1,3 @@
-"""
-Enhanced review execution logic for GuardianAgent.
-
-Handles the quality-gates-passed LLM review flow — building the prompt,
-calling the LLM, and parsing the JSON response.
-"""
-
 from __future__ import annotations
 
 import json

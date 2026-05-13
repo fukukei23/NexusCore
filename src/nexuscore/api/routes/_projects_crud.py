@@ -1,7 +1,3 @@
-"""
-Projects CRUD エンドポイント（list / create / get）
-"""
-
 import logging
 
 from fastapi import APIRouter, Depends, status

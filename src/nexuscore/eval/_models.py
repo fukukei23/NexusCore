@@ -1,5 +1,3 @@
-"""NexusEval data models — dataclasses and enums."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field

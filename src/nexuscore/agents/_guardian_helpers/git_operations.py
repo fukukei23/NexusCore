@@ -1,7 +1,3 @@
-"""
-Git branch preparation and commit message helpers for GuardianAgent.
-"""
-
 from __future__ import annotations
 
 import os

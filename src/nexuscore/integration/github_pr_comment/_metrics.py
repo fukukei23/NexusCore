@@ -1,9 +1,3 @@
-"""
-PR comment metrics collection and URL construction.
-
-Extracted from github_pr_comment.py for single-responsibility.
-"""
-
 from __future__ import annotations
 
 import json

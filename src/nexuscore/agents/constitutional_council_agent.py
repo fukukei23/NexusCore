@@ -1,13 +1,3 @@
-# =============================================================================
-# FILE:         src/nexuscore/agents/constitutional_council_agent.py
-# DATE:         2025-11-03 (JST)
-# REGISTRY:     nexuscore.agents.ConstitutionalCouncilAgent
-# DESC:
-#   - BaseAgent の LLM 経由呼び出しに統一（execute_llm_task）
-#   - ポリシー保存時のバックアップを「タイムスタンプ付き」でローテーション
-#   - CLI / Web UI は council_cli.py / council_webui.py に分離
-# =============================================================================
-
 import json
 import logging
 import os

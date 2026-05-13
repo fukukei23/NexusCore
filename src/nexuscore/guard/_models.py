@@ -1,5 +1,3 @@
-"""Guardian auto-reviewer data models and enums."""
-
 from __future__ import annotations
 
 import enum

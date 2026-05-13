@@ -1,7 +1,3 @@
-# =============================================================================
-# RoutedLLM — wrapper returned by LLMRouter.get_llm_for_task()
-# =============================================================================
-
 from __future__ import annotations
 
 import logging

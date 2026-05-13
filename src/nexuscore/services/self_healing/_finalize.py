@@ -1,7 +1,3 @@
-# =============================================================================
-# Self-healing finalization and session control utilities
-# =============================================================================
-
 from __future__ import annotations
 
 import logging

@@ -1,9 +1,3 @@
-"""
-Run表示ユーティリティ（ヘルパー関数）
-
-views_projects.py から抽出。Run一覧テーブル描画に使用。
-"""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
