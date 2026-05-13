@@ -1,15 +1,3 @@
-"""
-run_state_store.py
-
-Minimal JSON-based run state persistence for Pause/Resume.
-
-Storage (default):
-  var/run_state/<run_id>.json
-
-For tests or custom deployments, set:
-  NEXUSCORE_RUN_STATE_DIR=/path/to/run_state
-"""
-
 from __future__ import annotations
 
 import json

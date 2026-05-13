@@ -1,13 +1,3 @@
-"""
-semantic_diff.py
-
-AST ベースで Before/After コードを比較し、構造化した差分オブジェクトを返す。
-
-「どの関数が増えた／消えた／シグネチャ変更されたか」
-「どのロジックが意味的に変わったか（例: 例外追加・バリデーション追加）」
-を抽出する。
-"""
-
 from __future__ import annotations
 
 import ast

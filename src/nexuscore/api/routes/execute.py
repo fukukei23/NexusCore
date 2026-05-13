@@ -1,10 +1,3 @@
-"""
-Execute エンドポイント
-
-Self-healing ジョブ実行をトリガーするエンドポイント。
-既存の Flask 実装 (`src/nexuscore/api/server.py`) と互換性を保つ。
-"""
-
 import logging
 import os
 import sys

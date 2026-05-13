@@ -1,16 +1,3 @@
-"""
-CR-NEXUS-051-B: Retry Policy
-
-このモジュールは Error Taxonomy (051-A) に基づき、各例外に対する Retry / Abort / Skip を判断する。
-Decision Table が唯一の真実であり、実装はこの表をそのままコード化している。
-
-Spec 要件:
-    - 3.3.1: リトライ可否の判断ルール
-    - 3.3.2: リトライの有限性保証（SHALL要件）
-    - 3.3.3: Backoff 戦略（指数・線形・なし）
-    - 3.3.4: Unexpected エラーのリトライ禁止
-"""
-
 from __future__ import annotations
 
 import logging

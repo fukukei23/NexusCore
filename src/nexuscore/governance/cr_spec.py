@@ -1,18 +1,3 @@
-"""
-CR ガバナンス定義（Single Source of Truth）
-
-このモジュールは、CR（Change Request）に関するすべての定義を一元管理します。
-- Completion Report の必須セクション
-- README CR エントリの必須フィールド
-- CR ステータスとルール
-- scaffold 用テンプレート部品
-
-制約:
-- 純データのみを持ち、ロジックは禁止
-- tests / tools を import してはならない
-- 判定ロジック（placeholder 判定など）を書いてはならない
-"""
-
 from dataclasses import dataclass
 
 # ============================================================================

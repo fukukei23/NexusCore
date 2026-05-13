@@ -1,5 +1,3 @@
-"""Agent team assembly factory for NexusCore Orchestrator."""
-
 from __future__ import annotations
 
 import logging

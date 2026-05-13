@@ -1,11 +1,3 @@
-"""
-run_state_schema_validator.py
-
-CR-020 (RunState JSON Schema Contract) minimal validator.
-
-This module is intentionally lightweight and side-effect free.
-"""
-
 from __future__ import annotations
 
 from typing import Any

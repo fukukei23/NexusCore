@@ -1,21 +1,3 @@
-"""
-NexusCore カスタム例外クラス（CR-NEXUS-051-A: Error Taxonomy）
-
-Self-Healing 実行中の LLM 呼び出し & sandbox 実行で発生する例外を分類し、
-Retry 戦略を決定するために使用する。
-
-例外階層:
-    NexusCoreError
-    ├── ModelRateLimitError      (429)   → retry, exponential backoff
-    ├── ModelTimeoutError        (timeout) → retry, linear backoff
-    ├── ModelConnectionError     (conn)   → retry, exponential backoff
-    ├── InvalidModelOutputError  (output) → retry, linear backoff
-    ├── SandboxExecutionError    (exec)   → abort
-    ├── SandboxSecurityError     (sec)    → abort
-    ├── PatchApplyError          (patch)  → abort
-    └── UnexpectedSystemError    (??? )   → abort
-"""
-
 from __future__ import annotations
 
 import logging

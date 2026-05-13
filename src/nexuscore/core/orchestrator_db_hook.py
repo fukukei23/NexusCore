@@ -1,11 +1,3 @@
-"""
-NexusCore Orchestrator → ExecutionLog フック
-
-Orchestrator から直接 Webapp を知らないようにする「薄いアダプタ」。
-
-既存の CLI 実行を壊さないよう、防衛的に実装。
-"""
-
 from __future__ import annotations
 
 from typing import Any

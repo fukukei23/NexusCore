@@ -1,12 +1,3 @@
-"""
-Run Records エンドポイント（DBベースのRun管理）
-
-CR-NEXUS-032: Moved from /api/v1/runs to /api/v1/run-records to avoid collision with RunView endpoints.
-
-Run管理用の FastAPI エンドポイント（DBベース）。
-既存の Flask 実装 (`src/nexuscore/webapp/api_external.py`) と互換性を保つ。
-"""
-
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status

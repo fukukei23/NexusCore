@@ -1,10 +1,3 @@
-"""Phase execution mixin for Orchestrator.
-
-Contains the six development phases (Requirements → Review) and their helpers.
-Expects the host class to provide: logger, *_agent, llm_router, session_controller,
-project_path, constitution as instance attributes.
-"""
-
 from __future__ import annotations
 
 import json

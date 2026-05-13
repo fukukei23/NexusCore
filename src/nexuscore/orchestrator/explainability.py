@@ -1,13 +1,3 @@
-"""
-explainability.py
-
-CR-018 (Resume Failure Explainability Contract) MVP helper.
-
-Provides structured explainability metadata for orchestrator phases.
-Used by authority_runner to annotate run states with human-readable
-context about what happened, why, and what to do next.
-"""
-
 from __future__ import annotations
 
 from typing import Any

@@ -1,11 +1,3 @@
-"""
-Badge エンドポイント
-
-README バッジ向けのメトリクス API。
-shields.io などで使用できる JSON エンドポイントを提供する。
-既存の Flask 実装 (`src/nexuscore/webapp/api_badges.py`) と互換性を保つ。
-"""
-
 import logging
 
 from fastapi import APIRouter, status

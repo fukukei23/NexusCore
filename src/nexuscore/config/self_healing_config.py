@@ -1,23 +1,3 @@
-"""
-self_healing_config.py
-
-NexusCore Self-Healing Code Review 用の設定ローダー。
-
-設定ファイル:
-    <project_root>/.nexus/self_healing.config.json
-
-例:
-{
-  "label": "self-healing",
-  "allowed_target_branches": ["main", "develop"],
-  "test_command": "pytest -q",
-  "allow_test_modification": false,
-  "allow_deletions": false
-}
-
-すべて任意項目で、省略時は安全側のデフォルトが使われる。
-"""
-
 from __future__ import annotations
 
 import json

@@ -1,5 +1,3 @@
-"""Tab 1: Code / Prompt（Whisper + 自然文プロンプト → 初期コード生成）"""
-
 from __future__ import annotations
 
 import logging

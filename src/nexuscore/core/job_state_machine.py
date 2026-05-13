@@ -1,10 +1,3 @@
-# ==============================================================================
-# File: src/nexuscore/core/job_state_machine.py
-# Purpose:
-#   - ジョブの進行状況を管理するステートマシン
-#   - 状態遷移を制御し、各状態ごとに異なる動作を定義
-#   - SessionController と RunHistoryLogger と統合
-# ==============================================================================
 from __future__ import annotations
 
 import logging

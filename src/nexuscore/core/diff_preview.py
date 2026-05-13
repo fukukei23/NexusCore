@@ -1,17 +1,4 @@
-"""
-diff_preview.py
-
-Self-Healing / PatchApplier が生成した unified diff を、
-人間がレビューしやすい形に整形するユーティリティ群。
-
-主な用途:
-- GitHub PR コメントに貼るための Markdown ラップ
-- 長すぎる diff のトリミング
-- 変更されたファイル一覧の抽出
-"""
-
 from __future__ import annotations
-
 
 def truncate_diff(diff_text: str, max_lines: int = 200) -> str:
     """

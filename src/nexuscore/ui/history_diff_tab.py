@@ -1,5 +1,3 @@
-"""Tab 4: History & Diff（過去 Run・差分ビュー・Self-Healing トリガー）"""
-
 from __future__ import annotations
 
 import logging

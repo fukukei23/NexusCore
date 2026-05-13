@@ -1,11 +1,3 @@
-"""
-LLM call fallback chain management.
-
-When a provider returns 429 (rate limit), this module tracks cooldown state
-per provider and selects the next available candidate from the fallback list.
-Designed to prevent cascading stub-mode degradation on rate-limited providers.
-"""
-
 from __future__ import annotations
 
 import logging

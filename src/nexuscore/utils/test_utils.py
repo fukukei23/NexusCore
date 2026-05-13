@@ -1,9 +1,3 @@
-"""
-test_generator 用のユーティリティ関数
-
-import path の安定化、出力検証など。
-"""
-
 from __future__ import annotations
 
 import ast

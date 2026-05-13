@@ -1,5 +1,3 @@
-"""Tab 2: AI Revision（LLMで修正・パッチ生成）"""
-
 from __future__ import annotations
 
 import logging

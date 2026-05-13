@@ -1,10 +1,3 @@
-"""
-Execute API リクエスト・レスポンススキーマ
-
-FastAPI の execute エンドポイント用の Pydantic モデル定義。
-既存の Flask API (`src/nexuscore/api/server.py`) の仕様に準拠。
-"""
-
 from pydantic import BaseModel, Field
 
 

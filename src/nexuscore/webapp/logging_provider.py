@@ -1,10 +1,3 @@
-"""
-Webapp用のロギングプロバイダー実装
-
-Core層のlogging_interfaceを実装し、既存のDB拡張ロガーをラップする。
-これにより、Core層がWebapp層に直接依存せずにDB logging機能を利用できる。
-"""
-
 from pathlib import Path
 from typing import Any
 

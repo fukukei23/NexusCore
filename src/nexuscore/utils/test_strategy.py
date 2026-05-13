@@ -1,12 +1,3 @@
-"""
-test_strategy.py
-
-NexusCore のテスト戦略管理クラス。
-
-リスクベースのテスト生成戦略を管理し、
-AIテスト生成と手動補強の役割分担を制御します。
-"""
-
 from __future__ import annotations
 
 import logging

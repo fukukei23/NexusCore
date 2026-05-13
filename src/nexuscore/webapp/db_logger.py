@@ -1,15 +1,3 @@
-"""
-NexusCore SaaS基盤 - DBログフック
-
-既存の NPE logger.log_transaction を拡張して、
-Flaskアプリコンテキストが存在する場合のみDBに書き込む。
-
-既存の CLI 実行を壊さないよう、防衛的に実装。
-
-このモジュールは既存の log_transaction からの呼び出しを想定しているが、
-新しいコードでは logging_service.log_execution_event を直接使用することを推奨。
-"""
-
 from __future__ import annotations
 
 import logging

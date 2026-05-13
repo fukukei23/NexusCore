@@ -1,9 +1,3 @@
-"""Orchestrator – core orchestration class for NexusCore.
-
-Phase execution methods live in PhaseRunnerMixin; this module keeps
-Orchestrator dataclass fields, __post_init__, and run_full_project().
-"""
-
 from __future__ import annotations
 
 import json

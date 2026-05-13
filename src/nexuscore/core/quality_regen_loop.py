@@ -1,5 +1,3 @@
-"""Quality regeneration loop for NexusCore project (Issue #51: MC1-3)."""
-
 from __future__ import annotations
 
 import re

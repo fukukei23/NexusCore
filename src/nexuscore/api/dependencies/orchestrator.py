@@ -1,9 +1,3 @@
-"""
-Orchestrator Dependency Injection for FastAPI (CR-NEXUS-029).
-
-Provides request-scoped Orchestrator instance generation for API endpoints.
-"""
-
 import logging
 import os
 from pathlib import Path

@@ -1,16 +1,3 @@
-"""
-標準化されたエラーレスポンススキーマ
-
-すべての API エンドポイントで統一されたエラー構造を提供する。
-
-エラーコードの仕様:
-- すべてのエラーコードは `docs/api/ERROR_CODE_CATALOG.md` に定義されている必要があります
-- 新しいエラーコードを追加する場合は、必ず ERROR_CODE_CATALOG.md にも追記してください
-- ERROR_CODE_CATALOG.md がエラーコードの単一のソース（Single Source of Truth）です
-
-詳細なエラーコード仕様は `docs/api/ERROR_CODE_CATALOG.md` を参照してください。
-"""
-
 from pydantic import BaseModel, Field
 
 

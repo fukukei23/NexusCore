@@ -1,10 +1,3 @@
-"""
-github_pr_creator.py
-
-GitHub REST API を使ってDebuggerAgentが生成した修正パッチをPRとして自動作成するモジュール。
-PyGithub は使わず requests のみに依存する。
-"""
-
 from __future__ import annotations
 
 import base64

@@ -1,13 +1,3 @@
-"""
-orchestrator/authority_runner.py
-
-Authority-level execution controller for NexusCore Orchestrator.
-
-This module intentionally avoids importing frozen `nexuscore.core.orchestrator`
-at import time. It controls execution by calling existing public phase methods
-on an orchestrator instance (duck-typed).
-"""
-
 from __future__ import annotations
 
 import time

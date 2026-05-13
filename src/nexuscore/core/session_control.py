@@ -1,16 +1,3 @@
-"""
-session_control.py
-
-NexusCore の長時間タスク（Orchestrator など）に対して、
-「中断」「一旦保存」「再開」といったセッション操作を提供する制御レイヤ。
-
-設計方針:
-- 各セッションは session_id で識別する。
-- `.nexus/sessions/{session_id}.control.json` を通じて外部から stop/pause/continue を指示。
-- `.nexus/sessions/{session_id}.state.json` に現在のフェーズやメタデータをチェックポイントとして保存。
-- Orchestrator 側は、フェーズの境目ごとに `checkpoint()` と `should_stop()` を呼ぶだけでよい。
-"""
-
 from __future__ import annotations
 
 import json

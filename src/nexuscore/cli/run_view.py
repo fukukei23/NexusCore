@@ -1,11 +1,3 @@
-"""
-run_view.py
-
-CR-NEXUS-027: RunView projection for CLI UX.
-
-Transforms internal RunState / Explainability into human-readable CLI output.
-"""
-
 from __future__ import annotations
 
 from typing import Any

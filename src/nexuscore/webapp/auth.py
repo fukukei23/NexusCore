@@ -1,9 +1,3 @@
-"""
-NexusCore SaaS基盤 - GitHub OAuth認証
-
-既存の Orchestrator / NPE とは独立して動作する。
-"""
-
 from __future__ import annotations
 
 import os

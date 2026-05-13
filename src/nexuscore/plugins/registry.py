@@ -1,5 +1,3 @@
-"""Agent registry for plugin discovery and instantiation."""
-
 from __future__ import annotations
 
 import logging

@@ -1,17 +1,3 @@
-"""
-NexusGuard: 最小ポリシー判定器
-
-仕様:
-- decision は ALLOW/HOLD/BLOCK の3値
-- ルールIDに基づく reasons[] を必ず出力する
-- Eval verdict の解釈: NO→BLOCK, CONDITIONAL_GO→HOLD, GO→次判定へ
-- tests: FAIL→BLOCK, UNKNOWN→HOLD, PASS→次判定へ
-- high_risk_diff: true→HOLD
-- security (secret_found): true→BLOCK
-- 全通過→ALLOW
-- override はデフォルト無効。実装する場合も BLOCK 解除は禁止。
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field

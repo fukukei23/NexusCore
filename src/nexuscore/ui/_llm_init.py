@@ -1,5 +1,3 @@
-"""LLM / Whisper / SelfHealing の初期化（遅延import付き）。"""
-
 from __future__ import annotations
 
 import logging

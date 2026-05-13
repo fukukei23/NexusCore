@@ -1,12 +1,3 @@
-"""
-test_metrics.py
-
-テストメトリクスの収集と分析。
-
-NexusCore のテスト戦略の効果を測定し、
-フィードバックループを構築するためのメトリクスを提供します。
-"""
-
 from __future__ import annotations
 
 import json

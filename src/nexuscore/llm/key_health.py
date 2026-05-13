@@ -1,10 +1,3 @@
-"""
-API key health checker for NexusCore LLM providers.
-
-Validates key presence, detects placeholders and duplicates at startup.
-Key values are never logged — only status, length, and provider name.
-"""
-
 from __future__ import annotations
 
 import logging

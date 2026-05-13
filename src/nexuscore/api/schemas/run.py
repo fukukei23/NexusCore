@@ -1,10 +1,3 @@
-"""
-Run API リクエスト・レスポンススキーマ
-
-FastAPI の Run エンドポイント用の Pydantic モデル定義。
-既存の Flask 実装 (`src/nexuscore/webapp/api_external.py`) の仕様に準拠。
-"""
-
 from datetime import datetime
 from typing import Literal
 

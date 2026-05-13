@@ -1,13 +1,3 @@
-"""
-Health check エンドポイント
-
-API の稼働状況を確認するためのエンドポイント。
-認証不要な公開 API として扱う。
-
-注意: このエンドポイントは認証不要ですが、将来的に認証が必要になった場合は
-Depends(get_current_user) を追加することで簡単に有効化できます。
-"""
-
 from datetime import datetime
 
 from fastapi import APIRouter

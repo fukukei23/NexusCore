@@ -1,10 +1,3 @@
-"""
-GitHub Webhook API リクエスト・レスポンススキーマ
-
-FastAPI の GitHub Webhook エンドポイント用の Pydantic モデル定義。
-既存の Flask API (`src/nexuscore/api/github_webhook_handler.py`) の仕様に準拠。
-"""
-
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field

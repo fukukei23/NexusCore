@@ -1,9 +1,3 @@
-"""
-ログ設定の共通ユーティリティ
-
-すべてのログファイルを logs/ ディレクトリに統一して出力する。
-"""
-
 from __future__ import annotations
 
 import logging

@@ -1,11 +1,3 @@
-"""
-Badge API レスポンススキーマ
-
-FastAPI の Badge エンドポイント用の Pydantic モデル定義。
-shields.io 互換形式。
-既存の Flask 実装 (`src/nexuscore/webapp/api_badges.py`) の仕様に準拠。
-"""
-
 from typing import Literal
 
 from pydantic import BaseModel, Field

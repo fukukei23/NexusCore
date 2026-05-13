@@ -1,10 +1,3 @@
-"""
-LLM ランタイムの共有シングルトンと診断ユーティリティ。
-
-各モジュールが import したタイミングで ENV 連携と HTTP クライアントの
-有無を確定し、ログ出力も一元管理できるようにする。
-"""
-
 from __future__ import annotations
 
 import logging

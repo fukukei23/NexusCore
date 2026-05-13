@@ -1,13 +1,3 @@
-"""
-run_history.py
-
-Self-Healing や Orchestrator など、NexusCore の長時間タスクについて
-1 実行ごとに JSONL 形式で履歴を記録するユーティリティ。
-
-- 保存先: <project_root>/.nexus/history/{kind}.log.jsonl
-- 1 行 = 1 実行の RunRecord (JSON)
-"""
-
 from __future__ import annotations
 
 import json

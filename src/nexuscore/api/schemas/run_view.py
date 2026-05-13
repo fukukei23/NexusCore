@@ -1,9 +1,3 @@
-"""
-RunView schemas for CR-NEXUS-028.
-
-RunView projection models for API responses (RunState is not exposed directly).
-"""
-
 from __future__ import annotations
 
 from typing import Any

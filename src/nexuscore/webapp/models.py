@@ -1,10 +1,3 @@
-"""
-NexusCore SaaS基盤 - データベースモデル
-
-SQLAlchemy ORM モデル定義。
-既存の Orchestrator / NPE とは独立して動作する。
-"""
-
 from __future__ import annotations
 
 import hashlib

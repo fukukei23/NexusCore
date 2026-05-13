@@ -1,16 +1,3 @@
-"""
-Retry ユーティリティ
-
-LLM 呼び出しや Sandbox 実行に対して、Spec CR-NEXUS-051 に準拠した再試行を提供する。
-
-Spec 要件:
-- 3.3.1: リトライ可否の判断ルール
-- 3.3.2: リトライの有限性保証（SHALL要件）
-- 3.3.3: Backoff 戦略（意味論レベル定義）
-- 3.3.4: Unexpected エラーのリトライ禁止
-- 3.4.2: 分類不能エラー時のフォールバックフック
-"""
-
 from __future__ import annotations
 
 import time

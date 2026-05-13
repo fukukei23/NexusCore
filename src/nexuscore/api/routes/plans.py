@@ -1,10 +1,3 @@
-"""
-Plans エンドポイント
-
-Plan管理用の FastAPI エンドポイント。
-将来的な拡張を考慮した構造。
-"""
-
 import logging
 
 from fastapi import APIRouter, Depends, Query, status

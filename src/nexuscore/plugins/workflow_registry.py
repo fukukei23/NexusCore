@@ -1,5 +1,3 @@
-"""Workflow registry for plugin discovery and execution."""
-
 from __future__ import annotations
 
 import logging

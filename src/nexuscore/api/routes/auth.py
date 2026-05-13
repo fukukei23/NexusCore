@@ -1,10 +1,3 @@
-"""
-GitHub OAuth認証ルーター（FastAPI版）
-
-Flask webapp/auth.py から移行。Authlib Starlette クライアントを使用。
-既存のFlask Blueprint（webapp/auth.bp）は後方互換として保持。
-"""
-
 from __future__ import annotations
 
 import os

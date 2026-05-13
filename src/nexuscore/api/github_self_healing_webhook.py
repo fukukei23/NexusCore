@@ -1,13 +1,3 @@
-"""
-github_self_healing_webhook.py
-
-GitHub pull_request Webhook を受信して Self-Healing Service を実行するエンドポイント。
-
-安全ガード:
-  - PR ラベル "self-healing" が付いているものだけ実行
-  - GuardianAgent によるレビュー統合
-"""
-
 from __future__ import annotations
 
 import logging

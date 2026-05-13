@@ -1,10 +1,3 @@
-"""
-Routing policy utilities and task-model mappings for LLMRouter.
-
-NexusCore supports multiple LLM providers: OpenAI, Anthropic, Google Gemini,
-GLM (Zhipu AI), MiniMax, DeepSeek, Moonshot, and local models.
-"""
-
 from __future__ import annotations
 
 from typing import Any

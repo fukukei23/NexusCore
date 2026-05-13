@@ -1,16 +1,3 @@
-"""
-FastAPI アプリケーションエントリポイント
-
-NexusCore API の FastAPI ベース実装。
-既存の Flask server.py と共存し、段階的に移行するための土台。
-
-実装パターン（.cursorrules 準拠）:
-- ルートは src/nexuscore/api/routes/ 配下に作成
-- レスポンススキーマは src/nexuscore/api/schemas/ 配下の Pydantic BaseModel を使用
-- Public API は /api/v1/* プレフィックスを使用
-- 認証依存関係は src/nexuscore/api/dependencies/ 配下に配置
-"""
-
 import os
 
 from fastapi import FastAPI, HTTPException, Request, status

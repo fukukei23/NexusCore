@@ -1,12 +1,3 @@
-# ==============================================================================
-# ファイル: src/nexuscore/agents/base_agent.py
-# 目的  : すべての Agent の LLM 呼び出し基盤。llm_router 経由でモデル選択。
-# ポイント:
-#   - as_json=True のとき、system に「JSONのみ」ガード文を自動付与（中央集権）
-#   - 鍵優先度: 環境変数 > .env > secrets.py（.env は起動時に環境へロード）
-#   - llm_router が無い/失敗時のフォールバックを内蔵
-# 依存  : src/nexuscore/llm/llm_router.py
-# ==============================================================================
 from __future__ import annotations
 
 from nexuscore.logging_standard import get_logger

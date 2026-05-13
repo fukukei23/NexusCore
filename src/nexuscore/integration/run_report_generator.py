@@ -1,10 +1,3 @@
-"""
-Run 完了時 Markdown レポート自動生成モジュール
-
-Run 完了時に、Self-Healing Summary・LLMコスト・テスト結果・ログリンクを
-1枚の Markdown レポートにまとめて保存する。
-"""
-
 from __future__ import annotations
 
 import json

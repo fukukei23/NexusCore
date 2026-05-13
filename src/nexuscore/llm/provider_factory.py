@@ -1,7 +1,3 @@
-"""
-Factory helpers that map model names to provider classes.
-"""
-
 from __future__ import annotations
 
 from nexuscore.llm.providers import (

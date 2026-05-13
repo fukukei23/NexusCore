@@ -1,12 +1,3 @@
-"""
-github_webhook_handler.py
-
-Flask サーバで GitHub Webhook を受信するエンドポイント。
-
-/api/github/webhook に POST リクエストが来たら、
-github_self_healing_webhook.github_webhook() を呼び出す。
-"""
-
 from __future__ import annotations
 
 import logging

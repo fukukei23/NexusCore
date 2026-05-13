@@ -1,5 +1,3 @@
-"""共有状態・ユーティリティ関数。"""
-
 from __future__ import annotations
 
 import glob

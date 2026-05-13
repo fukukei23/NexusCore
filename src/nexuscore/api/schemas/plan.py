@@ -1,10 +1,3 @@
-"""
-Plan API リクエスト・レスポンススキーマ
-
-FastAPI の Plan エンドポイント用の Pydantic モデル定義。
-将来的な拡張を考慮した構造。
-"""
-
 from datetime import datetime
 
 from pydantic import BaseModel, Field

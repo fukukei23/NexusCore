@@ -1,12 +1,3 @@
-"""
-NexusCore SaaS基盤 - ExecutionLog 書き込みサービス
-
-Orchestrator / NPE / SandboxExecutor から直接 DB を触らずに、
-「Flask アプリコンテキストがあれば ExecutionLog を書く」ための薄いラッパ。
-
-既存の CLI 実行は挙動を変えない（has_app_context() チェックで分岐）。
-"""
-
 from __future__ import annotations
 
 import json

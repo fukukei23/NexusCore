@@ -1,9 +1,3 @@
-"""
-Health check レスポンススキーマ
-
-Health check エンドポイントのレスポンスモデル定義。
-"""
-
 from datetime import datetime
 from typing import Literal
 

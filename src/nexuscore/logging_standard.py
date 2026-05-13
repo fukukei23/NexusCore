@@ -1,15 +1,3 @@
-"""
-NexusCore 標準ロギングファクトリー
-
-すべてのモジュールはこのファクトリーを使用してロガーを取得する。
-これにより、ロギング設定の一元管理と統一されたフォーマットが実現される。
-
-Usage:
-    from nexuscore.logging_standard import get_logger
-    logger = get_logger(__name__)
-    logger.info("Application started")
-"""
-
 from __future__ import annotations
 
 import logging

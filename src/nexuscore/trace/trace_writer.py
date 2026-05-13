@@ -1,15 +1,3 @@
-"""
-NexusTrace: GuardDecision イベントの保存
-
-仕様:
-- 保存単位：1判定=1イベント（event_type="guard_decision"）
-- 保存形式：JSONL（1行=1JSON）
-- 必須：environment / policy_id / decision / reasons / timestamp / schema_version
-- artifacts（eval_report_id/test_run_id/diff_id/security_scan_id）はキーを保持し、無い場合はnull
-- code_identity（git_commit/repo_dirty 等）は取得可能な範囲で埋める。取得不能ならnullでよい
-- 保存失敗は GuardDecision を変更しない（Traceは観測系）。例外は外に投げず警告ログにする
-"""
-
 from __future__ import annotations
 
 import json

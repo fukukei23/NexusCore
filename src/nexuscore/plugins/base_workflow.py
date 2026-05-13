@@ -1,5 +1,3 @@
-"""Base class for workflow plugins."""
-
 from __future__ import annotations
 
 from typing import Any

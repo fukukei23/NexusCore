@@ -1,13 +1,3 @@
-# ==============================================================================
-# ファイル: src/nexuscore/workflows/multi_llm_review.py
-# 目的  : マルチLLM相互添削（並列→統合→自信度→追加検証/打切り）
-# 仕様  : --models で与えたモデルを「厳密に」使用（ルーターの自動選択は使わない）
-# 実行例:
-#   python -m src.nexuscore.workflows.multi_llm_review --task "pytest失敗の共通原因レビュー" \
-#     --models "gemini-1.5-flash-latest,claude-3-sonnet,gpt-4o,deepseek-r1" \
-#     --threshold 0.9 --max_extra 1 --tokens 400
-# ==============================================================================
-
 from __future__ import annotations
 
 import argparse

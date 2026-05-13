@@ -1,12 +1,3 @@
-"""
-Shared helper utilities for LLM routing and provider modules.
-
-The legacy ``llm_router`` module defined a number of helper functions that were
-also consumed by individual provider implementations.  Splitting them into this
-module lets both layers import the same helpers without introducing circular
-dependencies.
-"""
-
 from __future__ import annotations
 
 import json

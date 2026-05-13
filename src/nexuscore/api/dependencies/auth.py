@@ -1,12 +1,3 @@
-"""
-認証用 Dependency
-
-FastAPI の Depends で使用する認証関連の Dependency。
-API Key 認証（X-API-Key ヘッダー）を実装。
-
-将来 JWT 方式を追加できる拡張性のための抽象構造を提供。
-"""
-
 import json
 import logging
 import os

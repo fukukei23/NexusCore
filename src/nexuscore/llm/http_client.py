@@ -1,11 +1,3 @@
-"""
-LLM プロバイダ向け HTTP クライアント補助モジュール。
-
-更新履歴:
-- 2025-11-22 00:51 JST / Version 2.3.5-hotfix
-  - Retry 付き Session を集中管理し、requests 未導入時はスタブで降格する仕様を明確化。
-"""
-
 from __future__ import annotations
 
 import logging

@@ -1,13 +1,3 @@
-"""
-stacktrace_mapper.py
-
-テスト失敗時のスタックトレース (error_log) から、
-関連性の高いソースファイルのパスを抽出するユーティリティ。
-
-主な用途:
-- Self-Healing の対象ファイル候補を絞り込むための情報源として使用。
-"""
-
 from __future__ import annotations
 
 import re

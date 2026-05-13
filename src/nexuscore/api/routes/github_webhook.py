@@ -1,13 +1,3 @@
-"""
-GitHub Webhook エンドポイント
-
-GitHub pull_request Webhook を受信して Self-Healing Service を実行するエンドポイント。
-既存の Flask 実装 (`src/nexuscore/api/github_webhook_handler.py`) と互換性を保つ。
-
-注意: このエンドポイントは GitHub Webhook の署名認証（X-Hub-Signature-256）のみを使用し、
-API Key 認証（X-API-Key）は使用しません。これは GitHub Webhook の標準的な実装パターンです。
-"""
-
 import hashlib
 import hmac
 import logging

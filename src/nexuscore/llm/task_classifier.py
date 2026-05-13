@@ -1,7 +1,3 @@
-"""
-Utility for LLM task classification prompts.
-"""
-
 from __future__ import annotations
 
 import json

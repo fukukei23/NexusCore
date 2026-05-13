@@ -1,11 +1,3 @@
-"""
-Central registry for LLM profiles referenced by the router.
-
-NexusCore supports multiple LLM providers:
-- Quality tier: OpenAI GPT-5.5, Anthropic Claude Sonnet 4.6, Google Gemini 3.1 Pro
-- Lightweight tier: GLM-5.1 (Zhipu AI), MiniMax M2.7
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

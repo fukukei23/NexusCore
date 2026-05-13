@@ -1,20 +1,3 @@
-"""
-run_lock.py
-
-CR-023 (Concurrency / Locking Contract) + CR-NEXUS-024: Filesystem-based run lock.
-
-Lock file format: <lock_dir>/<safe_run_id>.lock
-  - safe_run_id = sha256(run_id).hexdigest() (to avoid filesystem injection)
-  - JSON content: {"run_id": "...", "pid": ..., "acquired_at": "...", "expires_at": "..."}
-
-Environment variables:
-  - NEXUSCORE_RUN_LOCK_DIR: Lock directory (default: <run_state_dir>/locks or /tmp/nexuscore_locks)
-  - NEXUSCORE_RUN_LOCK_TTL_SECONDS: Lock TTL in seconds (default: 3600 = 1 hour)
-
-Stale lock recovery:
-  - Locks with expires_at < now are moved to *.stale.<timestamp> and re-acquisition is attempted.
-"""
-
 from __future__ import annotations
 
 import hashlib

@@ -1,14 +1,4 @@
-"""
-test_generator_prompt.py
-
-AI テスト生成用のプロンプトテンプレート。
-
-tester_agent が LLM にテスト生成を依頼する際の
-プロンプトテンプレートを提供します。
-"""
-
 from __future__ import annotations
-
 
 def build_test_generation_prompt(
     target_file_path: str,

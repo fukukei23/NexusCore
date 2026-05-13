@@ -1,9 +1,3 @@
-"""
-API Keys エンドポイント用の Pydantic スキーマ
-
-API Key の発行・一覧取得・削除に関するリクエスト・レスポンスモデル。
-"""
-
 from datetime import datetime
 
 from pydantic import BaseModel, Field

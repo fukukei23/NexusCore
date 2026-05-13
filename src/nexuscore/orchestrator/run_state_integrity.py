@@ -1,11 +1,3 @@
-"""
-run_state_integrity.py
-
-CR-022 (Integrity / Tamper Detection Contract) + CR-NEXUS-026: HMAC-SHA256 implementation.
-
-RunState integrity verification using HMAC-SHA256 signatures.
-"""
-
 from __future__ import annotations
 
 import hashlib

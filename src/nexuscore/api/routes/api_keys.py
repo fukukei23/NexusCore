@@ -1,10 +1,3 @@
-"""
-API Keys エンドポイント
-
-API Key の発行・一覧取得・削除を提供する FastAPI エンドポイント。
-認証済みユーザーが自身の API Key を管理できます。
-"""
-
 import logging
 
 from fastapi import APIRouter, Depends, status

@@ -1,15 +1,3 @@
-"""
-notifier.py
-
-NexusCore の実行完了通知を外部サービス（Slack等）に送信するユーティリティ。
-
-主な用途:
-- Self-Healing の実行完了通知
-- Orchestrator の実行完了通知
-- 長時間タスクの進捗通知
-- 汎用的なプロジェクト完了通知（atelier-kyo-manager等）
-"""
-
 from __future__ import annotations
 
 import logging

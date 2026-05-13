@@ -1,14 +1,3 @@
-"""
-RunView API endpoints (CR-NEXUS-028/029/032).
-
-RunState-based RunView projection API endpoints.
-External API returns RunView only, not raw RunState JSON.
-Orchestrator Dependency Injection for API (CR-NEXUS-029).
-
-CR-NEXUS-032: Canonical paths are /api/v1/runs.
-Deprecated paths /api/v1/run-view/runs are kept for backward compatibility (excluded from OpenAPI).
-"""
-
 import logging
 import os
 from typing import Any

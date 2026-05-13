@@ -1,13 +1,3 @@
-"""NexusCore CLI application with subcommand structure.
-
-Provides:
-    nexus run <requirement> --project-path <path>
-    nexus agents
-    nexus plugin list
-    nexus plugin info <name>
-    nexus version
-"""
-
 from __future__ import annotations
 
 import importlib

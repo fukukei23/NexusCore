@@ -1,9 +1,3 @@
-"""
-GitHub PR 修正要約生成モジュール
-
-Run に紐づくパッチとログを元に、「何を直したか／なぜ壊れていたか／リスク」を自然言語で要約する。
-"""
-
 from __future__ import annotations
 
 import logging

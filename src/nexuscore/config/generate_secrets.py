@@ -1,9 +1,3 @@
-# ================================================================
-# ファイル名: generate_secrets.py
-# 目的: .env をもとに secrets.py/.env.template を自動生成する
-# 保存場所: src/nexuscore/config/
-# ================================================================
-
 from pathlib import Path
 
 from dotenv import dotenv_values

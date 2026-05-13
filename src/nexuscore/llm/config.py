@@ -1,14 +1,3 @@
-"""
-Configuration helpers for LLMRouter.
-
-This module centralizes .env loading, environment-variable synchronization,
-and typed access to runtime settings so that the router itself can focus on
-provider logic.
-
-NexusCore supports multiple LLM providers: OpenAI, Anthropic, Google Gemini,
-GLM (Zhipu AI), MiniMax, DeepSeek, and Moonshot.
-"""
-
 from __future__ import annotations
 
 import logging

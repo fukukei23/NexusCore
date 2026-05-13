@@ -1,11 +1,4 @@
-"""
-pr_comments.py
-
-GitHub PR コメントを組み立てるユーティリティ。
-"""
-
 from __future__ import annotations
-
 
 def summarize_patch(patch_str: str) -> tuple[int, int]:
     """

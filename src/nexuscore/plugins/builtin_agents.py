@@ -1,5 +1,3 @@
-"""Register all built-in NexusCore agents into the AgentRegistry."""
-
 from __future__ import annotations
 
 from nexuscore.agents.architect_agent import ArchitectAgent

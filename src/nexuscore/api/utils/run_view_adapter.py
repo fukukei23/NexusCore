@@ -1,9 +1,3 @@
-"""
-RunView utility for API (CR-NEXUS-028).
-
-Reuses build_run_view from CLI module to convert runner results to RunView Pydantic models.
-"""
-
 from __future__ import annotations
 
 from typing import Any

@@ -1,7 +1,3 @@
-# ==============================================================================
-# ファイル: src/nexuscore/config/constitution_loader.py
-# 目的  : 憲法（constitution.yaml）を読み込み、環境別設定をマージする
-# ==============================================================================
 from __future__ import annotations
 
 import logging

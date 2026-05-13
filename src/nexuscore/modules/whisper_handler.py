@@ -1,11 +1,3 @@
-"""
-Whisper 依存のラッパーモジュール。
-
-- whisper パッケージが無い環境でも import だけは通るようにする
-- 実際に機能を使う場合は WHISPER_AVAILABLE を確認するか、
-  _require_whisper() を経由してエラーを出す
-"""
-
 from __future__ import annotations
 
 try:

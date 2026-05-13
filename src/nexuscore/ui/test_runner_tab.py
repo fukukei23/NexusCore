@@ -1,5 +1,3 @@
-"""Tab 3: Test Runner（pytest 実行＋結果表示）"""
-
 from __future__ import annotations
 
 import logging
