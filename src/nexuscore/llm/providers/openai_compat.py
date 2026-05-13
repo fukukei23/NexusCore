@@ -125,6 +125,10 @@ class OpenAICompatLLM(BaseLLM):
                 return _strip_jsonish(text) if as_json else text
 
             except RequestsHTTPError as e:
+                status = getattr(getattr(e, "response", None), "status_code", 0)
+                if status == 429:
+                    self.last_call_mode = "rate-limited"
+                    raise
                 body = ""
                 try:
                     body = e.response.text
