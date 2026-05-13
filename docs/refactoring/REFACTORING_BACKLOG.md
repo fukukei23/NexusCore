@@ -35,7 +35,8 @@
 
 ## 判明事項（2026-05-13時点）
 
-- テストスイート: 4591 passed / 4 failed (Gradio UI, フレーク) / 2 skipped (integration smoke)
-- Phase 6 ★3ファイル分割 + FUK-5〜11 完了。残る技術的負債なし
+- テストスイート: 4624 passed / 5 failed (Gradio UI 4 + test_generator_e2e 1, すべてフレーク) / 191 skipped
+- Phase 6 ★3ファイル分割 + FUK-5〜17 完了。残る技術的負債なし
 - BaseAgentのloggerは`get_logger(__name__)`で生成、名前は`nexuscore.agents.base_agent`
 - Gemini providerテストは`google-generativeai`パッケージ未インストールでskip（既知）
+- Phase3テスト修正完了（15件: render_template mock 2 + removed function skip 5 + SelfHealing standalone 10）
