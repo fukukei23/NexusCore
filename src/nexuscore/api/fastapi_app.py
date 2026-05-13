@@ -98,10 +98,6 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
     # RunView canonical router をマウント（/api/v1/runs, 認証必須）
     app.include_router(run_view.canonical_router, prefix="/api/v1")
 
-    # RunView deprecated router をマウント（/api/v1/run-view/runs, OpenAPIから除外）
-    from .routes._run_view_deprecated import deprecated_router as run_view_deprecated_router
-    app.include_router(run_view_deprecated_router, prefix="/api/v1")
-
     # CR-NEXUS-034: グローバル例外ハンドラでエラー応答をトップレベルerror形式に統一（Option A）
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):

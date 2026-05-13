@@ -11,7 +11,6 @@ from nexuscore.api.routes.run_view import (
     _get_project_path_from_run_state,
     canonical_router,
 )
-from nexuscore.api.routes._run_view_deprecated import deprecated_router
 
 # 関数内importのモックパス
 LOAD_STATE_PATH = "nexuscore.orchestrator.run_state_store.load_state"
@@ -24,7 +23,6 @@ def app():
     """テスト用FastAPIアプリ"""
     _app = FastAPI()
     _app.include_router(canonical_router, prefix="/api/v1")
-    _app.include_router(deprecated_router, prefix="/api/v1")
 
     from nexuscore.api.dependencies.auth import AuthenticatedUser, get_current_user
 
@@ -159,38 +157,3 @@ class TestCreateRunViewErrorHandling:
             mock_ar.run_with_authority.side_effect = RuntimeError("boom")
             response = client.post("/api/v1/runs", json={"requirement": "test"})
             assert response.status_code == 500
-
-
-class TestDeprecatedEndpoints:
-    """deprecated endpoints (lines 369-377, 404-412)"""
-
-    def test_deprecated_get_delegates_to_canonical(self, client):
-        """deprecated GET が canonical に委譲"""
-        mock_state = {"status": "COMPLETED", "next_phase": None}
-        with patch(LOAD_STATE_PATH, return_value=mock_state):
-            response = client.get("/api/v1/run-view/runs/r1")
-            assert response.status_code == 200
-
-    def test_deprecated_resume_delegates(self, client):
-        """deprecated resume が canonical に委譲"""
-        mock_state = {"status": "PAUSED"}
-        with patch(LOAD_STATE_PATH, return_value=mock_state), \
-             patch(AUTHORITY_RUNNER_PATH) as mock_ar, \
-             patch(GET_ORCH_PATH):
-            mock_ar.resume_run.return_value = {"status": "RUNNING", "run_id": "r1"}
-            response = client.post("/api/v1/run-view/runs/r1/resume")
-            assert response.status_code in (200, 201)
-
-    def test_deprecated_create_delegates(self, client):
-        """deprecated create が canonical に委譲"""
-        with patch(AUTHORITY_RUNNER_PATH) as mock_ar, \
-             patch(GET_ORCH_PATH):
-            mock_ar.run_with_authority.return_value = {"status": "COMPLETED", "run_id": "r1"}
-            response = client.post("/api/v1/run-view/runs", json={"requirement": "test"})
-            assert response.status_code == 200
-
-    def test_deprecated_get_not_found(self, client):
-        """deprecated GET でも 404"""
-        with patch(LOAD_STATE_PATH, side_effect=FileNotFoundError):
-            response = client.get("/api/v1/run-view/runs/r1")
-            assert response.status_code == 404

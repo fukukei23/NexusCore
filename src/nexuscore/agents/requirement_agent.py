@@ -2,16 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
-import time
 import uuid
-from collections.abc import Generator
-
-# Gradio は lazy import（launch_gradio_ui() 内でのみ import）で UI 依存を分離
 from typing import Any
 
 _logger = logging.getLogger(__name__)
 
-# --- 依存 ---
 try:
     from ..utils.json_sanitizer import sanitize_json_like
 except ImportError:
@@ -21,105 +16,11 @@ except ImportError:
 from ._fallbacks import BaseAgent
 
 
-# (TextLocalization と StateMachine クラスは変更なし)
-class TextLocalization:
-    def __init__(self, language: str = "ja"):
-        self.language = language
-        self.texts = {
-            "ja": {
-                "title": "NexusCore: 対話型 要件定義エージェント",
-                "boot_msg": "Gradio UIを起動中...",
-                "initial_greeting": "こんにちは。どのようなソフトウェアを開発したいですか？",
-                "status_ready": "入力待機中...",
-                "status_thinking": "思考中...",
-                "status_suggesting": "提案を生成しました。",
-                "status_finished": "要件定義が完了しました。",
-                "input_placeholder": "メッセージを入力...",
-                "send_button": "送信",
-                "finish_button": "完了",
-                "final_output_label": "最終仕様（JSON）",
-                "yes_button": "はい",
-                "no_button": "いいえ",
-                "suggest_button": "他の提案は？",
-            },
-            "en": {
-                "title": "NexusCore: Interactive Requirement Agent",
-                "boot_msg": "Launching Gradio UI...",
-                "initial_greeting": "Hello. What software would you like to develop?",
-                "status_ready": "Waiting for input...",
-                "status_thinking": "Thinking...",
-                "status_suggesting": "Suggestion generated.",
-                "status_finished": "Requirements complete.",
-                "input_placeholder": "Enter your message...",
-                "send_button": "Send",
-                "finish_button": "Finish",
-                "final_output_label": "Final Specifications (JSON)",
-                "yes_button": "Yes",
-                "no_button": "No",
-                "suggest_button": "Other suggestions?",
-            },
-        }
-
-    def __getitem__(self, key: str) -> str:
-        return self.texts.get(self.language, self.texts["en"]).get(key, f"<{key}>")
-
-
-class StateMachine:
-    STATES = ("INIT", "COLLECTING", "SUGGESTING", "FINALIZING")
-
-    def __init__(self, agent: RequirementAgent):
-        self.agent = agent
-        self.state = self.agent._get_initial_state()
-
-    def _build_prompt(self, history: list[dict[str, Any]], user_input: str) -> str:
-        history_text = "\n".join(
-            f"{'User' if h['role'] == 'user' else 'Assistant'}: {h['content']}"
-            for h in history[-10:]
-        )
-        return f"""You are a requirements analyst. Based on the conversation, respond appropriately.
-
-Current state: {self.state["state"]}
-User input: {user_input}
-
-Conversation so far:
-{history_text}
-
-If in COLLECTING state: Ask clarifying questions or confirm understanding.
-If in SUGGESTING state: Propose concrete features and ask for approval.
-Respond concisely in {'Japanese' if self.agent.language == 'ja' else 'English'}."""
-
-    def transition(self, user_input: str | None = None) -> list[tuple[Any, str]]:
-        current = self.state["state"]
-
-        if current == "INIT":
-            self.state["state"] = "COLLECTING"
-        elif current == "COLLECTING":
-            self.state["state"] = "SUGGESTING"
-        elif current == "SUGGESTING":
-            self.state["state"] = "FINALIZING"
-
-        if user_input:
-            self.state["history"].append({"role": "user", "content": user_input})
-
-        if current in ("INIT", "COLLECTING", "SUGGESTING"):
-            try:
-                prompt = self._build_prompt(self.state["history"], user_input or "")
-                response = self.agent.execute_llm_task(prompt)
-            except Exception:
-                response = "要件をお聞かせください。" if self.agent.language == "ja" else "Please tell me your requirements."
-            self.state["history"].append({"role": "assistant", "content": response})
-            return [(None, response)]
-
-        return [(None, "仕様を生成します。")]
-
-
 class RequirementAgent(BaseAgent):
-    def __init__(self, language: str = "ja", use_ui: bool = False):
+    def __init__(self, language: str = "ja"):
         super().__init__()
         self.language = language
-        self.text = TextLocalization(language)
         self.final_requirements: dict[str, Any] | None = None
-        self.use_ui = use_ui
         self._initial_requirement: str = ""
 
     def _get_initial_state(self) -> dict[str, Any]:
@@ -135,9 +36,6 @@ class RequirementAgent(BaseAgent):
         self._initial_requirement = requirement
 
     def analyze_requirement(self, requirement: str) -> dict[str, Any]:
-        """
-        Headless requirement digestion fallback using LLM or heuristic summary.
-        """
         requirement = requirement.strip() or self._initial_requirement or "No requirement provided."
         prompt = f"""
 You are a requirements analyst. Convert the user's request into a concise JSON specification.
@@ -167,131 +65,3 @@ Ensure the response is strictly valid JSON with filled arrays (no empty strings)
             }
         self.final_requirements = data  # type: ignore[assignment]
         return data  # type: ignore[return-value]
-
-    def launch_gradio_ui(self, share: bool = False) -> dict[str, Any]:
-        """
-        Gradio UI を起動して要件定義を行う。
-
-        Note: Gradio はこのメソッド内でのみ import される（lazy import）。
-        これにより、RequirementAgent を import しても Gradio が読み込まれない。
-        """
-        if not self.use_ui:
-            self.logger.info("RequirementAgent running in headless mode.")
-            return self.analyze_requirement(self._initial_requirement)
-
-        # Lazy import: Gradio はこのメソッド内でのみ import
-        try:
-            import gradio as gr
-        except ImportError:
-            self.logger.warning("Gradio is not installed. Falling back to headless mode.")
-            return self.analyze_requirement(self._initial_requirement)
-
-        fsm = StateMachine(self)
-
-        with gr.Blocks(title=self.text["title"]) as demo:
-            gr.Markdown(f"<h1>{self.text['title']}</h1>")
-            status_bar = gr.Textbox(
-                value=self.text["status_ready"], label="Status", interactive=False
-            )
-            chatbot = gr.Chatbot(
-                label="Chat History", height=500, type="messages"  # type: ignore[call-arg]
-            )
-            with gr.Row():
-                msg_input = gr.Textbox(placeholder=self.text["input_placeholder"], scale=4)
-                send_button = gr.Button(self.text["send_button"], scale=1)
-            with gr.Row(visible=False):
-                yes_btn = gr.Button(self.text["yes_button"])
-                no_btn = gr.Button(self.text["no_button"])
-                suggest_btn = gr.Button(self.text["suggest_button"])
-            finish_button = gr.Button(self.text["finish_button"], variant="primary")
-            final_output = gr.Code(label=self.text["final_output_label"], language="json")
-
-            def on_ui_load() -> list[Any]:
-                fsm.state = self._get_initial_state()
-                initial_message = self.text["initial_greeting"]
-                fsm.state["history"].append({"role": "assistant", "content": initial_message})
-                # ★★★★★ ここからが v8.3 修正の核心 ★★★★★
-                # Chatbotが期待する messages 形式（辞書のリスト）で返すように修正
-                return [[{"role": "assistant", "content": initial_message}]], self.text[  # type: ignore[return-value]
-                    "status_ready"
-                ]
-                # ★★★★★ ここまで ★★★★★
-
-            def on_user_submit(
-                user_message: str, history: list[dict]
-            ) -> Generator[list[Any], None, None]:
-                if not user_message:
-                    yield history, self.text["status_ready"], gr.update(), gr.update(), gr.update(  # type: ignore[misc]
-                        visible=False
-                    ), gr.update(
-                        visible=False
-                    ), gr.update(
-                        visible=False
-                    )
-                    return
-
-                history.append({"role": "user", "content": user_message})
-                fsm.state["history"].append({"role": "user", "content": user_message})
-
-                yield (  # type: ignore[misc]
-                    history,
-                    self.text["status_thinking"],
-                    gr.update(interactive=False, value=""),
-                    gr.update(interactive=False),
-                    gr.update(visible=False),
-                    gr.update(visible=False),
-                    gr.update(visible=False),
-                )
-
-                time.sleep(1)
-                responses = fsm.transition(user_input=user_message)
-
-                for _, assistant_a in responses:
-                    history.append({"role": "assistant", "content": assistant_a})
-                    fsm.state["history"].append({"role": "assistant", "content": assistant_a})
-
-                suggestion_buttons_update = gr.update(visible=(fsm.state["state"] == "SUGGESTING"))
-                yield (  # type: ignore[misc]
-                    history,
-                    self.text["status_ready"],
-                    gr.update(interactive=True),
-                    gr.update(interactive=True),
-                    suggestion_buttons_update,
-                    suggestion_buttons_update,
-                    suggestion_buttons_update,
-                )
-
-            def on_finish_click() -> list[Any]:
-                self.final_requirements = self.generate_final_spec(fsm.state["history"])
-                final_json_str = json.dumps(self.final_requirements, indent=2, ensure_ascii=False)
-                # UIを閉じるには、Gradioサーバーを停止するなどの追加処理が必要
-                # ここでは完了ステータスを表示し、手動で閉じることを想定
-                # demo.close() # この呼び出しはバックエンドのイベントハンドラからは直接機能しない
-                return final_json_str, self.text["status_finished"]  # type: ignore[return-value]
-
-            demo.load(on_ui_load, outputs=[chatbot, status_bar])
-
-            send_button.click(
-                on_user_submit,
-                inputs=[msg_input, chatbot],
-                outputs=[chatbot, status_bar, msg_input, send_button, yes_btn, no_btn, suggest_btn],
-            )
-            msg_input.submit(
-                on_user_submit,
-                inputs=[msg_input, chatbot],
-                outputs=[chatbot, status_bar, msg_input, send_button, yes_btn, no_btn, suggest_btn],
-            )
-            finish_button.click(on_finish_click, outputs=[final_output, status_bar])
-
-        print(self.text["boot_msg"])
-        demo.queue().launch(server_name="127.0.0.1", server_port=7860, share=share)
-
-        return self.final_requirements or {}
-
-
-if __name__ == "__main__":
-    agent = RequirementAgent(language="ja")
-    specs = agent.launch_gradio_ui(share=False)
-    if specs:
-        print("\n--- [最終生成仕様] ---")
-        print(json.dumps(specs, indent=2, ensure_ascii=False))
