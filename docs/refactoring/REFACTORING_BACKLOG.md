@@ -19,6 +19,7 @@
 | FUK-14 | `logging_standard.py` テスト追加（12テスト） | Done |
 | FUK-15 | `modules/whisper_handler.py` テスト追加（8テスト） | Done |
 | FUK-16 | `archive/views_api_test.py` 削除（Flask legacy） | Done |
+| FUK-17 | `api/archive/server.py` 削除（Flask legacy API server、参照ゼロ） | Done |
 
 ## 完了済みタスク（履歴）
 
