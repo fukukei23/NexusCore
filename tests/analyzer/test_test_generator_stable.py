@@ -40,7 +40,7 @@ def test_template_mode_generates_basic_skeleton(sample_project_dir, tmp_path):
     generate_template_tests(...) を直接呼び出し。
     返ってきた文字列に以下が含まれることを確認:
     - "def test_add_one" を含む
-    - "TODO: implement test" を含む
+    - "NOTE: implement test" を含む
     """
     module_b_path = sample_project_dir / "module_b.py"
     if not module_b_path.exists():
@@ -58,8 +58,8 @@ def test_template_mode_generates_basic_skeleton(sample_project_dir, tmp_path):
         "def test_add_one" in template
     ), f"Expected 'def test_add_one' in template, got:\n{template}"
     assert (
-        "TODO: implement test" in template or "TODO:" in template
-    ), f"Expected 'TODO: implement test' in template, got:\n{template}"
+        "NOTE: implement test" in template or "NOTE:" in template
+    ), f"Expected 'NOTE: implement test' in template, got:\n{template}"
     assert "import pytest" in template, f"Expected 'import pytest' in template, got:\n{template}"
 
 
@@ -108,8 +108,8 @@ def test_llm_disabled_uses_template_only(sample_project_dir, tmp_path, monkeypat
         "def test_add_one" in test_code
     ), f"Expected 'def test_add_one' in generated code, got:\n{test_code}"
     assert (
-        "TODO:" in test_code or "not implemented" in test_code
-    ), f"Expected TODO or 'not implemented' in generated code, got:\n{test_code}"
+        "NOTE:" in test_code or "not implemented" in test_code
+    ), f"Expected NOTE or 'not implemented' in generated code, got:\n{test_code}"
 
     # LLM が呼ばれていないこと（config.use_llm=False なので _try_generate_tests_with_llm は呼ばれない）
     # ただし、generate_tests_for_module 内で generate_unit_tests が呼ばれ、その中で _try_generate_tests_with_llm が呼ばれる可能性がある
@@ -126,7 +126,7 @@ def test_llm_disabled_uses_template_only(sample_project_dir, tmp_path, monkeypat
 def test_llm_failure_falls_back_to_template(sample_project_dir, tmp_path):
     """
     _try_generate_tests_with_llm 内で利用している LLM クライアントを monkeypatch して、必ず例外を投げるようにする。
-    結果として返ってくるコードが generate_template_tests と同一（または少なくとも "TODO: implement test" を含む）ことを確認。
+    結果として返ってくるコードが generate_template_tests と同一（または少なくとも "NOTE: implement test" を含む）ことを確認。
     """
     module_b_path = sample_project_dir / "module_b.py"
     if not module_b_path.exists():
@@ -156,10 +156,10 @@ def test_llm_failure_falls_back_to_template(sample_project_dir, tmp_path):
             config=config,
         )
 
-    # 生成されたコードはテンプレートと同等（または "TODO:" を含む）であること
+    # 生成されたコードはテンプレートと同等（または "NOTE:" を含む）であること
     assert (
-        "TODO:" in generated or "not implemented" in generated
-    ), f"Expected TODO or 'not implemented' in generated code (fallback), got:\n{generated}"
+        "NOTE:" in generated or "not implemented" in generated
+    ), f"Expected NOTE or 'not implemented' in generated code (fallback), got:\n{generated}"
     assert (
         "import pytest" in generated
     ), f"Expected 'import pytest' in generated code, got:\n{generated}"

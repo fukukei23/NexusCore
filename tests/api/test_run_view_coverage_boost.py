@@ -10,8 +10,8 @@ from fastapi.testclient import TestClient
 from nexuscore.api.routes.run_view import (
     _get_project_path_from_run_state,
     canonical_router,
-    deprecated_router,
 )
+from nexuscore.api.routes._run_view_deprecated import deprecated_router
 
 # 関数内importのモックパス
 LOAD_STATE_PATH = "nexuscore.orchestrator.run_state_store.load_state"
