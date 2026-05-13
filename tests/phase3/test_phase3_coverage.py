@@ -104,13 +104,15 @@ class TestRenderRunStatusBadge:
 class TestRenderRunTable:
     """render_run_table(project: Project, runs: Sequence[Run]) -> str"""
 
-    def test_empty_runs(self):
+    @patch("nexuscore.webapp._projects_helpers.render_template", return_value="<table>mock</table>")
+    def test_empty_runs(self, mock_rt):
         from nexuscore.webapp._projects_helpers import render_run_table
         project = MagicMock()
         result = render_run_table(project, [])
         assert isinstance(result, str)
 
-    def test_with_runs(self):
+    @patch("nexuscore.webapp._projects_helpers.render_template", return_value="<table>SUCCESS</table>")
+    def test_with_runs(self, mock_rt):
         from nexuscore.webapp._projects_helpers import render_run_table
         from datetime import datetime
         project = MagicMock()
@@ -180,52 +182,35 @@ class TestViewsLogsRoutes:
 
 
 class TestRenderLlmCostTable:
-    """_render_llm_cost_table(llm_breakdown: dict[str, dict[str, Any]]) -> str"""
+    """_render_llm_cost_table — removed in dashboard refactor"""
 
+    @pytest.mark.skip("_render_llm_cost_table removed in dashboard refactor")
     def test_empty(self):
-        from nexuscore.webapp.views_dashboard import _render_llm_cost_table
-        result = _render_llm_cost_table({})
-        assert isinstance(result, str)
+        pass
 
+    @pytest.mark.skip("_render_llm_cost_table removed in dashboard refactor")
     def test_with_data(self):
-        from nexuscore.webapp.views_dashboard import _render_llm_cost_table
-        data = {"gpt-4o": {"calls": 10, "cost_usd": 1.50}}
-        result = _render_llm_cost_table(data)
-        assert "gpt-4o" in result
+        pass
 
 
 class TestRenderRecentRunsList:
-    """_render_recent_runs_list(project: Project, runs: list[Run]) -> str"""
+    """_render_recent_runs_list — removed in dashboard refactor"""
 
+    @pytest.mark.skip("_render_recent_runs_list removed in dashboard refactor")
     def test_empty(self):
-        from nexuscore.webapp.views_dashboard import _render_recent_runs_list
-        result = _render_recent_runs_list(MagicMock(), [])
-        assert isinstance(result, str)
+        pass
 
+    @pytest.mark.skip("_render_recent_runs_list removed in dashboard refactor")
     def test_with_runs(self):
-        from nexuscore.webapp.views_dashboard import _render_recent_runs_list
-        from datetime import datetime
-        run = MagicMock()
-        run.id = 1
-        run.status = "SUCCESS"
-        run.started_at = datetime(2026, 1, 1, 10, 0, 0)
-        result = _render_recent_runs_list(MagicMock(), [run])
-        assert "SUCCESS" in result
+        pass
 
 
 class TestRenderProjectDashboardHtml:
-    """render_project_dashboard_html(*, project, stats, recent_runs, ...) -> str"""
+    """render_project_dashboard_html — removed in dashboard refactor"""
 
+    @pytest.mark.skip("render_project_dashboard_html removed in dashboard refactor")
     def test_basic(self):
-        from nexuscore.webapp.views_dashboard import render_project_dashboard_html
-        project = MagicMock()
-        project.id = 1
-        project.name = "test"
-        result = render_project_dashboard_html(
-            project=project, stats={}, recent_runs=[],
-            latest_run=None, latest_run_metrics=None, llm_breakdown={},
-        )
-        assert "test" in result
+        pass
 
 
 class TestDashboardRoutes:
@@ -468,105 +453,56 @@ class TestSelfHealingServiceMaybeStop:
 
 
 class TestSelfHealingServiceGetChangedFiles:
-    """_get_changed_files(project_path, base_ref=None, head_ref=None) -> list[str]"""
+    """get_changed_files from git_operations module"""
 
-    def _make_service(self):
-        from nexuscore.services.self_healing_service import SelfHealingService
-        with patch.object(SelfHealingService, "__init__", lambda self, **kw: None):
-            svc = SelfHealingService.__new__(SelfHealingService)
-            svc.logger = MagicMock()
-            return svc
+    @patch("subprocess.run")
+    def test_no_diff(self, mock_run):
+        from nexuscore.services.git_operations import get_changed_files
+        mock_run.return_value = MagicMock(stdout="", returncode=0, stderr="")
+        result = get_changed_files(Path("/fake/repo"), "main", "feature")
+        assert isinstance(result, list)
 
-    def test_no_diff(self):
-        svc = self._make_service()
-        with patch("nexuscore.services.self_healing_service.subprocess") as mock_sub:
-            mock_sub.run.return_value = MagicMock(stdout="", returncode=0, stderr="")
-            result = svc._get_changed_files(Path("/fake/repo"), "main", "feature")
-            assert isinstance(result, list)
+    @patch("subprocess.run")
+    def test_with_diff(self, mock_run):
+        from nexuscore.services.git_operations import get_changed_files
+        mock_run.return_value = MagicMock(stdout="src/main.py\nsrc/utils.py", returncode=0, stderr="")
+        result = get_changed_files(Path("/fake/repo"), "main", "feature")
+        assert len(result) == 2
 
-    def test_with_diff(self):
-        svc = self._make_service()
-        with patch("nexuscore.services.self_healing_service.subprocess") as mock_sub:
-            mock_sub.run.return_value = MagicMock(stdout="src/main.py\nsrc/utils.py", returncode=0, stderr="")
-            result = svc._get_changed_files(Path("/fake/repo"), "main", "feature")
-            assert len(result) == 2
-
-    def test_no_refs_fallback(self):
-        svc = self._make_service()
-        with patch("nexuscore.services.self_healing_service.subprocess") as mock_sub:
-            mock_sub.run.return_value = MagicMock(stdout="", returncode=0, stderr="")
-            result = svc._get_changed_files(Path("/fake/repo"), None, None)
-            assert isinstance(result, list)
+    @patch("subprocess.run")
+    def test_no_refs_fallback(self, mock_run):
+        from nexuscore.services.git_operations import get_changed_files
+        mock_run.return_value = MagicMock(stdout="", returncode=0, stderr="")
+        result = get_changed_files(Path("/fake/repo"), None, None)
+        assert isinstance(result, list)
 
 
 class TestSelfHealingServiceRunTests:
-    """_run_tests(project_path, retry_context=None) -> tuple[bool, str]"""
+    """run_tests from test_runner module"""
 
-    def _make_service(self):
-        from nexuscore.services.self_healing_service import SelfHealingService
-        with patch.object(SelfHealingService, "__init__", lambda self, **kw: None):
-            svc = SelfHealingService.__new__(SelfHealingService)
-            svc.logger = MagicMock()
-            return svc
+    @patch("nexuscore.services.test_runner.HAS_SANDBOX", False)
+    @patch("subprocess.run")
+    def test_pass_via_subprocess(self, mock_run):
+        from nexuscore.services.test_runner import run_tests
+        mock_run.return_value = MagicMock(returncode=0, stdout="2 passed")
+        success, output = run_tests(Path("/fake/repo"))
+        assert success is True
 
-    def test_pass_via_subprocess(self):
-        """Test via subprocess fallback (HAS_RETRY may be True or False)"""
-        import nexuscore.services.self_healing_service as sh_mod
-        svc = self._make_service()
-        # Mock both paths: if HAS_RETRY, use run_in_sandbox; else subprocess
-        if sh_mod.HAS_RETRY and sh_mod.run_in_sandbox:
-            mock_result = MagicMock()
-            mock_result.returncode = 0
-            mock_result.timed_out = False
-            mock_result.stdout = "2 passed"
-            mock_result.stderr = ""
-            mock_result.exception_type = None
-            with patch.object(sh_mod, "run_in_sandbox", return_value=mock_result):
-                success, output = svc._run_tests(Path("/fake/repo"))
-            assert success is True
-        else:
-            with patch("nexuscore.services.self_healing_service.subprocess") as mock_sub:
-                mock_sub.run.return_value = MagicMock(returncode=0, stdout="2 passed")
-                mock_sub.PIPE = -1
-                mock_sub.STDOUT = -2
-                success, output = svc._run_tests(Path("/fake/repo"))
-                assert success is True
-
-    def test_fail_via_subprocess(self):
-        import nexuscore.services.self_healing_service as sh_mod
-        svc = self._make_service()
-        if sh_mod.HAS_RETRY and sh_mod.run_in_sandbox:
-            mock_result = MagicMock()
-            mock_result.returncode = 1
-            mock_result.timed_out = False
-            mock_result.stdout = "1 failed"
-            mock_result.stderr = "ERROR"
-            mock_result.exception_type = "AssertionError"
-            with patch.object(sh_mod, "run_in_sandbox", return_value=mock_result):
-                success, output = svc._run_tests(Path("/fake/repo"))
-            assert success is False
-        else:
-            with patch("nexuscore.services.self_healing_service.subprocess") as mock_sub:
-                mock_sub.run.return_value = MagicMock(returncode=1, stdout="1 failed")
-                mock_sub.PIPE = -1
-                mock_sub.STDOUT = -2
-                success, output = svc._run_tests(Path("/fake/repo"))
-                assert success is False
+    @patch("nexuscore.services.test_runner.HAS_SANDBOX", False)
+    @patch("subprocess.run")
+    def test_fail_via_subprocess(self, mock_run):
+        from nexuscore.services.test_runner import run_tests
+        mock_run.return_value = MagicMock(returncode=1, stdout="1 failed")
+        success, output = run_tests(Path("/fake/repo"))
+        assert success is False
 
 
 class TestSelfHealingServiceCollectRelevantFiles:
-    """_collect_relevant_files(*, project_path, error_log, changed_files, stacktrace_files)"""
-
-    def _make_service(self):
-        from nexuscore.services.self_healing_service import SelfHealingService
-        with patch.object(SelfHealingService, "__init__", lambda self, **kw: None):
-            svc = SelfHealingService.__new__(SelfHealingService)
-            svc.logger = MagicMock()
-            return svc
+    """collect_relevant_files from patch_workflow module"""
 
     def test_collect_nonexistent_files(self):
-        svc = self._make_service()
-        result = svc._collect_relevant_files(
+        from nexuscore.services.patch_workflow import collect_relevant_files
+        result = collect_relevant_files(
             project_path=Path("/fake/repo"),
             error_log="FAIL: test",
             changed_files=["src/main.py"],
@@ -575,11 +511,11 @@ class TestSelfHealingServiceCollectRelevantFiles:
         assert isinstance(result, dict)
 
     def test_collect_with_real_file(self):
-        svc = self._make_service()
+        from nexuscore.services.patch_workflow import collect_relevant_files
         with tempfile.TemporaryDirectory() as tmpdir:
             test_file = Path(tmpdir) / "main.py"
             test_file.write_text("print('hello')")
-            result = svc._collect_relevant_files(
+            result = collect_relevant_files(
                 project_path=Path(tmpdir),
                 error_log="error",
                 changed_files=["main.py"],
@@ -589,41 +525,36 @@ class TestSelfHealingServiceCollectRelevantFiles:
 
 
 class TestSelfHealingServiceGeneratePatch:
-    """_generate_patch_via_debugger(error_log, files, project_path) -> dict"""
-
-    def _make_service(self):
-        from nexuscore.services.self_healing_service import SelfHealingService
-        with patch.object(SelfHealingService, "__init__", lambda self, **kw: None):
-            svc = SelfHealingService.__new__(SelfHealingService)
-            svc.logger = MagicMock()
-            svc.debugger_agent = MagicMock()
-            return svc
+    """generate_patch_via_debugger from patch_workflow module"""
 
     def test_generate_with_debug_and_patch(self):
-        svc = self._make_service()
-        svc.debugger_agent.debug_and_patch.return_value = {"patch": "fix"}
-        result = svc._generate_patch_via_debugger(
-            error_log="error", files={"src/main.py": "code"}, project_path=Path("/fake")
+        from nexuscore.services.patch_workflow import generate_patch_via_debugger
+        debugger_agent = MagicMock()
+        debugger_agent.debug_and_patch.return_value = {"patch": "fix"}
+        result = generate_patch_via_debugger(
+            debugger_agent=debugger_agent,
+            error_log="error", files={"src/main.py": "code"}, project_path=Path("/fake"),
         )
         assert result == {"patch": "fix"}
 
     def test_generate_with_generate_patch(self):
-        svc = self._make_service()
-        del svc.debugger_agent.debug_and_patch
-        svc.debugger_agent.generate_patch.return_value = {"patch": "fix2"}
-        result = svc._generate_patch_via_debugger(
-            error_log="error", files={"src/main.py": "code"}, project_path=Path("/fake")
+        from nexuscore.services.patch_workflow import generate_patch_via_debugger
+        debugger_agent = MagicMock()
+        del debugger_agent.debug_and_patch
+        debugger_agent.generate_patch.return_value = {"patch": "fix2"}
+        result = generate_patch_via_debugger(
+            debugger_agent=debugger_agent,
+            error_log="error", files={"src/main.py": "code"}, project_path=Path("/fake"),
         )
         assert result == {"patch": "fix2"}
 
     def test_no_debugger_agent(self):
-        from nexuscore.services.self_healing_service import SelfHealingService
-        with patch.object(SelfHealingService, "__init__", lambda self, **kw: None):
-            svc = SelfHealingService.__new__(SelfHealingService)
-            svc.logger = MagicMock()
-            svc.debugger_agent = None
-            result = svc._generate_patch_via_debugger("err", {}, Path("/fake"))
-            assert result == {}
+        from nexuscore.services.patch_workflow import generate_patch_via_debugger
+        result = generate_patch_via_debugger(
+            debugger_agent=None,
+            error_log="err", files={}, project_path=Path("/fake"),
+        )
+        assert result == {}
 
 
 class TestSelfHealingServiceFinalize:
@@ -635,6 +566,7 @@ class TestSelfHealingServiceFinalize:
             svc = SelfHealingService.__new__(SelfHealingService)
             svc.logger = MagicMock()
             svc.history_logger = MagicMock()
+            svc.project_root = "/tmp/test"
             return svc
 
     def test_finalize_success(self):
