@@ -14,6 +14,11 @@
 | FUK-9 | `webapp/views_projects.py` ヘルパー抽出（437→2ファイル） | Done |
 | FUK-10 | `test_generator.py` TODO 4件解消 | Done |
 | FUK-11 | LLM smoke テスト `--run-integration` オプション追加 | Done |
+| FUK-12 | `guardian_auto_reviewer.py` 分割（412→151+309ファイル） | Done |
+| FUK-13 | `api/routes/run_view.py` 分割（412→215+106ファイル） | Done |
+| FUK-14 | `logging_standard.py` テスト追加（12テスト） | Done |
+| FUK-15 | `modules/whisper_handler.py` テスト追加（8テスト） | Done |
+| FUK-16 | `archive/views_api_test.py` 削除（Flask legacy） | Done |
 
 ## 完了済みタスク（履歴）
 
