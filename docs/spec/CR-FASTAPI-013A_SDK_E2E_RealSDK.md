@@ -168,14 +168,14 @@ pytest tests/e2e/test_sdk_e2e.py -v
 - [ ] `docs/api/README.md` を更新（E2E テスト手順を追加）
 - [ ] `README.md` を更新（必要に応じて）
 - [ ] テスト実行（`pytest tests/e2e/test_sdk_e2e.py -v`）
-- [ ] 完了レポート作成（`docs/api/CR-FASTAPI-013A_COMPLETION_REPORT.md`）
+- [ ] 完了レポート作成（`docs/api/CR-FASTAPI-013A_完了報告.md`）
 
 ## 7. 参照（References）
 
 - [CR-FASTAPI-012 Spec](./CR-FASTAPI-012_SDK_Auto_Generation.md) - SDK 自動生成導線の Spec
 - [CR-FASTAPI-012A Spec](./CR-FASTAPI-012A_SDK_Tooling_Hardening.md) - SDK 生成ツールのハードニング Spec
 - [CR-FASTAPI-013 Spec](./CR-FASTAPI-013_SDK_E2E_Testing.md) - SDK E2E テスト基盤の Spec
-- [CR-FASTAPI-013 Completion Report](../api/CR-FASTAPI-013_COMPLETION_REPORT.md) - SDK E2E テスト基盤の完了レポート
+- [CR-FASTAPI-013 Completion Report](../api/CR-FASTAPI-013_完了報告.md) - SDK E2E テスト基盤の完了レポート
 - [SDK Generation Script](../../tools/generate_sdk.py) - SDK 自動生成スクリプト
 - [FastAPI App Source](../../src/nexuscore/api/fastapi_app.py) - FastAPI アプリケーション
 

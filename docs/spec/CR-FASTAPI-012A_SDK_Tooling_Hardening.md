@@ -165,12 +165,12 @@ pytest tests/tools/test_generate_sdk_safe.py -q
 - [ ] `README.md` を更新（SDK 自動生成の説明を追加）
 - [ ] `.cursorrules` を更新（SDK 手書き禁止ルールを追加）
 - [ ] テスト実行（`python tools/generate_sdk.py --help` と `pytest tests/tools/test_generate_sdk_safe.py -q`）
-- [ ] 完了レポート作成（`docs/api/CR-FASTAPI-012A_COMPLETION_REPORT.md`）
+- [ ] 完了レポート作成（`docs/api/CR-FASTAPI-012A_完了報告.md`）
 
 ## 7. 参照（References）
 
 - [CR-FASTAPI-012 Spec](./CR-FASTAPI-012_SDK_Auto_Generation.md) - 前提となる CR
-- [CR-FASTAPI-012 Completion Report](../api/CR-FASTAPI-012_COMPLETION_REPORT.md) - 前提となる CR の完了レポート
+- [CR-FASTAPI-012 Completion Report](../api/CR-FASTAPI-012_完了報告.md) - 前提となる CR の完了レポート
 - [SDK Generation Script](../../tools/generate_sdk.py) - SDK 自動生成スクリプト
 - [API README](../api/README.md) - FastAPI Migration Prompts & Documentation
 

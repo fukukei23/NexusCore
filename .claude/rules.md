@@ -24,7 +24,7 @@ src/nexuscore/
 
 tests/             # テストスイート
 docs/             # ドキュメント
-GOVERNANCE/        # ガバナンス
+ガバナンス/        # ガバナンス
 ```
 
 ---
@@ -106,7 +106,7 @@ GOVERNANCE/        # ガバナンス
 ```
 
 - 生の例外オブジェクトやスタックトレースをクライアントに返さない
-- エラーコードは `docs/api/ERROR_CODE_CATALOG.md` に定義（Single Source of Truth）
+- エラーコードは `docs/api/エラーコードカタログ.md` に定義（Single Source of Truth）
 
 ---
 

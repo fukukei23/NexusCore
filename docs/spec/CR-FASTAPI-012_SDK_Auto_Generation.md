@@ -76,8 +76,8 @@ FastAPI 移行（CR-FASTAPI-001〜010A）により `/api/v1/*` が NexusCore の
 
 ## 7. 参照（References）
 
-- [FastAPI Migration Status](../api/FASTAPI_MIGRATION_STATUS.md)
-- [CR-FASTAPI-010 Completion Report](../api/CR-FASTAPI-010_COMPLETION_REPORT.md)
+- [FastAPI Migration Status](../api/FastAPI移行ステータス.md)
+- [CR-FASTAPI-010 Completion Report](../api/CR-FASTAPI-010_完了報告.md)
 - [CR-NEXUS-SPEC-STANDARDIZATION Completion Report](./CR-NEXUS-SPEC-STANDARDIZATION_COMPLETION_REPORT.md)
 - [FastAPI App Source](../../src/nexuscore/api/fastapi_app.py)
 

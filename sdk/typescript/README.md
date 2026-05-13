@@ -70,7 +70,7 @@ API Key は以下の方法で取得できます：
      -d '{"name": "New Key"}'
    ```
 
-詳細は [CR-FASTAPI-021 完了レポート](../../docs/api/CR-FASTAPI-021_COMPLETION_REPORT.md) を参照してください。
+詳細は [CR-FASTAPI-021 完了レポート](../../docs/api/CR-FASTAPI-021_完了報告.md) を参照してください。
 
 ### クライアント設定
 
@@ -181,7 +181,7 @@ try {
 
 ### Error Code Catalog
 
-すべてのエラーコードは [Error Code Catalog](../../docs/api/ERROR_CODE_CATALOG.md) に定義されています。
+すべてのエラーコードは [Error Code Catalog](../../docs/api/エラーコードカタログ.md) に定義されています。
 
 主なエラーコード：
 
@@ -213,13 +213,13 @@ E2E テスト実行時は、以下の環境変数を設定してください：
 - `NEXUSCORE_API_KEY`: API Key（既に設定されている場合）
 - `NEXUSCORE_BOOTSTRAP_API_KEY`: ブートストラップ API Key（自動発行用）
 
-詳細は [CR-FASTAPI-022 完了レポート](../../docs/api/CR-FASTAPI-022_COMPLETION_REPORT.md) を参照してください。
+詳細は [CR-FASTAPI-022 完了レポート](../../docs/api/CR-FASTAPI-022_完了報告.md) を参照してください。
 
 ## CI での使用
 
 GitHub Actions では、`.github/workflows/ts-e2e.yml` が自動的に bootstrap API Key を生成し、E2E テストを実行します。
 
-詳細は [CR-FASTAPI-023 完了レポート](../../docs/api/CR-FASTAPI-023_COMPLETION_REPORT.md) を参照してください。
+詳細は [CR-FASTAPI-023 完了レポート](../../docs/api/CR-FASTAPI-023_完了報告.md) を参照してください。
 
 ## 開発
 
@@ -256,5 +256,5 @@ MIT License - 詳細は [LICENSE](./LICENSE) を参照してください。
 ## 関連ドキュメント
 
 - [FastAPI API ドキュメント](../../docs/api/README.md)
-- [Error Code Catalog](../../docs/api/ERROR_CODE_CATALOG.md)
-- [CR-FASTAPI-019 完了レポート](../../docs/api/CR-FASTAPI-019_COMPLETION_REPORT.md)
+- [Error Code Catalog](../../docs/api/エラーコードカタログ.md)
+- [CR-FASTAPI-019 完了レポート](../../docs/api/CR-FASTAPI-019_完了報告.md)

@@ -40,12 +40,12 @@ NexusCore の詳細なアーキテクチャ設計は、以下の **Canonical Des
 2. Canonical Architecture
    - `docs/architecture/ARCHITECTURE_CORE.md`
 3. Project Constraints
-   - `PROJECT_PROFILES/PROJECT_PROFILE_NEXUSCORE.md`
+   - `プロジェクトプロファイル/PROJECT_PROFILE_NEXUSCORE.md`
 4. Governance Assets
-   - `GOVERNANCE/README.md`
-   - `GOVERNANCE/MASTER_PROTOCOL_TEMPLATE.md`
+   - `ガバナンス/README.md`
+   - `ガバナンス/マスタープロトコルテンプレート.md`
 5. 変更対象に関連する Spec
-   - `GOVERNANCE/spec/` または `docs/spec/`
+   - `ガバナンス/spec/` または `docs/spec/`
 
 これらを参照せずに行われた実装・修正・提案は、Gate 未通過として扱う。
 
@@ -60,7 +60,7 @@ NexusCore は以下のガバナンスモデルに従う：
 
 重要な判断・却下・方針変更は、必ず以下に記録する：
 
-- `DECISION_LOGS/DECISION_LOG.md`
+- `判断ログ/判断ログ.md`
 
 ---
 

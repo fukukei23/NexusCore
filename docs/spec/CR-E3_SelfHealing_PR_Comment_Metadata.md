@@ -298,7 +298,7 @@ AI は、以下がすべて true のとき「E-3 は完了」とみなす：
 
 ## 関連ドキュメント
 
-- [CR-FASTAPI-019 Completion Report](../api/CR-FASTAPI-019_COMPLETION_REPORT.md) - TypeScript SDK 商品化
-- [エラーコードカタログ](../api/ERROR_CODE_CATALOG.md)
+- [CR-FASTAPI-019 Completion Report](../api/CR-FASTAPI-019_完了報告.md) - TypeScript SDK 商品化
+- [エラーコードカタログ](../api/エラーコードカタログ.md)
 - [API README](../api/README.md)
 

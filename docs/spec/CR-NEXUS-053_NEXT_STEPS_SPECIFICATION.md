@@ -149,8 +149,8 @@ Phase 3: P5 Docker/K8s検証
 ### 4.1 ガバナンス遵守
 
 NexusCoreはSTIT+IRGガバナンスを採用しているため、機能実装時は以下を参照:
-- `GOVERNANCE/MASTER_PROTOCOL_TEMPLATE.md`
-- `GOVERNANCE/HYGIENE_CHECK.md`
+- `ガバナンス/マスタープロトコルテンプレート.md`
+- `ガバナンス/ハイジンチェック.md`
 - `docs/ARCHITECTURE.md`（Gate/SSOT Entrypoint）
 
 ### 4.2 Gate分類

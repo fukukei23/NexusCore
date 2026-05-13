@@ -97,8 +97,8 @@
 **Spec（仕様）・Change Request・完了レポートの保存先とルール**
 
 - [CR と実装計画の結果の保存先](CR_AND_REPORTS_SAVE_LOCATIONS.md) - Spec / 完了レポートの保存場所、完了レポートに含める項目、テスト必須ルール
-- **STIT（Spec & Test Driven Iteration）**: 仕様・テスト・実装の順序と Gate は [GOVERNANCE/SPEC_TEST_DRIVEN_ITERATION.md](../GOVERNANCE/SPEC_TEST_DRIVEN_ITERATION.md) を参照
-- **Phase 2.5（IRG）**: [docs/ARCHITECTURE.md](ARCHITECTURE.md) および [GOVERNANCE/templates/REVIEW_PACKET_PHASE25_TEMPLATE.md](../GOVERNANCE/templates/REVIEW_PACKET_PHASE25_TEMPLATE.md) を参照
+- **STIT（Spec & Test Driven Iteration）**: 仕様・テスト・実装の順序と Gate は [ガバナンス/スペックテスト駆動イテレーション.md](../ガバナンス/スペックテスト駆動イテレーション.md) を参照
+- **Phase 2.5（IRG）**: [docs/ARCHITECTURE.md](ARCHITECTURE.md) および [ガバナンス/templates/レビューパケット_フェーズ25_テンプレート.md](../ガバナンス/templates/レビューパケット_フェーズ25_テンプレート.md) を参照
 
 ---
 
@@ -129,8 +129,8 @@
 
 - [JobStateMachine 実装](job_state_machine_implementation.md) - ジョブ状態遷移の実装
 - [Tree-sitter チェッカー最適化](tree_sitter_checker_optimization.md) - Tree-sitter の最適化
-- [外部 API 検証](external_api_verification.md) - 外部 API の検証方法
-- [外部 Run API 例](external_run_api_examples.md) - 外部から Run API を呼び出す例
+- [外部 API 検証](外部API検証.md) - 外部 API の検証方法
+- [外部 Run API 例](外部実行API例.md) - 外部から Run API を呼び出す例
 - [Run レポートポリシー](run_reports_policy.md) - Run レポートの保存ポリシー
 - [ログ履歴管理検証](log_history_management_verification.md) - ログ履歴管理の検証
 - [Semantic Diff 設計](semantic_diff_design.md) - Semantic Diff の設計

@@ -78,7 +78,7 @@ VSCode / Chrome 拡張などの外部ツールから NexusCore SaaS の Self-Hea
 
 #### E-2-1. 外部統合ガイドの追加
 
-**ファイル**: `docs/external_run_api_examples.md`（新規作成）
+**ファイル**: `docs/外部実行API例.md`（新規作成）
 
 **内容**:
 - エンドポイント概要
@@ -96,7 +96,7 @@ VSCode / Chrome 拡張などの外部ツールから NexusCore SaaS の Self-Hea
 
 **実装内容**:
 - 「External Integrations」セクションを追加
-- `docs/external_run_api_examples.md` へのリンクを追加
+- `docs/外部実行API例.md` へのリンクを追加
 
 ## 変更ファイル一覧
 
@@ -111,7 +111,7 @@ VSCode / Chrome 拡張などの外部ツールから NexusCore SaaS の Self-Hea
 3. **`tests/webapp/test_external_api.py`**
    - 外部統合 API のテスト
 
-4. **`docs/external_run_api_examples.md`**
+4. **`docs/外部実行API例.md`**
    - 外部統合ガイド（VSCode / Chrome / Python サンプル）
 
 ### 変更ファイル
@@ -212,6 +212,6 @@ VSCode / Chrome 拡張などの外部ツールから NexusCore SaaS の Self-Hea
 
 ## 関連ドキュメント
 
-- `docs/external_run_api_examples.md` - 外部統合 API の使用例
+- `docs/外部実行API例.md` - 外部統合 API の使用例
 - `docs/saas_architecture.md` - SaaS アーキテクチャの詳細
 

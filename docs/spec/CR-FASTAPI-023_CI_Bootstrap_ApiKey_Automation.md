@@ -67,7 +67,7 @@ CI での標準フローは次のようにしたい：
 - README / docs/api/README / sdk/typescript/README / .cursorrules 更新：
   - 「CI での bootstrap key 生成はこのワークフローを使う」ことを明文化
 - 完了レポート作成
-  - `docs/api/CR-FASTAPI-023_COMPLETION_REPORT.md`
+  - `docs/api/CR-FASTAPI-023_完了報告.md`
 
 ### 1.5 非スコープ（Out-of-Scope）
 
@@ -132,7 +132,7 @@ jobs:
   - `bootstrap-apikey` ジョブが成功し、job output に有効な bootstrap key がセットされる。
   - 後続の TS E2E ジョブが、その key 経由で `/api/v1/api-keys` を叩いてテスト用 key を発行し、E2E が通る。
 - ローカル環境と CI の運用フローが README / docs / .cursorrules に統一的に記載されている。
-- `docs/api/CR-FASTAPI-023_COMPLETION_REPORT.md` が作成されている。
+- `docs/api/CR-FASTAPI-023_完了報告.md` が作成されている。
 
 ---
 
@@ -144,7 +144,7 @@ jobs:
 
 **新規作成**:
 - `docs/spec/CR-FASTAPI-023_CI_Bootstrap_ApiKey_Automation.md`（本仕様書）
-- `docs/api/CR-FASTAPI-023_COMPLETION_REPORT.md`（完了レポート）
+- `docs/api/CR-FASTAPI-023_完了報告.md`（完了レポート）
 - `.github/workflows/ts-e2e.yml`（または既存 workflow の追加セクション）
 
 **変更**:

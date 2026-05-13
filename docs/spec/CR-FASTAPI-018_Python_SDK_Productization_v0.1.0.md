@@ -23,7 +23,7 @@
   - インストール方法（ローカル / TestPyPI）
   - 認証（API Key）設定方法
   - 代表的な API 呼び出し例（Projects / Runs / Execute など）
-  - エラーコードカタログとの関係（ERROR_CODE_CATALOG.md 参照方法）
+  - エラーコードカタログとの関係（エラーコードカタログ.md 参照方法）
 - LICENSE が SDK ディレクトリ直下に存在し、NexusCore 本体と整合している
 - 簡易な SDK 向けテスト（インポート確認、型レベルの smoke test）が存在
 - .cursorrules における「SDK 手書き禁止」「OpenAPI からの自動生成」のポリシーを侵さずに商品化が完了している
@@ -97,7 +97,7 @@ Makefile または tools/generate_sdk.py に、Python SDK のビルド・publish
    - Makefile に sdk-python / sdk-python-build / sdk-python-publish-test ターゲットを追加
 
 8. **Completion Report の作成**
-   - docs/api/CR-FASTAPI-018_COMPLETION_REPORT.md を新規作成
+   - docs/api/CR-FASTAPI-018_完了報告.md を新規作成
    - README / docs/api/README に CR-FASTAPI-018 の完了とリンクを追記
 
 ### 1.7 リスク・依存関係
@@ -112,7 +112,7 @@ Makefile または tools/generate_sdk.py に、Python SDK のビルド・publish
 - TestPyPI に 0.1.0 として publish 可能な状態（dry-run・設定レベル）である
 - SDK 専用 README, LICENSE, examples, tests が sdk/python/ 以下に整備されている
 - tools/generate_sdk.py＋Makefile で自動生成〜ビルドまで回せる
-- docs/api/CR-FASTAPI-018_COMPLETION_REPORT.md が存在し、README からリンクされている
+- docs/api/CR-FASTAPI-018_完了報告.md が存在し、README からリンクされている
 - .cursorrules の「SDK 手書き禁止」ルールに違反していない（auto-generated 部分は未改変）
 
 ## 2. Cursor 用実装指示書（Implementation Instruction for Cursor）
@@ -129,7 +129,7 @@ Cursor MUST operate on (create or modify) the following:
 - sdk/python/tests/（新規）
 - tools/generate_sdk.py
 - Makefile
-- docs/api/CR-FASTAPI-018_COMPLETION_REPORT.md（新規作成）
+- docs/api/CR-FASTAPI-018_完了報告.md（新規作成）
 - docs/api/README.md
 - README.md
 
@@ -166,7 +166,7 @@ Cursor MUST perform the following:
        - Projects 一覧取得
        - Runs 取得 or Execute API 呼び出し
      - エラーコードの扱い：
-       - エラー内容が ERROR_CODE_CATALOG.md と対応している旨と、その場所へのリンクを記載
+       - エラー内容が エラーコードカタログ.md と対応している旨と、その場所へのリンクを記載
 
 4. **examples ディレクトリの作成**
    - sdk/python/examples/basic_usage.py を作成し、次のような最小コードを含めること：
@@ -192,7 +192,7 @@ Cursor MUST perform the following:
      - sdk-python-publish-test：TestPyPI への publish コマンド（プレースホルダーコマンドと環境変数説明）
 
 7. **Completion Report の作成**
-   - docs/api/CR-FASTAPI-018_COMPLETION_REPORT.md を新規作成し、以下を含めること：
+   - docs/api/CR-FASTAPI-018_完了報告.md を新規作成し、以下を含めること：
      - 実装日時
      - 目的・ゴール
      - 実装ステップ
@@ -202,7 +202,7 @@ Cursor MUST perform the following:
 
 8. **README / docs/api/README の更新**
    - README.md に「CR-FASTAPI-018 完了」と Python SDK 商品化の一行説明を追加すること。
-   - docs/api/README.md に CR-FASTAPI-018_COMPLETION_REPORT.md へのリンクを追加すること。
+   - docs/api/README.md に CR-FASTAPI-018_完了報告.md へのリンクを追加すること。
 
 ### 2.3 禁止事項（Prohibited Changes）
 
@@ -238,5 +238,5 @@ pytest tests/api  # 既存 API テストに悪影響がないこと
 
 - すべてのコード変更を unified diff 形式で出力すること。
 - diff 提示後に、作成・変更されたファイル一覧をサマライズすること。
-- docs/api/CR-FASTAPI-018_COMPLETION_REPORT.md の中身を Markdown 全文で出力すること。
+- docs/api/CR-FASTAPI-018_完了報告.md の中身を Markdown 全文で出力すること。
 

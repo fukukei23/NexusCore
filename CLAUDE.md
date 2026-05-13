@@ -78,7 +78,7 @@ feat: / fix: / docs: / test: / refactor: / perf: / chore:
 
 ## 変更記録ルール
 
-- 機能追加・バグ修正・リファクタリングなどの変更をコミットした際、`docs/CHANGELOG.md` に追記すること
+- 機能追加・バグ修正・リファクタリングなどの変更をコミットした際、`docs/変更履歴.md` に追記すること
 - フォーマットは Keep a Changelog 準拠（Added / Changed / Fixed / Removed / Deprecated）
 - セッション終了時またはタスク完了時に更新
 
@@ -90,5 +90,5 @@ feat: / fix: / docs: / test: / refactor: / perf: / chore:
 | アーキテクチャ | `docs/architecture/ARCHITECTURE_CORE.md` |
 | API仕様 | `docs/srs/NEXUSCORE_SRS.md` |
 | テストガイド | `docs/testing/testing_guide.md` |
-| 開発ガイド | `docs/DEVELOPMENT.md` |
+| 開発ガイド | `docs/開発ガイド.md` |
 | リファクタリング | `docs/refactoring/REFACTORING_BACKLOG.md` |

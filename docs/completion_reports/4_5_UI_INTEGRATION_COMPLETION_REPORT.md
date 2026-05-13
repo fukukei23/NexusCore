@@ -131,7 +131,7 @@ def build_unified_ui() -> gr.Blocks:
 
 2. **実装方針**:
    - UI からは内部的に現在ユーザーの API Key を自動付与（DB から取得）
-   - 外部からの curl/VSCode との整合性は docs/external_run_api_examples.md に任せる
+   - 外部からの curl/VSCode との整合性は docs/外部実行API例.md に任せる
 
 **コード例**:
 ```python

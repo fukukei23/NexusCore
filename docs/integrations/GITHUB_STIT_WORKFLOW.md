@@ -318,8 +318,8 @@ Decision Log は以下のタイミングで記録する。
 
 ```
 root/
-  GOVERNANCE/
-    SPEC_TEST_DRIVEN_ITERATION.md  ← STIT 本体
+  ガバナンス/
+    スペックテスト駆動イテレーション.md  ← STIT 本体
   docs/
     STIT_STANDARD.md               ← 汎用STIT定義（配布用）
     integrations/

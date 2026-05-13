@@ -255,6 +255,6 @@ retry_utils.py
 ## 9. 関連ドキュメント
 
 - **Spec**: `docs/spec/CR-NEXUS-051_ERROR_CLASSIFICATION_SPECIFICATION.md` (v1.1.1)
-- **Phase 2.5 Review**: `GOVERNANCE/review_packets/RP-NEXUS-051_PHASE25_INDEPENDENT_REVIEW_v2.md`
-- **Decision Log**: `DECISION_LOGS/DECISION_LOG.md`
+- **Phase 2.5 Review**: `ガバナンス/review_packets/RP-NEXUS-051_PHASE25_INDEPENDENT_REVIEW_v2.md`
+- **Decision Log**: `判断ログ/判断ログ.md`
 

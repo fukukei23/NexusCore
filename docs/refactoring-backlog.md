@@ -19,7 +19,7 @@
   - `src/nexuscore/api/routes/runs.py`
   - `src/nexuscore/api/routes/api_keys.py`
   - `src/nexuscore/api/routes/projects.py`
-  - `docs/api/CR-FASTAPI-005_COMPLETION_REPORT.md`（参照確認）
+  - `docs/api/CR-FASTAPI-005_完了報告.md`（参照確認）
 - **修正方針**:
   1. `src/nexuscore/api/dependencies/auth.py`（既存、11KB）に統合
   2. 各routeファイルから重複定義を削除し、`from nexuscore.api.dependencies.auth import get_user_id_from_auth` に置換
