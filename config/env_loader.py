@@ -30,13 +30,12 @@ def load_env_safe(env_path: str = ".env"):
 
     load_dotenv(dotenv_path=tmp_env_path, override=True)
 
-    # 確認ログ
+    # 確認ログ（鍵値は出力しない）
     for key in ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY"]:
-        if key in os.environ:
-            val = os.environ[key]
-            print(f"[ENV] {key}: len={len(val)} head={val[:6]}... tail={val[-5:]}")
-        else:
-            print(f"[ENV] {key}: (not set)")
+        val = os.environ.get(key)
+        status = "set" if val else "unset"
+        length = len(val) if val else 0
+        print(f"[ENV] {key}: {status} (length={length})")
 
     # 安全のため一時ファイル削除
     try:
