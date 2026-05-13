@@ -111,7 +111,7 @@ def get_orchestrator(project_path: str | None = None, language: str = "ja") -> O
     guardian_api_key, guardian_model = _load_guardian_credentials()
 
     # Initialize all agents
-    requirement_agent = RequirementAgent(language=language, use_ui=False)
+    requirement_agent = RequirementAgent(language=language)
     architect = ArchitectAgent()
     planner = PlannerAgent()
     coder = CoderAgent()

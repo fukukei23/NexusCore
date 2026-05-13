@@ -105,10 +105,7 @@ class PhaseRunnerMixin:
 
         specs: dict[str, Any] = {}
         try:
-            use_ui = bool(getattr(self.requirement_agent, "use_ui", False))
-            if use_ui and hasattr(self.requirement_agent, "launch_gradio_ui"):
-                specs = self.requirement_agent.launch_gradio_ui(share=False)
-            elif hasattr(self.requirement_agent, "analyze_requirement"):
+            if hasattr(self.requirement_agent, "analyze_requirement"):
                 specs = self.requirement_agent.analyze_requirement(context.user_requirement)
             else:
                 specs = {"raw_requirement": context.user_requirement}
