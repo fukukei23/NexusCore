@@ -42,6 +42,7 @@ from nexuscore.agents.guardian_agent import GuardianAgent
 from nexuscore.agents.policy_agent import PolicyAgent
 from nexuscore.agents.postmortem_agent import PostmortemAgent
 from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
+from nexuscore.agents.constitutional_council_agent import ConstitutionalCouncilAgent
 from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.llm.llm_router import LLMRouter
 # from nexuscore.utils.config import config # .envからの読み込みはdotenvで直接行う
@@ -237,6 +238,24 @@ def main():
         postmortem_agent = PostmortemAgent()
         knowledge_curator_agent = KnowledgeCuratorAgent()
         patch_applier = PatchApplier()
+
+        # Optional agents (pre-pipeline context + post-review governance)
+        context_agent = None
+        try:
+            from nexuscore.analyzer.context_agent import ContextAgent
+            context_agent = ContextAgent(project_root=project_path)
+        except Exception as e:
+            logging.warning(f"ContextAgent initialization skipped: {e}")
+
+        constitutional_council_agent = None
+        try:
+            constitutional_council_agent = ConstitutionalCouncilAgent(
+                policy_path=os.path.join(project_path, "config", "policy_rules.json"),
+                amendments_dir=os.path.join(project_path, "amendments"),
+            )
+        except Exception as e:
+            logging.warning(f"ConstitutionalCouncilAgent initialization skipped: {e}")
+
         llm_router = LLMRouter()
 
         # --- 4. 司令塔 (Orchestrator) の任命 ---
@@ -257,6 +276,8 @@ def main():
             postmortem_agent=postmortem_agent,
             knowledge_curator_agent=knowledge_curator_agent,
             patch_applier_agent=patch_applier,
+            context_agent=context_agent,
+            constitutional_council_agent=constitutional_council_agent,
             llm_router=llm_router
         )
 

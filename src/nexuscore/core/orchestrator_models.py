@@ -34,3 +34,6 @@ class OrchestratorContext:
     review: dict[str, Any] = field(default_factory=dict)
 
     phase_log: list[str] = field(default_factory=list)
+    context_profile: dict[str, Any] = field(default_factory=dict)
+    error_prevention_rules: dict[str, Any] = field(default_factory=dict)
+    postmortem_report: dict[str, Any] = field(default_factory=dict)

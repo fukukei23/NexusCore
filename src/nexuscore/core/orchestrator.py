@@ -41,6 +41,7 @@ from nexuscore.agents.coder_agent import CoderAgent
 from nexuscore.agents.debugger_agent import DebuggerAgent
 from nexuscore.agents.guardian_agent import GuardianAgent
 from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
+from nexuscore.agents.constitutional_council_agent import ConstitutionalCouncilAgent
 from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.agents.planner_agent import PlannerAgent
 from nexuscore.agents.policy_agent import PolicyAgent
@@ -86,6 +87,9 @@ class Orchestrator(PhaseRunnerMixin):
     # --- LLM Router / config ---
     llm_router: LLMRouter
     max_retries: int = 5
+
+    # --- optional agents (not required for pipeline) ---
+    constitutional_council_agent: ConstitutionalCouncilAgent | None = None
 
     session_controller: SessionController | None = None
 
@@ -174,6 +178,9 @@ class Orchestrator(PhaseRunnerMixin):
         try:
             # Phase 0: 開始直後のチェックポイント
             self._maybe_stop("start", {"task_id": task_id, "requirement": user_requirement})
+
+            # Phase 0: Context Analysis (pre-pipeline)
+            context = self.run_context_phase(context)
 
             # フェーズを順番に実行
             context = self.run_requirements_phase(context)

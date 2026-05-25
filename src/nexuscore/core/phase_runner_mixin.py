@@ -89,6 +89,30 @@ class PhaseRunnerMixin:
             return content
 
     # ------------------------------------------------------------------
+    # Phase 0: Context Analysis
+    # ------------------------------------------------------------------
+    def run_context_phase(self, context: OrchestratorContext) -> OrchestratorContext:
+        """Phase 0: Analyze project context and set error prevention rules."""
+        self.logger.info(f"[{context.task_id}] Phase 0: Context Analysis")
+        context_agent = getattr(self, "context_agent", None)
+        if context_agent is None:
+            self.logger.info(f"[{context.task_id}] ContextAgent not configured, skipping.")
+            return context
+        try:
+            context.context_profile = context_agent.get_context()
+            context.error_prevention_rules = context_agent.get_error_prevention_rules()
+            self.logger.info(
+                f"[{context.task_id}] Context analysis complete: "
+                f"{len(context.context_profile)} profile keys, "
+                f"{len(context.error_prevention_rules)} prevention rules"
+            )
+        except Exception as e:
+            self.logger.warning(
+                f"[{context.task_id}] ContextAgent failed (graceful skip): {e}"
+            )
+        return context
+
+    # ------------------------------------------------------------------
     # Phase 1: Requirements
     # ------------------------------------------------------------------
     def run_requirements_phase(self, context: OrchestratorContext) -> OrchestratorContext:
@@ -312,13 +336,40 @@ python hello.py
         return context
 
     # ------------------------------------------------------------------
-    # Phase 6: Review (stub)
+    # Phase 6: Review
     # ------------------------------------------------------------------
     def run_review_phase(self, context: OrchestratorContext) -> OrchestratorContext:
         self.logger.info(f"[{context.task_id}] Phase 6: Review")
         context.phase_log.append("REVIEW")
         context.review = {}
+
+        self._maybe_run_constitutional_review(context)
         return context
+
+    def _maybe_run_constitutional_review(self, context: OrchestratorContext) -> None:
+        """Trigger ConstitutionalCouncil when systemic issues are detected."""
+        council = getattr(self, "constitutional_council_agent", None)
+        if council is None:
+            return
+
+        postmortem_data = context.postmortem_report
+        if not postmortem_data:
+            return
+
+        try:
+            knowledge_brief = {
+                "pattern": postmortem_data.get("error_signature", "unknown"),
+                "suggestion": postmortem_data.get("solution_pattern", {}).get("instruction", ""),
+            }
+            council.review_and_amend(
+                postmortem_report=postmortem_data,
+                knowledge_brief=knowledge_brief,
+            )
+            self.logger.info(f"[{context.task_id}] Constitutional review completed.")
+        except Exception as e:
+            self.logger.warning(
+                f"[{context.task_id}] ConstitutionalCouncil failed (graceful skip): {e}"
+            )
 
     # ------------------------------------------------------------------
     # FastLane helper
