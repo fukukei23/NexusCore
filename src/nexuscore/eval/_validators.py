@@ -34,7 +34,7 @@ def parse_json(input_data: str) -> ParseResult:
     except json.JSONDecodeError as e:
         errors.append(f"JSON parse error: {str(e)}")
         return ParseResult(success=False, errors=errors)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — JSONパース後の予期せぬエラーフォールバック
         errors.append(f"Unexpected error during JSON parse: {str(e)}")
         return ParseResult(success=False, errors=errors)
 
@@ -71,7 +71,7 @@ def validate_schema(data: dict[str, Any], schema: dict[str, Any] | None) -> Sche
         if e.path:
             errors.append(f"  Path: {list(e.path)}")
         return SchemaValidationResult(pass_=False, errors=errors)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — スキーマ検証後の予期せぬエラーフォールバック
         errors.append(f"Unexpected error during schema validation: {str(e)}")
         return SchemaValidationResult(pass_=False, errors=errors)
 
@@ -142,7 +142,7 @@ def measure_stability(cases: list[EvaluationCase]) -> StabilityResult:
         try:
             normalized = normalize_json(case.parse_result.data)
             normalized_strings.append(normalized)
-        except Exception as e:
+        except TypeError as e:
             return StabilityResult(
                 measured=True,
                 value=0.0,

@@ -183,5 +183,5 @@ def run_tests(project_path: str) -> tuple[bool, str]:
             False,
             "pytestコマンドが見つかりませんでした。仮想環境が有効で、pytestがインストールされているか確認してください。",
         )
-    except Exception as e:
+    except (subprocess.SubprocessError, OSError, RuntimeError) as e:
         return False, f"テスト実行中に予期せぬエラーが発生しました: {e}"

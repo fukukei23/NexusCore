@@ -516,7 +516,7 @@ class TestRunTests:
 
     def test_handles_general_exception(self):
         """Handles general exceptions during test run"""
-        with patch("subprocess.run", side_effect=Exception("Test error")):
+        with patch("subprocess.run", side_effect=RuntimeError("Test error")):
             success, output = run_tests("/path/to/project")
 
         assert success is False

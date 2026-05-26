@@ -127,6 +127,6 @@ def load_sandbox_policy(policy_path: str | None = None) -> dict[str, Any]:
                 else:
                     default[key] = value
         return default
-    except Exception as e:
+    except (OSError, ValueError, yaml.parser.ParserError) as e:
         logger.warning(f"Failed to load sandbox policy from {policy_file}: {e}. Using defaults.")
         return default

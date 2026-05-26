@@ -132,12 +132,12 @@ class OpenAICompatLLM(BaseLLM):
                 body = ""
                 try:
                     body = e.response.text
-                except Exception:
+                except Exception:  # noqa: BLE001 — HTTPレスポンスボディ取得の防御的キャッチ
                     pass
                 self.log_error("REAL-CALL HTTP error", e, body)
                 return self._stub_fallback_response(self.stub_label, as_json=as_json)
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — リアルコール全体のフォールバック
                 self.log_error("REAL-CALL failed", e)
                 return self._stub_fallback_response(self.stub_label, as_json=as_json)
 

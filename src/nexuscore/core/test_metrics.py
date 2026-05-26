@@ -99,7 +99,7 @@ class TestMetricsCollector:
             with self.history_file.open("a", encoding="utf-8") as f:
                 json.dump(asdict(record), f, ensure_ascii=False)
                 f.write("\n")
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             logger.error(f"Failed to record test generation: {e}", exc_info=True)
 
     def record_bug_found(
@@ -123,7 +123,7 @@ class TestMetricsCollector:
                     # 履歴ファイルを再書き込み（簡易実装）
                     self._rewrite_history(records)
                     break
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.error(f"Failed to record bug found: {e}", exc_info=True)
 
     def record_test_deletion(
@@ -145,7 +145,7 @@ class TestMetricsCollector:
                     record["deleted_reason"] = reason
                     self._rewrite_history(records)
                     break
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             logger.error(f"Failed to record test deletion: {e}", exc_info=True)
 
     def get_metrics(self, module_name: str) -> TestMetrics | None:
@@ -260,5 +260,5 @@ class TestMetricsCollector:
                 for record in records:
                     json.dump(record, f, ensure_ascii=False)
                     f.write("\n")
-        except Exception as e:
+        except (OSError, UnicodeDecodeError, TypeError) as e:
             logger.error(f"Failed to rewrite history: {e}", exc_info=True)

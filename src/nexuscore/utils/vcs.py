@@ -59,6 +59,6 @@ class GitController:
             commit = self.repo.index.commit(message)
             _logger.info("Committed successfully: %s", commit.hexsha)
             return commit.hexsha
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — git library can raise various exceptions
             _logger.error("Error during git commit: %s", e)
             return None

@@ -137,7 +137,7 @@ class TestStrategyManager:
             )
 
             logger.info(f"Loaded test strategy config: {len(modules)} modules")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — YAML parse, file I/O, or missing pyyaml
             logger.error(f"Failed to load test strategy config: {e}", exc_info=True)
             self.config = TestStrategyConfig(modules={})
 

@@ -90,7 +90,7 @@ def build_history_diff_tab(state: gr.State) -> None:
             current_state.latest_run_id = run_id
 
             return before_code, after_code, markdown_content, current_state
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Load run failed: {e}", exc_info=True)
             return "", "", f"Error: {e}", current_state
 
@@ -131,7 +131,7 @@ Duration: {result.get('duration_seconds', 0):.2f}s
             current_state.latest_run_id = result.get("run_id")
 
             return result_text, current_state
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Self-Healing execution failed: {e}", exc_info=True)
             return f"Error: {e}", current_state
 

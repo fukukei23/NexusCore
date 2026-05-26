@@ -302,7 +302,7 @@ def trigger_run(project_id: int):
             )
             return redirect(url_for("views_projects.project_detail", project_id=project.id))
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — orchestrator execution failure
             if request.accept_mimetypes.best == "application/json":
                 return (
                     jsonify(

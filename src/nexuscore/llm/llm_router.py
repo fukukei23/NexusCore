@@ -134,7 +134,7 @@ class LLMRouter:
     def _classify_task_type(self, prompt: str) -> str:
         try:
             task = self._classifier.classify(prompt, self.task_model_map)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — タスク分類失敗時のフォールバック
             self.logger.error("Task classification failed: %s. Falling back to 'general'.", e)
             task = "general"
         task = LEGACY_TO_TASK.get(task, task)
@@ -196,7 +196,7 @@ class LLMRouter:
                 base_client = self._make_client(candidate)
                 model_name = candidate
                 break
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — LLMクライアント初期化失敗時のフォールバック
                 last_err = e
                 self.logger.warning("Failed to init client for model='%s': %s", candidate, e)
         if base_client is None:
@@ -265,7 +265,7 @@ class LLMRouter:
                 "task_type": task or getattr(routed, "task_type", "general"),
                 "mode": getattr(inner, "last_call_mode", getattr(routed, "last_call_mode", "stub")),
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — complete API全体のフォールバック
             self.logger.error("LLMRouter.complete failed: %s", e, exc_info=True)
             return {
                 "ok": False,

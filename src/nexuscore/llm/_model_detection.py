@@ -40,7 +40,7 @@ def detect_available_models(logger: logging.Logger) -> dict[str, list[Any]]:
                             "[Model Detection] OpenAI chat-compatible (first 10): %s",
                             chat_compatible[:10],
                         )
-        except Exception as e:
+        except (OSError, ConnectionError, ValueError, RuntimeError) as e:
             logger.warning(
                 "[Model Detection] OpenAI models.list failed: %s. Using static defaults.", e
             )
@@ -74,7 +74,7 @@ def detect_available_models(logger: logging.Logger) -> dict[str, list[Any]]:
                         "[Model Detection] Gemini API returned status %d. Using static defaults.",
                         resp.status_code,
                     )
-        except Exception as e:
+        except (OSError, ConnectionError, ValueError, RuntimeError) as e:
             logger.warning(
                 "[Model Detection] Gemini models.list failed: %s. Using static defaults.", e
             )

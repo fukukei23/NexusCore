@@ -204,7 +204,7 @@ def retry_with_context(
                 if context:
                     context.record_attempt(attempt)
                 return result
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — リトライ対象呼び出しの広範なキャッチ
                 last_exception = e
 
                 # 3.3.1: リトライ可否の判断ルール
@@ -247,7 +247,7 @@ def retry_with_context(
                             should_retry = True
                         else:
                             should_retry = False
-                except Exception as classification_error:
+                except Exception as classification_error:  # noqa: BLE001 — エラー分類中のフォールバック
                     # 3.4.2: 分類不能エラー時のフォールバックフック
                     if logger_instance is not None:
                         logger_instance.warning(

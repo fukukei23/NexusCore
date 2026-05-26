@@ -16,7 +16,7 @@ try:
 
     _router = LLMRouter()
     HAS_LLM = True
-except Exception as e:
+except Exception as e:  # noqa: BLE001 — plugin init may fail for many reasons
     logging.getLogger(__name__).warning(f"LLMRouter init failed: {e}")
     _router = None
     HAS_LLM = False

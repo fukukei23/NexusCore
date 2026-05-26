@@ -163,6 +163,6 @@ Write the summary in Japanese, 5 bullets or fewer.
             logger.warning(f"LLM call failed: {result.get('reason', 'unknown')}")
             return None
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — LLM呼び出し + DBクエリ全体のフォールバック
         logger.error(f"Failed to generate PR change summary: {e}", exc_info=True)
         return None

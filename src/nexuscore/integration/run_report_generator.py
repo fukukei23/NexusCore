@@ -91,7 +91,7 @@ def _collect_run_metrics(run: Run) -> dict[str, Any]:
             for p in patches:
                 patch_files.add(p.file_path)
                 total_patch_lines += _estimate_diff_lines(p.diff_text or "")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — DBパッチクエリのフォールバック
             logger.warning(f"Failed to collect patch metrics: {e}", exc_info=True)
 
         # LLMログ (NPE)
@@ -160,7 +160,7 @@ def _compute_recent_success_rate(project_id: int, limit: int = 30) -> float:
 
             success = sum(1 for r in runs if r.status == "SUCCESS")
             return success / len(runs)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — DB成功 rateクエリのフォールバック
             logger.warning(f"Failed to compute success rate: {e}", exc_info=True)
             return 0.0
 
@@ -194,7 +194,7 @@ def _collect_test_results(run: Run) -> dict[str, Any]:
             "info_count": info_count,
             "test_output": "\n".join(test_outputs[:20]),  # 最大20件
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — DBテスト結果クエリのフォールバック
         logger.warning(f"Failed to collect test results: {e}", exc_info=True)
         return {
             "error_count": 0,
@@ -326,7 +326,7 @@ def generate_run_report_markdown(run_db_id: int) -> str:
 """
         return report
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — レポート生成全体のフォールバック
         logger.error(f"Failed to generate run report: {e}", exc_info=True)
         return f"# Run Report\n\nError generating report: {e}\n"
 
@@ -372,7 +372,7 @@ def write_run_report_file(run_db_id: int, base_dir: Path | None = None) -> Path:
         logger.info(f"Run report written to: {report_path}")
         return report_path
 
-    except Exception as e:
+    except (OSError, ValueError) as e:
         logger.error(f"Failed to write run report file: {e}", exc_info=True)
         raise
 

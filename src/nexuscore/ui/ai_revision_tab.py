@@ -93,7 +93,7 @@ def build_ai_revision_tab(state: gr.State) -> None:
                 return "", "LLM Router が初期化されていません。", current_state
 
             return revised, "修正コードを生成しました。「ファイルに書き戻す」で保存できます。", current_state
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Patch generation failed: {e}", exc_info=True)
             return "", f"Error: {e}", current_state
 
@@ -116,7 +116,7 @@ def build_ai_revision_tab(state: gr.State) -> None:
                 return f"{file_path} に書き戻しました。", current_state
             else:
                 return "書き戻し先ファイルが見つかりません。Code/Promptでコードを保存してから使ってください。", current_state
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Patch apply failed: {e}", exc_info=True)
             return f"Error: {e}", current_state
 

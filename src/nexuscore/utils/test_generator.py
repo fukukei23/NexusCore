@@ -100,7 +100,7 @@ def generate_template_tests(
     try:
         try:
             source_code = module_path.read_text(encoding="utf-8", errors="ignore")
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             logger.warning(f"Failed to read module {module_path}: {e}")
             return f'# Auto-generated test scaffold\nimport pytest\ndef test_read_error():\n    pytest.skip("Failed to read module: {e}")\n'
 
@@ -165,7 +165,7 @@ def generate_template_tests(
 
         return "\n".join(lines)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Unexpected error in generate_template_tests: {e}", exc_info=True)
         return f'# Auto-generated test scaffold\nimport pytest\ndef test_unexpected_error():\n    pytest.skip("Unexpected error: {e}")\n'
 
@@ -232,7 +232,7 @@ pytest テストコードを生成してください。コードブロック（`
     except ValueError as e:
         logger.warning(f"MiniMax API key not configured: {e}, falling back to template")
         return template_code
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning(f"LLM generation failed: {e}, falling back to template", exc_info=True)
         return template_code
 
@@ -268,7 +268,7 @@ def generate_unit_tests(
                 template += f"def test_{func_name}():\n"
                 template += f"    # NOTE: implement test for {func_name}\n"
                 template += '    assert False, "not implemented"\n\n'
-        except Exception as e:
+        except SyntaxError as e:
             logger.warning(f"Failed to parse code directly: {e}")
             template = '# Auto-generated test scaffold\nimport pytest\ndef test_parse_error():\n    pytest.skip("Failed to parse code")\n'
 
@@ -342,7 +342,7 @@ def generate_tests_for_module(
 
     try:
         code = module_path.read_text(encoding="utf-8", errors="ignore")
-    except Exception as e:
+    except (OSError, UnicodeDecodeError) as e:
         logger.error(f"Failed to read module {module_path}: {e}")
         if output_path is None:
             output_path = module_path.parent / f"test_{module_path.stem}.py"
@@ -395,7 +395,7 @@ if __name__ == "__main__":
     try:
         output_path = generate_tests_for_module(args.module_path, output_path=args.output, project_root=project_root, config=config)
         print(f"✅ Generated test file: {output_path}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to generate tests: {e}", exc_info=True)
         print(f"❌ Failed to generate tests: {e}")
         exit(1)

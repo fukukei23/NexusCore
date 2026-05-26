@@ -143,7 +143,7 @@ def run_orchestrator_inline(
 
         run.status = "SUCCESS"
         status = "success"
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — orchestrator execution failure
         logger.error(f"Orchestrator execution failed for run_id={run.id}: {exc}", exc_info=True)
         run.status = "FAILED"
         status = "error"
@@ -168,5 +168,5 @@ def run_orchestrator_inline(
                         "プロジェクト名": project.name,
                     },
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — Slack notification in finally
             logger.warning(f"Failed to send Slack notification: {e}", exc_info=True)

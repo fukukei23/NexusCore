@@ -62,7 +62,7 @@ def build_code_prompt_tab(state: gr.State) -> None:
                 if not audio_path:
                     return ""
                 return transcribe_audio(audio_path)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Transcription failed: {e}", exc_info=True)
                 return f"Error: {e}"
 
@@ -112,7 +112,7 @@ def build_code_prompt_tab(state: gr.State) -> None:
             current_state.current_file_path = auto_filename
 
             return generated, auto_filename, current_state
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Code generation failed: {e}", exc_info=True)
             return f"Error: {e}", filename, current_state
 
@@ -174,7 +174,7 @@ def build_code_prompt_tab(state: gr.State) -> None:
                 f"テストファイル自動生成: {test_path}\n"
                 f"（Test Runnerで「保存したファイルを使う」を押すと自動入力されます）"
             ), current_state
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Save failed: {e}", exc_info=True)
             return f"Error: {e}", current_state
 

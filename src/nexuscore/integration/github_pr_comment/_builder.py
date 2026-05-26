@@ -187,7 +187,7 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
             parts.append(metadata_block)
             parts.append("")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — メトリクス収集全体のフォールバック
             logger.warning(f"Failed to build Self-Healing metadata block: {e}", exc_info=True)
 
     # === E-5: Self-Healing Summary (カード形式) ===
@@ -226,7 +226,7 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
 """
             parts.append(summary_card)
             parts.append(additional_info)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — サマリーカード生成全体のフォールバック
             logger.warning(f"Failed to build Self-Healing Summary: {e}", exc_info=True)
 
     # === Guardian Review ===
@@ -270,7 +270,7 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
                     parts.append("\n---\n\n")
                     parts.append(format_markdown_report_block(markdown_content))
                     parts.append("\n")
-        except Exception as e:
+        except (OSError, UnicodeDecodeError, ImportError) as e:
             logger.warning(f"Failed to load run markdown: {e}", exc_info=True)
 
     # === Observability Links (B-2) ===
@@ -295,7 +295,7 @@ def build_pr_comment(ctx: PRCommentContext) -> str:
 
 """
                 parts.append(links_md)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — URL構築全体のフォールバック
             logger.warning(f"Failed to build Observability Links: {e}", exc_info=True)
 
     return "\n".join(parts)

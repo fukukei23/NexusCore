@@ -110,7 +110,7 @@ def build_test_runner_tab(state: gr.State) -> None:
             status_md = f"**ステータス:** {'成功' if success else '失敗'}\n\n**Return Code:** {result.returncode}"
 
             return output, status_md, current_state
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Test execution failed: {e}", exc_info=True)
             return f"Error: {e}", "**ステータス:** Error", current_state
 

@@ -84,7 +84,7 @@ def run_pylint(file_path: str) -> float:
             return score
         _logger.warning("Pylint score not found in output.")
         return 0.0
-    except Exception as e:
+    except (OSError, subprocess.SubprocessError, RuntimeError) as e:
         _logger.error("An error occurred while running Pylint: %s", e)
         return 0.0
 
@@ -103,7 +103,7 @@ def run_mypy(file_path: str) -> tuple[bool, str]:
             error_summary = "\n".join(line for line in output.splitlines() if "error:" in line)
             _logger.error("MyPy found issues.")
             return False, error_summary
-    except Exception as e:
+    except (OSError, subprocess.SubprocessError, RuntimeError) as e:
         _logger.error("An error occurred while running MyPy: %s", e)
         return False, str(e)
 
@@ -136,7 +136,7 @@ def run_bandit(target_path: str) -> tuple[bool, list[dict[str, Any]]]:
     except json.JSONDecodeError:
         _logger.info("Bandit: No security issues reported.")
         return True, []
-    except Exception as e:
+    except (OSError, subprocess.SubprocessError, RuntimeError) as e:
         _logger.error("An error occurred while running Bandit: %s", e)
         return False, []
 
@@ -166,7 +166,7 @@ def run_pytest_cov(project_path: str) -> float:
             return coverage
         _logger.warning("Pytest-cov coverage not found. Output:\n%s", output)
         return 0.0
-    except Exception as e:
+    except (OSError, subprocess.SubprocessError, RuntimeError) as e:
         _logger.error("An error occurred while running pytest-cov: %s", e)
         return 0.0
 

@@ -545,7 +545,7 @@ class TestAnalyzeFile:
         test_file = tmp_path / "test.py"
         test_file.write_text("content")
 
-        with patch.object(Path, "read_text", side_effect=Exception("Read failed")):
+        with patch.object(Path, "read_text", side_effect=RuntimeError("Read failed")):
             result = analyzer.analyze_file(test_file)
 
         assert result.success is False

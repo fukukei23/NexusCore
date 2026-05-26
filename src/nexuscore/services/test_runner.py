@@ -98,7 +98,7 @@ def _run_via_subprocess(cmd_str: str, project_path: Path) -> tuple[bool, str]:
         output = proc.stdout
         success = proc.returncode == 0
         return success, output
-    except (subprocess.SubprocessError, OSError) as e:
+    except Exception as e:  # noqa: BLE001 — subprocess mock may break exception types
         msg = f"Exception while running tests: {e}"
         logger.error(msg, exc_info=True)
         return False, msg

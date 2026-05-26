@@ -234,7 +234,7 @@ def resume_run(
                 "run_id": run_id,
             }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — レジューム全体のフォールバック
         try:
             state["status"] = "FAILED"
             state["last_error"] = {

@@ -112,7 +112,7 @@ def github_callback():
         # プロジェクト一覧にリダイレクト
         return redirect(url_for("views_projects.list_projects"))
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — top-level OAuth handler
         return jsonify({"error": f"OAuth callback failed: {str(e)}"}), 500
 
 

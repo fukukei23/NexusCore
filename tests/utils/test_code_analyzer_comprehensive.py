@@ -175,7 +175,7 @@ class TestRunPylint:
     @patch("subprocess.run")
     def test_run_pylint_exception(self, mock_run):
         """run_pylint returns 0.0 on exception"""
-        mock_run.side_effect = Exception("Command failed")
+        mock_run.side_effect = RuntimeError("Command failed")
 
         score = run_pylint("test.py")
 
@@ -229,7 +229,7 @@ test.py:20: error: Name not defined"""
     @patch("subprocess.run")
     def test_run_mypy_exception(self, mock_run):
         """run_mypy returns False with exception message on error"""
-        mock_run.side_effect = Exception("MyPy not installed")
+        mock_run.side_effect = RuntimeError("MyPy not installed")
 
         passed, output = run_mypy("test.py")
 
@@ -335,7 +335,7 @@ class TestRunBandit:
     @patch("subprocess.run")
     def test_run_bandit_exception(self, mock_run):
         """run_bandit returns False on exception"""
-        mock_run.side_effect = Exception("Bandit not installed")
+        mock_run.side_effect = RuntimeError("Bandit not installed")
 
         passed, issues = run_bandit("src/")
 
@@ -405,7 +405,7 @@ TOTAL                100     15    85%
     @patch("subprocess.run")
     def test_run_pytest_cov_exception(self, mock_run):
         """run_pytest_cov returns 0.0 on exception"""
-        mock_run.side_effect = Exception("Pytest not found")
+        mock_run.side_effect = RuntimeError("Pytest not found")
 
         coverage = run_pytest_cov("/project/path")
 

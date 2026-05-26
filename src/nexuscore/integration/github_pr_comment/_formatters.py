@@ -20,7 +20,7 @@ def load_run_markdown(run_id: str) -> str:
         else:
             logger.debug(f"Run report not found: {report_path}")
             return ""
-    except Exception as e:
+    except (OSError, UnicodeDecodeError, ImportError, RuntimeError) as e:
         logger.warning(f"Failed to load run markdown: {e}", exc_info=True)
         return ""
 

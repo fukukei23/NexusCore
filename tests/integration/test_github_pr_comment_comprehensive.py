@@ -303,7 +303,7 @@ class TestLoadRunMarkdown:
     def test_load_run_markdown_exception_handled(self):
         """例外が発生した場合"""
         with patch("nexuscore.integration.run_report_generator.get_markdown_report_path") as mock_path:
-            mock_path.side_effect = Exception("Import error")
+            mock_path.side_effect = RuntimeError("Import error")
 
             result = load_run_markdown("RUN-test")
 

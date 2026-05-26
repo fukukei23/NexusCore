@@ -40,7 +40,7 @@ def _profiles_table() -> str:
         for _name, p in PROFILE_REGISTRY.items():
             desc = (p.description or "").replace("|", "\\|")
             rows.append(f"| {p.name} | {p.provider} | {p.model} | {p.default_temperature} | {desc} |")
-    except Exception:
+    except ImportError:
         rows.append("| - | - | - | - | プロファイル情報の取得に失敗 |")
     return "\n".join(rows)
 
@@ -61,7 +61,7 @@ def _task_map_summary() -> str:
             secondary = ", ".join(cfg.secondary) if cfg.secondary else "-"
             temp = f"{cfg.temperature}" if cfg.temperature is not None else "-"
             lines.append(f"- **{task_name}**: primary=`{cfg.primary}`, fallback=`{cfg.fallback}`, secondary=[{secondary}], temp={temp}")
-    except Exception:
+    except ImportError:
         lines.append("タスクマップ情報の取得に失敗")
     return "\n".join(lines)
 
@@ -75,7 +75,7 @@ def _runtime_status() -> str:
         lines.append(f"- LLM Router: {'✅ 初期化済み' if HAS_LLM else '❌ 未初期化'}")
         lines.append(f"- Whisper: {'✅ 利用可能' if HAS_WHISPER else '❌ 未インストール'}")
         lines.append(f"- Self-Healing: {'✅ 利用可能' if HAS_SELF_HEALING else '❌ 未インストール'}")
-    except Exception:
+    except ImportError:
         lines.append("ランタイム情報の取得に失敗")
     return "\n".join(lines)
 

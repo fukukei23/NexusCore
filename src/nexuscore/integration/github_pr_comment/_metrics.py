@@ -123,7 +123,7 @@ def _collect_run_metrics(run: object) -> dict:
                 added, removed = _estimate_diff_lines_separated(diff_text)
                 total_added_lines += added
                 total_removed_lines += removed
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — DBパッチクエリのフォールバック
         logger.warning(f"Failed to collect patch metrics: {e}", exc_info=True)
 
     models: defaultdict[str, int] = defaultdict(int)
@@ -200,7 +200,7 @@ def _compute_recent_success_rate(project_id: int, limit: int = 30) -> float:
 
         success = sum(1 for r in runs if hasattr(r, "status") and r.status == "SUCCESS")
         return success / len(runs)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — DB成功 rateクエリのフォールバック
         logger.warning(f"Failed to compute success rate: {e}", exc_info=True)
         return 0.0
 

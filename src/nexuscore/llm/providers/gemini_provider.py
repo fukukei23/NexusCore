@@ -87,7 +87,7 @@ class GeminiLLM(BaseLLM):
         if self.real_calls and self.client:
             try:
                 call_fn = self._build_real_call(prompt, system_prompt, **kwargs)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Gemini SDK初期化失敗時のフォールバック
                 self.log_error("init failed (system)", e)
                 return self._stub_fallback_response("gemini", preview="Init failed. Fallback to stub.", as_json=as_json)
             return self.execute_real_or_fallback("gemini", call_fn, as_json=as_json)

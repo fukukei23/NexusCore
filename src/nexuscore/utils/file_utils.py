@@ -29,7 +29,7 @@ def extract_file_content(file):
                     logging.info("DEBUG: open cp932 (preview): %s", content[:100])
                     return content
         # ... (以下、既存の関数の実装が続く) ...
-    except Exception as e:
+    except (OSError, UnicodeDecodeError) as e:
         logging.error(f"Error in extract_file_content: {e}")
         return ""
 
@@ -101,7 +101,7 @@ def create_project_structure(root_path: str, files: list):
                 content = item.get("content", "")
                 full_path.write_text(content, encoding="utf-8")
                 logger.debug(f"Created file: {full_path}")
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             logger.error(f"Failed to create {item_type} at {full_path}: {e}")
 
 

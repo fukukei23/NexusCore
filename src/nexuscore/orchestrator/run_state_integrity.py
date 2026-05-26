@@ -130,5 +130,5 @@ def verify_integrity(state: dict[str, Any]) -> tuple[bool, str | None, str | Non
     except RuntimeError:
         # Secret not set - propagate
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return False, "STATE_INTEGRITY_ERROR", f"Integrity verification error: {str(e)}"

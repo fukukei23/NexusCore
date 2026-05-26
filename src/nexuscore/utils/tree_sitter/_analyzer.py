@@ -54,7 +54,7 @@ class SemanticAnalyzer:
         try:
             get_parser("python")
             return True, "Tree-sitter ready"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — tree-sitter native library errors
             return False, f"Setup error: {e}"
 
     def setup_parsers(self, languages: list[str] | None = None) -> bool:
@@ -70,7 +70,7 @@ class SemanticAnalyzer:
             try:
                 self.languages[lang] = get_language(lang)
                 self.parsers[lang] = get_parser(lang)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — tree-sitter native library errors
                 logger.warning("Failed to load %s: %s", lang, e)
 
         logger.info("Loaded parsers: %s", list(self.parsers.keys()))
@@ -119,7 +119,7 @@ class SemanticAnalyzer:
                         symbols[symbol_type].append(
                             {"name": symbol_name, "line": node.start_point[0] + 1, "column": node.start_point[1] + 1}
                         )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — tree-sitter query API errors
                 logger.debug("Query failed for %s: %s", symbol_type, e)
 
         return dict(symbols)
@@ -173,7 +173,7 @@ class SemanticAnalyzer:
                 self._profiling_stats["total_time"] += analysis_time
 
             return result
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — tree-sitter parse errors
             logger.warning("Analysis failed for %s: %s", file_path, e)
             return AnalysisResult(success=False, error=str(e), file_path=file_path, language=language)
 
@@ -186,7 +186,7 @@ class SemanticAnalyzer:
         try:
             content = file_path.read_text(encoding="utf-8")
             return self.analyze_source_code(content, language, str(file_path))
-        except Exception as e:
+        except (OSError, UnicodeDecodeError, RuntimeError) as e:
             logger.warning("File read error for %s: %s", file_path, e)
             return AnalysisResult(success=False, error=f"Read error: {e}")
 
@@ -220,7 +220,7 @@ class SemanticAnalyzer:
                     results[str(file_path)] = AnalysisResult(
                         success=False, error=f"Timeout after {CONFIG['timeout_seconds']}s", file_path=str(file_path),
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 — concurrent worker errors
                     logger.warning("Error analyzing %s: %s", file_path, e)
                     results[str(file_path)] = AnalysisResult(success=False, error=str(e), file_path=str(file_path))
                 if HAS_EXTRAS:

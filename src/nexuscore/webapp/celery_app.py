@@ -167,7 +167,7 @@ def _register_tasks(celery_instance: Celery) -> None:
             run.status = "SUCCESS"
             status = "success"
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — orchestrator execution failure
             # エラーハンドリング
             error_message = str(exc)
             logger.error(f"Orchestrator execution failed for run_id={run.id}: {exc}", exc_info=True)
@@ -188,7 +188,7 @@ def _register_tasks(celery_instance: Celery) -> None:
             run.finished_at = datetime.now(UTC)
             try:
                 db.session.commit()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — DB commit/rollback in finally block
                 logger.error(f"Failed to update Run status in finally block: {e}", exc_info=True)
                 db.session.rollback()
 
@@ -212,9 +212,9 @@ def _register_tasks(celery_instance: Celery) -> None:
                     )
                     db.session.add(log_entry)
                     db.session.commit()
-                except Exception as log_exc:
+                except Exception as log_exc:  # noqa: BLE001 — non-critical logging in finally
                     logger.warning(f"Failed to log report generation: {log_exc}", exc_info=True)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — report generation in finally
                 logger.warning(f"Failed to generate run report: {e}", exc_info=True)
                 # レポート生成失敗は本処理を壊さない
 
@@ -236,7 +236,7 @@ def _register_tasks(celery_instance: Celery) -> None:
                             "プロジェクト名": project.name,
                         },
                     )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Slack notification in finally
                 logger.warning(f"Failed to send Slack notification: {e}", exc_info=True)
 
     # タスクをグローバルに公開（views_projects.py から参照できるように）

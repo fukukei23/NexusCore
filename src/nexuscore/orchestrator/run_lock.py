@@ -145,7 +145,7 @@ def try_acquire_run_lock(run_id: str) -> tuple[bool, str | None]:
             except FileExistsError:
                 return False, "CONFLICT"
         return False, "CONFLICT"
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — ロックファイル作成全体のフォールバック
         # Write failure or other error: clean up incomplete lock file
         try:
             if lock_path.exists():

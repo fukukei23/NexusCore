@@ -53,7 +53,7 @@ def ensure_env_loaded() -> str | None:
                     os.environ["NEXUSCORE_ENV_LOADED"] = str(candidate.resolve())
                     _ENV_LOADED = True
                     return os.getenv("NEXUSCORE_ENV_LOADED")
-            except Exception:  # pragma: no cover - defensive
+            except Exception:  # pragma: no cover - defensive  # noqa: BLE001
                 continue
 
         if not _ENV_LOADED and find_dotenv is not None:
