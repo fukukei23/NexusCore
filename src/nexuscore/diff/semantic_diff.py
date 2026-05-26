@@ -358,7 +358,7 @@ def compute_semantic_diff(
                 )
             )[:20]
             result.raw_line_diff_summary = "\n".join(diff_lines)
-        except Exception:
-            pass  # 最後の手段も失敗した場合は空のまま返す
+        except Exception:  # noqa: BLE001 — 最後の手段も失敗した場合は空のまま返す
+            pass
 
     return result

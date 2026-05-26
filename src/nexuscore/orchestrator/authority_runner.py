@@ -135,7 +135,7 @@ def run_with_authority(
                 constitution.setdefault("automation_policy", {})[
                     "authority_level"
                 ] = authority_level
-        except Exception:
+        except Exception:  # noqa: BLE001 — 外部dictの安全な更新（フォールバック）
             pass
 
     stop_before = stop_before_phases_for_authority_level(authority_level)
@@ -222,7 +222,7 @@ def _invoke_orchestrator(
                 phase=phase,
                 metadata={"execution_context": execution_context, "next_phase": phase},
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 — チェックポイント失敗は処理を止めない
             pass
 
         if phase in stop_before_phases:

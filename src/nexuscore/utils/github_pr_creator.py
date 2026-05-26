@@ -202,7 +202,7 @@ class GitHubPRCreator:
         if pr_number:
             try:
                 self.add_labels(repo_full_name, pr_number)
-            except Exception:
+            except Exception:  # noqa: BLE001 — ラベル追加失敗はPR作成を止めない
                 logger.warning("Label addition failed for PR #%d, continuing.", pr_number)
 
         return {

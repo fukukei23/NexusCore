@@ -97,7 +97,7 @@ def resume_run(
         }
         try:
             save_state(failed_state)
-        except Exception:
+        except Exception:  # noqa: BLE001 — 失敗状態の保存失敗は握りつぶす
             pass
         return {
             "status": "FAILED",
@@ -243,7 +243,7 @@ def resume_run(
                 "next_action": "Check logs and retry",
             }
             update_state(state)
-        except Exception:
+        except Exception:  # noqa: BLE001 — エラー状態更新の失敗は握りつぶす
             pass
         return {
             "status": "FAILED",

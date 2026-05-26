@@ -43,5 +43,5 @@ def sanitize_json_like(payload: Any) -> dict | list | Any:
     # 3. JSONとしてパースを試みる
     try:
         return json.loads(candidate)
-    except Exception:
+    except (json.JSONDecodeError, ValueError):
         return payload

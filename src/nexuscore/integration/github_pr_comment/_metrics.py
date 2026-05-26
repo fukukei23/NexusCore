@@ -137,7 +137,7 @@ def _collect_run_metrics(run: object) -> dict:
                 if isinstance(payload, str):
                     try:
                         payload = json.loads(payload)
-                    except Exception:
+                    except (json.JSONDecodeError, ValueError):
                         payload = {}
 
                 model = payload.get("model") or payload.get("model_name") or "unknown"
@@ -150,9 +150,9 @@ def _collect_run_metrics(run: object) -> dict:
                 )
                 try:
                     total_cost += float(cost)
-                except Exception:
+                except (ValueError, TypeError):
                     pass
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — DBクエリ + メトリクス収集全体のフォールバック
         logger.warning(f"Failed to collect LLM metrics: {e}", exc_info=True)
 
     start_time = None

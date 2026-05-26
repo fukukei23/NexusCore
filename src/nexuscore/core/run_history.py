@@ -51,7 +51,7 @@ class RunHistoryLogger:
             with path.open("a", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False)
                 f.write("\n")
-        except Exception:
+        except (OSError, UnicodeEncodeError):
             # ログ書き込みに失敗しても致命的ではないので握りつぶす
             # （必要ならここで logging.error を出してもよい）
             pass
@@ -113,7 +113,7 @@ class RunHistoryLogger:
                     continue
                 try:
                     records.append(json.loads(line))
-                except Exception:
+                except (json.JSONDecodeError, ValueError):
                     # 1行壊れていても全体は読み出せるようにする
                     continue
         return records
@@ -182,6 +182,5 @@ class RunHistoryLogger:
                     details=record.details,
                 )
             # その他の種類の通知は必要に応じて追加
-        except Exception:
-            # 通知失敗は致命的ではないので握りつぶす
+        except Exception:  # noqa: BLE001 — 通知失敗は致命的ではないので握りつぶす
             pass

@@ -23,7 +23,7 @@ def extract_file_content(file):
                     content = f.read()
                     logging.info("DEBUG: open utf-8 (preview): %s", content[:100])
                     return content
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 with open(file.name, encoding="cp932", errors="ignore") as f:
                     content = f.read()
                     logging.info("DEBUG: open cp932 (preview): %s", content[:100])

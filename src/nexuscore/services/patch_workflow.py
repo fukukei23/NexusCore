@@ -50,7 +50,7 @@ def collect_relevant_files(
             content = abs_path.read_text(encoding="utf-8", errors="ignore")
             rel = str(abs_path.relative_to(project_path))
             files_dict[rel] = content
-        except Exception:
+        except (OSError, UnicodeDecodeError):
             continue
 
     if not files_dict:
@@ -59,7 +59,7 @@ def collect_relevant_files(
                 content = py.read_text(encoding="utf-8", errors="ignore")
                 rel = str(py.relative_to(project_path))
                 files_dict[rel] = content
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 continue
             if len(files_dict) >= 10:
                 break

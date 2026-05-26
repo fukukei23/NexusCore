@@ -150,7 +150,7 @@ def try_acquire_run_lock(run_id: str) -> tuple[bool, str | None]:
         try:
             if lock_path.exists():
                 _move_to_stale(lock_path)
-        except Exception:
+        except Exception:  # noqa: BLE001 — クリーンアップ: 不完全ロックファイルの削除
             pass
         return False, f"LOCK_ERROR: {str(e)}"
 
@@ -213,7 +213,7 @@ def refresh_run_lock(run_id: str) -> tuple[bool, str | None, dict[str, Any] | No
         try:
             if temp_path.exists():
                 temp_path.unlink()
-        except Exception:
+        except Exception:  # noqa: BLE001 — クリーンアップ: 一時ファイルの削除
             pass
         return False, "LOCK_REFRESH_FAILED", {"error": str(e), "error_type": type(e).__name__}
 

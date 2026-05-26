@@ -128,7 +128,7 @@ def generate_template_tests(
         if project_root is not None:
             try:
                 module_import_path = project_path_to_module_path(project_root, module_path)
-            except Exception:
+            except (ValueError, OSError):
                 module_import_path = module_path.stem
         else:
             module_import_path = module_path.stem

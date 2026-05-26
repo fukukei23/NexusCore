@@ -29,7 +29,7 @@ try:
     src_dir = current_dir.parents[2]  # .../src
     if str(src_dir) not in sys.path:
         sys.path.insert(0, str(src_dir))
-except Exception:
+except Exception:  # noqa: BLE001 — パス操作のフォールバック
     logging.getLogger(__name__).warning("Could not determine src directory.")
 
 # ------------------------------------------------------------------------------
@@ -162,8 +162,7 @@ class Orchestrator(PhaseRunnerMixin):
                     ),
                 },
             )
-        except Exception:
-            # ログ失敗は既存の処理を止めない
+        except Exception:  # noqa: BLE001 — ログ失敗は既存の処理を止めない
             pass
 
         # 初期コンテキストの作成
@@ -228,7 +227,7 @@ class Orchestrator(PhaseRunnerMixin):
                     status="FINISHED",
                     message="Orchestrator run finished",
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 — DBフック失敗は処理を止めない
                 pass
 
         except RuntimeError as e:
@@ -247,7 +246,7 @@ class Orchestrator(PhaseRunnerMixin):
                         status="INTERRUPTED",
                         message="Orchestrator run stopped by user request",
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001 — DBフック失敗は処理を止めない
                     pass
                 return
             # それ以外の RuntimeError は従来通り上位に投げる
@@ -264,7 +263,7 @@ class Orchestrator(PhaseRunnerMixin):
                     status="FAILED",
                     message=f"Orchestrator run failed: {str(e)[:200]}",
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 — DBフック失敗は処理を止めない
                 pass
             raise
 

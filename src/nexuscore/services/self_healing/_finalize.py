@@ -16,7 +16,7 @@ def maybe_stop(
         return
     try:
         session_controller.checkpoint(phase, meta or {})
-    except Exception:
+    except Exception:  # noqa: BLE001 — チェックポイント失敗は処理を止めない
         logger.exception("Failed to checkpoint at phase='%s'", phase)
     if session_controller.should_stop():
         logger.warning("Session stop requested at phase='%s'.", phase)
@@ -85,7 +85,7 @@ def finalize_run(
             started_at=started_at, finished_at=finished_at,
         )
         history_logger.log_run(record)
-    except Exception:
+    except Exception:  # noqa: BLE001 — DB操作フォールバック（致命的ではない）
         logger.exception("Failed to log self-healing run history.")
 
     try:
@@ -98,7 +98,7 @@ def finalize_run(
             logger.info("Run report generated: %s", report_path)
     except ImportError:
         pass
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — レポート生成失敗は致命的ではない
         logger.warning("Failed to generate run report: %s", e, exc_info=True)
 
     return {

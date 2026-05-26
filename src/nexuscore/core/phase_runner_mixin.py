@@ -41,7 +41,7 @@ class PhaseRunnerMixin:
             return
         try:
             self.session_controller.checkpoint(phase, extra or {})
-        except Exception:
+        except Exception:  # noqa: BLE001 — チェックポイント失敗は処理を止めない
             self.logger.exception(f"Failed to checkpoint session at phase '{phase}'")
         try:
             if self.session_controller.should_stop():
@@ -51,7 +51,7 @@ class PhaseRunnerMixin:
                 raise RuntimeError("SessionStopped")
         except RuntimeError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 — セッションストップチェックのフォールバック
             self.logger.exception("Error while checking session stop request.")
 
     def _execute_task_via_npe(self, prompt: str, metadata: dict[str, Any]) -> str:
@@ -85,7 +85,7 @@ class PhaseRunnerMixin:
             from nexuscore.utils.clean_output import clean_output
 
             return clean_output(content)
-        except Exception:
+        except Exception:  # noqa: BLE001 — clean_output失敗時は生テキストを返す
             return content
 
     # ------------------------------------------------------------------
@@ -148,7 +148,7 @@ class PhaseRunnerMixin:
                 status="SUCCESS",
                 message="Requirement phase completed",
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 — DBフック失敗は処理を止めない
             pass
 
         return context
@@ -213,7 +213,7 @@ class PhaseRunnerMixin:
 
             try:
                 plan = json.loads(plan_text)
-            except Exception:
+            except (json.JSONDecodeError, ValueError):
                 plan = {"raw_plan": plan_text}
 
             context.plan = plan
@@ -231,7 +231,7 @@ class PhaseRunnerMixin:
                     message="Planning phase completed",
                     extra={"fast_lane": context.fast_lane},
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 — DBフック失敗は処理を止めない
                 pass
 
         except Exception as e:
@@ -246,7 +246,7 @@ class PhaseRunnerMixin:
                     status="FAILED",
                     message=f"Planning phase failed: {str(e)[:200]}",
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 — DBフック失敗は処理を止めない
                 pass
             raise
 
@@ -408,7 +408,7 @@ python hello.py
         if plan_text:
             try:
                 plan_json = json.loads(plan_text)
-            except Exception:
+            except (json.JSONDecodeError, ValueError):
                 plan_json = None
             if plan_json:
                 module_hint = os.getenv("FAST_LANE_TEST_MODULE", "fast_lane.regression_suite")

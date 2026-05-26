@@ -22,7 +22,7 @@ def default_context_factory(
             fast_lane=fast_lane,
             run_db_id=run_db_id,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 — OrchestratorContext生成失敗時のフォールバック
 
         @dataclass
         class _FallbackContext:

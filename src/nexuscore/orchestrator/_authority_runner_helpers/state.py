@@ -25,7 +25,7 @@ def apply_context_snapshot(context: Any, snapshot: dict[str, Any]) -> None:
     for key, val in snapshot.items():
         try:
             setattr(context, key, val)
-        except Exception:
+        except Exception:  # noqa: BLE001 — コンテキスト復元時の属性設定フォールバック
             continue
 
 
@@ -65,7 +65,7 @@ def get_or_create_session_controller(orchestrator: Any) -> Any:
 
     try:
         from nexuscore.core.session_control import SessionController
-    except Exception:
+    except ImportError:
         return None
 
     project_path = getattr(orchestrator, "project_path", None)
@@ -76,7 +76,7 @@ def get_or_create_session_controller(orchestrator: Any) -> Any:
     sc = SessionController(session_id=uuid.uuid4().hex, root_dir=root_dir)
     try:
         orchestrator.session_controller = sc
-    except Exception:
+    except Exception:  # noqa: BLE001 — 外部オブジェクトへの安全な属性設定
         pass
     return sc
 
@@ -89,9 +89,9 @@ def set_stop_policy(session_controller: Any, stop_before_phases: list[str]) -> N
         try:
             session_controller.set_stop_before_phases(list(stop_before_phases))
             return
-        except Exception:
+        except Exception:  # noqa: BLE001 — 外部メソッド呼び出しのフォールバック
             return
     try:
         session_controller.stop_before_phases = list(stop_before_phases)
-    except Exception:
+    except Exception:  # noqa: BLE001 — 外部オブジェクトへの安全な属性設定フォールバック
         pass

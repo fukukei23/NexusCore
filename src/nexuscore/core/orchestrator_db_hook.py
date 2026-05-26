@@ -4,7 +4,7 @@ from typing import Any
 
 try:
     from nexuscore.webapp.logging_service import log_execution_event as _log_exec_event
-except Exception:
+except ImportError:
     _log_exec_event = None
 
 

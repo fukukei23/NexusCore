@@ -184,7 +184,7 @@ class SandboxExecutor:
             from nexuscore.webapp.logging_service import log_execution_event
         except ImportError:
             return
-        except Exception:
+        except Exception:  # noqa: BLE001 — モジュール初期化エラー等の追加キャッチ
             return
 
         base_payload: dict[str, Any] = {"error_type": error_type.value}

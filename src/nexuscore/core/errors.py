@@ -231,12 +231,11 @@ def convert_http_error_to_nexus_error(exc: Exception) -> NexusCoreError:
         error_class = classify_error(exc)
         try:
             error_str = str(exc) if exc is not None else "None"
-        except Exception:
-            # エラーオブジェクトの文字列化に失敗した場合
+        except Exception:  # noqa: BLE001 — エラーオブジェクトの文字列化に失敗した場合
             error_str = f"<unstringifiable {type(exc).__name__ if exc is not None else 'None'}>"
         try:
             error_type = type(exc).__name__ if exc is not None else "NoneType"
-        except Exception:
+        except Exception:  # noqa: BLE001 — type().__name__への安全なアクセス
             error_type = "Unknown"
 
         if error_class == "rate_limit":
@@ -255,7 +254,7 @@ def convert_http_error_to_nexus_error(exc: Exception) -> NexusCoreError:
             # Step 3: 上位へのエラー伝播（3.4.2 Step 3）
             # unexpected 系の標準エラーとして上位レイヤーへ伝播
             return UnexpectedSystemError(f"Unexpected error ({error_type}): {error_str}")
-    except Exception as conversion_error:
+    except Exception as conversion_error:  # noqa: BLE001 — 変換処理中の例外を捕捉（3.4.3）
         # 変換処理中の例外を捕捉（3.4.3）
         logger.warning(
             f"Exception occurred during error conversion. "
@@ -267,10 +266,10 @@ def convert_http_error_to_nexus_error(exc: Exception) -> NexusCoreError:
         # Step 3: 安全な例外として伝播（3.4.2 Step 3）
         try:
             error_str = str(exc) if exc is not None else "None"
-        except Exception:
+        except Exception:  # noqa: BLE001 — エラーオブジェクトの文字列化に失敗した場合
             error_str = f"<unstringifiable {type(exc).__name__ if exc is not None else 'None'}>"
         try:
             error_type = type(exc).__name__ if exc is not None else "NoneType"
-        except Exception:
+        except Exception:  # noqa: BLE001 — type().__name__への安全なアクセス
             error_type = "Unknown"
         return UnexpectedSystemError(f"Unclassifiable error ({error_type}): {error_str}")

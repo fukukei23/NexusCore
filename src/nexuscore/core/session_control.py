@@ -78,7 +78,7 @@ class SessionController:
             cmd = self._read_control()
             cmd["stop_before_phases"] = list(phases)
             self._write_control(cmd)
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             pass
 
     def checkpoint(self, phase: str, metadata: dict[str, Any] | None = None) -> None:
@@ -114,7 +114,7 @@ class SessionController:
         try:
             with self.control_file.open("r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             # 破損していても全システムを止めない
             return {}
 
@@ -124,7 +124,7 @@ class SessionController:
         try:
             with self.state_file.open("r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             return {}
 
     def _write_state(self, data: dict[str, Any]) -> None:

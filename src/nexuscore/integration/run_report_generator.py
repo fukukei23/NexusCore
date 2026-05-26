@@ -105,7 +105,7 @@ def _collect_run_metrics(run: Run) -> dict[str, Any]:
                 if isinstance(payload, str):
                     try:
                         payload = json.loads(payload)
-                    except Exception:
+                    except (json.JSONDecodeError, ValueError):
                         payload = {}
 
                 model = payload.get("model") or payload.get("model_name") or "unknown"
@@ -118,9 +118,9 @@ def _collect_run_metrics(run: Run) -> dict[str, Any]:
                 )
                 try:
                     total_cost += float(cost)
-                except Exception:
+                except (ValueError, TypeError):
                     pass
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — DBクエリ + メトリクス収集全体のフォールバック
             logger.warning(f"Failed to collect LLM metrics: {e}", exc_info=True)
 
         return {
@@ -253,7 +253,7 @@ def generate_run_report_markdown(run_db_id: int) -> str:
                 patch_files_list.append(
                     f"- `{p.file_path}` ({'applied' if p.applied else 'not applied'})"
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001 — DBクエリフォールバック（致命的ではない）
             pass
 
         patch_files_str = "\n".join(patch_files_list[:10]) if patch_files_list else "- (no patches)"

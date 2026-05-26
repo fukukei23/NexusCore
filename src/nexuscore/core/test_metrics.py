@@ -246,10 +246,10 @@ class TestMetricsCollector:
                         continue
                     try:
                         records.append(json.loads(line))
-                    except Exception:
+                    except (json.JSONDecodeError, ValueError):
                         continue
-        except Exception as e:
-            logger.error(f"Failed to load test generation history: {e}", exc_info=True)
+        except Exception:  # noqa: BLE001 — ファイルI/O + JSONパース全体のフォールバック
+            logger.error("Failed to load test generation history", exc_info=True)
 
         return records
 
