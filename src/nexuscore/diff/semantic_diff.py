@@ -214,6 +214,51 @@ def _build_behavior_hints_from_diff(
     return hints
 
 
+def _raw_diff_summary(lines_before: list[str], lines_after: list[str], max_lines: int = 20) -> str:
+    """unified_diff の最初の max_lines 行を返すヘルパー。"""
+    diff_lines = list(
+        difflib.unified_diff(lines_before, lines_after, fromfile="before", tofile="after", lineterm="", n=3)
+    )[:max_lines]
+    return "\n".join(diff_lines)
+
+
+def _compute_function_diff(
+    functions_before: dict[str, dict[str, str | None]],
+    functions_after: dict[str, dict[str, str | None]],
+) -> list[FunctionChange]:
+    """Before/After の関数辞書から関数レベルの差分を計算する。"""
+    changes: list[FunctionChange] = []
+    all_names = set(functions_before.keys()) | set(functions_after.keys())
+
+    for name in all_names:
+        before = functions_before.get(name)
+        after = functions_after.get(name)
+
+        if before is None and after is not None:
+            changes.append(FunctionChange(
+                name=name, kind="added",
+                signature_after=after.get("signature"), doc_after=after.get("doc"),
+            ))
+        elif before is not None and after is None:
+            changes.append(FunctionChange(
+                name=name, kind="removed",
+                signature_before=before.get("signature"), doc_before=before.get("doc"),
+            ))
+        elif before is not None and after is not None:
+            sig_before = before.get("signature")
+            sig_after = after.get("signature")
+            doc_before = before.get("doc")
+            doc_after = after.get("doc")
+            if sig_before != sig_after or doc_before != doc_after:
+                changes.append(FunctionChange(
+                    name=name, kind="modified",
+                    signature_before=sig_before, signature_after=sig_after,
+                    doc_before=doc_before, doc_after=doc_after,
+                ))
+
+    return changes
+
+
 def compute_semantic_diff(
     file_path: Path,
     before_code: str,
@@ -224,141 +269,45 @@ def compute_semantic_diff(
     """
     Before/After のコードから「意味的な変更点」を抽出する。
 
-    - 失敗した場合も例外を投げず、最低限 raw_line_diff_summary だけ埋めて返す。
-
-    Args:
-        file_path: ファイルパス（相対パスでも可）
-        before_code: Before コード
-        after_code: After コード
-        language: 言語（現状は "python" のみ対応）
-
-    Returns:
-        SemanticDiffResult
+    失敗した場合も例外を投げず、最低限 raw_line_diff_summary だけ埋めて返す。
     """
     result = SemanticDiffResult(file_path=file_path)
 
     # Python 以外は raw diff のみ
     if language != "python":
-        lines_before = before_code.splitlines()
-        lines_after = after_code.splitlines()
-        diff_lines = list(
-            difflib.unified_diff(
-                lines_before,
-                lines_after,
-                fromfile="before",
-                tofile="after",
-                lineterm="",
-                n=3,
-            )
-        )[
-            :20
-        ]  # 最初の20行だけ
-        result.raw_line_diff_summary = "\n".join(diff_lines)
+        result.raw_line_diff_summary = _raw_diff_summary(before_code.splitlines(), after_code.splitlines())
         return result
 
     # Python コードの解析
     try:
-        # Before の AST 解析
-        tree_before: ast.AST | None = None
         functions_before: dict[str, dict[str, str | None]] = {}
         try:
-            tree_before = ast.parse(before_code, filename=str(file_path))
-            functions_before = _extract_functions_from_ast(tree_before)
+            functions_before = _extract_functions_from_ast(
+                ast.parse(before_code, filename=str(file_path))
+            )
         except SyntaxError as e:
             logger.warning(f"Failed to parse before code for {file_path}: {e}")
 
-        # After の AST 解析
-        tree_after: ast.AST | None = None
         functions_after: dict[str, dict[str, str | None]] = {}
         try:
-            tree_after = ast.parse(after_code, filename=str(file_path))
-            functions_after = _extract_functions_from_ast(tree_after)
+            functions_after = _extract_functions_from_ast(
+                ast.parse(after_code, filename=str(file_path))
+            )
         except SyntaxError as e:
             logger.warning(f"Failed to parse after code for {file_path}: {e}")
 
-        # 関数レベルの差分を計算
-        all_function_names = set(functions_before.keys()) | set(functions_after.keys())
+        result.functions = _compute_function_diff(functions_before, functions_after)
 
-        for func_name in all_function_names:
-            before_info = functions_before.get(func_name)
-            after_info = functions_after.get(func_name)
-
-            if before_info is None and after_info is not None:
-                # 追加
-                result.functions.append(
-                    FunctionChange(
-                        name=func_name,
-                        kind="added",
-                        signature_after=after_info.get("signature"),
-                        doc_after=after_info.get("doc"),
-                    )
-                )
-            elif before_info is not None and after_info is None:
-                # 削除
-                result.functions.append(
-                    FunctionChange(
-                        name=func_name,
-                        kind="removed",
-                        signature_before=before_info.get("signature"),
-                        doc_before=before_info.get("doc"),
-                    )
-                )
-            elif before_info is not None and after_info is not None:
-                # 変更の可能性をチェック
-                sig_before = before_info.get("signature")
-                sig_after = after_info.get("signature")
-                doc_before = before_info.get("doc")
-                doc_after = after_info.get("doc")
-
-                if sig_before != sig_after or doc_before != doc_after:
-                    result.functions.append(
-                        FunctionChange(
-                            name=func_name,
-                            kind="modified",
-                            signature_before=sig_before,
-                            signature_after=sig_after,
-                            doc_before=doc_before,
-                            doc_after=doc_after,
-                        )
-                    )
-
-        # 振る舞いの変化ヒントを構築
         lines_before = before_code.splitlines()
         lines_after = after_code.splitlines()
         result.behavior_hints = _build_behavior_hints_from_diff(lines_before, lines_after)
-
-        # raw diff サマリー（最初の20行だけ）
-        diff_lines = list(
-            difflib.unified_diff(
-                lines_before,
-                lines_after,
-                fromfile="before",
-                tofile="after",
-                lineterm="",
-                n=3,
-            )
-        )[:20]
-        result.raw_line_diff_summary = "\n".join(diff_lines)
+        result.raw_line_diff_summary = _raw_diff_summary(lines_before, lines_after)
 
     except Exception as e:  # noqa: BLE001
-        # どこかで例外が出ても SemanticDiffResult を返すようにする
         logger.warning(f"Error computing semantic diff for {file_path}: {e}", exc_info=True)
-        # 最低限 raw diff だけは埋める
         try:
-            lines_before = before_code.splitlines()
-            lines_after = after_code.splitlines()
-            diff_lines = list(
-                difflib.unified_diff(
-                    lines_before,
-                    lines_after,
-                    fromfile="before",
-                    tofile="after",
-                    lineterm="",
-                    n=3,
-                )
-            )[:20]
-            result.raw_line_diff_summary = "\n".join(diff_lines)
-        except Exception:  # noqa: BLE001 — 最後の手段も失敗した場合は空のまま返す
+            result.raw_line_diff_summary = _raw_diff_summary(before_code.splitlines(), after_code.splitlines())
+        except Exception:  # noqa: BLE001
             pass
 
     return result

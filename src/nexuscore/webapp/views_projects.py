@@ -214,18 +214,68 @@ def create_project():
     return redirect(url_for("views_projects.project_detail", project_id=project.id))
 
 
+def _dispatch_celery_run(run: Run, project: Project):
+    """Celery非同期でRunを実行し、レスポンスを返す。"""
+    from nexuscore.webapp.celery_app import run_orchestrator_task
+
+    run_orchestrator_task.delay(run.id)
+
+    if request.accept_mimetypes.best == "application/json":
+        return (
+            jsonify({
+                "run_id": run.run_id,
+                "status": run.status,
+                "message": "Run queued. Execution will start shortly.",
+            }),
+            202,
+        )
+
+    flash(
+        f"Run '{run.run_id[:8]}...' がキューに入りました。実行状態は上記の Run 一覧で確認できます。ログは Run ID をクリックしてください。",
+        "info",
+    )
+    return redirect(url_for("views_projects.project_detail", project_id=project.id))
+
+
+def _dispatch_inline_run(run: Run, project: Project, requirement: str, autonomy_level: int, fast_lane: bool):
+    """インライン同期でRunを実行し、レスポンスを返す。"""
+    from nexuscore.webapp.orchestrator_inline import run_orchestrator_inline
+
+    try:
+        run_orchestrator_inline(
+            run=run, project=project, requirement=requirement,
+            autonomy_level=autonomy_level, fast_lane=fast_lane,
+        )
+
+        if request.accept_mimetypes.best == "application/json":
+            return jsonify({
+                "run_id": run.run_id,
+                "status": run.status,
+                "message": "Run completed." if run.status == "SUCCESS" else "Run failed.",
+            }), (200 if run.status == "SUCCESS" else 500)
+
+        flash(
+            f"Run '{run.run_id[:8]}...' が完了しました。ステータス: {run.status}",
+            "success" if run.status == "SUCCESS" else "error",
+        )
+        return redirect(url_for("views_projects.project_detail", project_id=project.id))
+
+    except Exception as exc:  # noqa: BLE001 — orchestrator execution failure
+        if request.accept_mimetypes.best == "application/json":
+            return jsonify({
+                "run_id": run.run_id,
+                "status": run.status,
+                "message": f"Run failed: {str(exc)}",
+            }), 500
+
+        flash(f"Run '{run.run_id[:8]}...' が失敗しました: {str(exc)}", "error")
+        return redirect(url_for("views_projects.project_detail", project_id=project.id))
+
+
 @bp.route("/<int:project_id>/run", methods=["POST"])
 @require_auth
 def trigger_run(project_id: int):
-    """
-    プロジェクト実行トリガー（フェーズ1: 同期接続版 → フェーズ2: Celery 非同期版に切り替え可能）
-
-    POST /projects/<project_id>/run
-
-    Data access: Direct DB access + Orchestrator service call (no API call)
-    FastAPI equivalent: POST /api/v1/projects/{id}/run (for external clients)
-    """
-
+    """プロジェクト実行トリガー（Celery / インライン切替可能）"""
     user = get_current_user()
     project = user_project_or_404(user.id, project_id)
 
@@ -237,83 +287,17 @@ def trigger_run(project_id: int):
     if not requirement:
         return jsonify({"error": "requirement is required"}), 400
 
-    run_id = uuid.uuid4().hex
     run = Run(
         project_id=project.id,
-        run_id=run_id,
+        run_id=uuid.uuid4().hex,
         triggered_by=user.id,
         status="PENDING",
         autonomy_level=autonomy_level,
         requirement=requirement,
-        started_at=None,
-        finished_at=None,
     )
     db.session.add(run)
     db.session.commit()
 
-    use_celery = os.getenv("NEXUS_USE_CELERY", "1") == "1"
-
-    if use_celery:
-        from nexuscore.webapp.celery_app import run_orchestrator_task
-
-        run_orchestrator_task.delay(run.id)
-
-        if request.accept_mimetypes.best == "application/json":
-            return (
-                jsonify(
-                    {
-                        "run_id": run.run_id,
-                        "status": run.status,
-                        "message": "Run queued. Execution will start shortly.",
-                    }
-                ),
-                202,
-            )
-
-        flash(
-            f"Run '{run.run_id[:8]}...' がキューに入りました。実行状態は上記の Run 一覧で確認できます。ログは Run ID をクリックしてください。",
-            "info",
-        )
-        return redirect(url_for("views_projects.project_detail", project_id=project.id))
-    else:
-        from nexuscore.webapp.orchestrator_inline import run_orchestrator_inline
-
-        try:
-            run_orchestrator_inline(
-                run=run,
-                project=project,
-                requirement=requirement,
-                autonomy_level=autonomy_level,
-                fast_lane=fast_lane,
-            )
-
-            if request.accept_mimetypes.best == "application/json":
-                return jsonify(
-                    {
-                        "run_id": run.run_id,
-                        "status": run.status,
-                        "message": "Run completed." if run.status == "SUCCESS" else "Run failed.",
-                    }
-                ), (200 if run.status == "SUCCESS" else 500)
-
-            flash(
-                f"Run '{run.run_id[:8]}...' が完了しました。ステータス: {run.status}",
-                "success" if run.status == "SUCCESS" else "error",
-            )
-            return redirect(url_for("views_projects.project_detail", project_id=project.id))
-
-        except Exception as exc:  # noqa: BLE001 — orchestrator execution failure
-            if request.accept_mimetypes.best == "application/json":
-                return (
-                    jsonify(
-                        {
-                            "run_id": run.run_id,
-                            "status": run.status,
-                            "message": f"Run failed: {str(exc)}",
-                        }
-                    ),
-                    500,
-                )
-
-            flash(f"Run '{run.run_id[:8]}...' が失敗しました: {str(exc)}", "error")
-            return redirect(url_for("views_projects.project_detail", project_id=project.id))
+    if os.getenv("NEXUS_USE_CELERY", "1") == "1":
+        return _dispatch_celery_run(run, project)
+    return _dispatch_inline_run(run, project, requirement, autonomy_level, fast_lane)

@@ -29,6 +29,107 @@ except ImportError:
     LLMRouter = None
 
 
+def _collect_diff_snippets(run: object) -> str:
+    """Run に紐づくパッチから diff スニペットを収集する。"""
+    patches = []
+    if hasattr(run, "id") and PatchRecord:
+        patches = PatchRecord.query.filter_by(run_id=run.id).all()
+
+    diff_snippets = []
+    for p in patches[:10]:
+        file_path = p.file_path if hasattr(p, "file_path") else "unknown"
+        diff_text = p.diff_text if hasattr(p, "diff_text") else ""
+        lines = diff_text.splitlines()[:80] if diff_text else []
+        if lines:
+            diff_snippets.append(f"File: {file_path}\n" + "\n".join(lines))
+
+    return "\n\n".join(diff_snippets) if diff_snippets else "(no diff available)"
+
+
+def _collect_error_logs(run: object) -> str:
+    """Run に紐づく ERROR/WARNING ログを収集する。"""
+    log_entries = []
+    if hasattr(run, "id") and ExecutionLog:
+        log_entries = (
+            ExecutionLog.query.filter(ExecutionLog.run_id == run.id)
+            .order_by(ExecutionLog.created_at.asc())
+            .all()
+        )
+
+    log_text_lines: list[str] = []
+    for lg in log_entries[:100]:
+        source = lg.source if hasattr(lg, "source") else "unknown"
+        level = lg.level if hasattr(lg, "level") else "INFO"
+        message = lg.message if hasattr(lg, "message") else ""
+        if level in ("ERROR", "WARNING"):
+            log_text_lines.append(f"[{source}][{level}] {message}")
+
+    return "\n".join(log_text_lines) if log_text_lines else "(no important logs)"
+
+
+_SUMMARY_PROMPT_TEMPLATE = """\
+You are an AI code review assistant.
+
+The following codebase was automatically self-healed by an AI orchestrator.
+We have:
+
+- Guardian review comments (high level)
+- Patch diffs
+- Structured logs (errors/warnings)
+
+Please summarize the essence of the change for a pull request comment, in concise bullet points.
+
+Focus on:
+
+1. What was broken or risky before.
+2. What was changed (at a high level; avoid too much detail).
+3. Why this change reduces risk or improves quality.
+4. Any remaining risks or recommendations.
+
+Guardian review:
+
+{guardian_review}
+
+Patch diff snippets:
+
+{diff_block}
+
+Important logs:
+
+{log_text}
+
+Write the summary in Japanese, 5 bullets or fewer.
+"""
+
+
+def _call_llm_summary(prompt: str, llm_router: object) -> str | None:
+    """LLM を呼び出して要約を生成する。"""
+    def llm_complete_fn(model: str, system_prompt: str, user_prompt: str) -> dict:
+        if hasattr(llm_router, "complete"):
+            return llm_router.complete(
+                model=model,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                task="code_review",
+            )
+        return {"ok": False, "reason": "LLMRouter.complete not available", "content": ""}
+
+    result = guarded_llm_call(
+        model="glm-4-flash",
+        task="code_review",
+        system_prompt="You summarize code changes for pull requests. Return concise bullet points in Japanese.",
+        user_prompt=prompt,
+        llm_complete_fn=llm_complete_fn,
+    )
+
+    if isinstance(result, dict) and result.get("ok"):
+        summary_text = result.get("content", "").strip()
+        return summary_text if summary_text else None
+
+    logger.warning(f"LLM call failed: {result.get('reason', 'unknown')}")
+    return None
+
+
 def generate_pr_change_summary(
     run: object,
     guardian_review_markdown: str,
@@ -52,116 +153,26 @@ def generate_pr_change_summary(
         return None
 
     try:
-        # パッチ情報を収集
-        patches = []
-        if hasattr(run, "id") and PatchRecord:
-            patches = PatchRecord.query.filter_by(run_id=run.id).all()
+        diff_block = _collect_diff_snippets(run)
+        log_text = _collect_error_logs(run)
 
-        diff_snippets = []
-        for p in patches[:10]:  # 最大10ファイル
-            file_path = p.file_path if hasattr(p, "file_path") else "unknown"
-            diff_text = p.diff_text if hasattr(p, "diff_text") else ""
+        prompt = _SUMMARY_PROMPT_TEMPLATE.format(
+            guardian_review=guardian_review_markdown[:2000],
+            diff_block=diff_block[:3000],
+            log_text=log_text[:2000],
+        )
 
-            # 1ファイルあたり80行まで
-            lines = diff_text.splitlines()[:80] if diff_text else []
-            if lines:
-                diff_snippets.append(f"File: {file_path}\n" + "\n".join(lines))
-
-        diff_block = "\n\n".join(diff_snippets) if diff_snippets else "(no diff available)"
-
-        # ログ情報を収集（ERROR/WARNING のみ）
-        log_entries = []
-        if hasattr(run, "id") and ExecutionLog:
-            log_entries = (
-                ExecutionLog.query.filter(ExecutionLog.run_id == run.id)
-                .order_by(ExecutionLog.created_at.asc())
-                .all()
-            )
-
-        log_text_lines: list[str] = []
-        for lg in log_entries[:100]:  # 最大100エントリ
-            source = lg.source if hasattr(lg, "source") else "unknown"
-            level = lg.level if hasattr(lg, "level") else "INFO"
-            message = lg.message if hasattr(lg, "message") else ""
-
-            if level in ("ERROR", "WARNING"):
-                log_text_lines.append(f"[{source}][{level}] {message}")
-
-        log_text = "\n".join(log_text_lines) if log_text_lines else "(no important logs)"
-
-        # プロンプトを構築
-        prompt = f"""
-You are an AI code review assistant.
-
-The following codebase was automatically self-healed by an AI orchestrator.
-We have:
-
-- Guardian review comments (high level)
-- Patch diffs
-- Structured logs (errors/warnings)
-
-Please summarize the essence of the change for a pull request comment, in concise bullet points.
-
-Focus on:
-
-1. What was broken or risky before.
-2. What was changed (at a high level; avoid too much detail).
-3. Why this change reduces risk or improves quality.
-4. Any remaining risks or recommendations.
-
-Guardian review:
-
-{guardian_review_markdown[:2000]}
-
-Patch diff snippets:
-
-{diff_block[:3000]}
-
-Important logs:
-
-{log_text[:2000]}
-
-Write the summary in Japanese, 5 bullets or fewer.
-"""
-
-        # LLM を呼び出す
         if llm_router is None:
             if LLMRouter is None:
                 logger.warning("LLMRouter not available. Skipping summary generation.")
                 return None
             llm_router = LLMRouter()
 
-        # guarded_llm_call 経由で LLM を呼び出す
         if guarded_llm_call is None:
             logger.warning("guarded_llm_call not available. Skipping summary generation.")
             return None
 
-        # LLMRouter の complete メソッドをラップ
-        def llm_complete_fn(model: str, system_prompt: str, user_prompt: str) -> dict:
-            if hasattr(llm_router, "complete"):
-                return llm_router.complete(
-                    model=model,
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    task="code_review",
-                )
-            else:
-                return {"ok": False, "reason": "LLMRouter.complete not available", "content": ""}
-
-        result = guarded_llm_call(
-            model="glm-4-flash",  # 軽量モデルを使用
-            task="code_review",
-            system_prompt="You summarize code changes for pull requests. Return concise bullet points in Japanese.",
-            user_prompt=prompt,
-            llm_complete_fn=llm_complete_fn,
-        )
-
-        if isinstance(result, dict) and result.get("ok"):
-            summary_text = result.get("content", "").strip()
-            return summary_text if summary_text else None
-        else:
-            logger.warning(f"LLM call failed: {result.get('reason', 'unknown')}")
-            return None
+        return _call_llm_summary(prompt, llm_router)
 
     except Exception as e:  # noqa: BLE001 — LLM呼び出し + DBクエリ全体のフォールバック
         logger.error(f"Failed to generate PR change summary: {e}", exc_info=True)

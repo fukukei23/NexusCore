@@ -70,6 +70,73 @@ class SelfHealingService:
     # ------------------------------------------------------------------
     # 公開 API
     # ------------------------------------------------------------------
+    def _run_validation_gates(
+        self, patch_text: str, project_path: str, base_ctx: dict[str, Any],
+    ) -> tuple[bool, dict[str, Any], dict | None, dict | None]:
+        """3つの検証ゲートを実行する。return (blocked, gate_result, guardian_review, dry_result)"""
+        blocked, gate_result = validate_test_modification(patch_text, self.config, base_ctx.copy())
+        if blocked:
+            return True, gate_result, None, None
+
+        blocked, gate_result = validate_guardian_review(
+            patch_text, base_ctx.get("_repo_full_name", ""),
+            getattr(self, "_guardian_agent", None), base_ctx,
+        )
+        if blocked:
+            return True, gate_result, None, None
+        guardian_review_result = base_ctx.pop("guardian_review_result", None)
+
+        blocked, gate_result = validate_dry_run(
+            patch_text, project_path, self.patch_applier, self.config, base_ctx,
+        )
+        if blocked:
+            return True, gate_result, None, None
+        dry_result = base_ctx.pop("dry_result", None)
+
+        return False, {}, guardian_review_result, dry_result
+
+    def _build_success_details(
+        self, *, output, output2, stack_files, changed_files, debug_result,
+        dry_result, apply_result, patch_text, diff_summary, execution_ms,
+        retry_info_dict,
+    ) -> dict[str, Any]:
+        """Self-healing成功/失敗時のdetails dictを構築する。"""
+        patch_changed_files = summarize_diff_files(patch_text)
+        details: dict[str, Any] = {
+            "initial_test_output": output, "rerun_test_output": output2,
+            "stacktrace_files": stack_files, "changed_files": changed_files,
+            "debug_result": debug_result, "dry_run_result": dry_result,
+            "apply_result": apply_result,
+            "patch_preview": wrap_diff_as_markdown(patch_text),
+            "patch_changed_files": patch_changed_files,
+            "execution_ms": execution_ms,
+            "files_changed": len(patch_changed_files),
+            **retry_info_dict,
+        }
+
+        if diff_summary:
+            details["diff_summary"] = diff_summary
+
+        guardian_agent = getattr(self, "_guardian_agent", None)
+        if guardian_agent and hasattr(guardian_agent, "model") and guardian_agent.model:
+            details["model"] = guardian_agent.model
+
+        return details
+
+    def _inject_guardian_details(
+        self, details: dict[str, Any], guardian_review_result: dict | None,
+    ) -> None:
+        """GuardianAgent のレビュー結果を details に統合する（in-place）。"""
+        if not guardian_review_result:
+            return
+        details["guardian_review"] = guardian_review_result
+        details["guardian_status"] = guardian_review_result.get("decision", "unknown")
+        auto_review = guardian_review_result.get("auto_review")
+        if auto_review:
+            details["guardian_comment"] = auto_review.get("summary", "")
+        elif guardian_review_result.get("reason"):
+            details["guardian_comment"] = guardian_review_result.get("reason")
+
     def run_for_pull_request(
         self,
         *,
@@ -165,25 +232,14 @@ class SelfHealingService:
             base_ctx = {
                 "initial_test_output": output, "stacktrace_files": stack_files,
                 "changed_files": changed_files, "debug_result": debug_result,
+                "_repo_full_name": repo_full_name,
             }
 
-            blocked, gate_result = validate_test_modification(patch_text, self.config, base_ctx.copy())
-            if blocked:
-                return self._finalize(**gate_result, **fk, **time_kw)
-
-            blocked, gate_result = validate_guardian_review(
-                patch_text, repo_full_name, getattr(self, "_guardian_agent", None), base_ctx,
+            blocked, gate_result, guardian_review_result, dry_result = self._run_validation_gates(
+                patch_text, str(project_path), base_ctx,
             )
             if blocked:
                 return self._finalize(**gate_result, **fk, **time_kw)
-            guardian_review_result = base_ctx.pop("guardian_review_result", None)
-
-            blocked, gate_result = validate_dry_run(
-                patch_text, str(project_path), self.patch_applier, self.config, base_ctx,
-            )
-            if blocked:
-                return self._finalize(**gate_result, **fk, **time_kw)
-            dry_result = base_ctx.pop("dry_result", None)
 
             # 6. Apply patch
             allow_del = self.config.allow_deletions if self.config else False
@@ -208,34 +264,14 @@ class SelfHealingService:
             duration_seconds = round(finished_ts - started_ts, 2) if started_ts else None
             execution_ms = int(duration_seconds * 1000) if duration_seconds else None
 
-            patch_changed_files = summarize_diff_files(patch_text)
-
-            details: dict[str, Any] = {
-                "initial_test_output": output, "rerun_test_output": output2,
-                "stacktrace_files": stack_files, "changed_files": changed_files,
-                "debug_result": debug_result, "dry_run_result": dry_result,
-                "apply_result": apply_result,
-                "patch_preview": wrap_diff_as_markdown(patch_text),
-                "patch_changed_files": patch_changed_files,
-                "execution_ms": execution_ms,
-                "files_changed": len(patch_changed_files),
-                **ri,
-            }
-
-            if diff_summary:
-                details["diff_summary"] = diff_summary
-
-            if guardian_agent and hasattr(guardian_agent, "model") and guardian_agent.model:
-                details["model"] = guardian_agent.model
-
-            if guardian_review_result:
-                details["guardian_review"] = guardian_review_result
-                details["guardian_status"] = guardian_review_result.get("decision", "unknown")
-                auto_review = guardian_review_result.get("auto_review")
-                if auto_review:
-                    details["guardian_comment"] = auto_review.get("summary", "")
-                elif guardian_review_result.get("reason"):
-                    details["guardian_comment"] = guardian_review_result.get("reason")
+            details = self._build_success_details(
+                output=output, output2=output2, stack_files=stack_files,
+                changed_files=changed_files, debug_result=debug_result,
+                dry_result=dry_result, apply_result=apply_result,
+                patch_text=patch_text, diff_summary=diff_summary,
+                execution_ms=execution_ms, retry_info_dict=ri,
+            )
+            self._inject_guardian_details(details, guardian_review_result)
 
             return self._finalize(
                 status=status, summary=summary, details=details,

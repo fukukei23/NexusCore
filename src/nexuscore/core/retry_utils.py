@@ -144,125 +144,75 @@ def _calculate_backoff_delay(attempt: int, error_class: str, config: RetryConfig
         return config.base_delay * (config.backoff_multiplier**attempt)
 
 
+_RETRYABLE_CATEGORIES = frozenset({"rate_limit", "timeout", "connection", "invalid_output"})
+
+
+def _classify_and_should_retry(
+    error: Exception,
+    retry_on: Iterable[type[Exception]] | None,
+    logger_instance: Any | None,
+) -> tuple[bool, str]:
+    """エラーを分類し、リトライ可否を判定する。return (should_retry, error_class)"""
+    try:
+        if retry_on is not None and isinstance(error, tuple(retry_on)):  # type: ignore[arg-type]
+            return True, "user_specified"
+        error_class = classify_error(error)
+        if error_class == "unexpected":
+            return False, error_class
+        return error_class in _RETRYABLE_CATEGORIES, error_class
+    except Exception as classification_error:  # noqa: BLE001
+        if logger_instance is not None:
+            logger_instance.warning(
+                f"Error classification failed during retry decision. "
+                f"Original error: {type(error).__name__} - {str(error)[:200]}. "
+                f"Classification error: {type(classification_error).__name__} - {str(classification_error)}. "
+                f"Treating as non-retryable (unexpected)."
+            )
+        return False, "unknown"
+
+
 def retry_with_context(
     func: Callable[..., T],
     *,
     max_retries: int = 3,
     base_delay: float = 1.0,
     retry_on: Iterable[type[Exception]] | None = None,
-    logger_instance: Any | None = None,  # logging.Logger の型ヒントを避ける
+    logger_instance: Any | None = None,
     context: RetryContext | None = None,
     retry_config: RetryConfig | None = None,
 ) -> Callable[..., T]:
-    """
-    指定した例外クラスに対して、Spec CR-NEXUS-051 に準拠した再試行を提供するデコレータ。
-
-    Args:
-        func: 再試行対象の関数
-        max_retries: 最大再試行回数（3.3.2 SHALL要件: 有限性保証、デフォルト: 3）
-        base_delay: ベース遅延時間（秒、デフォルト: 1.0）
-        retry_on: 再試行対象の例外クラスのイテラブル（後方互換性のため残す）
-        logger_instance: ログ出力用の Logger（省略時はデフォルトロガー）
-        context: RetryContext インスタンス（retry_count と error_class を記録）
-        retry_config: RetryConfig インスタンス（設定値の注入、省略時はデフォルト値）
-
-    Returns:
-        ラップされた関数
-
-    Spec 要件:
-        - 3.3.1: リトライ可否の判断ルール（retryable: rate_limit, timeout, connection, invalid_output）
-        - 3.3.2: リトライの有限性保証（max_retries で制御）
-        - 3.3.3: Backoff 戦略（意味論レベル定義）
-        - 3.3.4: Unexpected エラーのリトライ禁止
-    """
+    """指定した例外クラスに対して再試行を提供するデコレータ（Spec CR-NEXUS-051 準拠）。"""
     if logger_instance is None:
         logger_instance = logger
 
     if retry_config is None:
         retry_config = RetryConfig(max_retries=max_retries, base_delay=base_delay)
     else:
-        # retry_config が指定された場合、元の設定を変更しないためコピーを作成
         import copy
         retry_config = copy.copy(retry_config)
-        if max_retries != 3:  # デフォルト値以外が指定された場合
+        if max_retries != 3:
             retry_config.max_retries = max_retries
-        if base_delay != 1.0:  # デフォルト値以外が指定された場合
+        if base_delay != 1.0:
             retry_config.base_delay = base_delay
 
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> T:
         last_exception: Exception | None = None
-
-        # 3.3.2 SHALL要件: リトライの有限性保証
-        # max_retries は RetryConfig から取得し、無限ループを防止
-        max_attempts = retry_config.max_retries + 1  # 初回 + リトライ回数
+        max_attempts = retry_config.max_retries + 1
 
         for attempt in range(max_attempts):
             try:
                 result = func(*args, **kwargs)
-                # 成功時は context に記録（初回成功の場合は retry_count=0）
                 if context:
                     context.record_attempt(attempt)
                 return result
-            except Exception as e:  # noqa: BLE001 — リトライ対象呼び出しの広範なキャッチ
+            except Exception as e:  # noqa: BLE001 — retry target call broad catch
                 last_exception = e
+                should_retry, error_class = _classify_and_should_retry(e, retry_on, logger_instance)
 
-                # 3.3.1: リトライ可否の判断ルール
-                should_retry = False
-                error_class = "unknown"  # Initialize to avoid UnboundLocalError
-                try:
-                    if retry_on is not None and isinstance(e, retry_on):  # type: ignore[arg-type]
-                        should_retry = True
-                        error_class = "user_specified"
-                    elif isinstance(e, NexusCoreError):
-                        # NexusCore カスタム例外の場合は classify_error で判定
-                        error_class = classify_error(e)
-                        # 3.3.4: Unexpected エラーのリトライ禁止
-                        if error_class == "unexpected":
-                            should_retry = False
-                        # 3.3.1: retryable: rate_limit, timeout, connection, invalid_output
-                        elif error_class in (
-                            "rate_limit",
-                            "timeout",
-                            "connection",
-                            "invalid_output",
-                        ):
-                            should_retry = True
-                        # 3.3.1: non-retryable: sandbox, patch_apply
-                        else:
-                            should_retry = False
-                    else:
-                        # 一般的な例外の場合も分類を試みる
-                        error_class = classify_error(e)
-                        # 3.3.4: Unexpected エラーのリトライ禁止
-                        if error_class == "unexpected":
-                            should_retry = False
-                        # 3.3.1: retryable: rate_limit, timeout, connection, invalid_output
-                        elif error_class in (
-                            "rate_limit",
-                            "timeout",
-                            "connection",
-                            "invalid_output",
-                        ):
-                            should_retry = True
-                        else:
-                            should_retry = False
-                except Exception as classification_error:  # noqa: BLE001 — エラー分類中のフォールバック
-                    # 3.4.2: 分類不能エラー時のフォールバックフック
-                    if logger_instance is not None:
-                        logger_instance.warning(
-                            f"Error classification failed during retry decision. "
-                            f"Original error: {type(e).__name__} - {str(e)[:200]}. "
-                            f"Classification error: {type(classification_error).__name__} - {str(classification_error)}. "
-                            f"Treating as non-retryable (unexpected)."
-                        )
-                    should_retry = False
-
-                # context に記録
                 if context:
                     context.record_attempt(attempt, e)
 
-                # 3.3.2: 最大リトライ回数に達した場合、リトライ処理は即座に終了
                 if attempt >= retry_config.max_retries or not should_retry:
                     if logger_instance is not None:
                         logger_instance.error(
@@ -272,7 +222,6 @@ def retry_with_context(
                         )
                     raise
 
-                # 3.3.3: Backoff 戦略の適用（意味論レベル）
                 delay = _calculate_backoff_delay(attempt, error_class, retry_config)
                 if logger_instance is not None:
                     logger_instance.warning(
@@ -283,7 +232,6 @@ def retry_with_context(
                 if delay > 0:
                     time.sleep(delay)
 
-        # 到達不能: for loopは必ずreturnまたはraiseで終了する
         raise last_exception  # type: ignore[misc]
 
     return wrapper

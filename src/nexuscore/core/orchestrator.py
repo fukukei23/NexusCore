@@ -124,6 +124,18 @@ class Orchestrator(PhaseRunnerMixin):
             self.logger.addHandler(fh)
             self.logger.addHandler(ch)
 
+    def _log_orch_event(self, run_db_id: int | None, phase: str, status: str, message: str,
+                        extra: dict | None = None) -> None:
+        """Orchestrator DB ログフック（失敗は無視）。"""
+        try:
+            from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
+            kwargs: dict[str, Any] = dict(run_db_id=run_db_id, phase=phase, status=status, message=message)
+            if extra:
+                kwargs["extra"] = extra
+            log_orchestrator_event(**kwargs)
+        except Exception:  # noqa: BLE001
+            pass
+
     def run_full_project(
         self,
         user_requirement: str,
@@ -131,57 +143,24 @@ class Orchestrator(PhaseRunnerMixin):
         fast_lane: bool = False,
         run_db_id: int | None = None,
     ) -> None:
-        """
-        高レベルな「フルプロジェクト」実行フロー。
-
-        フェーズ分割後の簡素化版: 各フェーズメソッドを順番に呼び出すだけの構造。
-
-        Args:
-            user_requirement: ユーザー要件
-            language: 言語（デフォルト: "ja"）
-            fast_lane: 高速レーン実行フラグ
-            run_db_id: Run.id（Webapp側でRunレコードを作成したときのID、CLI実行時はNone）
-        """
+        """高レベルな「フルプロジェクト」実行フロー。"""
         self.logger.info(f"=== Full Project Run Start === requirement='{user_requirement}'")
         task_id = uuid.uuid4().hex
 
-        # Orchestrator ログフック（開始時）
-        try:
-            from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
+        self._log_orch_event(run_db_id, "startup", "STARTED", "Orchestrator run started", {
+            "task_id": task_id,
+            "requirement": user_requirement[:200],
+            "autonomy_level": self.constitution.get("automation_policy", {}).get("autonomy_level"),
+        })
 
-            log_orchestrator_event(
-                run_db_id=run_db_id,
-                phase="startup",
-                status="STARTED",
-                message="Orchestrator run started",
-                extra={
-                    "task_id": task_id,
-                    "requirement": user_requirement[:200],
-                    "autonomy_level": self.constitution.get("automation_policy", {}).get(
-                        "autonomy_level"
-                    ),
-                },
-            )
-        except Exception:  # noqa: BLE001 — ログ失敗は既存の処理を止めない
-            pass
-
-        # 初期コンテキストの作成
         context = OrchestratorContext(
-            task_id=task_id,
-            user_requirement=user_requirement,
-            language=language,
-            fast_lane=fast_lane,
-            run_db_id=run_db_id,
+            task_id=task_id, user_requirement=user_requirement,
+            language=language, fast_lane=fast_lane, run_db_id=run_db_id,
         )
 
         try:
-            # Phase 0: 開始直後のチェックポイント
             self._maybe_stop("start", {"task_id": task_id, "requirement": user_requirement})
-
-            # Phase 0: Context Analysis (pre-pipeline)
             context = self.run_context_phase(context)
-
-            # フェーズを順番に実行
             context = self.run_requirements_phase(context)
             context = self.run_planning_phase(context)
             context = self.run_architecture_phase(context)
@@ -189,7 +168,6 @@ class Orchestrator(PhaseRunnerMixin):
             context = self.run_testing_phase(context)
             context = self.run_review_phase(context)
 
-            # FastLane の場合の後処理（ログ出力）
             if fast_lane:
                 code_result = context.implementation.get("code", "")
                 test_result = context.testing.get("tests", "")
@@ -201,70 +179,22 @@ class Orchestrator(PhaseRunnerMixin):
                 )
                 if not hasattr(self, "last_fastlane_outputs"):
                     self.last_fastlane_outputs = {}
-                self.last_fastlane_outputs = {
-                    "code": code_result,
-                    "tests": test_result,
-                    "plan": plan_text,
-                }
+                self.last_fastlane_outputs = {"code": code_result, "tests": test_result, "plan": plan_text}
 
-            # Phase 3 以降の開発サイクル（将来拡張用）
-            tasks = (
-                context.plan.get("functions_to_implement", [])
-                if isinstance(context.plan, dict)
-                else []
-            )
+            tasks = context.plan.get("functions_to_implement", []) if isinstance(context.plan, dict) else []
             self.logger.info(f"[{task_id}] Phase 3: Development Cycle (tasks={len(tasks)})")
-
             self.logger.info(f"=== Full Project Run Finished === requirement='{user_requirement}'")
-
-            # Orchestrator ログフック（完了）
-            try:
-                from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
-
-                log_orchestrator_event(
-                    run_db_id=run_db_id,
-                    phase="shutdown",
-                    status="FINISHED",
-                    message="Orchestrator run finished",
-                )
-            except Exception:  # noqa: BLE001 — DBフック失敗は処理を止めない
-                pass
+            self._log_orch_event(run_db_id, "shutdown", "FINISHED", "Orchestrator run finished")
 
         except RuntimeError as e:
             if str(e) == "SessionStopped":
-                self.logger.info(
-                    "Project run stopped by user request. "
-                    "All generated files remain on disk for session resume."
-                )
-                # Orchestrator ログフック（中断）
-                try:
-                    from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
-
-                    log_orchestrator_event(
-                        run_db_id=run_db_id,
-                        phase="shutdown",
-                        status="INTERRUPTED",
-                        message="Orchestrator run stopped by user request",
-                    )
-                except Exception:  # noqa: BLE001 — DBフック失敗は処理を止めない
-                    pass
+                self.logger.info("Project run stopped by user request. All generated files remain on disk.")
+                self._log_orch_event(run_db_id, "shutdown", "INTERRUPTED", "Orchestrator run stopped by user request")
                 return
-            # それ以外の RuntimeError は従来通り上位に投げる
             raise
-        except Exception as e:  # noqa: BLE001 — orchestrator top-level fallback after specific catches
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"[{task_id}] Orchestrator run failed: {e}", exc_info=True)
-            # Orchestrator ログフック（例外）
-            try:
-                from nexuscore.core.orchestrator_db_hook import log_orchestrator_event
-
-                log_orchestrator_event(
-                    run_db_id=run_db_id,
-                    phase="orchestrator",
-                    status="FAILED",
-                    message=f"Orchestrator run failed: {str(e)[:200]}",
-                )
-            except Exception:  # noqa: BLE001 — DBフック失敗は処理を止めない
-                pass
+            self._log_orch_event(run_db_id, "orchestrator", "FAILED", f"Orchestrator run failed: {str(e)[:200]}")
             raise
 
 

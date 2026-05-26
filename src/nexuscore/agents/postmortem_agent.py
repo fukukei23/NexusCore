@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 from typing import Any
@@ -64,35 +65,7 @@ def _validate_and_normalize(payload: dict[str, Any]) -> dict[str, Any] | None:
     return payload
 
 
-
-class PostmortemAgent(BaseAgent):
-    SYSTEM_PROMPT = """
-あなたは、非常に経験豊富なソフトウェア開発者であり、根本原因分析（RCA）の専門家です。
-あなたの仕事は、他のAIエージェントが解決に失敗したテストエラーの完全なコンテキストを分析し、
-そのエラーを将来解決するための「知識」をJSON形式で生成することです。
-"""
-
-    def analyze_failure_and_suggest_fkb_entry(
-        self,
-        error_log: str,
-        source_code: str,
-        test_code: str,
-        source_file_path: str,
-        test_file_path: str,
-    ) -> dict | None:
-        """
-        未知のエラーを分析し、KnowledgeBaseに追加すべき新しいエントリを提案する。
-        """
-        self.logger.info(
-            f"Analyzing failed test to generate new FKB entry (source={source_file_path}, test={test_file_path})"
-        )
-
-        # LLMに渡す前に、コンテキストを安全な形にサニタイズする
-        error_log_s = _redact(_truncate(error_log))
-        source_code_s = _redact(_truncate(source_code))
-        test_code_s = _redact(_truncate(test_code))
-
-        prompt = f"""
+_FKB_SUGGESTION_PROMPT = """\
 # 状況
 我々のAI開発システムが、以下のテストエラーの自己修復に失敗しました。
 原因は、故障知識ベース（FKB）に、このエラーを解決するためのルールが存在しなかったことです。
@@ -154,47 +127,76 @@ class PostmortemAgent(BaseAgent):
 - `cause` と `description` は、日本語で簡潔に記述すること。
 - JSONは必ず `{{` で始まり、 `}}` で終わる単一のオブジェクトであること。
 """
+
+
+def _parse_llm_json_response(response_str: str, logger: logging.Logger) -> dict | None:
+    """LLMからのJSON応答をパースする。"""
+    try:
+        return json.loads(response_str)
+    except json.JSONDecodeError:
+        pass
+
+    match = re.search(r"\{.*\}", response_str, re.DOTALL)
+    if not match:
+        logger.error(f"LLM response does not contain a JSON object. Raw response:\n{response_str}")
+        return None
+    try:
+        return json.loads(match.group(0))
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse extracted JSON: {e}. Raw extract:\n{match.group(0)}")
+        return None
+
+
+class PostmortemAgent(BaseAgent):
+    SYSTEM_PROMPT = """
+あなたは、非常に経験豊富なソフトウェア開発者であり、根本原因分析（RCA）の専門家です。
+あなたの仕事は、他のAIエージェントが解決に失敗したテストエラーの完全なコンテキストを分析し、
+そのエラーを将来解決するための「知識」をJSON形式で生成することです。
+"""
+
+    def analyze_failure_and_suggest_fkb_entry(
+        self,
+        error_log: str,
+        source_code: str,
+        test_code: str,
+        source_file_path: str,
+        test_file_path: str,
+    ) -> dict | None:
+        """未知のエラーを分析し、KnowledgeBaseに追加すべき新しいエントリを提案する。"""
+        self.logger.info(
+            f"Analyzing failed test to generate new FKB entry (source={source_file_path}, test={test_file_path})"
+        )
+
+        error_log_s = _redact(_truncate(error_log))
+        source_code_s = _redact(_truncate(source_code))
+        test_code_s = _redact(_truncate(test_code))
+
+        prompt = _FKB_SUGGESTION_PROMPT.format(
+            error_log_s=error_log_s,
+            source_file_path=source_file_path,
+            source_code_s=source_code_s,
+            test_file_path=test_file_path,
+            test_code_s=test_code_s,
+        )
+
         try:
             response_str = self.execute_llm_task(prompt, temperature=0.3, as_json=True)
-
             if not response_str:
                 self.logger.error("LLM response was empty.")
                 return None
 
-            # LLMからの出力を安全にパースし、検証する
-            candidate = None
-            try:
-                # まず、文字列全体がJSONであると信じてパースを試みる
-                candidate = json.loads(response_str)
-            except json.JSONDecodeError:
-                # 失敗した場合のみ、フォールバックとして波括弧で囲まれた部分を抽出
-                match = re.search(r"\{.*\}", response_str, re.DOTALL)
-                if not match:
-                    self.logger.error(
-                        f"LLM response does not contain a JSON object. Raw response:\n{response_str}"
-                    )
-                    return None
-                try:
-                    candidate = json.loads(match.group(0))
-                except json.JSONDecodeError as e:
-                    self.logger.error(
-                        f"Failed to parse extracted JSON: {e}. Raw extract:\n{match.group(0)}"
-                    )
-                    return None
+            candidate = _parse_llm_json_response(response_str, self.logger)
+            if candidate is None:
+                return None
 
-            # スキーマと内容の検証
             normalized = _validate_and_normalize(candidate)
             if not normalized:
-                self.logger.error(
-                    f"Generated JSON failed schema/regex validation. Raw candidate:\n{candidate}"
-                )
+                self.logger.error(f"Generated JSON failed schema/regex validation. Raw candidate:\n{candidate}")
                 return None
 
             self.logger.info("Successfully generated and validated a new FKB suggestion.")
             return normalized
 
         except Exception as e:  # noqa: BLE001
-            self.logger.error(
-                f"An unexpected error occurred in PostmortemAgent: {e}", exc_info=True
-            )
+            self.logger.error(f"An unexpected error occurred in PostmortemAgent: {e}", exc_info=True)
             return None

@@ -123,33 +123,7 @@ class UnifiedAnalyzer:
                 )
 
         if self.cache and files_to_analyze:
-            cache_entries = {}
-            for file_path, file_hash in file_hashes.items():
-                if file_hash:
-                    try:
-                        rel_path = str(file_path.relative_to(self.project_root))
-                        cached_result = self.cache.get_cached_result(file_path, file_hash)
-                        if cached_result:
-                            cache_entries[rel_path] = {"hash": file_hash, "result": cached_result}
-                    except ValueError:
-                        pass
-
-            for result in results:
-                if result.success and result.data.get("file_path"):
-                    result_file_path = Path(result.data["file_path"])
-                    if result_file_path in file_hashes:
-                        file_hash = file_hashes[result_file_path]
-                        if file_hash:
-                            try:
-                                rel_path = str(result_file_path.relative_to(self.project_root))
-                                cache_entries[rel_path] = {
-                                    "hash": file_hash,
-                                    "result": result.to_dict(),
-                                }
-                            except ValueError:
-                                pass
-
-            self.cache.save_cache(cache_entries)
+            self._save_analysis_cache(files_to_analyze, results, file_hashes)
 
         elapsed = (datetime.now() - start_time).total_seconds()
         logger.info(
@@ -175,6 +149,35 @@ class UnifiedAnalyzer:
                 else None
             ),
         }
+
+    def _save_analysis_cache(
+        self, files_to_analyze: list[Path], results: list,
+        file_hashes: dict[Path, str],
+    ) -> None:
+        """分析結果をキャッシュに保存する。"""
+        cache_entries: dict[str, dict] = {}
+        for file_path, file_hash in file_hashes.items():
+            if file_hash:
+                try:
+                    rel_path = str(file_path.relative_to(self.project_root))
+                    cached_result = self.cache.get_cached_result(file_path, file_hash)
+                    if cached_result:
+                        cache_entries[rel_path] = {"hash": file_hash, "result": cached_result}
+                except ValueError:
+                    pass
+
+        for result in results:
+            if result.success and result.data.get("file_path"):
+                result_file_path = Path(result.data["file_path"])
+                file_hash = file_hashes.get(result_file_path)
+                if file_hash:
+                    try:
+                        rel_path = str(result_file_path.relative_to(self.project_root))
+                        cache_entries[rel_path] = {"hash": file_hash, "result": result.to_dict()}
+                    except ValueError:
+                        pass
+
+        self.cache.save_cache(cache_entries)
 
 
 # --- Legacy compatibility interface ---
