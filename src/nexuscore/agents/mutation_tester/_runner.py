@@ -50,13 +50,13 @@ def run_mutmut(source_path: str, test_path: str, timeout: int, logger) -> dict[s
     except subprocess.TimeoutExpired as e:
         logger.error("mutmut実行がタイムアウトしました")
         raise MutationTestTimeoutError("mutmut execution timed out after 600 seconds") from e
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error("mutmut実行エラー: %s", e, exc_info=True)
         raise MutationTestError(f"mutmut execution failed: {e}") from e
     finally:
         try:
             shutil.rmtree(temp_dir)
-        except Exception as e:
+        except OSError as e:
             logger.warning("一時ディレクトリ削除失敗: %s", e)
 
 
@@ -110,7 +110,7 @@ def get_survived_mutants(logger) -> list[Mutant]:
 
         return parse_survived_mutants(result.stdout)
 
-    except Exception as e:
+    except (subprocess.SubprocessError, OSError) as e:
         logger.error("ミュータント詳細取得エラー: %s", e)
         return []
 

@@ -87,7 +87,7 @@ def run(requirement: str, project_path: str, language: str, verbose: bool) -> No
     except KeyboardInterrupt:
         click.echo("\nOperation cancelled by user.", err=True)
         raise SystemExit(130)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — CLI top-level fallback after specific catches
         click.echo(f"Error: {type(e).__name__}: {e}", err=True)
         if verbose:
             import traceback

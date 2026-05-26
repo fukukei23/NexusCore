@@ -25,7 +25,7 @@ try:
         sys.path.insert(0, PROJECT_ROOT)
     if SRC_PATH not in sys.path:
         sys.path.insert(0, SRC_PATH)
-except Exception as exc:
+except (OSError, ValueError) as exc:
     logging.warning("Failed to configure import paths for API server: %s", exc)
 
 # --- NexusCoreのコンポーネントをインポート ---
@@ -162,7 +162,7 @@ def run_orchestrator_task(task_id: str, requirement: str, project_path: str, con
         }
         logger.info(f"Task {task_id} completed successfully.")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.critical(f"An error occurred in task {task_id}: {e}", exc_info=True)
         tasks[task_id] = {"status": "error", "message": f"orchestrator failed: {e}"}
 
@@ -236,7 +236,7 @@ def github_webhook_endpoint():
     except ImportError:
         logger.error("github_webhook_handler is not available")
         return jsonify({"error": "GitHub webhook handler not available"}), 500
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"GitHub webhook endpoint error: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
@@ -278,7 +278,7 @@ def generate_dev_token():
                 "usage": f"Authorization: Bearer {token}",
             }
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Token generation failed: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 

@@ -93,7 +93,7 @@ class SandboxExecutor:
                     returncode=-1, timed_out=True, exception_type=exception_type,
                 )
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — sandbox error classification after specific TimeoutExpired catch
                 last_exception = e
                 exception_type = self._classify_exception(e)
 
@@ -169,7 +169,7 @@ class SandboxExecutor:
         except subprocess.TimeoutExpired:
             raise
 
-        except Exception:
+        except Exception:  # noqa: BLE001 — re-raise pattern for unknown subprocess errors
             raise
 
     def _log_sandbox_error(

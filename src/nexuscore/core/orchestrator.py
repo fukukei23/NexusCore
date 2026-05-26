@@ -251,7 +251,7 @@ class Orchestrator(PhaseRunnerMixin):
                 return
             # それ以外の RuntimeError は従来通り上位に投げる
             raise
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — orchestrator top-level fallback after specific catches
             self.logger.error(f"[{task_id}] Orchestrator run failed: {e}", exc_info=True)
             # Orchestrator ログフック（例外）
             try:

@@ -110,7 +110,7 @@ class ConstitutionLoader:
 
             return merged
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — config loader fallback to defaults
             logger.error(f"憲法読み込みエラー: {e}", exc_info=True)
             return self._get_default_constitution()
 

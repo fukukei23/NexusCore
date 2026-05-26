@@ -22,7 +22,7 @@ try:
         sys.path.insert(0, PROJECT_ROOT)
     if SRC_PATH not in sys.path:
         sys.path.insert(0, SRC_PATH)
-except Exception as exc:
+except (OSError, ValueError) as exc:
     logging.warning("Failed to configure import paths for API server: %s", exc)
 
 # --- NexusCoreのコンポーネントをインポート ---
@@ -148,7 +148,7 @@ def run_orchestrator_task(task_id: str, requirement: str, project_path: str, con
     except ImportError as e:
         logger.error(f"Import error in task {task_id}: {e}")
         tasks[task_id] = {"status": "error", "message": f"Module not found: {e}. Run 'pip install -e .' to install dependencies."}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.critical(f"An error occurred in task {task_id}: {e}", exc_info=True)
         tasks[task_id] = {"status": "error", "message": f"orchestrator failed: {e}"}
 

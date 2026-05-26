@@ -106,7 +106,7 @@ class PhaseRunnerMixin:
                 f"{len(context.context_profile)} profile keys, "
                 f"{len(context.error_prevention_rules)} prevention rules"
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — optional agent, graceful skip
             self.logger.warning(
                 f"[{context.task_id}] ContextAgent failed (graceful skip): {e}"
             )
@@ -126,7 +126,7 @@ class PhaseRunnerMixin:
                 specs = self.requirement_agent.analyze_requirement(context.user_requirement)
             else:
                 specs = {"raw_requirement": context.user_requirement}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — agent failure logging before re-raise
             self.logger.error(f"[{context.task_id}] Requirement phase failed: {e}", exc_info=True)
             raise
 
@@ -234,7 +234,7 @@ class PhaseRunnerMixin:
             except Exception:  # noqa: BLE001 — DBフック失敗は処理を止めない
                 pass
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — agent failure logging before re-raise
             self.logger.error(f"[{context.task_id}] Planning phase failed: {e}", exc_info=True)
             context.plan = {"error": str(e), "raw_specs": context.specs}
             try:
@@ -311,7 +311,7 @@ python hello.py
 """
                 readme_path.write_text(readme_content, encoding="utf-8")
                 self.logger.info(f"README.md saved to: {readme_path}")
-            except Exception as e:
+            except (OSError, UnicodeEncodeError) as e:
                 self.logger.warning(f"Failed to save files: {e}")
 
         return context
@@ -366,7 +366,7 @@ python hello.py
                 knowledge_brief=knowledge_brief,
             )
             self.logger.info(f"[{context.task_id}] Constitutional review completed.")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — optional agent, graceful skip
             self.logger.warning(
                 f"[{context.task_id}] ConstitutionalCouncil failed (graceful skip): {e}"
             )
@@ -393,7 +393,7 @@ python hello.py
             try:
                 self.logger.info("[FastLane] tester fallback via %s", func_name)
                 return func(*args, **kwargs) or ""
-            except Exception as err:
+            except Exception as err:  # noqa: BLE001 — fallback tester, graceful skip
                 self.logger.warning(
                     "[FastLane] tester fallback %s failed: %s",
                     func_name,

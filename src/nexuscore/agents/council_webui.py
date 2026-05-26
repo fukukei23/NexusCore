@@ -108,7 +108,7 @@ def run_web_ui(agent: ConstitutionalCouncilAgent, host: str = "127.0.0.1", port:
                 key=lambda f: f.stat().st_mtime,
                 reverse=True,
             )
-        except Exception as e:
+        except OSError as e:
             logger.error("[WEB-UI] Error reading amendments directory: %s", e)
             flash(f"改正案ディレクトリの読み込みに失敗しました: {e}", "danger")
             pending_files = []
@@ -117,7 +117,7 @@ def run_web_ui(agent: ConstitutionalCouncilAgent, host: str = "127.0.0.1", port:
             try:
                 with f.open("r", encoding="utf-8") as fp:
                     content = json.dumps(json.load(fp), ensure_ascii=False, indent=2)
-            except Exception as e:
+            except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
                 logger.error("[WEB-UI] Error reading file %s: %s", f, e)
                 content = f"読み込みエラー (Error reading file: {e})"
             files_data.append((f.name, content))
@@ -150,7 +150,7 @@ def run_web_ui(agent: ConstitutionalCouncilAgent, host: str = "127.0.0.1", port:
                         f"改正案 '{filename}' の承認に失敗しました。ログを確認してください。",
                         "danger",
                     )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error("[WEB-UI] Error during approval of %s: %s", filename, e)
             flash(f"承認処理中に予期せぬエラー: {e}", "danger")
         return redirect(url_for("index"))
@@ -175,7 +175,7 @@ def run_web_ui(agent: ConstitutionalCouncilAgent, host: str = "127.0.0.1", port:
                     f"改正案 '{filename}' の却下（アーカイブ）に失敗しました。ログを確認してください。",
                     "danger",
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error("[WEB-UI] Error during rejection of %s: %s", filename, e)
             flash(f"却下処理中に予期せぬエラー: {e}", "danger")
         return redirect(url_for("index"))

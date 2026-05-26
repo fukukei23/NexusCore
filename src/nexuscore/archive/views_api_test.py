@@ -59,7 +59,7 @@ def api_test():
                     <pre style="background-color: #ffffff; padding: 12px; border-radius: 4px; overflow-x: auto;">{json.dumps(result_data, indent=2, ensure_ascii=False)}</pre>
                 </div>
                 """
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — UI handler: simulated API result rendering
                 error_msg = f"API execution failed: {e}"
 
     html = f"""

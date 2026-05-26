@@ -90,7 +90,7 @@ async def project_success_rate_badge(project_id: int) -> BadgeResponse:
             color=color,  # type: ignore[arg-type]
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # HTTPException はそのまま再発生（make_error で生成されたもの）
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise
@@ -181,7 +181,7 @@ async def project_last_run_badge(project_id: int) -> BadgeResponse:
             color=color,  # type: ignore[arg-type]
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # HTTPException はそのまま再発生（make_error で生成されたもの）
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise

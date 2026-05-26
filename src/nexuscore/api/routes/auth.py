@@ -100,7 +100,7 @@ async def github_callback(request: Request):
         # プロジェクト一覧にリダイレクト
         return RedirectResponse(url="/projects/")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"OAuth callback failed: {e}", exc_info=True)
         return JSONResponse(
             status_code=500,
@@ -133,7 +133,7 @@ async def _fetch_primary_email(headers: dict[str, str]) -> str | None:
         for e in emails:
             if e.get("verified"):
                 return e.get("email")
-    except Exception:
+    except (requests.RequestException, ValueError):
         pass
     return None
 

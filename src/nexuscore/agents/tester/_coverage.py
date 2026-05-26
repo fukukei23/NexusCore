@@ -37,7 +37,7 @@ def get_coverage_for_module(project_root: Path, module_name: str) -> float:
             if module_name in key:
                 return value.get("summary", {}).get("percent_covered", 0.0)
         return 0.0
-    except Exception as e:
+    except (subprocess.SubprocessError, json.JSONDecodeError, OSError) as e:
         logger.debug("Failed to get coverage for module '%s': %s", module_name, e)
         return 0.0
 
@@ -77,6 +77,6 @@ def run_tests_and_get_coverage(
         return total_coverage
     except subprocess.TimeoutExpired:
         logger.error("Test execution timeout for %s", test_file_path)
-    except Exception as e:
+    except (subprocess.SubprocessError, json.JSONDecodeError, OSError) as e:
         logger.error("Failed to run tests or get coverage: %s", e, exc_info=True)
     return 0.0

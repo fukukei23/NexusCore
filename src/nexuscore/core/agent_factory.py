@@ -37,7 +37,7 @@ def assemble_agent_team(project_path: str) -> dict[str, Any]:
         from nexuscore.analyzer.context_agent import ContextAgent
 
         agents["context_agent"] = ContextAgent(project_root=project_path)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — optional agent, skip if unavailable
         logger.warning("ContextAgent not available, skipping: %s", e)
 
     logger.info("Agent team assembled via Registry. total=%d (including llm_router).", len(agents))

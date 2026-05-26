@@ -45,7 +45,7 @@ def _prepare_local_knowledge_base(project_path: str, project_root: str) -> str |
     try:
         shutil.copy(template_path, project_kb_path)
         logger.info("Copied fkb_local.json template into project directory.")
-    except Exception as copy_error:
+    except (OSError, shutil.Error) as copy_error:
         logger.error("Failed to copy knowledge base template: %s", copy_error, exc_info=True)
         return None
 

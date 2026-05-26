@@ -12,7 +12,7 @@ def prepare_branch(branch_name: str) -> None:
     """
     try:
         repo = git.Repo(os.getcwd())
-    except Exception as e:
+    except (git.InvalidGitRepositoryError, git.NoSuchPathError, OSError) as e:
         raise RuntimeError(f"Git repo not found: {e}") from e
     repo.git.checkout("-B", branch_name)
 

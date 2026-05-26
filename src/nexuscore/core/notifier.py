@@ -122,7 +122,7 @@ class SlackNotifier:
             response.raise_for_status()
             logger.info(f"Slack通知を送信しました: {title}")
             return True
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — HTTP/network errors from requests library (optional dep)
             logger.error(f"Slack通知の送信に失敗しました: {e}", exc_info=True)
             return False
 

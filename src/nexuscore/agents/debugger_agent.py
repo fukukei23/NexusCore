@@ -29,7 +29,7 @@ def _find_project_root_for_database() -> str | None:
             if parent == current:
                 break
             current = parent
-    except Exception:
+    except OSError:
         pass
     return None
 
@@ -66,7 +66,7 @@ class DebuggerAgent(BaseAgent):
             try:
                 with open(knowledge_base_path, encoding="utf-8") as f:
                     self.local_knowledge_base = json.load(f)
-            except Exception:
+            except (OSError, json.JSONDecodeError, UnicodeDecodeError):
                 self.logger.error(
                     f"Failed to load local knowledge base from {knowledge_base_path}", exc_info=True
                 )
@@ -118,7 +118,7 @@ class DebuggerAgent(BaseAgent):
         if knowledge_base and hasattr(knowledge_base, "find_solution"):
             try:
                 return knowledge_base.find_solution(error_log)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 self.logger.warning("knowledge_base.find_solution failed.", exc_info=True)
                 return None
 
@@ -143,7 +143,7 @@ class DebuggerAgent(BaseAgent):
 """
         try:
             response = self.execute_llm_task(prompt, as_json=False)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"execute_llm_task failed: {e}", exc_info=True)
             return None
 
@@ -165,7 +165,7 @@ class DebuggerAgent(BaseAgent):
         """
         try:
             rel_path = os.path.relpath(source_path, project_path)
-        except Exception:
+        except ValueError:
             rel_path = source_path
 
         original_lines = original.splitlines(keepends=True)
@@ -233,6 +233,6 @@ class DebuggerAgent(BaseAgent):
             if pr_result.get("status") == "created":
                 self.successful_prs += 1
             return pr_result
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error("PR creation failed: %s", e, exc_info=True)
             return {"status": "error", "error": str(e)}

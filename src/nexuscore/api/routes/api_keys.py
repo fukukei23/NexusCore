@@ -125,7 +125,7 @@ async def issue_api_key(
             logger.error(f"Database error during API key creation: {e}", exc_info=True)
             raise make_internal_error("Failed to create API key") from e
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # HTTPException はそのまま再発生
         if hasattr(e, "status_code"):
             raise
@@ -191,7 +191,7 @@ async def list_api_keys(
         logger.error(f"Database error during API key list: {e}", exc_info=True)
         raise make_internal_error("Failed to retrieve API keys") from e
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # HTTPException はそのまま再発生
         if hasattr(e, "status_code"):
             raise
@@ -265,7 +265,7 @@ async def revoke_api_key(
         logger.error(f"Database error during API key revocation: {e}", exc_info=True)
         raise make_internal_error("Failed to revoke API key") from e
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # HTTPException はそのまま再発生
         if hasattr(e, "status_code"):
             raise

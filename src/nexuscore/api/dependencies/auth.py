@@ -58,7 +58,7 @@ def load_api_key() -> str | None:
                 if api_key:
                     logger.debug("API Key loaded from secrets.json")
                     return api_key.strip()
-    except Exception as e:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
         logger.warning(f"Failed to load API Key from secrets.json: {e}")
 
     return None
@@ -112,7 +112,7 @@ def get_current_user(
         # CR-NEXUS-038: サーバー設定エラーを確実に検出するため、認証前に get_api_key() を呼ぶ
         try:
             get_api_key()
-        except Exception:
+        except Exception:  # noqa: BLE001
             # get_api_key() が 500 を返す場合（サーバー設定エラー）はそのまま raise
             raise
 
@@ -137,7 +137,7 @@ def get_current_user(
             # DB アクセスエラー（接続エラーなど）
             logger.error(f"Database error during API Key lookup: {e}", exc_info=True)
             raise make_internal_error("Database connection error during authentication") from e
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # HTTPException はそのまま再発生（make_error で生成されたもの）
             if isinstance(e, Exception) and hasattr(e, "status_code"):
                 raise
@@ -174,7 +174,7 @@ def get_current_user(
             # DB アクセスエラー（接続エラーなど）
             logger.error(f"Database error during User lookup: {e}", exc_info=True)
             raise make_internal_error("Database connection error during user lookup") from e
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # HTTPException はそのまま再発生（make_error で生成されたもの）
             if isinstance(e, Exception) and hasattr(e, "status_code"):
                 raise
@@ -201,7 +201,7 @@ def get_current_user(
         # 環境変数ベースの認証にフォールバック
         try:
             expected_api_key = get_api_key()
-        except Exception:
+        except Exception:  # noqa: BLE001
             # get_api_key() が 500 を返す場合（サーバー設定エラー）
             # これは認証フェイルではなく、サーバー側の問題なので 500 をそのまま返す
             raise
@@ -211,7 +211,7 @@ def get_current_user(
             raise make_unauthorized_error("Invalid or missing API key") from None
         logger.debug("API Key authentication successful (fallback mode)")
         return AuthenticatedUser(user_id="api_user", roles=["api_user"])
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # HTTPException はそのまま再発生（make_error で生成されたもの）
         if isinstance(e, Exception) and hasattr(e, "status_code"):
             raise

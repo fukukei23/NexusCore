@@ -157,7 +157,7 @@ class NexusConfig:
         if config_file.exists():
             try:
                 return json.loads(config_file.read_text())
-            except Exception as e:
+            except (OSError, json.JSONDecodeError, ValueError) as e:
                 _logger.warning("Failed to load %s: %s", config_file, e)
                 return {}
         return {}

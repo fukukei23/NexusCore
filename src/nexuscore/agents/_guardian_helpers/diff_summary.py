@@ -71,7 +71,7 @@ def generate_diff_summary(
 
         return summary.strip()
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         if logger:
             logger.error(f"Failed to generate diff summary: {e}", exc_info=True)
         return f"差分サマリーの生成に失敗しました: {e}"
@@ -123,7 +123,7 @@ def _generate_multi_file_diff_summary(
             result[file_path] = (
                 summary if isinstance(summary, str) else "要約生成に失敗しました"
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             if logger:
                 logger.warning(
                     f"Failed to generate diff summary for {file_path}: {e}", exc_info=True,

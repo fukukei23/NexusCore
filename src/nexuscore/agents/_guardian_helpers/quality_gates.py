@@ -39,7 +39,7 @@ def run_quality_gates(
             constitution=constitution,
             project_root=project_root or "",
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         if logger:
             logger.error(f"Tier 1 quality gate failed: {e}", exc_info=True)
         tier1_report = None
@@ -53,7 +53,7 @@ def run_quality_gates(
             constitution=constitution,
             timeout_per_test=10,
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         if logger:
             logger.error(f"Tier 2 quality gate failed: {e}", exc_info=True)
         tier2_report = None  # type: ignore[assignment]
@@ -285,7 +285,7 @@ def review_with_llm(
         review_data.setdefault("decision", "APPROVE")
         review_data.setdefault("reason", "理由なし")
         return review_data
-    except Exception as e:
+    except (json.JSONDecodeError, ValueError, RuntimeError) as e:
         if logger:
             logger.error(f"LLM review failed: {e}", exc_info=True)
         return {"decision": "MANUAL_REVIEW", "reason": f"LLM レビューエラー: {e}"}
@@ -324,7 +324,7 @@ def review_unified_diff(
             if auto_result.decision == ReviewDecision.MANUAL_REVIEW:
                 result["decision"] = "MANUAL_REVIEW"
                 result["reason"] = f"自動レビューで警告が検出されました:\n{auto_result.summary()}"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             result["auto_review"] = {"error": str(e)}
             if logger:
                 logger.warning(f"GuardianAutoReviewer failed: {e}")

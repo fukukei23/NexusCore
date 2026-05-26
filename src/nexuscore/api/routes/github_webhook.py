@@ -127,7 +127,7 @@ async def github_webhook_endpoint(
                 accepted=False,
                 reason="Invalid payload: JSON is required",
             )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to read request body: {e}", exc_info=True)
         raise make_bad_request_error("Failed to read request body") from e
 
@@ -150,7 +150,7 @@ async def github_webhook_endpoint(
             accepted=False,
             reason="Invalid payload: JSON is required",
         )
-    except Exception as e:
+    except (ValueError, TypeError) as e:
         logger.error(f"Failed to parse payload: {e}", exc_info=True)
         return GitHubWebhookResponse(
             accepted=False,
@@ -185,7 +185,7 @@ async def github_webhook_endpoint(
     except ImportError as e:
         logger.error(f"GitHub webhook handler is not available: {e}", exc_info=True)
         raise make_internal_error("GitHub webhook handler not available") from e
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"GitHub webhook handling failed: {e}", exc_info=True)
         return GitHubWebhookResponse(
             accepted=False,
@@ -241,7 +241,7 @@ def _post_pr_comment_if_configured(result: dict, payload: dict) -> None:
 
         logger.info(f"Posted PR comment to {repo_full_name}#{pr_number}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # PR コメント投稿失敗は致命的ではないのでログだけ
         logger.error(f"Failed to post PR comment: {e}", exc_info=True)
 
@@ -297,7 +297,7 @@ def _send_slack_notification_if_configured(result: dict, payload: dict) -> None:
                     metrics = _collect_run_metrics(run)
                     if project:
                         metrics["success_rate"] = _compute_recent_success_rate(project.id, limit=30)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Failed to collect metrics for Slack notification: {e}", exc_info=True)
 
         # PR URL と Run ログ URL を構築
@@ -314,7 +314,7 @@ def _send_slack_notification_if_configured(result: dict, payload: dict) -> None:
 
                 base_url = _get_config().webapp_base_url.rstrip("/")
                 run_logs_url = f"{base_url}/logs/runs/{run.run_id}"
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to build run_logs_url: {e}", exc_info=True)
 
         # Slack 通知を送信
@@ -346,6 +346,6 @@ def _send_slack_notification_if_configured(result: dict, payload: dict) -> None:
                 f"Failed to send Slack notification for {repo_full_name} PR #{pr_number}"
             )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # Slack 通知失敗は致命的ではないのでログだけ
         logger.error(f"Failed to send Slack notification: {e}", exc_info=True)

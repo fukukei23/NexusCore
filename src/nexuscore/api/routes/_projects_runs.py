@@ -96,7 +96,7 @@ async def trigger_project_run(
                 )
                 queue_mode = "sync"
                 status_code = status.HTTP_200_OK
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 db.session.refresh(run)
                 logger.error(f"Failed to run orchestrator inline: {exc}", exc_info=True)
                 raise make_internal_error(f"Failed to run orchestrator: {str(exc)}") from exc
@@ -112,7 +112,7 @@ async def trigger_project_run(
             queue_mode=queue_mode,  # type: ignore[arg-type]
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         if isinstance(e, HTTPException):
             raise
         logger.error(f"Failed to trigger project run: {e}", exc_info=True)
@@ -166,7 +166,7 @@ async def get_latest_run(
             )
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         if isinstance(e, HTTPException):
             raise
         logger.error(f"Failed to get latest run: {e}", exc_info=True)

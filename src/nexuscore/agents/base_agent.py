@@ -108,7 +108,7 @@ class BaseAgent:
                     llm = self.llm_router.get_llm_for_task(prompt, task_type=task_type)
                 elif self.llm_router and hasattr(self.llm_router, "get_default_llm"):
                     llm = self.llm_router.get_default_llm()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.logger.error(f"LLM クライアント取得に失敗: {e}", exc_info=True)
                 # HTTP エラーを NexusCore 例外に変換
                 if HAS_RETRY and convert_http_error_to_nexus_error:
@@ -132,7 +132,7 @@ class BaseAgent:
                                 raise InvalidModelOutputError(f"Invalid JSON output: {e}") from None
                             raise
                     return result
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     # HTTP エラーを NexusCore 例外に変換
                     if HAS_RETRY and convert_http_error_to_nexus_error:
                         raise convert_http_error_to_nexus_error(e) from None
@@ -160,7 +160,7 @@ class BaseAgent:
             )
             try:
                 return wrapped_func()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.logger.error(f"LLM 実行エラー（Retry 後も失敗）: {e}", exc_info=True)
                 # フォールバック
                 return "{}" if as_json else ""
@@ -168,7 +168,7 @@ class BaseAgent:
             # Retry が利用できない場合は従来通り
             try:
                 return _execute_llm_internal()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.logger.error(f"LLM 実行エラー: {e}", exc_info=True)
                 # フォールバック
                 return "{}" if as_json else ""

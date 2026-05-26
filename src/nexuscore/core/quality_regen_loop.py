@@ -101,7 +101,7 @@ class QualityRegenLoop:
             ctx = self.orchestrator.run_testing_phase(ctx)
             self.orchestrator.run_implementation_phase(ctx)
             return True
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — orchestrator phase failure, returns False
             logger.error("Regeneration request failed at iteration %d: %s", iteration, exc)
             return False
 

@@ -156,7 +156,7 @@ class PolicyInterface:
                         inbrowser=True,
                         quiet=True,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 — Gradio launch in thread
                     _logger.error("Gradio起動エラー: %s", e)
 
             thread = threading.Thread(target=launch_gradio)
@@ -175,7 +175,7 @@ class PolicyInterface:
                 _logger.warning("中断されました: デフォルト設定を使用します")
                 return self._get_safe_default_policy()
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — UI creation fallback to safe defaults
             _logger.error("UI起動失敗: %s", e)
             return self._get_safe_default_policy()
         finally:
@@ -184,7 +184,7 @@ class PolicyInterface:
                 try:
                     self.interface.close()
                     _logger.info("Gradioインターフェースを閉じました。")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 — cleanup in finally block
                     _logger.warning("Gradioを閉じる際にエラーが発生: %s", e)
 
     def _get_default_policy(self) -> dict:

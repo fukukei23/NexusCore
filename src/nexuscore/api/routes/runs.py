@@ -96,7 +96,7 @@ async def list_runs(
     except ImportError:
         logger.error("webapp models not available")
         raise make_internal_error("Database models not available") from None
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to list runs: {e}", exc_info=True)
         raise make_internal_error("Failed to list runs. Please try again later.") from e
 
@@ -177,7 +177,7 @@ async def get_run(
             created_at=run.created_at,
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         if isinstance(e, HTTPException):
             raise
         logger.error(f"Failed to get run: {e}", exc_info=True)

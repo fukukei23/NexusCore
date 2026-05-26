@@ -135,7 +135,7 @@ def classify_error(exc: Exception) -> str:
             try:
                 error_str = str(exc).lower()
                 error_type = type(exc).__name__.lower()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — error object stringification can fail in unexpected ways
                 # エラーオブジェクトの文字列化に失敗した場合
                 logger.warning(
                     f"Failed to stringify error object (type: {type(exc).__name__}). "
@@ -200,7 +200,7 @@ def classify_error(exc: Exception) -> str:
 
         return result
 
-    except Exception as classification_error:
+    except Exception as classification_error:  # noqa: BLE001 — classification error fallback (3.4.3)
         # Step 2: 分類処理中の例外を捕捉（3.4.3）
         logger.warning(
             f"Exception occurred during error classification. "
