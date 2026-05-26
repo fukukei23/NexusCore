@@ -8,11 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from nexuscore.core.sandbox._config import (  # noqa: F401 — legacy re-exports
-    _CPU_TIME_LIMIT_SEC,
-    _MEMORY_LIMIT_MB,
+from nexuscore.core.sandbox._config import (
     _apply_resource_limits,
-    _check_forbidden_modules,
     load_sandbox_policy,
 )
 

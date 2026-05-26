@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 
-from nexuscore.guard._models import FileChange, ProjectType, ReviewIssue
+from nexuscore.guard._models import FileChange, ReviewIssue
 
 
 # ── Pattern constants ──────────────────────────────────────────────────────
