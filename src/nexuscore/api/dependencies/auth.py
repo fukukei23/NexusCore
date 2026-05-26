@@ -89,6 +89,62 @@ def get_api_key() -> str:
     return _cached_api_key
 
 
+def _resolve_api_key_obj(x_api_key: str):
+    """API Key ハッシュから ApiKey オブジェクトを検索する。見つからない場合は例外を投げる。"""
+    from sqlalchemy.exc import SQLAlchemyError
+
+    from nexuscore.webapp.models import ApiKey
+
+    try:
+        token_hash = ApiKey.hash_token(x_api_key)
+        if not hasattr(ApiKey, "query") or ApiKey.query is None:
+            logger.warning("ApiKey.query is not available (database not initialized)")
+            raise make_unauthorized_error("Invalid or missing API key")
+        return ApiKey.query.filter_by(token_hash=token_hash).first()
+    except (AttributeError, RuntimeError) as e:
+        logger.warning(f"Database not initialized or query unavailable: {e}")
+        raise make_unauthorized_error("Invalid or missing API key") from e
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during API Key lookup: {e}", exc_info=True)
+        raise make_internal_error("Database connection error during authentication") from e
+    except Exception as e:  # noqa: BLE001
+        if hasattr(e, "status_code"):
+            raise
+        error_str = str(e).lower()
+        if "no application" in error_str or "context" in error_str or "query" in error_str:
+            raise make_unauthorized_error("Invalid or missing API key") from None
+        logger.error(f"Unexpected error during API Key hash: {e}", exc_info=True)
+        raise make_internal_error("Unexpected error during authentication") from e
+
+
+def _resolve_user(api_key_obj):
+    """ApiKey オブジェクトから User を取得する。見つからない場合は例外を投げる。"""
+    from sqlalchemy.exc import SQLAlchemyError
+
+    from nexuscore.webapp.models import User
+
+    try:
+        if hasattr(api_key_obj, "user") and api_key_obj.user is not None:
+            return api_key_obj.user
+        if not hasattr(User, "query") or User.query is None:
+            raise make_unauthorized_error("Invalid or missing API key")
+        return User.query.get(api_key_obj.user_id)
+    except (AttributeError, RuntimeError) as e:
+        logger.warning(f"Database not initialized or query unavailable: {e}")
+        raise make_unauthorized_error("Invalid or missing API key") from e
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during User lookup: {e}", exc_info=True)
+        raise make_internal_error("Database connection error during user lookup") from e
+    except Exception as e:  # noqa: BLE001
+        if hasattr(e, "status_code"):
+            raise
+        error_str = str(e).lower()
+        if "no application" in error_str or "context" in error_str or "query" in error_str:
+            raise make_unauthorized_error("Invalid or missing API key") from None
+        logger.error(f"Unexpected error during User lookup: {e}", exc_info=True)
+        raise make_internal_error("Unexpected error during user lookup") from e
+
+
 def get_current_user(
     x_api_key: str = Header(..., alias="X-API-Key", description="API Key for authentication")
 ) -> AuthenticatedUser:
@@ -96,131 +152,29 @@ def get_current_user(
     現在の認証済みユーザーを取得する Dependency
 
     X-API-Key ヘッダーを使用した API Key 認証を実装。
-    既存のFlask実装 (`api_key_required`) と互換性を保つため、
-    データベースからAPI Keyを検証し、対応するユーザーを取得する。
-
-    Args:
-        x_api_key: X-API-Key ヘッダーの値
-
-    Returns:
-        AuthenticatedUser: 認証済みユーザー情報（user_id にユーザーIDを含む）
-
-    Raises:
-        HTTPException: 認証失敗時（401）またはサーバー設定エラー時（500）
     """
     try:
-        # CR-NEXUS-038: サーバー設定エラーを確実に検出するため、認証前に get_api_key() を呼ぶ
-        try:
-            get_api_key()
-        except Exception:  # noqa: BLE001
-            # get_api_key() が 500 を返す場合（サーバー設定エラー）はそのまま raise
-            raise
+        get_api_key()
 
-        from sqlalchemy.exc import SQLAlchemyError
-
-        from nexuscore.webapp.models import ApiKey, User
-
-        # API Key からユーザーを解決（既存のFlask実装と同じロジック）
-        try:
-            token_hash = ApiKey.hash_token(x_api_key)
-            # ApiKey.query が存在しない場合（DB が初期化されていない場合）は認証フェイルとして扱う
-            if not hasattr(ApiKey, "query") or ApiKey.query is None:
-                logger.warning("ApiKey.query is not available (database not initialized)")
-                raise make_unauthorized_error("Invalid or missing API key")
-            api_key_obj = ApiKey.query.filter_by(token_hash=token_hash).first()
-        except (AttributeError, RuntimeError) as e:
-            # ApiKey.query が存在しない場合、または DB が初期化されていない場合
-            # RuntimeError は SQLAlchemy が DB コンテキストを持っていない場合に発生する可能性がある
-            logger.warning(f"Database not initialized or query unavailable: {e}")
-            raise make_unauthorized_error("Invalid or missing API key") from e
-        except SQLAlchemyError as e:
-            # DB アクセスエラー（接続エラーなど）
-            logger.error(f"Database error during API Key lookup: {e}", exc_info=True)
-            raise make_internal_error("Database connection error during authentication") from e
-        except Exception as e:  # noqa: BLE001
-            # HTTPException はそのまま再発生（make_error で生成されたもの）
-            if isinstance(e, Exception) and hasattr(e, "status_code"):
-                raise
-            # その他の予期しないエラー（hash_token のエラーなど）
-            # ただし、DB が初期化されていない可能性があるため、認証フェイルとして扱う
-            error_str = str(e).lower()
-            if "no application" in error_str or "context" in error_str or "query" in error_str:
-                logger.warning(f"Database context error (likely DB not initialized): {e}")
-                raise make_unauthorized_error("Invalid or missing API key") from None
-            logger.error(f"Unexpected error during API Key hash: {e}", exc_info=True)
-            raise make_internal_error("Unexpected error during authentication") from e
-
-        # API Key が見つからない場合は認証フェイル（401）
+        api_key_obj = _resolve_api_key_obj(x_api_key)
         if not api_key_obj:
-            logger.warning("Invalid API Key provided")
             raise make_unauthorized_error("Invalid or missing API key")
 
-        # User を取得
-        try:
-            # User.query が存在しない場合（DB が初期化されていない場合）は認証フェイルとして扱う
-            if hasattr(api_key_obj, "user") and api_key_obj.user is not None:
-                user = api_key_obj.user
-            else:
-                if not hasattr(User, "query") or User.query is None:
-                    logger.warning("User.query is not available (database not initialized)")
-                    raise make_unauthorized_error("Invalid or missing API key")
-                user = User.query.get(api_key_obj.user_id)
-        except (AttributeError, RuntimeError) as e:
-            # User.query が存在しない場合、または DB が初期化されていない場合
-            # RuntimeError は SQLAlchemy が DB コンテキストを持っていない場合に発生する可能性がある
-            logger.warning(f"Database not initialized or query unavailable: {e}")
-            raise make_unauthorized_error("Invalid or missing API key") from e
-        except SQLAlchemyError as e:
-            # DB アクセスエラー（接続エラーなど）
-            logger.error(f"Database error during User lookup: {e}", exc_info=True)
-            raise make_internal_error("Database connection error during user lookup") from e
-        except Exception as e:  # noqa: BLE001
-            # HTTPException はそのまま再発生（make_error で生成されたもの）
-            if isinstance(e, Exception) and hasattr(e, "status_code"):
-                raise
-            # その他の予期しないエラー
-            # ただし、DB が初期化されていない可能性があるため、認証フェイルとして扱う
-            error_str = str(e).lower()
-            if "no application" in error_str or "context" in error_str or "query" in error_str:
-                logger.warning(f"Database context error (likely DB not initialized): {e}")
-                raise make_unauthorized_error("Invalid or missing API key") from None
-            logger.error(f"Unexpected error during User lookup: {e}", exc_info=True)
-            raise make_internal_error("Unexpected error during user lookup") from e
-
-        # User が見つからない場合は認証フェイル（401）
+        user = _resolve_user(api_key_obj)
         if not user:
-            logger.warning("User not found for API Key")
             raise make_unauthorized_error("Invalid or missing API key")
 
-        # 認証成功
-        logger.debug(f"API Key authentication successful for user {user.id}")
         return AuthenticatedUser(user_id=str(user.id), roles=["api_user"])
 
     except ImportError:
-        # webapp モジュールが利用できない場合（テスト環境など）
-        # 環境変数ベースの認証にフォールバック
-        try:
-            expected_api_key = get_api_key()
-        except Exception:  # noqa: BLE001
-            # get_api_key() が 500 を返す場合（サーバー設定エラー）
-            # これは認証フェイルではなく、サーバー側の問題なので 500 をそのまま返す
-            raise
-
+        expected_api_key = get_api_key()
         if x_api_key != expected_api_key:
-            logger.warning("Invalid API Key provided")
             raise make_unauthorized_error("Invalid or missing API key") from None
-        logger.debug("API Key authentication successful (fallback mode)")
         return AuthenticatedUser(user_id="api_user", roles=["api_user"])
     except Exception as e:  # noqa: BLE001
-        # HTTPException はそのまま再発生（make_error で生成されたもの）
-        if isinstance(e, Exception) and hasattr(e, "status_code"):
+        if hasattr(e, "status_code"):
             raise
-        # この時点で到達するのは、予期しない例外のみ
-        # 認証フェイルではないことを明示
-        logger.error(
-            f"Unexpected error during authentication (not an authentication failure): {e}",
-            exc_info=True,
-        )
+        logger.error(f"Unexpected error during authentication: {e}", exc_info=True)
         raise make_internal_error("Unexpected server error during authentication") from e
 
 

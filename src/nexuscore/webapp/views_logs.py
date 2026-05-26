@@ -80,46 +80,20 @@ def project_logs(project_id: int):
     )
 
 
-@bp.route("/runs/<string:run_id>")
-@require_auth
-def run_logs(run_id: str):
-    """
-    特定のRunのログ一覧（4.5: Self-Healing メトリクス追加）
-    GET /logs/runs/<run_id>?source=NPE&level=ERROR&page=1&per_page=50
-
-    Data access: Direct DB access (no API call)
-    FastAPI equivalent: GET /api/v1/runs/{id} (for external clients, but different data structure)
-    """
+def _collect_run_display_data(run: Run) -> dict:
+    """Run 表示用のメトリクス・Guardian・Diff データを収集する"""
     from nexuscore.integration.github_pr_comment import _collect_run_metrics
     from nexuscore.integration.run_report_generator import get_markdown_report_path
 
-    user = get_current_user()
-    run = Run.query.filter_by(run_id=run_id).first_or_404()
-
-    # 権限チェック（プロジェクトのオーナーか）
-    user_project_or_404(user.id, run.project_id)
-
-    # 4.5: Self-Healing メトリクスを収集
     metrics = _collect_run_metrics(run)
     duration_sec = _compute_run_duration(run)
-    duration_str = _format_duration(duration_sec) if duration_sec else "N/A"
 
-    # 4.4: details から retry_count と last_error_class を取得
     patch_files = run_patch_files(run.id)
     retry_count, last_error_class = run_logs_payload(run.id)
-
-    # LLMコスト情報
     _, _, llm_breakdown = run_llm_cost(run.id)
 
-    # 最初のモデル名を取得
-    model_name = next(iter(llm_breakdown), None)
-    files_changed = len(patch_files)
-    cost_usd = metrics.get("estimated_cost_jpy", 0.0) / _USD_JPY_RATE  # JPY -> USD 簡易換算
-
-    # Guardian Review 情報を取得（ExecutionLog から）
     guardian_review = None
-    logs_for_review = ExecutionLog.query.filter_by(run_id=run.id).all()
-    for log in logs_for_review:
+    for log in ExecutionLog.query.filter_by(run_id=run.id).all():
         payload = log.payload_json or {}
         if isinstance(payload, str):
             try:
@@ -127,37 +101,59 @@ def run_logs(run_id: str):
             except (json.JSONDecodeError, ValueError):
                 payload = {}
         if payload.get("guardian_review"):
-            guardian_review = payload.get("guardian_review")
+            guardian_review = payload["guardian_review"]
             break
 
-    # Diff Summary を取得（Run レポートから）
     diff_summary = ""
     try:
-        report_path = get_markdown_report_path(run_id)
+        report_path = get_markdown_report_path(run.run_id)
         if report_path.exists():
-            markdown_content = report_path.read_text(encoding="utf-8")
-            if "## AI Diff Summary" in markdown_content:
-                diff_start = markdown_content.find("## AI Diff Summary")
-                diff_end = markdown_content.find("##", diff_start + 1)
-                if diff_end > 0:
-                    diff_summary = markdown_content[diff_start:diff_end]
+            md = report_path.read_text(encoding="utf-8")
+            if "## AI Diff Summary" in md:
+                start = md.find("## AI Diff Summary")
+                end = md.find("##", start + 1)
+                if end > 0:
+                    diff_summary = md[start:end]
     except (OSError, UnicodeDecodeError):
         pass
 
-    # クエリパラメータ
+    return {
+        "metrics": metrics,
+        "duration_str": _format_duration(duration_sec) if duration_sec else "N/A",
+        "patch_files": patch_files,
+        "retry_count": retry_count,
+        "last_error_class": last_error_class,
+        "model_name": next(iter(llm_breakdown), None),
+        "files_changed": len(patch_files),
+        "cost_usd": metrics.get("estimated_cost_jpy", 0.0) / _USD_JPY_RATE,
+        "guardian_review": guardian_review,
+        "diff_summary": diff_summary,
+    }
+
+
+@bp.route("/runs/<string:run_id>")
+@require_auth
+def run_logs(run_id: str):
+    """
+    特定のRunのログ一覧（4.5: Self-Healing メトリクス追加）
+    GET /logs/runs/<run_id>?source=NPE&level=ERROR&page=1&per_page=50
+    """
+    user = get_current_user()
+    run = Run.query.filter_by(run_id=run_id).first_or_404()
+    user_project_or_404(user.id, run.project_id)
+
+    display = _collect_run_display_data(run)
+
     source_filter = request.args.get("source")
     level_filter = request.args.get("level")
     per_page = int(request.args.get("per_page", 50))
 
-    # クエリ構築
     query = ExecutionLog.query.filter_by(run_id=run.id)
-
     if source_filter:
         query = query.filter(ExecutionLog.source == source_filter)
     if level_filter:
         query = query.filter(ExecutionLog.level == level_filter)
 
-    # ページング
     logs_paginated, pagination = paginate_query(
         query, order_column=ExecutionLog.created_at, per_page=per_page
     )
@@ -176,26 +172,24 @@ def run_logs(run_id: str):
     ]
 
     if request.headers.get("Accept", "").startswith("application/json"):
-        return jsonify(
-            {
-                "run": {
-                    "run_id": run.run_id,
-                    "status": run.status,
-                    "started_at": run.started_at.isoformat() if run.started_at else None,
-                    "finished_at": run.finished_at.isoformat() if run.finished_at else None,
-                },
-                "metrics": {
-                    "duration_str": duration_str,
-                    "retry_count": retry_count,
-                    "last_error_class": last_error_class,
-                    "model": model_name,
-                    "files_changed": files_changed,
-                    "cost_usd": cost_usd,
-                },
-                "logs": logs_data,
-                "pagination": pagination,
-            }
-        )
+        return jsonify({
+            "run": {
+                "run_id": run.run_id,
+                "status": run.status,
+                "started_at": run.started_at.isoformat() if run.started_at else None,
+                "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+            },
+            "metrics": {
+                "duration_str": display["duration_str"],
+                "retry_count": display["retry_count"],
+                "last_error_class": display["last_error_class"],
+                "model": display["model_name"],
+                "files_changed": display["files_changed"],
+                "cost_usd": display["cost_usd"],
+            },
+            "logs": logs_data,
+            "pagination": pagination,
+        })
 
     return render_template(
         "logs/run_logs.html",
@@ -205,13 +199,13 @@ def run_logs(run_id: str):
         status_badge_html=_render_run_status_badge(run.status),
         started_str=run.started_at.isoformat() if run.started_at else "N/A",
         finished_str=run.finished_at.isoformat() if run.finished_at else "N/A",
-        model_name=model_name,
-        duration_str=duration_str,
-        retry_count=retry_count,
-        files_changed=files_changed,
-        cost_usd=cost_usd,
-        last_error_class=last_error_class,
-        guardian_review=guardian_review,
-        diff_summary=diff_summary,
+        model_name=display["model_name"],
+        duration_str=display["duration_str"],
+        retry_count=display["retry_count"],
+        files_changed=display["files_changed"],
+        cost_usd=display["cost_usd"],
+        last_error_class=display["last_error_class"],
+        guardian_review=display["guardian_review"],
+        diff_summary=display["diff_summary"],
         logs_data=logs_data,
     )

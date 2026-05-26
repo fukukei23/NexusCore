@@ -83,6 +83,57 @@ from nexuscore.webapp.models import Project, Run
 from nexuscore.webapp.orchestrator_helper import run_orchestrator_sync
 
 
+def _finalize_run(run: Run, project: Project, status: str) -> None:
+    """Run完了後のレポート生成 + Slack通知"""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    run.finished_at = datetime.now(UTC)
+    try:
+        db.session.commit()
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"Failed to update Run status in finally block: {e}", exc_info=True)
+        db.session.rollback()
+
+    try:
+        from nexuscore.integration.run_report_generator import write_run_report_file
+
+        report_path = write_run_report_file(run.id)
+        logger.info(f"Run report generated: {report_path}")
+
+        try:
+            from nexuscore.webapp.models import ExecutionLog
+
+            db.session.add(ExecutionLog(
+                run_id=run.id,
+                source="SYSTEM",
+                level="INFO",
+                message=f"Run report generated: {report_path}",
+                payload_json={"report_path": str(report_path)},
+            ))
+            db.session.commit()
+        except Exception as log_exc:  # noqa: BLE001
+            logger.warning(f"Failed to log report generation: {log_exc}", exc_info=True)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Failed to generate run report: {e}", exc_info=True)
+
+    try:
+        from nexuscore.core.notifier import get_notifier
+
+        notifier = get_notifier()
+        if notifier:
+            session_id = run.run_id or str(run.id)
+            notifier.notify_orchestrator_complete(
+                project_path=project.local_path,
+                requirement=run.requirement,
+                status=status,
+                session_id=session_id,
+                details={"Run ID": run.run_id, "プロジェクト名": project.name},
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Failed to send Slack notification: {e}", exc_info=True)
+
+
 def _register_tasks(celery_instance: Celery) -> None:
     """Celery タスクを登録する"""
     global run_orchestrator_task
@@ -94,13 +145,9 @@ def _register_tasks(celery_instance: Celery) -> None:
 
         Args:
             run_db_id: Run.id（Webapp側でRunレコードを作成したときのID）
-
-        このタスクは:
-        - JobStateMachine を使用して状態遷移を管理
-        - Run テーブルの status/started_at/finished_at を更新
-        - run_full_project(..., run_db_id=run.id) を呼び出す
         """
         import logging
+        import os
 
         logger = logging.getLogger(__name__)
 
@@ -112,7 +159,6 @@ def _register_tasks(celery_instance: Celery) -> None:
         project: Project = run.project
         job_id = run.run_id or str(run.id)
 
-        # requirement が保存されていない場合はエラー
         if not run.requirement:
             logger.error(f"Run.requirement is empty for run_id={run.id}")
             run.status = "FAILED"
@@ -120,17 +166,11 @@ def _register_tasks(celery_instance: Celery) -> None:
             db.session.commit()
             return
 
-        # SessionController と RunHistoryLogger を初期化
-        import os
-
-        session_dir = os.path.join(project.local_path, ".nexus", "sessions")
         session_controller = SessionController(
             session_id=job_id,
-            root_dir=session_dir,
+            root_dir=os.path.join(project.local_path, ".nexus", "sessions"),
         )
         history_logger = RunHistoryLogger(project_root=project.local_path)
-
-        # JobStateMachine を初期化
         state_machine = JobStateMachine(
             job_id=job_id,
             session_controller=session_controller,
@@ -138,16 +178,13 @@ def _register_tasks(celery_instance: Celery) -> None:
             job_type="orchestrator",
         )
 
+        final_status = "error"
         try:
-            # ジョブを開始（Pending → Running）
             state_machine.start()
-
-            # Run テーブルを更新
             run.status = "RUNNING"
             run.started_at = datetime.now(UTC)
             db.session.commit()
 
-            # Orchestrator を実行
             run_orchestrator_sync(
                 project_path=project.local_path,
                 user_requirement=run.requirement,
@@ -157,89 +194,21 @@ def _register_tasks(celery_instance: Celery) -> None:
                 fast_lane=False,
             )
 
-            # ジョブを完了（Running → Completed）
-            state_machine.complete(
-                details={
-                    "run_db_id": run.id,
-                    "project_name": project.name,
-                }
-            )
+            state_machine.complete(details={"run_db_id": run.id, "project_name": project.name})
             run.status = "SUCCESS"
-            status = "success"
+            final_status = "success"
 
-        except Exception as exc:  # noqa: BLE001 — orchestrator execution failure
-            # エラーハンドリング
-            error_message = str(exc)
+        except Exception as exc:  # noqa: BLE001
             logger.error(f"Orchestrator execution failed for run_id={run.id}: {exc}", exc_info=True)
-
-            # ジョブを失敗として記録（Running → Failed）
             state_machine.fail(
-                error_message=error_message,
-                details={
-                    "run_db_id": run.id,
-                    "project_name": project.name,
-                    "exception_type": type(exc).__name__,
-                },
+                error_message=str(exc),
+                details={"run_db_id": run.id, "project_name": project.name, "exception_type": type(exc).__name__},
             )
             run.status = "FAILED"
-            status = "error"
 
         finally:
-            run.finished_at = datetime.now(UTC)
-            try:
-                db.session.commit()
-            except Exception as e:  # noqa: BLE001 — DB commit/rollback in finally block
-                logger.error(f"Failed to update Run status in finally block: {e}", exc_info=True)
-                db.session.rollback()
+            _finalize_run(run, project, final_status)
 
-            # Run レポートを生成
-            try:
-                from nexuscore.integration.run_report_generator import write_run_report_file
-
-                report_path = write_run_report_file(run.id)
-                logger.info(f"Run report generated: {report_path}")
-
-                # ExecutionLog に記録
-                try:
-                    from nexuscore.webapp.models import ExecutionLog
-
-                    log_entry = ExecutionLog(
-                        run_id=run.id,
-                        source="SYSTEM",
-                        level="INFO",
-                        message=f"Run report generated: {report_path}",
-                        payload_json={"report_path": str(report_path)},
-                    )
-                    db.session.add(log_entry)
-                    db.session.commit()
-                except Exception as log_exc:  # noqa: BLE001 — non-critical logging in finally
-                    logger.warning(f"Failed to log report generation: {log_exc}", exc_info=True)
-            except Exception as e:  # noqa: BLE001 — report generation in finally
-                logger.warning(f"Failed to generate run report: {e}", exc_info=True)
-                # レポート生成失敗は本処理を壊さない
-
-            # Slack 通知を送信
-            try:
-                from nexuscore.core.notifier import get_notifier
-
-                notifier = get_notifier()
-                if notifier:
-                    # セッションIDを取得（run.run_id を使用）
-                    session_id = run.run_id or str(run.id)
-                    notifier.notify_orchestrator_complete(
-                        project_path=project.local_path,
-                        requirement=run.requirement,
-                        status=status,
-                        session_id=session_id,
-                        details={
-                            "Run ID": run.run_id,
-                            "プロジェクト名": project.name,
-                        },
-                    )
-            except Exception as e:  # noqa: BLE001 — Slack notification in finally
-                logger.warning(f"Failed to send Slack notification: {e}", exc_info=True)
-
-    # タスクをグローバルに公開（views_projects.py から参照できるように）
     run_orchestrator_task = _run_orchestrator_task_internal
 
 
