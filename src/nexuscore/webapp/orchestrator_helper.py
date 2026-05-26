@@ -43,8 +43,8 @@ def create_orchestrator_instance(
         constitution["automation_policy"].update(
             {"autonomy_level": autonomy_level}
         )
-    except Exception:
-        pass  # 失敗してもデフォルト値で進む
+    except Exception:  # noqa: BLE001 — config load failure uses defaults
+        logger.warning("Failed to load config, using defaults", exc_info=True)
 
     # セッションIDの決定
     if not session_id:

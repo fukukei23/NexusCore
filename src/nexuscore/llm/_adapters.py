@@ -20,7 +20,7 @@ try:
                 return self._b.preflight_check(
                     model_name=model_name, est_input_tokens=est_input_tokens
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 — budget check failure allows execution
                 return True, 0.0
 
         def track_cost(self, model_name: str, input_tokens: int, output_tokens: int) -> float:
@@ -30,10 +30,10 @@ try:
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 — tracking failure returns 0
                 return 0.0
 
-except Exception:
+except ImportError:
     BUDGET_API = "none"
 
     class BudgetManager:  # type: ignore[no-redef]
@@ -53,19 +53,19 @@ except Exception:
 
 try:
     from nexuscore.npe.logger import log_transaction  # v1
-except Exception:
+except ImportError:
     try:
         from nexuscore.npe import logger as _logger_v2
 
         log_transaction = _logger_v2.log_transaction
-    except Exception:
+    except ImportError:
 
         def log_transaction(payload: dict, log_file: str):
             try:
                 Path(log_file).parent.mkdir(parents=True, exist_ok=True)
                 with open(log_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-            except Exception as e:
+            except OSError as e:
                 logging.getLogger("LLMRouter").warning(
                     "[LogTransaction] Failed to write log file %s: %s", log_file, e
                 )

@@ -22,8 +22,7 @@ def enhance_log_transaction(log_data: dict[str, Any], log_file: str | None = Non
     except ImportError:
         # webapp がインストールされていない場合はスキップ（CLI実行時など）
         return
-    except Exception:
-        # インポートエラーは既存の処理を止めない
+    except (AttributeError, ModuleNotFoundError):
         return
 
     # log_data から情報を抽出

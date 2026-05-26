@@ -93,7 +93,7 @@ def run_logs_payload(run_id: int) -> tuple[int, str | None]:
         if isinstance(payload, str):
             try:
                 payload = json.loads(payload)
-            except Exception:
+            except (json.JSONDecodeError, ValueError):
                 payload = {}
         if payload.get("retry_count"):
             retry_count = max(retry_count, payload.get("retry_count", 0))
@@ -122,7 +122,7 @@ def run_llm_cost(run_id: int) -> tuple[int, float, dict]:
         if isinstance(payload, str):
             try:
                 payload = json.loads(payload)
-            except Exception:
+            except (json.JSONDecodeError, ValueError):
                 payload = {}
 
         model = payload.get("model") or payload.get("model_name") or "unknown"
@@ -152,7 +152,7 @@ def run_llm_cost(run_id: int) -> tuple[int, float, dict]:
         try:
             total_cost += float(cost)
             breakdown[model]["cost_total"] += float(cost)
-        except Exception:
+        except (TypeError, ValueError):
             pass
 
     return call_count, total_cost, breakdown

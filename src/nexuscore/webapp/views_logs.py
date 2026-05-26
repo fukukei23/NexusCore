@@ -122,7 +122,7 @@ def run_logs(run_id: str):
         if isinstance(payload, str):
             try:
                 payload = json.loads(payload)
-            except Exception:
+            except (json.JSONDecodeError, ValueError):
                 payload = {}
         if payload.get("guardian_review"):
             guardian_review = payload.get("guardian_review")
@@ -139,7 +139,7 @@ def run_logs(run_id: str):
                 diff_end = markdown_content.find("##", diff_start + 1)
                 if diff_end > 0:
                     diff_summary = markdown_content[diff_start:diff_end]
-    except Exception:
+    except (OSError, UnicodeDecodeError):
         pass
 
     # クエリパラメータ

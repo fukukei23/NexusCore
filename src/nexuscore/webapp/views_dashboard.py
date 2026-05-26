@@ -62,7 +62,7 @@ def dashboard():
             .group_by(ExecutionLog.payload_json["model"].astext)
             .all()
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 — dashboard degrades gracefully on query failure
         llm_stats = []
 
     if request.headers.get("Accept", "").startswith("application/json"):

@@ -25,8 +25,7 @@ def _to_json(payload: Any) -> str:
 
     try:
         return json.dumps(payload, ensure_ascii=False, default=str)
-    except Exception:
-        # 万一シリアライズに失敗してもログ全体が死なないようにする
+    except (TypeError, ValueError):
         return json.dumps({"raw": str(payload)}, ensure_ascii=False)
 
 
@@ -67,5 +66,5 @@ def log_execution_event(
     # ログは失敗してもコア処理を壊さないように、commit 失敗は握りつぶす方向で
     try:
         db.session.commit()
-    except Exception:
+    except Exception:  # noqa: BLE001 — DB commit failure must not crash the app
         db.session.rollback()
