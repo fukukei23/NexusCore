@@ -1,5 +1,128 @@
 from __future__ import annotations
 
+_TEST_LEVEL_INSTRUCTIONS: dict[str, str] = {
+    "unit": """
+## テストレベル: ユニットテスト
+
+以下の観点でテストを生成してください：
+- 各関数の入出力の検証
+- エッジケース（空文字列、None、境界値など）
+- 例外処理の確認
+- 戻り値の型と内容の検証
+
+外部依存（LLM API、ファイルシステム、サブプロセス）はモック化してください。
+""",
+    "component": """
+## テストレベル: コンポーネントテスト
+
+以下の観点でテストを生成してください：
+- モジュール全体の振る舞いの検証
+- 外部依存（LLM API、ファイルシステム、サブプロセス）をモック化
+- エラーハンドリングの確認
+- 状態遷移の確認（あれば）
+
+モックは適切に設定し、実装の詳細に依存しすぎないようにしてください。
+""",
+    "e2e": """
+## テストレベル: E2E / シナリオテスト
+
+以下の観点でテストを生成してください：
+- 典型的なユーザーフローの確認
+- エンドツーエンドのワークフローの検証
+- 統合的な動作の確認
+
+実際の外部依存を使う場合は、テスト環境を適切に設定してください。
+""",
+}
+
+_RISK_INSTRUCTIONS: dict[str, str] = {
+    "S": """
+## ⚠️ 重要: クリティカルモジュール
+
+このモジュールは **クリティカル** なため、以下の点を特に注意してください：
+- 安全性に関するテストを必ず含める
+- エッジケースを網羅的にカバーする
+- 例外処理のテストを充実させる
+- 境界値テストを必ず含める
+
+生成後、人間によるレビューが必須です。
+""",
+    "A": """
+## 重要: 重要モジュール
+
+このモジュールは **重要** なため、以下の点を注意してください：
+- 主要な機能のテストを網羅する
+- エッジケースを適切にカバーする
+- 例外処理のテストを含める
+
+生成後、人間によるレビューを推奨します。
+""",
+    "B": """
+## 非クリティカルモジュール
+
+このモジュールは非クリティカルなため、基本的なテストを生成してください。
+重大なバグを検出できる程度のテストで十分です。
+""",
+}
+
+_WEBAPP_INSTRUCTIONS = """
+## Web/API テストの特別な要件
+
+このモジュールは Flask アプリケーションの Web/API レイヤーです。以下の点を特に注意してください：
+
+- Flask アプリケーションのテストであることを想定してください
+- HTTP エンドポイントに対するテストクライアント（Flaskの `test_client()` または既存のテストユーティリティ）を利用してください
+- 認証が必要なエンドポイントについては、認証済み / 非認証の両方のパターンをテストしてください
+- ステータスコード（200, 401, 403, 404, 500 など）、レスポンスボディ、権限エラー（401/403）も検証してください
+- 異常系（存在しないリソースID、権限のないユーザーによるアクセス、不正なリクエストボディなど）も最低1ケース以上含めてください
+- セッション管理やクッキーのテストも必要に応じて含めてください
+"""
+
+_OUTPUT_FORMAT_TEMPLATE = """\
+## 出力形式
+
+以下の形式で pytest テストコードを生成してください：
+
+```python
+{test_file_hint}
+
+import pytest
+from unittest.mock import Mock, patch, MagicMock
+
+# テストコードをここに記述
+```
+
+## 注意事項
+
+- `time.sleep` は使わない
+- 外部API依存は必ずモック化
+- ランダム値は固定する
+- 実ファイル削除は行わない（tmp_path を使用）
+- 実行時間は短く（〜500ms）
+- 1テスト = 1責務
+- 公開APIに対するテスト
+- 内部実装に依存しない
+"""
+
+
+def _build_header_block(target_file_path: str, target_code: str, existing_tests: str | None) -> list[str]:
+    lines = [
+        "# テスト生成タスク",
+        "",
+        "## 対象ファイル",
+        f"`{target_file_path}`",
+        "",
+        "## 対象コード",
+        "```python",
+        target_code,
+        "```",
+        "",
+    ]
+    if existing_tests:
+        lines.extend(["## 既存テスト", "```python", existing_tests, "```", ""])
+    return lines
+
+
 def build_test_generation_prompt(
     target_file_path: str,
     target_code: str,
@@ -30,128 +153,19 @@ def build_test_generation_prompt(
     Returns:
         LLM に送るプロンプト文字列
     """
-    lines = [
-        "# テスト生成タスク",
-        "",
-        "## 対象ファイル",
-        f"`{target_file_path}`",
-        "",
-        "## 対象コード",
-        "```python",
-        target_code,
-        "```",
-        "",
-    ]
+    lines = _build_header_block(target_file_path, target_code, existing_tests)
 
-    # 既存テストがあれば追加
-    if existing_tests:
-        lines.extend(
-            [
-                "## 既存テスト",
-                "```python",
-                existing_tests,
-                "```",
-                "",
-            ]
-        )
-
-    # テストレベルに応じた指示
-    test_level_instructions = {
-        "unit": """
-## テストレベル: ユニットテスト
-
-以下の観点でテストを生成してください：
-- 各関数の入出力の検証
-- エッジケース（空文字列、None、境界値など）
-- 例外処理の確認
-- 戻り値の型と内容の検証
-
-外部依存（LLM API、ファイルシステム、サブプロセス）はモック化してください。
-""",
-        "component": """
-## テストレベル: コンポーネントテスト
-
-以下の観点でテストを生成してください：
-- モジュール全体の振る舞いの検証
-- 外部依存（LLM API、ファイルシステム、サブプロセス）をモック化
-- エラーハンドリングの確認
-- 状態遷移の確認（あれば）
-
-モックは適切に設定し、実装の詳細に依存しすぎないようにしてください。
-""",
-        "e2e": """
-## テストレベル: E2E / シナリオテスト
-
-以下の観点でテストを生成してください：
-- 典型的なユーザーフローの確認
-- エンドツーエンドのワークフローの検証
-- 統合的な動作の確認
-
-実際の外部依存を使う場合は、テスト環境を適切に設定してください。
-""",
-    }
-
-    lines.append(test_level_instructions.get(test_level, test_level_instructions["unit"]))
+    lines.append(_TEST_LEVEL_INSTRUCTIONS.get(test_level, _TEST_LEVEL_INSTRUCTIONS["unit"]))
+    lines.append("")
+    lines.append(_RISK_INSTRUCTIONS.get(risk_level, _RISK_INSTRUCTIONS["B"]))
     lines.append("")
 
-    # リスクランクに応じた指示
-    risk_instructions = {
-        "S": """
-## ⚠️ 重要: クリティカルモジュール
-
-このモジュールは **クリティカル** なため、以下の点を特に注意してください：
-- 安全性に関するテストを必ず含める
-- エッジケースを網羅的にカバーする
-- 例外処理のテストを充実させる
-- 境界値テストを必ず含める
-
-生成後、人間によるレビューが必須です。
-""",
-        "A": """
-## 重要: 重要モジュール
-
-このモジュールは **重要** なため、以下の点を注意してください：
-- 主要な機能のテストを網羅する
-- エッジケースを適切にカバーする
-- 例外処理のテストを含める
-
-生成後、人間によるレビューを推奨します。
-""",
-        "B": """
-## 非クリティカルモジュール
-
-このモジュールは非クリティカルなため、基本的なテストを生成してください。
-重大なバグを検出できる程度のテストで十分です。
-""",
-    }
-
-    lines.append(risk_instructions.get(risk_level, risk_instructions["B"]))
-    lines.append("")
-
-    # Web/API モジュール向けの特別な指示
-    is_webapp_module = module_name is not None and module_name.startswith("webapp.")
-    webapp_instructions = ""
-    if is_webapp_module:
-        webapp_instructions = """
-## Web/API テストの特別な要件
-
-このモジュールは Flask アプリケーションの Web/API レイヤーです。以下の点を特に注意してください：
-
-- Flask アプリケーションのテストであることを想定してください
-- HTTP エンドポイントに対するテストクライアント（Flaskの `test_client()` または既存のテストユーティリティ）を利用してください
-- 認証が必要なエンドポイントについては、認証済み / 非認証の両方のパターンをテストしてください
-- ステータスコード（200, 401, 403, 404, 500 など）、レスポンスボディ、権限エラー（401/403）も検証してください
-- 異常系（存在しないリソースID、権限のないユーザーによるアクセス、不正なリクエストボディなど）も最低1ケース以上含めてください
-- セッション管理やクッキーのテストも必要に応じて含めてください
-"""
-        lines.append(webapp_instructions)
+    if module_name is not None and module_name.startswith("webapp."):
+        lines.append(_WEBAPP_INSTRUCTIONS)
         lines.append("")
 
-    # 追加要件があれば追加
     if additional_requirements:
-        lines.append("## 追加要件")
-        lines.append(additional_requirements)
-        lines.append("")
+        lines.extend(["## 追加要件", additional_requirements, ""])
 
     if requirements:
         lines.append("## 追加要件・懸念事項")
@@ -159,44 +173,11 @@ def build_test_generation_prompt(
             lines.append(f"{i}. {req}")
         lines.append("")
 
-    # カバレッジ目標
-    lines.extend(
-        [
-            "## 目標カバレッジ",
-            f"{min_coverage}% 以上を目指してください。",
-            "",
-        ]
-    )
+    lines.extend(["## 目標カバレッジ", f"{min_coverage}% 以上を目指してください.", ""])
 
-    # 出力形式
-    lines.extend(
-        [
-            "## 出力形式",
-            "",
-            "以下の形式で pytest テストコードを生成してください：",
-            "",
-            "```python",
-            f"# tests/test_{target_file_path.replace('/', '_').replace('.py', '')}.py",
-            "",
-            "import pytest",
-            "from unittest.mock import Mock, patch, MagicMock",
-            "",
-            "# テストコードをここに記述",
-            "```",
-            "",
-            "## 注意事項",
-            "",
-            "- `time.sleep` は使わない",
-            "- 外部API依存は必ずモック化",
-            "- ランダム値は固定する",
-            "- 実ファイル削除は行わない（tmp_path を使用）",
-            "- 実行時間は短く（〜500ms）",
-            "- 1テスト = 1責務",
-            "- 公開APIに対するテスト",
-            "- 内部実装に依存しない",
-            "",
-        ]
-    )
+    test_file_hint = f"# tests/test_{target_file_path.replace('/', '_').replace('.py', '')}.py"
+    lines.append(_OUTPUT_FORMAT_TEMPLATE.format(test_file_hint=test_file_hint))
+    lines.append("")
 
     return "\n".join(lines)
 

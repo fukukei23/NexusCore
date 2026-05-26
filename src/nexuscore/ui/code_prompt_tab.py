@@ -13,6 +13,55 @@ from ._state import AppState
 logger = logging.getLogger(__name__)
 
 
+def _extract_filename_from_code(code: str) -> str:
+    match = re.search(r"^class\s+(\w+)", code, re.MULTILINE)
+    if match:
+        return f"{match.group(1)}.py"
+    match = re.search(r"^def\s+(\w+)", code, re.MULTILINE)
+    if match:
+        return f"{match.group(1)}.py"
+    return f"generated_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py"
+
+
+def _generate_test_code(code: str, module_stem: str) -> str:
+    func_names = re.findall(r"^def\s+([a-zA-Z][a-zA-Z0-9_]*)\s*\(", code, re.MULTILINE)
+    class_names = re.findall(r"^class\s+([a-zA-Z][a-zA-Z0-9_]*)", code, re.MULTILINE)
+
+    lines = [
+        "import sys",
+        "import pytest",
+        "sys.path.insert(0, 'sandbox_output')",
+        f"from {module_stem} import *",
+        "",
+    ]
+
+    if not func_names and not class_names:
+        lines += [
+            "def test_module_loads():",
+            '    """モジュールが正常にインポートできることを確認"""',
+            "    pass",
+        ]
+    else:
+        for fn in func_names:
+            lines += [
+                f"def test_{fn}():",
+                f'    """TODO: {fn}() のテストケースを追加してください"""',
+                f"    # result = {fn}(...)",
+                "    # assert result == expected",
+                "    pass",
+                "",
+            ]
+
+    return "\n".join(lines)
+
+
+def _strip_code_block(raw: str) -> str:
+    if raw.startswith("```"):
+        lines = raw.split("\n")
+        return "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+    return raw
+
+
 def build_code_prompt_tab(state: gr.State) -> None:
     with gr.Column():
         gr.Markdown("## Code / Prompt")
@@ -72,15 +121,6 @@ def build_code_prompt_tab(state: gr.State) -> None:
             outputs=[prompt_input],
         )
 
-    def _extract_filename_from_code(code: str) -> str:
-        match = re.search(r"^class\s+(\w+)", code, re.MULTILINE)
-        if match:
-            return f"{match.group(1)}.py"
-        match = re.search(r"^def\s+(\w+)", code, re.MULTILINE)
-        if match:
-            return f"{match.group(1)}.py"
-        return f"generated_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py"
-
     def generate_code_handler(
         prompt: str, filename: str, current_state: AppState
     ) -> tuple[str, str, AppState]:
@@ -100,9 +140,7 @@ def build_code_prompt_tab(state: gr.State) -> None:
                     user_prompt=prompt,
                 )
                 generated = result.get("content", "") if result.get("ok") else f"LLM Error: {result.get('reason', 'unknown')}"
-                if generated.startswith("```"):
-                    lines = generated.split("\n")
-                    generated = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+                generated = _strip_code_block(generated)
             else:
                 generated = "LLM Router が初期化されていません。APIキーを確認してください。"
 
@@ -115,37 +153,6 @@ def build_code_prompt_tab(state: gr.State) -> None:
         except Exception as e:  # noqa: BLE001
             logger.error(f"Code generation failed: {e}", exc_info=True)
             return f"Error: {e}", filename, current_state
-
-    def _generate_test_code(code: str, module_stem: str) -> str:
-        func_names = re.findall(r"^def\s+([a-zA-Z][a-zA-Z0-9_]*)\s*\(", code, re.MULTILINE)
-        class_names = re.findall(r"^class\s+([a-zA-Z][a-zA-Z0-9_]*)", code, re.MULTILINE)
-
-        lines = [
-            "import sys",
-            "import pytest",
-            "sys.path.insert(0, 'sandbox_output')",
-            f"from {module_stem} import *",
-            "",
-        ]
-
-        if not func_names and not class_names:
-            lines += [
-                "def test_module_loads():",
-                '    """モジュールが正常にインポートできることを確認"""',
-                "    pass",
-            ]
-        else:
-            for fn in func_names:
-                lines += [
-                    f"def test_{fn}():",
-                    f'    """TODO: {fn}() のテストケースを追加してください"""',
-                    f"    # result = {fn}(...)",
-                    "    # assert result == expected",
-                    "    pass",
-                    "",
-                ]
-
-        return "\n".join(lines)
 
     def save_code_handler(
         code: str, filename: str, current_state: AppState
