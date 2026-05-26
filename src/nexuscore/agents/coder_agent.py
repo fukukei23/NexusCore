@@ -25,7 +25,7 @@ class CoderAgent(BaseAgent):
             return True, ""
         except SyntaxError as e:
             return False, f"SyntaxError: {e}"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return False, f"ParseError: {e}"
 
     def implement_code(
@@ -144,5 +144,5 @@ class CoderAgent(BaseAgent):
             ):
                 return True, ""
             return False, f"Tree-sitter validation failed for {lang}"
-        except Exception:
+        except ImportError:
             return True, ""  # チェッカー呼び出し失敗でもブロックしない

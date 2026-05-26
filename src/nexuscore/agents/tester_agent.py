@@ -130,7 +130,7 @@ class TesterAgent(BaseAgent):
         try:
             llm_response = self.execute_llm_task(prompt, as_json=True, task_type="test_generate")
             test_code = extract_test_code_from_response(llm_response)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error("Failed to generate test code via LLM: %s", e, exc_info=True)
             return None
 
@@ -144,7 +144,7 @@ class TesterAgent(BaseAgent):
                 test_code=test_code,
                 target_file_path=target_file_path,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error("Failed to apply generated test code: %s", e, exc_info=True)
             return None
 
@@ -160,7 +160,7 @@ class TesterAgent(BaseAgent):
                     coverage_before=coverage_before,
                     coverage_after=coverage_after,
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("Failed to record test generation metrics: %s", e, exc_info=True)
 
         return {
@@ -194,7 +194,7 @@ class TesterAgent(BaseAgent):
                     existing_tests=existing_tests,
                 )
                 results[module_name] = result
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error("Failed to process file '%s': %s", file_path, e, exc_info=True)
                 results[file_path] = None
         return results

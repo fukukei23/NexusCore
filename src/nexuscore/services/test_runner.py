@@ -75,7 +75,7 @@ def _run_via_sandbox(
         output = result.stdout + result.stderr if result.stderr else result.stdout
         return success, output
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         msg = f"Exception while running tests: {e}"
         logger.error(msg, exc_info=True)
         if retry_context:
@@ -98,7 +98,7 @@ def _run_via_subprocess(cmd_str: str, project_path: Path) -> tuple[bool, str]:
         output = proc.stdout
         success = proc.returncode == 0
         return success, output
-    except Exception as e:
+    except (subprocess.SubprocessError, OSError) as e:
         msg = f"Exception while running tests: {e}"
         logger.error(msg, exc_info=True)
         return False, msg

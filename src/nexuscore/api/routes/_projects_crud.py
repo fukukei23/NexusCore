@@ -63,7 +63,7 @@ async def list_projects(
     except ImportError:
         logger.error("webapp models not available")
         raise make_internal_error("Database models not available") from None
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to list projects: {e}", exc_info=True)
         raise make_internal_error("Failed to list projects. Please try again later.") from e
 
@@ -121,7 +121,7 @@ async def create_project(
     except ImportError:
         logger.error("webapp models not available")
         raise make_internal_error("Database models not available") from None
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to create project: {e}", exc_info=True)
         db.session.rollback()
         raise make_internal_error("Failed to create project. Please try again later.") from e
@@ -173,7 +173,7 @@ async def get_project(
             updated_at=project.updated_at,
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         if isinstance(e, HTTPException):
             raise
         logger.error(f"Failed to get project: {e}", exc_info=True)

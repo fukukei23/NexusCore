@@ -7,13 +7,13 @@ try:
     from dotenv import load_dotenv
 
     load_dotenv(override=False)
-except Exception:
+except Exception:  # noqa: BLE001
     pass
 
 # ルーターの読み込み
 try:
     from ..llm.llm_router import LLMRouter
-except Exception:
+except Exception:  # noqa: BLE001
     LLMRouter = None  # type: ignore[assignment, misc]
 
 # 4.4: Retry と例外分類
@@ -60,7 +60,7 @@ class BaseAgent:
                 self.logger.warning(
                     "LLMRouter が見つかりません。ローカルフォールバックに切り替えます。"
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"LLMRouter 初期化に失敗: {e}", exc_info=True)
             self.llm_router = None
         # 4.4: RetryContext を保持（self_healing_service から設定可能）

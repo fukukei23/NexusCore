@@ -66,7 +66,7 @@ async def get_run_view(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to get run view: {e}", exc_info=True)
         from ..utils.errors import make_internal_error
 
@@ -137,7 +137,7 @@ async def resume_run_view(
         raise
     except FileNotFoundError:
         raise make_not_found_error("RunState", run_id) from None
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to resume run: {e}", exc_info=True)
         from ..utils.errors import make_internal_error
 
@@ -197,7 +197,7 @@ async def create_run_view(
 
         return run_view
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to create run: {e}", exc_info=True)
         from ..utils.errors import make_internal_error
 

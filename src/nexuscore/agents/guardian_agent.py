@@ -58,7 +58,7 @@ class GuardianAgent(BaseAgent):
         try:
             if callable(self.on_budget_tick):
                 self.on_budget_tick(step)
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     def _run_quality_gates(
@@ -253,7 +253,7 @@ class GuardianAgent(BaseAgent):
                     result["decision"] = "MANUAL_REVIEW"
                     result["reason"] = f"自動レビューで警告が検出されました:\n{auto_result.summary()}"
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 result["auto_review"] = {"error": str(e)}
                 self.logger.warning(f"GuardianAutoReviewer failed: {e}")
 

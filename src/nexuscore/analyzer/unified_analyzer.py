@@ -115,7 +115,7 @@ class UnifiedAnalyzer:
                 else:
                     self.stats["failed_files"] += 1
                     results.append(result)
-            except Exception as e:
+            except (OSError, UnicodeDecodeError) as e:
                 logger.warning("Failed to analyze %s: %s", file_path, e)
                 self.stats["failed_files"] += 1
                 results.append(
@@ -200,7 +200,7 @@ def analyze_python_file(file_path):
     try:
         content = path_obj.read_text(encoding="utf-8")
         return print_syntax_tree(content, "python")
-    except Exception as e:
+    except (OSError, UnicodeDecodeError) as e:
         return {"error": f"Failed to read file: {e}", "success": False}
 
 

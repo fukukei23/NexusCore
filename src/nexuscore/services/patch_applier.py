@@ -100,7 +100,7 @@ class PatchApplier:
             else:
                 patch_bytes = patch_text
             patch_set = patch.fromstring(patch_bytes)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             msg = f"Failed to parse patch text with python-patch: {e}"
             result["reason"] = msg
             result["error"] = str(e)
@@ -135,7 +135,7 @@ class PatchApplier:
                     f"The patch may be invalid or already applied."
                 )
                 self.logger.error(result["reason"])
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             msg = f"Exception occurred while applying patch: {e}"
             result["reason"] = msg
             result["error"] = str(e)

@@ -137,7 +137,7 @@ def format_pr_comment(
             from nexuscore.integration.github_pr_comment import load_run_markdown
 
             markdown_report = load_run_markdown(run_id)
-        except Exception as e:
+        except (ImportError, OSError) as e:
             logger.warning(f"Failed to load run markdown: {e}", exc_info=True)
 
     # PRCommentContext を作成（run と project は None にして、result から情報を取得）
@@ -358,7 +358,7 @@ def github_webhook(
 
         return result
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Self-healing execution failed: {e}", exc_info=True)
         return {
             "status": "error",

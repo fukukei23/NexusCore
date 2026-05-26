@@ -17,7 +17,7 @@ from ..plugins.workflow_registry import WorkflowRegistry
 # 任意（未導入でも動作可）
 try:
     from tools.prompt_batcher import build_batch_prompt
-except Exception:
+except ImportError:
 
     def build_batch_prompt(task_title, code_snippets, **_):  # type: ignore[misc]
         blocks = []
@@ -119,7 +119,7 @@ async def _run_one_model(
         )
         try:
             data = json.loads(out or "{}")
-        except Exception:
+        except (json.JSONDecodeError, ValueError):
             data = {}
         summary = {
             "issues": data.get("issues", []),
@@ -127,7 +127,7 @@ async def _run_one_model(
             "confidence": float(data.get("confidence", 0.0)),
         }
         return ModelReview(model=model_name, summary=summary, raw=out, ok=True)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # 認証エラーや429などはここに来る。低自信度で継続させる。
         return ModelReview(
             model=model_name,

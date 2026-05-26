@@ -34,7 +34,7 @@ class AnalyzerCache:
             content = file_path.read_bytes()
             hash_hex = hashlib.sha256(content).hexdigest()
             return f"sha256:{hash_hex}"
-        except Exception as e:
+        except OSError as e:
             logger.warning("Failed to compute hash for %s: %s", file_path, e)
             return ""
 
@@ -70,7 +70,7 @@ class AnalyzerCache:
                 self.cache_file, len(data.get("files", {})),
             )
             return True
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.warning("Failed to load cache from %s: %s", self.cache_file, e)
             return False
 
@@ -94,7 +94,7 @@ class AnalyzerCache:
             temp_file.replace(self.cache_file)
             self.cache_data = cache_data
             logger.debug("Saved cache to %s (%d files)", self.cache_file, len(file_results))
-        except Exception as e:
+        except OSError as e:
             logger.warning("Failed to save cache to %s: %s", self.cache_file, e)
 
     def get_cached_result(self, file_path: Path, current_hash: str) -> dict[str, Any] | None:

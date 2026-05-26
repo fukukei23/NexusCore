@@ -120,6 +120,6 @@ def get_changed_files(
                 files.append(path)
 
         return files
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"get_changed_files failed: {e}", exc_info=True)
         return []

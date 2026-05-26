@@ -32,7 +32,7 @@ def _get_git_commit() -> str | None:
         )
         if result.returncode == 0:
             return result.stdout.strip()
-    except Exception:
+    except (subprocess.SubprocessError, OSError):
         pass
     return None
 
@@ -51,7 +51,7 @@ def _get_repo_dirty() -> bool | None:
         )
         # returncode 0 = clean, non-zero = dirty
         return result.returncode != 0
-    except Exception:
+    except (subprocess.SubprocessError, OSError):
         pass
     return None
 
@@ -167,7 +167,7 @@ def write_guard_decision_event(
             json_line = json.dumps(event, ensure_ascii=False)
             f.write(json_line + "\n")
 
-    except Exception as e:
+    except OSError as e:
         # 保存失敗は例外を外に投げず警告ログにする
         logger.warning(
             f"Failed to write guard decision event to {trace_file}: {e}",

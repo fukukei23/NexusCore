@@ -53,7 +53,7 @@ def handle_github_webhook() -> dict[str, Any]:
             "result": result,
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"GitHub webhook handling failed: {e}", exc_info=True)
         return {  # type: ignore[return-value]
             "accepted": False,
@@ -109,7 +109,7 @@ def _post_pr_comment_if_configured(result: dict[str, Any], payload: dict[str, An
 
         logger.info(f"Posted PR comment to {repo_full_name}#{pr_number}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # PR コメント投稿失敗は致命的ではないのでログだけ
         logger.error(f"Failed to post PR comment: {e}", exc_info=True)
 
@@ -165,7 +165,7 @@ def _send_slack_notification_if_configured(result: dict[str, Any], payload: dict
                     metrics = _collect_run_metrics(run)
                     if project:
                         metrics["success_rate"] = _compute_recent_success_rate(project.id, limit=30)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Failed to collect metrics for Slack notification: {e}", exc_info=True)
 
         # PR URL と Run ログ URL を構築
@@ -182,7 +182,7 @@ def _send_slack_notification_if_configured(result: dict[str, Any], payload: dict
 
                 base_url = _get_config().webapp_base_url.rstrip("/")
                 run_logs_url = f"{base_url}/logs/runs/{run.run_id}"
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to build run_logs_url: {e}", exc_info=True)
 
         # Slack 通知を送信
@@ -214,6 +214,6 @@ def _send_slack_notification_if_configured(result: dict[str, Any], payload: dict
                 f"Failed to send Slack notification for {repo_full_name} PR #{pr_number}"
             )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # Slack 通知失敗は致命的ではないのでログだけ
         logger.error(f"Failed to send Slack notification: {e}", exc_info=True)

@@ -23,7 +23,7 @@ def build_tests_and_testimony_prompt(code_to_test: str) -> str:
 def build_tests_from_plan_prompt(plan: dict, module_to_import: str) -> str:
     try:
         plan_str = json.dumps(plan, indent=2, ensure_ascii=False)
-    except Exception:
+    except (TypeError, ValueError):
         plan_str = str(plan)
 
     return f"""

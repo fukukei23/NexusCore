@@ -56,7 +56,7 @@ Ensure the response is strictly valid JSON with filled arrays (no empty strings)
         response = self.execute_llm_task(prompt, as_json=True)
         try:
             data = sanitize_json_like(json.loads(response))
-        except Exception:
+        except (json.JSONDecodeError, ValueError, TypeError):
             data = {
                 "summary": requirement[:80],
                 "features": ["Auto-generated draft feature list"],

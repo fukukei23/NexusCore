@@ -75,13 +75,13 @@ class ContextAnalyzer:
         try:
             frameworks = self._safe_parse_requirements()
             tech_stack["frameworks"].extend(frameworks)
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             _logger.warning("requirements.txt解析エラー: %s", e)
 
         # 安全なツール検出
         try:
             tech_stack["tools"] = self._safe_detect_tools()
-        except Exception as e:
+        except (OSError,) as e:
             _logger.warning("ツール検出エラー: %s", e)
 
         return tech_stack
@@ -123,7 +123,7 @@ class ContextAnalyzer:
 
                 return list(set(frameworks))[:20]  # 最大20個
 
-            except Exception as e:
+            except (OSError, UnicodeDecodeError) as e:
                 _logger.warning("requirements.txt読み込みエラー: %s", e)
                 return ["gradio", "openai"]
 
@@ -149,7 +149,7 @@ class ContextAnalyzer:
                 file_path = os.path.join(self.project_root, file_pattern)
                 if os.path.exists(file_path):
                     tools.append(tool)
-        except Exception as e:
+        except (OSError,) as e:
             _logger.warning("ツールファイル検索エラー: %s", e)
 
         return tools
@@ -210,7 +210,7 @@ class ContextAnalyzer:
                     if len(structure["test_dirs"]) < 10:  # 制限
                         structure["test_dirs"].append(rel_path)
 
-        except Exception as e:
+        except (OSError,) as e:
             _logger.warning("ファイル構造スキャンエラー: %s", e)
 
         return structure
@@ -233,7 +233,7 @@ class ContextAnalyzer:
             # 簡単なインポート検索（危険なAST解析は使用しない）
             self._safe_scan_imports(dependencies)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             _logger.warning("依存関係解析エラー: %s", e)
             # フォールバック
             dependencies["external"] = ["gradio", "openai", "pytest"]
@@ -278,13 +278,13 @@ class ContextAnalyzer:
                                         module = parts[1]
                                         self._categorize_import(module, dependencies)
 
-                        except Exception:
+                        except (OSError, UnicodeDecodeError):
                             # ファイル読み込みエラーは無視
                             pass
 
                         scanned_files += 1
 
-        except Exception as e:
+        except (OSError,) as e:
             _logger.warning("インポートスキャンエラー: %s", e)
 
     def _categorize_import(self, module: str, dependencies: dict):
@@ -320,7 +320,7 @@ class ContextAnalyzer:
                 "git_repo": os.path.exists(os.path.join(self.project_root, ".git")),
                 "package_managers": self._safe_detect_package_managers(),
             }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             _logger.warning("環境検出エラー: %s", e)
             env_info = {
                 "python_version": "3.11+",
@@ -349,7 +349,7 @@ class ContextAnalyzer:
                 venv_info["active"] = True
                 venv_info["type"] = "conda"
                 venv_info["path"] = conda_env
-        except Exception:
+        except (OSError,):
             pass
 
         return venv_info
@@ -364,7 +364,7 @@ class ContextAnalyzer:
                 file_path = os.path.join(self.project_root, pattern)
                 if os.path.exists(file_path):
                     env_files.append(pattern)
-        except Exception:
+        except (OSError,):
             pass
 
         return env_files
@@ -382,7 +382,7 @@ class ContextAnalyzer:
             for file_name, manager in manager_files.items():
                 if os.path.exists(os.path.join(self.project_root, file_name)):
                     managers.append(manager)
-        except Exception:
+        except (OSError,):
             pass
 
         return managers
@@ -410,5 +410,5 @@ if __name__ == "__main__":
         _logger.info("環境: %s", env["platform"])
 
         _logger.info("安全版Context Analyzer 完了！")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         _logger.error("テストエラー: %s", e)

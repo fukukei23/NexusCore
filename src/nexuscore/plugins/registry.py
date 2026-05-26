@@ -58,7 +58,7 @@ class AgentRegistry:
                 agent_class = ep.load()
                 cls.register(ep.name, agent_class)
                 logger.info("Discovered external agent: %s", ep.name)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("Failed to load agent plugin '%s': %s", ep.name, e)
 
     @classmethod

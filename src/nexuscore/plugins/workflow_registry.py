@@ -58,7 +58,7 @@ class WorkflowRegistry:
                 wf_class = ep.load()
                 cls.register(ep.name, wf_class)
                 logger.info("Discovered external workflow: %s", ep.name)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("Failed to load workflow plugin '%s': %s", ep.name, e)
 
     @classmethod

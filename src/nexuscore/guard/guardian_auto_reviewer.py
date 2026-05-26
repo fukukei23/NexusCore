@@ -56,7 +56,7 @@ class GuardianAutoReviewer:
             self.policy_rules = [
                 r for r in all_rules if r.get("enabled", True)
             ]
-        except Exception:
+        except (OSError, json.JSONDecodeError, ValueError):
             self.policy_rules = []
 
     @staticmethod

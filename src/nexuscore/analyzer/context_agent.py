@@ -43,7 +43,7 @@ class ContextAgent:
             # PolicyInterfaceが正常にインポートできた場合のみインスタンス化
             self.policy_interface = PolicyInterface() if PolicyInterface else None
             _logger.info("完全版Context Agent初期化完了")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             _logger.warning("高度機能初期化失敗、基本機能で継続: %s", e)
             self.analyzer = None
             self.policy_interface = None
@@ -64,7 +64,7 @@ class ContextAgent:
                 context = json.load(f)
                 _logger.info("キャッシュされたコンテキストをロードしました: %s", self.context_cache_file)
                 return context
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             _logger.warning("コンテキストキャッシュの読み込みに失敗: %s", e)
             return self.create_new_context()
 
@@ -82,7 +82,7 @@ class ContextAgent:
                 # 安全な基本情報 + 高度情報を統合
                 auto_context = {**base_context, **enhanced_context}
                 _logger.info("高度解析完了")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 _logger.warning("高度解析失敗、基本解析を使用: %s", e)
                 auto_context = base_context
         else:
@@ -147,7 +147,7 @@ class ContextAgent:
                         frameworks.append("pytest")
                     if "streamlit" in content:
                         frameworks.append("streamlit")
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 frameworks = ["gradio", "openai"]
 
         return frameworks
@@ -163,7 +163,7 @@ class ContextAgent:
                 count += len(files)
                 if count > 1000:  # 安全制限
                     break
-        except Exception:
+        except OSError:
             count = 0
         return count
 
@@ -178,7 +178,7 @@ class ContextAgent:
                 count += sum(1 for f in files if f.endswith(".py"))
                 if count > 500:  # 安全制限
                     break
-        except Exception:
+        except OSError:
             count = 0
         return count
 
@@ -188,7 +188,7 @@ class ContextAgent:
         if self.policy_interface:
             try:
                 return self.policy_interface.launch_and_wait_for_input(timeout=180)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 _logger.warning("Gradio UI失敗、コマンドライン版を使用: %s", e)
 
         # コマンドライン版（simple版と同様）
@@ -278,7 +278,7 @@ class ContextAgent:
             with open(self.context_cache_file, "w", encoding="utf-8") as f:
                 json.dump(context, f, indent=2, ensure_ascii=False)
             _logger.info("コンテキストを保存しました: %s", self.context_cache_file)
-        except Exception as e:
+        except (OSError, TypeError) as e:
             _logger.error("コンテキスト保存エラー: %s", e)
 
     def get_context(self) -> dict:
@@ -302,7 +302,7 @@ class ContextAgent:
                     **enhanced_update,
                     "last_updated": datetime.now().isoformat(),
                 }
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 _logger.warning("高度更新失敗、基本更新を使用: %s", e)
                 updated_context = {
                     **self.context_profile,

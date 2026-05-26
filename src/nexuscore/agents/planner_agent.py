@@ -109,7 +109,7 @@ class PlannerAgent(BaseAgent):
                         existing.append(fb_task)
                 sanitized["functions_to_implement"] = existing  # type: ignore[call-overload]
             return sanitized  # type: ignore[return-value]
-        except Exception:
+        except (json.JSONDecodeError, ValueError, TypeError, KeyError):
             self.logger.error(
                 f"Failed to decode or validate JSON plan. Raw response: {response_str}",
                 exc_info=True,

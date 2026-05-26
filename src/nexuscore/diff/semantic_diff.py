@@ -340,7 +340,7 @@ def compute_semantic_diff(
         )[:20]
         result.raw_line_diff_summary = "\n".join(diff_lines)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # どこかで例外が出ても SemanticDiffResult を返すようにする
         logger.warning(f"Error computing semantic diff for {file_path}: {e}", exc_info=True)
         # 最低限 raw diff だけは埋める

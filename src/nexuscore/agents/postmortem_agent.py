@@ -193,7 +193,7 @@ class PostmortemAgent(BaseAgent):
             self.logger.info("Successfully generated and validated a new FKB suggestion.")
             return normalized
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(
                 f"An unexpected error occurred in PostmortemAgent: {e}", exc_info=True
             )

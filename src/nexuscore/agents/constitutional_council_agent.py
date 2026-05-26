@@ -35,7 +35,7 @@ class ConstitutionalCouncilAgent(BaseAgent):
         try:
             with self.policy_path.open("r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception as e:
+        except (json.JSONDecodeError, OSError) as e:
             logger.error("Failed to load or parse current policies from %s: %s", self.policy_path, e)
             raise RuntimeError(f"Failed to load current policies: {e}") from e
 
@@ -52,7 +52,7 @@ class ConstitutionalCouncilAgent(BaseAgent):
             with self.policy_path.open("w", encoding="utf-8") as f:
                 json.dump(policies, f, ensure_ascii=False, indent=2)
             logger.info("[Council] Policies updated and saved: %s", self.policy_path)
-        except Exception as e:
+        except OSError as e:
             logger.error("Failed to save policies to %s: %s", self.policy_path, e)
             raise RuntimeError(f"Failed to save policies: {e}") from e
 
@@ -102,7 +102,7 @@ class ConstitutionalCouncilAgent(BaseAgent):
                 if not resp:
                     raise ValueError("Empty response from execute_llm_task")
                 return resp if isinstance(resp, str) else str(resp)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 last_err = e
                 logger.warning(
                     "[Council] LLM execute failed (attempt %d/%d): %s",
@@ -197,7 +197,7 @@ Analyze the case files in light of the current constitution and propose exactly 
             with pending_path.open("w", encoding="utf-8") as f:
                 json.dump(proposal, f, ensure_ascii=False, indent=2)
             logger.info("[Council] Amendment proposal saved for human approval: %s", pending_path)
-        except Exception as e:
+        except OSError as e:
             logger.error("[Council] Failed to save pending amendment: %s", e)
 
     # -------------------------------
@@ -218,7 +218,7 @@ Analyze the case files in light of the current constitution and propose exactly 
                 pending_file.replace(archive_path)
                 logger.info("[Council] Amendment archived as %s: %s", status, archive_path)
                 return True
-            except Exception as e:
+            except OSError as e:
                 last_err = e
                 wait = 2**attempt
                 logger.error(
@@ -245,7 +245,7 @@ Analyze the case files in light of the current constitution and propose exactly 
             with pending_file.open("r", encoding="utf-8") as f:
                 proposal = json.load(f)
             logger.info("[Council] Approving amendment: %s", pending_file.name)
-        except Exception as e:
+        except (json.JSONDecodeError, OSError) as e:
             logger.error("[Council] Failed to load pending amendment %s: %s", pending_file, e)
             return False
 
@@ -282,7 +282,7 @@ Analyze the case files in light of the current constitution and propose exactly 
 
         try:
             self._save_policies(new_policies)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error("[Council] Failed to save policies: %s", e)
             return False
 

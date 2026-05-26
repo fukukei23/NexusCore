@@ -46,7 +46,7 @@ class TreeSitterEngine:
                 if lang not in self.parsers:
                     self.languages[lang] = get_language(lang)
                     self.parsers[lang] = get_parser(lang)
-            except Exception as e:
+            except ImportError as e:
                 logger.warning("Failed to load parser for %s: %s", lang, e)
         return len(self.parsers) > 0
 
@@ -67,7 +67,7 @@ class TreeSitterEngine:
                 semantic_info=semantic_info,
                 errors={"has_syntax_errors": root_node.has_error},
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return AnalysisResult(success=False, error=str(e), file_path=file_path)
 
     def _extract_semantic_info(self, language: str, root_node: Node) -> dict[str, Any]:
@@ -125,7 +125,7 @@ class TreeSitterEngine:
                             "scope": scope_name,
                         }
                     )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning("Query failed in %s: %s. Falling back to manual extraction.", language, e)
             self._manual_extract(root_node, info)
 

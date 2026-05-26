@@ -132,7 +132,7 @@ class KnowledgeCuratorAgent(BaseAgent):
                     )
                     return False
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.logger.error(f"An error occurred during validation: {e}", exc_info=True)
                 return False
 

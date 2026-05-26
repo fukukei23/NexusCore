@@ -30,7 +30,7 @@ def _cost(model: str, kind: str) -> float:
     if key in os.environ:
         try:
             return float(os.environ[key])
-        except Exception as e:
+        except ValueError as e:
             logging.getLogger("npe.budget").warning("Invalid env override %s: %s", key, e)
     return DEFAULT_COST_TABLE.get(model, DEFAULT_COST_TABLE["glm-4-plus"]).get(kind, 1.0)
 

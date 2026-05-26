@@ -19,7 +19,7 @@ def run_cli_menu(agent: ConstitutionalCouncilAgent) -> None:
                 list(agent.amendments_dir.glob("pending_*.json")),
                 key=lambda f: f.stat().st_mtime,
             )
-        except Exception as e:
+        except OSError as e:
             logger.error("Error reading amendments directory: %s", e)
             break
 
@@ -36,7 +36,7 @@ def run_cli_menu(agent: ConstitutionalCouncilAgent) -> None:
                         "description", proposal.get("delete_policy_id", "N/A")
                     )
                     logger.info("[%d] %s (Summary: %s...)", idx, f.name, str(summary)[:50])
-            except Exception as e:
+            except (json.JSONDecodeError, OSError) as e:
                 logger.error("[%d] %s (Error reading content: %s)", idx, f.name, e)
 
         logger.info("------------------------------------------")

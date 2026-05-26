@@ -42,7 +42,7 @@ def execute_commit_workflow(
     try:
         if branch_name:
             prepare_branch(branch_name)
-    except Exception as e:
+    except OSError as e:
         review_data["commit"] = f"Failed to prepare branch '{branch_name}': {e}"
         return review_data
 

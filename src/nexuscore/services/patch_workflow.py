@@ -99,7 +99,7 @@ def generate_patch_via_debugger(
 
         logger.warning("DebuggerAgent has neither 'debug_and_patch' nor 'generate_patch'.")
         return {}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"DebuggerAgent call failed: {e}", exc_info=True)
         return {}
 
@@ -158,7 +158,7 @@ def run_guardian_review(
         )
         logger.info(f"GuardianAgent auto-review: decision={result.get('decision')}")
         return result
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning(f"GuardianAgent review failed: {e}", exc_info=True)
         return None
 
@@ -212,7 +212,7 @@ def generate_diff_summary(
         if full_path.exists():
             try:
                 before_code_by_file[file_path] = full_path.read_text(encoding="utf-8")
-            except Exception as e:
+            except (OSError, UnicodeDecodeError) as e:
                 logger.warning(f"Failed to read before code for {file_path}: {e}")
 
     if not before_code_by_file or guardian_agent is None:
@@ -241,7 +241,7 @@ def generate_diff_summary(
                     language="python",
                 )
                 semantic_diffs[rel_path] = result.to_dict()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 logger.warning(f"Failed to compute semantic diff for {rel_path}: {exc}", exc_info=True)
 
         if file_diffs:
@@ -252,7 +252,7 @@ def generate_diff_summary(
             )
             logger.info(f"Generated diff summary for {len(file_diffs)} files via GuardianAgent")
             return diff_summary
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning(f"Failed to generate diff summary: {e}", exc_info=True)
 
     return None

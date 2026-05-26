@@ -30,7 +30,7 @@ def _rotate_if_needed(path: Path) -> None:
                     older.unlink(missing_ok=True)
                 newer.rename(older)
         path.rename(path.with_suffix(path.suffix + ".1"))
-    except Exception as e:
+    except OSError as e:
         # Intentional print: logging infrastructure itself may not be available during rotation failure
         print(f"[NPE-Logger] WARN: rotation failed: {e}")
 
@@ -56,7 +56,7 @@ def log_transaction(log_data: dict, log_file: str | Path = DEFAULT_LOG):
         print("\n--- NPE AUDIT LOG ---")
         print(pretty)
         print("---------------------\n")
-    except Exception as e:
+    except (TypeError, ValueError) as e:
         logging.getLogger("npe.logger").warning("Console print failed: %s", e)
 
     with _lock:
@@ -64,7 +64,7 @@ def log_transaction(log_data: dict, log_file: str | Path = DEFAULT_LOG):
             _rotate_if_needed(log_file)
             with log_file.open("a", encoding="utf-8") as f:
                 f.write(entry_compact + "\n")
-        except Exception as e:
+        except OSError as e:
             # ファイルに書けない状況でも"監査の消失"を避ける
             # Intentional print: absolute last-resort fallback when file I/O fails;
             # the audit trail must not be silently lost
@@ -78,5 +78,5 @@ def log_transaction(log_data: dict, log_file: str | Path = DEFAULT_LOG):
 
         provider = get_logging_provider()
         provider.enhance_transaction(log_data, log_file)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logging.getLogger("npe.logger").warning("DB logging provider failed: %s", e)

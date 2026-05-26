@@ -38,7 +38,7 @@ class SelfHealingConfig:
 
         try:
             data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
             # 壊れている場合は安全側デフォルト
             return cls()
 
