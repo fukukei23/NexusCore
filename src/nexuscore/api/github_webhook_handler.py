@@ -84,6 +84,11 @@ def _post_pr_comment_if_configured(result: dict[str, Any], payload: dict[str, An
             logger.warning("Cannot post PR comment: missing repo_full_name or pr_number")
             return
 
+        # repo_full_name の形式を検証（"owner/repo" のみ許可）
+        if "/" not in repo_full_name or repo_full_name.startswith("/") or repo_full_name.endswith("/"):
+            logger.warning(f"Invalid repo_full_name format: {repo_full_name}")
+            return
+
         # プロジェクトルートを取得（環境変数から）
         project_root = os.getenv("NEXUS_PROJECT_ROOT", os.getcwd())
         comment_body = format_pr_comment(

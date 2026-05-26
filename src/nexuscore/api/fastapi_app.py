@@ -41,7 +41,10 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
     )
 
     # セッションミドルウェア（OAuth認証用）
-    app.add_middleware(SessionMiddleware, secret_key=os.getenv("SESSION_SECRET", "nexuscore-dev-secret"))
+    _session_secret = os.getenv("SESSION_SECRET")
+    if not _session_secret and os.getenv("ENV") == "production":
+        raise RuntimeError("SESSION_SECRET must be set in production")
+    app.add_middleware(SessionMiddleware, secret_key=_session_secret or "nexuscore-dev-secret")
 
     # Flask アプリケーションを作成（DB アクセスに必要）
     from nexuscore.webapp import create_app as create_flask_app
@@ -160,10 +163,10 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
         """
         その他の例外をトップレベル error 形式に統一するハンドラ
         """
-        # HTTPException は既に http_exception_handler で処理されているため、ここには来ない
-        # ただし、念のため HTTPException は除外
         if isinstance(exc, (HTTPException, StarletteHTTPException)):
             raise exc
+
+        logger.error(f"Unhandled exception: {exc}", exc_info=True)
 
         error_response = ErrorResponse(
             error=ErrorDetail(code="INTERNAL_ERROR", message="Internal server error")

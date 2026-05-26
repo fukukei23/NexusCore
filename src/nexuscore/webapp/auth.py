@@ -115,7 +115,8 @@ def github_callback():
         return redirect(url_for("views_projects.list_projects"))
 
     except Exception as e:  # noqa: BLE001 — top-level OAuth handler
-        return jsonify({"error": f"OAuth callback failed: {str(e)}"}), 500
+        logger.error(f"OAuth callback failed: {e}", exc_info=True)
+        return jsonify({"error": "OAuth callback failed"}), 500
 
 
 @bp.route("/logout")

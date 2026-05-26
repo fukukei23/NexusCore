@@ -41,7 +41,7 @@ class TestTranscribeAudio:
         from nexuscore.modules.whisper_handler import transcribe_audio
 
         result = transcribe_audio("/fake/audio.wav")
-        assert "エラー" in result
+        assert result == ""
 
     @patch("nexuscore.modules.whisper_handler._get_model")
     def test_transcribe_returns_text(self, mock_get_model):
@@ -61,7 +61,7 @@ class TestTranscribeAudio:
         from nexuscore.modules.whisper_handler import transcribe_audio
 
         result = transcribe_audio("/fake/audio.wav")
-        assert "エラー" in result
+        assert result == ""
 
 
 class TestGetModel:

@@ -35,4 +35,6 @@ def transcribe_audio(audio_path: str) -> str:
         result = model.transcribe(audio_path)
         return result["text"]
     except Exception as e:  # noqa: BLE001 — Whisper SDK呼び出し全体のフォールバック
-        return f"文字起こし中にエラーが発生しました: {e}"
+        import logging
+        logging.getLogger(__name__).error(f"Whisper transcription failed: {e}", exc_info=True)
+        return ""

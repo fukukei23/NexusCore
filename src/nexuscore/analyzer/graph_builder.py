@@ -79,7 +79,7 @@ class DependencyGraphBuilder:
 
                 # 呼び出し先ノードのIDを特定
                 # (単純化のため、同じ名前の最初の定義にリンクする)
-                if callee_name in self.definitions:
+                if callee_name in self.definitions and self.definitions[callee_name]:
                     callee_node_id = self.definitions[callee_name][0]
 
                     # 呼び出し元と呼び出し先がグラフに存在する場合のみエッジを追加
