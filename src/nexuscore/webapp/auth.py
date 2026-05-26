@@ -11,6 +11,8 @@ from nexuscore.webapp.models import User
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
+_HTTP_TIMEOUT = int(os.getenv("NEXUS_HTTP_TIMEOUT", "10"))
+
 # OAuth設定（環境変数から読み込み）
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
@@ -60,13 +62,13 @@ def github_callback():
 
         # GitHub API でユーザー情報を取得
         headers = {"Authorization": f"token {token.get('access_token')}"}
-        user_response = requests.get("https://api.github.com/user", headers=headers, timeout=10)
+        user_response = requests.get("https://api.github.com/user", headers=headers, timeout=_HTTP_TIMEOUT)
         user_response.raise_for_status()
         github_user = user_response.json()
 
         # メールアドレスを取得（別エンドポイント）
         email_response = requests.get(
-            "https://api.github.com/user/emails", headers=headers, timeout=10
+            "https://api.github.com/user/emails", headers=headers, timeout=_HTTP_TIMEOUT
         )
         email = None
         if email_response.status_code == 200:

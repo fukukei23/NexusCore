@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 from flask import Blueprint, jsonify, render_template, request
@@ -16,7 +17,7 @@ from nexuscore.webapp.db_helpers import (
     user_projects_query,
     user_runs_stats,
 )
-from nexuscore.webapp.models import ExecutionLog, PatchRecord, Project, Run
+from nexuscore.webapp.models import ExecutionLog, Run
 from nexuscore.webapp.views_projects import (
     _compute_run_duration,
     _format_duration,
@@ -24,6 +25,8 @@ from nexuscore.webapp.views_projects import (
 )
 
 bp = Blueprint("views_dashboard", __name__, url_prefix="/dashboard")
+
+_gradio_host = os.getenv("NEXUS_GRADIO_HOST", "http://localhost:7860")
 
 
 @bp.route("/")
@@ -191,7 +194,7 @@ def gradio_dashboard(project_id: int):
     project = user_project_or_404(user.id, project_id)
 
     # Gradio アプリのURL（別ポートで起動している前提）
-    gradio_url = f"http://localhost:7860/?project_id={project_id}"
+    gradio_url = f"{_gradio_host}/?project_id={project_id}"
 
     return render_template(
         "dashboard/gradio.html",

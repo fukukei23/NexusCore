@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 
 from flask import Blueprint, jsonify, render_template, request
-from sqlalchemy import desc
 
 from nexuscore.webapp.auth import get_current_user, require_auth
 from nexuscore.webapp.db_helpers import (
@@ -21,6 +21,8 @@ from nexuscore.webapp.views_projects import (
 )
 
 bp = Blueprint("views_logs", __name__, url_prefix="/logs")
+
+_USD_JPY_RATE = float(os.getenv("NEXUS_USD_JPY_RATE", "150.0"))
 
 
 @bp.route("/projects/<int:project_id>")
@@ -112,7 +114,7 @@ def run_logs(run_id: str):
     # 最初のモデル名を取得
     model_name = next(iter(llm_breakdown), None)
     files_changed = len(patch_files)
-    cost_usd = metrics.get("estimated_cost_jpy", 0.0) / 150.0  # JPY -> USD 簡易換算
+    cost_usd = metrics.get("estimated_cost_jpy", 0.0) / _USD_JPY_RATE  # JPY -> USD 簡易換算
 
     # Guardian Review 情報を取得（ExecutionLog から）
     guardian_review = None
