@@ -24,12 +24,13 @@ def assemble_agent_team(project_path: str) -> dict[str, Any]:
     agents: dict[str, Any] = {"llm_router": llm_router}
 
     for param_name, registry_name in PARAM_NAME_MAP.items():
-        if registry_name == "patch_applier":
-            agents[param_name] = PatchApplier()
-        elif AgentRegistry.has(registry_name):
+        if AgentRegistry.has(registry_name):
             agents[param_name] = AgentRegistry.get(registry_name)()
         else:
             logger.warning("Agent '%s' not found in registry, skipping.", registry_name)
+
+    # PatchApplier is a service, not a BaseAgent
+    agents["patch_applier_agent"] = PatchApplier()
 
     # ContextAgent (not a BaseAgent, so not in registry)
     try:

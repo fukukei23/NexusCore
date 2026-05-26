@@ -91,9 +91,13 @@ def _is_safe_filename(filename: str) -> bool:
 
 def run_web_ui(agent: ConstitutionalCouncilAgent, host: str = "127.0.0.1", port: int = 5000) -> None:
     app = Flask(__name__)
-    app.secret_key = os.getenv(
-        "FLASK_SECRET_KEY", "dev_only_secret_key_for_council_ui_fallback"
-    )
+    secret = os.getenv("FLASK_SECRET_KEY")
+    if not secret:
+        if os.getenv("ENV") == "production":
+            raise RuntimeError("FLASK_SECRET_KEY must be set in production")
+        logger.warning("FLASK_SECRET_KEY not set — using insecure dev-only fallback")
+        secret = "dev_only_secret_key_DO_NOT_USE_IN_PRODUCTION"
+    app.secret_key = secret
 
     @app.route("/")
     def index():

@@ -8,15 +8,12 @@ class ArchitectAgent(BaseAgent):
 各ファイルのスケルトンコード（骨格）、そして依存関係を定義するJSONを出力してください。
 """
 
-    # ★★★★★ ここからが最重要修正点 (1/2) ★★★★★
     def __init__(self):
         """
         ArchitectAgentを初期化する。
         新しいBaseAgentの__init__を呼び出すことで、LLMRouterが自動的にセットアップされる。
         """
         super().__init__()
-
-    # ★★★★★ ここまで ★★★★★
 
     def design_project_structure(self, user_requirement: str) -> str:
         prompt = f"""
@@ -56,8 +53,4 @@ class ArchitectAgent(BaseAgent):
   }}
 }}
 """
-        # ★★★★★ ここからが最重要修正点 (2/2) ★★★★★
-        # 古い_call_llmから、新しいexecute_llm_taskメソッドに変更
-        # これにより、このタスクに最適なLLMがLLMRouterによって自動で選択される
         return self.execute_llm_task(prompt, as_json=True)
-        # ★★★★★ ここまで ★★★★★

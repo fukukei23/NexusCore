@@ -187,6 +187,8 @@ class ContextAnalyzer:
                 ]
 
                 rel_path = os.path.relpath(root, self.project_root)
+                if rel_path.startswith(".."):
+                    continue  # skip paths outside project root
                 if rel_path == ".":
                     rel_path = "root"
 

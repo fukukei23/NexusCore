@@ -44,7 +44,6 @@ PARAM_NAME_MAP: dict[str, str] = {
     "postmortem_agent": "postmortem",
     "knowledge_curator_agent": "knowledge_curator",
     "constitutional_council_agent": "constitutional_council",
-    "patch_applier_agent": "patch_applier",
 }
 
 _AGENT_DESCRIPTIONS: dict[str, str] = {}

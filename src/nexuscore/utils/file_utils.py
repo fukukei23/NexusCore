@@ -46,7 +46,7 @@ def file_list_display(files):
             names.append(file.name)
         else:
             names.append(str(file))
-    return "\\n".join(names)
+    return "\n".join(names)
 
 
 def download_history(history):

@@ -6,25 +6,6 @@ from ._state import AppState
 from .ai_revision_tab import build_ai_revision_tab
 
 
-def run_test_handler(command: str, test_file: str, current_state: AppState):
-    """Deprecated: use test_runner_tab.run_test_handler instead."""
-    import subprocess
-    import sys
-    from pathlib import Path
-
-    try:
-        cmd = [sys.executable, "-m", "pytest", "-q"]
-        if test_file and test_file.strip():
-            cmd.append(test_file)
-        result = subprocess.run(cmd, shell=False, capture_output=True, text=True, cwd=Path.cwd())
-        output = result.stdout + result.stderr if result.stderr else result.stdout
-        current_state.latest_test_result = output
-        status_md = f"**ステータス:** {'✅ 成功' if result.returncode == 0 else '❌ 失敗'}\n\n**Return Code:** {result.returncode}"
-        return output, status_md, current_state
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(f"Test execution failed: {e}", exc_info=True)
-        return f"❌ エラー: {e}", "**ステータス:** ❌ エラー", current_state
 from .code_prompt_tab import build_code_prompt_tab
 from .history_diff_tab import build_history_diff_tab
 from .settings_tab import build_settings_tab

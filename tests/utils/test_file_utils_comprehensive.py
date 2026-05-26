@@ -153,7 +153,7 @@ class TestFileListDisplay:
         assert "file0.txt" in result
         assert "file1.txt" in result
         assert "file2.txt" in result
-        assert "\\n" in result  # 改行がエスケープされている
+        assert "\n" in result  # 改行区切りで結合される
 
     def test_file_list_display_single_file_not_list(self):
         """リストではなく単一ファイルを渡した場合"""

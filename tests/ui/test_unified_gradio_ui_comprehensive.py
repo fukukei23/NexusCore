@@ -20,7 +20,6 @@ from nexuscore.ui.unified_gradio_ui import (
     AppState,
     build_unified_ui,
     launch_unified_ui,
-    run_test_handler,
 )
 
 
@@ -300,148 +299,6 @@ class TestAppStateIntegration:
         assert state.latest_run_id is None
         assert len(state.before_code) == 0
         assert len(state.after_code) == 0
-
-
-# ============================================================================
-# run_test_handler テスト
-# ============================================================================
-class TestRunTestHandler:
-    def test_run_test_handler_success(self):
-        """テスト実行成功"""
-        state = AppState()
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = Mock(returncode=0, stdout="All tests passed", stderr="")
-
-            output, status, new_state = run_test_handler("pytest", "", state)
-
-            assert "All tests passed" in output
-            assert "✅ 成功" in status
-            assert new_state.latest_test_result == "All tests passed"
-
-    def test_run_test_handler_failure(self):
-        """テスト実行失敗"""
-        state = AppState()
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = Mock(returncode=1, stdout="", stderr="Test failed")
-
-            output, status, new_state = run_test_handler("pytest", "", state)
-
-            assert "Test failed" in output
-            assert "❌ 失敗" in status
-
-    def test_run_test_handler_with_test_file(self):
-        """特定のテストファイルを実行"""
-        state = AppState()
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = Mock(returncode=0, stdout="Tests passed", stderr="")
-
-            run_test_handler("pytest", "tests/test_sample.py", state)
-
-            mock_run.assert_called_once()
-            call_args = mock_run.call_args[0][0]
-            assert "pytest" in call_args
-            assert "tests/test_sample.py" in call_args
-
-    def test_run_test_handler_shell_false_security(self):
-        """shell=Falseでセキュアに実行"""
-        state = AppState()
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
-
-            run_test_handler("pytest", "", state)
-
-            # shell=False を確認
-            assert mock_run.call_args[1]["shell"] is False
-
-    def test_run_test_handler_command_injection_protection(self):
-        """コマンドインジェクション対策"""
-        state = AppState()
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
-
-            # 悪意のあるコマンドを試みる
-            run_test_handler("pytest", "; rm -rf /", state)
-
-            # リスト形式で渡されることを確認
-            call_args = mock_run.call_args[0][0]
-            assert isinstance(call_args, list)
-            assert mock_run.call_args[1]["shell"] is False
-
-    def test_run_test_handler_exception(self):
-        """例外処理"""
-        state = AppState()
-
-        with patch("subprocess.run", side_effect=Exception("Test error")):
-            output, status, new_state = run_test_handler("pytest", "", state)
-
-            assert "❌ エラー" in output
-            assert "❌ エラー" in status
-
-    def test_run_test_handler_empty_command(self):
-        """空のコマンド"""
-        state = AppState()
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
-
-            run_test_handler("", "", state)
-
-            # 空のコマンドでも実行される
-            mock_run.assert_called_once()
-
-    def test_run_test_handler_stdout_stderr_combined(self):
-        """stdoutとstderrの結合"""
-        state = AppState()
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = Mock(
-                returncode=0, stdout="stdout content", stderr="stderr content"
-            )
-
-            output, _, _ = run_test_handler("pytest", "", state)
-
-            assert "stdout content" in output
-            assert "stderr content" in output
-
-    def test_run_test_handler_updates_state(self):
-        """stateの更新を確認"""
-        state = AppState()
-        test_output = "Test output"
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = Mock(returncode=0, stdout=test_output, stderr="")
-
-            _, _, new_state = run_test_handler("pytest", "", state)
-
-            assert new_state.latest_test_result == test_output
-
-    def test_run_test_handler_multiple_test_files(self):
-        """複数のテストファイル指定"""
-        state = AppState()
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
-
-            run_test_handler("pytest -v", "tests/test_a.py tests/test_b.py", state)
-
-            mock_run.assert_called_once()
-
-    def test_run_test_handler_return_code_propagation(self):
-        """リターンコードの伝播"""
-        state = AppState()
-
-        for return_code in [0, 1, 2, 127]:
-            with patch("subprocess.run") as mock_run:
-                mock_run.return_value = Mock(returncode=return_code, stdout="", stderr="")
-
-                _, status, _ = run_test_handler("pytest", "", state)
-
-                assert str(return_code) in status
 
 
 # ============================================================================
@@ -960,11 +817,11 @@ class TestModuleImports:
         assert hasattr(unified_gradio_ui, "build_unified_ui")
         assert hasattr(unified_gradio_ui, "launch_unified_ui")
 
-    def test_run_test_handler_exists(self):
-        """run_test_handler関数の存在確認"""
+    def test_run_test_handler_removed(self):
+        """run_test_handlerは非推奨で削除済み"""
         from nexuscore.ui import unified_gradio_ui
 
-        assert hasattr(unified_gradio_ui, "run_test_handler")
+        assert not hasattr(unified_gradio_ui, "run_test_handler")
 
 
 # ============================================================================
@@ -1021,11 +878,8 @@ class TestIntegration:
         # Step 4: パッチ適用
         state.after_code[str(save_path)] = "improved code"
 
-        # Step 5: テスト実行
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = Mock(returncode=0, stdout="OK", stderr="")
-            output, status, state = run_test_handler("pytest", "", state)
-            state.latest_test_result = output
+        # Step 5: テスト実行（run_test_handlerは削除済み、直接state更新で代替）
+        state.latest_test_result = "OK"
 
         # Step 6: Run ID記録
         state.latest_run_id = "integration-test-run"

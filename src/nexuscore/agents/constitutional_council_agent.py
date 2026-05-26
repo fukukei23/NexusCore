@@ -325,6 +325,8 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "web":
         logger.info("Starting Web UI mode...")
         if os.getenv("FLASK_SECRET_KEY") is None:
+            if os.getenv("ENV") == "production":
+                raise RuntimeError("FLASK_SECRET_KEY must be set in production mode")
             logger.warning("WARNING: 'FLASK_SECRET_KEY' not set. Using insecure fallback key.")
         council_agent.run_web_ui()
     else:

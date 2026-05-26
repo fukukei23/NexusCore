@@ -5,7 +5,6 @@ from typing import Any
 
 from .base_agent import BaseAgent
 
-# ★★★★★ ここからが最終ブラッシュアップの核心 (1/3) ★★★★★
 # --- 入力/出力データを安全に処理するためのヘルパー関数 ---
 
 ALLOWED_TARGETS = {"source_file", "test_file", "both"}
@@ -65,8 +64,6 @@ def _validate_and_normalize(payload: dict[str, Any]) -> dict[str, Any] | None:
     return payload
 
 
-# ★★★★★ ここまで ★★★★★
-
 
 class PostmortemAgent(BaseAgent):
     SYSTEM_PROMPT = """
@@ -90,12 +87,10 @@ class PostmortemAgent(BaseAgent):
             f"Analyzing failed test to generate new FKB entry (source={source_file_path}, test={test_file_path})"
         )
 
-        # ★★★★★ ここからが最終ブラッシュアップの核心 (2/3) ★★★★★
         # LLMに渡す前に、コンテキストを安全な形にサニタイズする
         error_log_s = _redact(_truncate(error_log))
         source_code_s = _redact(_truncate(source_code))
         test_code_s = _redact(_truncate(test_code))
-        # ★★★★★ ここまで ★★★★★
 
         prompt = f"""
 # 状況
@@ -166,7 +161,6 @@ class PostmortemAgent(BaseAgent):
                 self.logger.error("LLM response was empty.")
                 return None
 
-            # ★★★★★ ここからが最終ブラッシュアップの核心 (3/3) ★★★★★
             # LLMからの出力を安全にパースし、検証する
             candidate = None
             try:
@@ -198,7 +192,6 @@ class PostmortemAgent(BaseAgent):
 
             self.logger.info("Successfully generated and validated a new FKB suggestion.")
             return normalized
-            # ★★★★★ ここまで ★★★★★
 
         except Exception as e:
             self.logger.error(

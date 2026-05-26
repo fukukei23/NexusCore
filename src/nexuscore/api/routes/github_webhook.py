@@ -41,7 +41,10 @@ def verify_github_signature(
         bool: 署名が有効な場合 True
     """
     if not secret:
-        # シークレットが設定されていない場合は検証をスキップ（開発環境など）
+        # シークレットが設定されていない場合は検証をスキップ（開発環境のみ）
+        if os.getenv("ENV") == "production":
+            logger.error("GITHUB_WEBHOOK_SECRET is not set in production — rejecting request")
+            return False
         logger.warning("GITHUB_WEBHOOK_SECRET is not set. Skipping signature verification.")
         return True
 

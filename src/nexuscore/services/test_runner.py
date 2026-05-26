@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shlex
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -84,10 +85,12 @@ def _run_via_sandbox(
 
 def _run_via_subprocess(cmd_str: str, project_path: Path) -> tuple[bool, str]:
     try:
+        cmd_list = shlex.split(cmd_str)
+        if not cmd_list:
+            cmd_list = ["pytest", "-q"]
         proc = subprocess.run(
-            cmd_str,
+            cmd_list,
             cwd=str(project_path),
-            shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,

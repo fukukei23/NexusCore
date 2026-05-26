@@ -51,9 +51,6 @@ class DebuggerAgent(BaseAgent):
     中央のナレッジベースと連携し、過去の失敗から学習する。
     """
 
-    total_pr_attempts: int = 0
-    successful_prs: int = 0
-
     SYSTEM_PROMPT = """あなたは、ソフトウェアのデバッグを専門とするAIアシスタントです。あなたの仕事は、失敗したテストのログと関連するソースコードを分析し、バグの根本原因を特定し、それを修正するためのパッチ（unified diff形式）を生成することです。"""
 
     def __init__(self, knowledge_base_path: str | None = None):
@@ -61,6 +58,8 @@ class DebuggerAgent(BaseAgent):
         DebuggerAgentを初期化する。
         """
         super().__init__()
+        self.total_pr_attempts: int = 0
+        self.successful_prs: int = 0
         self.local_knowledge_base = None
         if knowledge_base_path:
             self.logger.info(f"Using local temporary knowledge base: {knowledge_base_path}")
@@ -203,7 +202,7 @@ class DebuggerAgent(BaseAgent):
         """
         from nexuscore.utils.github_pr_creator import GitHubPRCreator
 
-        DebuggerAgent.total_pr_attempts += 1
+        self.total_pr_attempts += 1
 
         result = self.debug_and_patch(error_log, files_content, project_path)
         if "error" in result:
@@ -232,7 +231,7 @@ class DebuggerAgent(BaseAgent):
                 original_content=original_code,
             )
             if pr_result.get("status") == "created":
-                DebuggerAgent.successful_prs += 1
+                self.successful_prs += 1
             return pr_result
         except Exception as e:
             self.logger.error("PR creation failed: %s", e, exc_info=True)

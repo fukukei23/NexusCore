@@ -89,7 +89,7 @@ class TreeSitterEngine:
                 node_to_captures[node.id][name] = node
 
             class_names = {
-                parts["class.name"].text.decode("utf8")
+                parts["class.name"].text.decode("utf8", errors="replace")
                 for parts in node_to_captures.values()
                 if "class.definition" in parts and "class.name" in parts
             }
@@ -98,7 +98,7 @@ class TreeSitterEngine:
                 if "function.definition" in captured_parts and "function.name" in captured_parts:
                     info["definitions"].append(
                         {
-                            "name": captured_parts["function.name"].text.decode("utf8"),
+                            "name": captured_parts["function.name"].text.decode("utf8", errors="replace"),
                             "type": "function",
                             "line": captured_parts["function.definition"].start_point[0] + 1,
                         }
@@ -106,13 +106,13 @@ class TreeSitterEngine:
                 elif "class.definition" in captured_parts and "class.name" in captured_parts:
                     info["definitions"].append(
                         {
-                            "name": captured_parts["class.name"].text.decode("utf8"),
+                            "name": captured_parts["class.name"].text.decode("utf8", errors="replace"),
                             "type": "class",
                             "line": captured_parts["class.definition"].start_point[0] + 1,
                         }
                     )
                 elif "call.expression" in captured_parts and "call.name" in captured_parts:
-                    call_name = captured_parts["call.name"].text.decode("utf8")
+                    call_name = captured_parts["call.name"].text.decode("utf8", errors="replace")
                     if call_name in class_names:
                         continue
                     call_node = captured_parts["call.expression"]
@@ -146,7 +146,7 @@ class TreeSitterEngine:
             if current.type in ["function_definition", "class_definition"]:
                 name_node = current.child_by_field_name("name")
                 if name_node:
-                    return name_node.text.decode("utf8")
+                    return name_node.text.decode("utf8", errors="replace")
             current = current.parent
         return "global"
 
@@ -156,7 +156,7 @@ class TreeSitterEngine:
             if name_node:
                 info["definitions"].append(
                     {
-                        "name": name_node.text.decode("utf8"),
+                        "name": name_node.text.decode("utf8", errors="replace"),
                         "type": node.type,
                         "line": node.start_point[0] + 1,
                     }
@@ -173,7 +173,7 @@ class TreeSitterEngine:
                     class_names = {
                         d["name"] for d in info["definitions"] if d.get("type") == "class"
                     }
-                    call_name = name_node.text.decode("utf8")
+                    call_name = name_node.text.decode("utf8", errors="replace")
                     if call_name not in class_names:
                         info["calls"].append(
                             {

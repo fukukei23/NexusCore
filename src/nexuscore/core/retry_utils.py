@@ -181,7 +181,9 @@ def retry_with_context(
     if retry_config is None:
         retry_config = RetryConfig(max_retries=max_retries, base_delay=base_delay)
     else:
-        # retry_config が指定された場合、max_retries と base_delay を上書き
+        # retry_config が指定された場合、元の設定を変更しないためコピーを作成
+        import copy
+        retry_config = copy.copy(retry_config)
         if max_retries != 3:  # デフォルト値以外が指定された場合
             retry_config.max_retries = max_retries
         if base_delay != 1.0:  # デフォルト値以外が指定された場合

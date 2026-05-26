@@ -134,7 +134,7 @@ class NexusConfig:
 
         # 各サブシステムの設定を作成
         config = cls(
-            flask_secret_key=os.getenv("FLASK_SECRET_KEY", "dev-secret-key-change-in-production"),
+            flask_secret_key=os.getenv("FLASK_SECRET_KEY", "dev-secret-key-change-in-production" if os.getenv("ENV") != "production" else None),
             database=DatabaseConfig.from_env(),
             celery=CeleryConfig.from_env(),
             autonomy=AutonomyConfig.from_env(),

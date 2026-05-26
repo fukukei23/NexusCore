@@ -26,9 +26,7 @@ class KnowledgeCuratorAgent(BaseAgent):
         original_project_path: str,
         failed_test_path: str,
         related_source_path: str,
-        # ▼▼▼▼▼ 【最重要修正点】生のテスト失敗ログを追加 ▼▼▼▼▼
         original_test_output: str,
-        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
     ) -> bool:
         """
         提案されたFKBエントリを一時的なサンドボックス環境で検証する。
