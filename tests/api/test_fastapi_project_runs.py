@@ -138,7 +138,7 @@ def test_trigger_project_run_sync_mode(mock_db_session, mock_project, mock_run, 
         patch.object(projects_module.os, "getenv") as mock_getenv,
         patch("nexuscore.webapp.models.Project") as MockProject,
         patch("nexuscore.webapp.models.Run") as MockRun,
-        patch("nexuscore.webapp.orchestrator_inline.run_orchestrator_inline") as mock_inline,
+        patch("nexuscore.webapp.orchestrator_helper.run_orchestrator_inline") as mock_inline,
     ):
 
         # os.getenv のモックを設定

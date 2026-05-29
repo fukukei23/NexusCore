@@ -53,7 +53,7 @@ async def trigger_project_run(
         from nexuscore.webapp import db
         from nexuscore.webapp.celery_app import run_orchestrator_task
         from nexuscore.webapp.models import Project, Run
-        from nexuscore.webapp.orchestrator_inline import run_orchestrator_inline
+        from nexuscore.webapp.orchestrator_helper import run_orchestrator_inline
 
         user_id = get_user_id_from_auth(current_user)
 

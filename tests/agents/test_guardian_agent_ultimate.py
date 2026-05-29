@@ -160,6 +160,7 @@ class TestGuardianAgentUltimate(unittest.TestCase):
                     except Exception:
                         pass
 
+    @unittest.skipUnless(__import__("importlib").util.find_spec("psutil"), "psutil not installed")
     @patch("psutil.cpu_percent")
     @patch("psutil.virtual_memory")
     @patch("psutil.net_io_counters")

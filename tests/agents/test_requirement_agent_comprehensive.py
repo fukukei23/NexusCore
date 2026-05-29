@@ -10,19 +10,21 @@ Comprehensive Tests for RequirementAgent
 """
 
 import json
+
+import pytest
 from unittest.mock import MagicMock, patch
 
-from nexuscore.agents.requirement_agent import (
-    RequirementAgent,
-    StateMachine,
-    TextLocalization,
-)
+from nexuscore.agents.requirement_agent import RequirementAgent
+
+# StateMachine and TextLocalization were removed from requirement_agent.py
+# Tests using these are skipped below.
 
 # ============================================================================
 # Tests: TextLocalization
 # ============================================================================
 
 
+@pytest.mark.skip("TextLocalization removed from requirement_agent.py")
 class TestTextLocalization:
     def test_init_with_japanese(self):
         """日本語で初期化"""
@@ -81,6 +83,7 @@ class TestTextLocalization:
 # ============================================================================
 
 
+@pytest.mark.skip("StateMachine removed from requirement_agent.py")
 class TestStateMachine:
     def test_init_with_agent(self):
         """エージェントで初期化"""
@@ -109,6 +112,7 @@ class TestStateMachine:
 # ============================================================================
 
 
+@pytest.mark.skip("agent.text and agent.use_ui removed from RequirementAgent")
 class TestRequirementAgentInit:
     def test_init_with_defaults(self):
         """デフォルト値で初期化"""
@@ -320,6 +324,7 @@ class TestAnalyzeRequirement:
 # ============================================================================
 
 
+@pytest.mark.skip("launch_gradio_ui removed from RequirementAgent")
 class TestLaunchGradioUi:
     def test_headless_mode_calls_analyze_requirement(self):
         """ヘッドレスモードではanalyze_requirementを呼ぶ"""
@@ -353,6 +358,7 @@ class TestLaunchGradioUi:
 # ============================================================================
 
 
+@pytest.mark.skip("StateMachine and launch_gradio_ui removed from RequirementAgent")
 class TestIntegrationScenarios:
     @patch.object(RequirementAgent, "execute_llm_task")
     def test_full_headless_workflow(self, mock_execute):
@@ -522,6 +528,7 @@ class TestRequirementAgentEdgeCases:
         agent.set_initial_requirement("")
         assert agent._initial_requirement == ""
 
+    @pytest.mark.skip("TextLocalization removed from requirement_agent.py")
     def test_text_localization_with_empty_language(self):
         """空の言語コードでのTextLocalization"""
         text = TextLocalization(language="")
@@ -532,7 +539,7 @@ class TestRequirementAgentEdgeCases:
     @patch.object(RequirementAgent, "execute_llm_task")
     def test_multiple_requirement_updates_workflow(self, mock_execute):
         """複数回の要件更新ワークフロー"""
-        agent = RequirementAgent(use_ui=False)
+        agent = RequirementAgent()
 
         # 1回目の要件設定
         agent.set_initial_requirement("要件v1")
@@ -552,6 +559,7 @@ class TestRequirementAgentEdgeCases:
         # final_requirementsが更新される
         assert agent.final_requirements["summary"] == "v2"
 
+    @pytest.mark.skip("StateMachine removed from requirement_agent.py")
     @patch.object(RequirementAgent, "execute_llm_task")
     def test_state_machine_multiple_transitions(self, mock_execute):
         """StateMachineの複数回遷移"""
@@ -691,6 +699,7 @@ class TestRequirementAgentAdvancedScenarios:
 # ============================================================================
 
 
+@pytest.mark.skip("launch_gradio_ui and Gradio UI removed from RequirementAgent")
 class TestGradioUIEventHandlers:
     """Cover lines 192-253: Gradio UI internal event handler closures."""
 
@@ -835,6 +844,7 @@ class TestGradioUIEventHandlers:
                 assert result == {"summary": "existing"}
 
 
+@pytest.mark.skip("launch_gradio_ui and Gradio UI removed from RequirementAgent")
 class TestGradioClosureExecution:
     """Directly execute closures captured from launch_gradio_ui to cover lines 206-253."""
 

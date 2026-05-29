@@ -144,7 +144,7 @@ def test_post_run_with_api_key(client: TestClient, mock_api_key, mock_db_models)
     }
 
     with (
-        patch("nexuscore.webapp.orchestrator_inline.run_orchestrator_inline"),
+        patch("nexuscore.webapp.orchestrator_helper.run_orchestrator_inline"),
         patch("nexuscore.webapp.celery_app.run_orchestrator_task"),
         patch("os.getenv", return_value="1"),
     ):  # Celery 使用を強制（202 を返す）

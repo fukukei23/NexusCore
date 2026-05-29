@@ -10,13 +10,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from nexuscore.core.errors import SandboxSecurityError
-from nexuscore.core.sandbox_executor import (
+from nexuscore.core.sandbox._config import (
     _CPU_TIME_LIMIT_SEC,
     _MEMORY_LIMIT_MB,
-    SandboxExecutor,
     _apply_resource_limits,
     _check_forbidden_modules,
 )
+from nexuscore.core.sandbox_executor import SandboxExecutor
 
 
 @pytest.fixture

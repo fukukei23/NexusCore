@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 
+@pytest.mark.skip("TextLocalization removed from requirement_agent.py")
 class TestTextLocalization:
     """TextLocalization のテスト"""
 
@@ -34,6 +35,7 @@ class TestTextLocalization:
         assert loc["nonexistent_key"] == "<nonexistent_key>"
 
 
+@pytest.mark.skip("StateMachine removed from requirement_agent.py")
 class TestStateMachine:
     """StateMachine のテスト"""
 
@@ -63,6 +65,7 @@ class TestStateMachine:
 class TestRequirementAgentInit:
     """RequirementAgent 初期化テスト"""
 
+    @pytest.mark.skip("agent.use_ui removed from RequirementAgent")
     def test_init_default(self):
         from nexuscore.agents.requirement_agent import RequirementAgent
 
@@ -77,6 +80,7 @@ class TestRequirementAgentInit:
         agent = RequirementAgent(language="en")
         assert agent.language == "en"
 
+    @pytest.mark.skip("agent.use_ui removed from RequirementAgent")
     def test_init_with_ui(self):
         from nexuscore.agents.requirement_agent import RequirementAgent
 
@@ -180,6 +184,7 @@ class TestRequirementAgentHeadless:
         result = agent.analyze_requirement("")
         assert isinstance(result, dict)
 
+    @pytest.mark.skip("launch_gradio_ui and use_ui removed from RequirementAgent")
     def test_launch_gradio_ui_headless_mode(self):
         """use_ui=False の場合、headlessモードでanalyze_requirementを呼ぶ"""
         from nexuscore.agents.requirement_agent import RequirementAgent

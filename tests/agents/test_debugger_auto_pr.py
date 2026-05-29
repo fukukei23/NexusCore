@@ -214,8 +214,7 @@ class TestAutoPRMetrics:
     """メトリクス追跡とバリデーションのテスト"""
 
     def setup_method(self):
-        DebuggerAgent.total_pr_attempts = 0
-        DebuggerAgent.successful_prs = 0
+        pass  # metrics are instance attributes, no class-level reset needed
 
     def test_metrics_track_success(self, agent, mock_llm, mock_pr_creator):
         """成功時にメトリクスが正しく更新される"""
@@ -229,8 +228,8 @@ class TestAutoPRMetrics:
             base_branch="main", fix_branch="fix/1", github_token="tok",
         )
 
-        assert DebuggerAgent.total_pr_attempts == 1
-        assert DebuggerAgent.successful_prs == 1
+        assert agent.total_pr_attempts == 1
+        assert agent.successful_prs == 1
 
     def test_metrics_track_failure(self, agent, mock_llm, mock_pr_creator):
         """失敗時はsuccessful_prsが増えない"""
@@ -244,8 +243,8 @@ class TestAutoPRMetrics:
             base_branch="main", fix_branch="fix/1", github_token="tok",
         )
 
-        assert DebuggerAgent.total_pr_attempts == 1
-        assert DebuggerAgent.successful_prs == 0
+        assert agent.total_pr_attempts == 1
+        assert agent.successful_prs == 0
 
     def test_no_changes_skipped(self, agent, mock_llm, mock_pr_creator):
         """修正コードが元と同じ場合スキップされる"""
@@ -299,9 +298,9 @@ class TestAutoPRMetrics:
             if i == 19:
                 mock_inst.create_fix_pr.side_effect = None
 
-        assert DebuggerAgent.total_pr_attempts == 20
-        assert DebuggerAgent.successful_prs == 19
-        success_rate = DebuggerAgent.successful_prs / DebuggerAgent.total_pr_attempts
+        assert agent.total_pr_attempts == 20
+        assert agent.successful_prs == 19
+        success_rate = agent.successful_prs / agent.total_pr_attempts
         assert success_rate >= 0.95
 
 
