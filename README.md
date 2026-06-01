@@ -15,15 +15,23 @@
 
 ## スクリーンショット
 
-<p align="center">
-  <img src="docs/screenshots/cli-pipeline.png" width="500" alt="CLI マルチエージェントパイプライン実行">
-  <br><b>CLI実行: 14エージェント初期化 → 8プロバイダーLLMルーティング → パイプライン実行</b>
-</p>
+### CLI マルチエージェントパイプライン（核心の動作）
 
 <p align="center">
-  <img src="docs/screenshots/test-results.png" width="500" alt="テスト結果 4,862 passed">
-  <br><b>テストスイート: 4,862 passed / カバレッジ 81%</b>
+  <img src="docs/screenshots/cli-pipeline.png" width="500" alt="CLI パイプライン実行">
 </p>
+
+> `python main_cli.py --project-path /tmp/demo "フィボナッチ数列を計算する関数を作成して"` を実行した様子。ユーザーの自然言語入力を受け取り、14のAIエージェント（Requirement → Architect → Planner → Coder → Tester → Debugger → Guardian...）が順次起動。LLMルーティングがOpenAI/Gemini/Anthropic/GLM等8プロバイダーから用途に最適なモデルを自動選択し、コード生成 → レビュー → テスト生成までを一気通貫で実行します。
+
+### テストスイート（品質の証明）
+
+<p align="center">
+  <img src="docs/screenshots/test-results.png" width="500" alt="テスト結果">
+</p>
+
+> 4,862テストが全て通過（カバレッジ81%）。agents / llm / core / api / npe / governance / guard 等、全モジュールがユニットテスト・統合テストで保護されています。ruff + mypyの静的解析も通過。
+
+### 統合UI（Gradio）
 
 <table>
   <tr>
@@ -37,14 +45,24 @@
     <td><img src="docs/screenshots/03-test-runner.png" width="300" alt="Test Runner"></td>
   </tr>
   <tr>
+    <td>自然言語でコード生成を指示。音声入力にも対応。生成されたコードをその場で保存・実行可能</td>
+    <td>AIが既存コードをレビューし、改善提案を差分形式で表示。修正をワンクリックで適用</td>
+    <td>生成されたテストをその場で実行。pass/fail結果とカバレッジをリアルタイム表示</td>
+  </tr>
+  <tr>
     <td align="center"><b>History & Diff</b></td>
     <td align="center"><b>Settings</b></td>
     <td align="center"><b>モバイル表示</b></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/04-history-diff.png" width="300" alt="History Diff"></td>
+    <td><img src="docs/screenshots/04-history-diff.png" width="300" alt="History"></td>
     <td><img src="docs/screenshots/05-settings.png" width="300" alt="Settings"></td>
     <td><img src="docs/screenshots/06-mobile.png" width="150" alt="Mobile"></td>
+  </tr>
+  <tr>
+    <td>過去の修正履歴をdiff形式で閲覧。どのエージェントが何を変更したかを時系列で追跡</td>
+    <td>LLMプロバイダー・モデル・予算上限を設定。8プロバイダーのAPIキーを一元管理</td>
+    <td>モバイルブラウザからも全タブにアクセス可能。出先でもエージェントの実行状況を確認</td>
   </tr>
 </table>
 
