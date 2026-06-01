@@ -15,6 +15,11 @@
 
 ## スクリーンショット
 
+<p align="center">
+  <img src="docs/screenshots/demo-flow.gif" width="600" alt="操作デモ（タブ切り替え：Code/Prompt→AI Revision→Test Runner→History→Settings）">
+  <br><b>操作デモ（タブ切り替え）</b>
+</p>
+
 <table>
   <tr>
     <td align="center"><b>Code / Prompt</b></td>
