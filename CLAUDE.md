@@ -1,5 +1,26 @@
 # CLAUDE.md — NexusCore
 
+## セッション開始プロトコル（必須）
+
+**毎回のセッション冒頭に必ず実行すること。**
+
+1. obsidian-ssot の `50_PROJECTS/NexusCore-dev/_STATUS.md` を読む
+2. 「今のタスク」があればそれを継続する
+3. 「今のタスク」が空なら `50_PROJECTS/NexusCore-dev/backlog.md` の先頭P1タスクを選び、`_STATUS.md` の「今のタスク」を更新してから着手する
+4. タスク完了時は `_STATUS.md` の「今のタスク」→「直近完了」に移動し、次候補タスクをひとつ繰り上げる
+
+**SSOT参照パス（obsidian-ssotリポジトリ）**:
+- 現在状態: `50_PROJECTS/NexusCore-dev/_STATUS.md`
+- バックログ: `50_PROJECTS/NexusCore-dev/backlog.md`
+- レビュー結果: `50_PROJECTS/NexusCore-dev/review/YYYY-MM-DD_review.md`
+- サイクル問題ログ: `50_PROJECTS/NexusCore-dev/_CYCLE_LOG.md`
+
+**レビューサイクル**: 月・金の2回（code-review-v3.md 使用）
+- 月曜: delta-from モード（直前1週間の変更ファイルのみ）
+- 金曜: 全体スナップショット更新
+
+---
+
 ## プロジェクト概要
 
 AIエージェントによるソフトウェア開発自動化フレームワーク。
