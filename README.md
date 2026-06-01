@@ -16,8 +16,13 @@
 ## スクリーンショット
 
 <p align="center">
-  <img src="docs/screenshots/demo-flow.gif" width="600" alt="操作デモ（タブ切り替え：Code/Prompt→AI Revision→Test Runner→History→Settings）">
-  <br><b>操作デモ（タブ切り替え）</b>
+  <img src="docs/screenshots/cli-pipeline.png" width="500" alt="CLI マルチエージェントパイプライン実行">
+  <br><b>CLI実行: 14エージェント初期化 → 8プロバイダーLLMルーティング → パイプライン実行</b>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/test-results.png" width="500" alt="テスト結果 4,862 passed">
+  <br><b>テストスイート: 4,862 passed / カバレッジ 81%</b>
 </p>
 
 <table>

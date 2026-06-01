@@ -222,7 +222,7 @@ def main():
         # BaseAgentとLLMRouterにより、APIキーやモデル名は自動で管理される
 
         # ▼▼▼▼▼ 統合点 (3/4): RequirementAgentをチームに追加 ▼▼▼▼▼
-        requirement_agent = RequirementAgent(language=args.language, use_ui=args.requirement_ui)
+        requirement_agent = RequirementAgent(language=args.language)
         if hasattr(requirement_agent, "set_initial_requirement"):
             requirement_agent.set_initial_requirement(args.requirement)
         # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
