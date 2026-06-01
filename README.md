@@ -13,16 +13,30 @@
 [![Python](https://img.shields.io/badge/python-3.12+-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
 
-![NexusCore Unified UI](docs/images/unified_ui.png)
+## スクリーンショット
 
-<details>
-<summary>UI Screenshots</summary>
-
-| Code Generation | Review | Workflow |
-|:---:|:---:|:---:|
-| ![Code Generation](docs/images/ui_code_generation.png) | ![Review](docs/images/ui_review.png) | ![Workflow](docs/images/ui_workflow.png) |
-
-</details>
+<table>
+  <tr>
+    <td align="center"><b>Code / Prompt</b></td>
+    <td align="center"><b>AI Revision</b></td>
+    <td align="center"><b>Test Runner</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/01-code-prompt.png" width="300" alt="Code Prompt"></td>
+    <td><img src="docs/screenshots/02-ai-revision.png" width="300" alt="AI Revision"></td>
+    <td><img src="docs/screenshots/03-test-runner.png" width="300" alt="Test Runner"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>History & Diff</b></td>
+    <td align="center"><b>Settings</b></td>
+    <td align="center"><b>モバイル表示</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/04-history-diff.png" width="300" alt="History Diff"></td>
+    <td><img src="docs/screenshots/05-settings.png" width="300" alt="Settings"></td>
+    <td><img src="docs/screenshots/06-mobile.png" width="150" alt="Mobile"></td>
+  </tr>
+</table>
 
 ---
 
