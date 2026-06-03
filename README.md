@@ -68,6 +68,43 @@
 
 ---
 
+## CLI デモ（GIF）
+
+<table>
+  <tr>
+    <td align="center"><b>CLI ヘルプ</b></td>
+    <td align="center"><b>エージェント概要</b></td>
+    <td align="center"><b>テスト実行</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/demo/gifs/01_help.gif" width="250" alt="CLI Help"></td>
+    <td><img src="docs/demo/gifs/02_agents.gif" width="250" alt="Agents"></td>
+    <td><img src="docs/demo/gifs/03_tests.gif" width="250" alt="Tests"></td>
+  </tr>
+  <tr>
+    <td>CLIの使い方とオプション一覧</td>
+    <td>14の専門エージェントの協調動作フロー</td>
+    <td>4,862テストの実行結果（99.82%通過）</td>
+  </tr>
+  <tr>
+    <td align="center"><b>カバレッジ</b></td>
+    <td align="center"><b>LLMルーティング</b></td>
+    <td align="center"><b>パイプライン実行</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/demo/gifs/04_coverage.gif" width="250" alt="Coverage"></td>
+    <td><img src="docs/demo/gifs/05_llm.gif" width="250" alt="LLM Routing"></td>
+    <td><img src="docs/demo/gifs/06_exec.gif" width="250" alt="Pipeline"></td>
+  </tr>
+  <tr>
+    <td>カバレッジ90.7% — 品質ゲート通過</td>
+    <td>8プロバイダーの自動ルーティング</td>
+    <td>要件→設計→実装→テストまで一気通貫</td>
+  </tr>
+</table>
+
+---
+
 ## 特徴
 
 ### マルチエージェントシステム
