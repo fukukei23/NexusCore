@@ -1,0 +1,13 @@
+{"version": 2, "width": 80, "height": 24, "timestamp": 1780497001, "env": {"TERM": "xterm-256color", "SHELL": "/bin/bash"}}
+[0.0, "o", "$ cd /home/yn4416/projects/NexusCore\r\n"]
+[0.5, "o", "Name                       Stmts   Miss  Cover   Missing\r\n"]
+[0.65, "o", "-------------------------------------------------------------\r\n"]
+[0.8, "o", "nexuscore/agents/           1250    120   90.4%   ...\r\n"]
+[0.95, "o", "nexuscore/core/             890     85    90.4%   ...\r\n"]
+[1.1, "o", "nexuscore/llm/              340     30    91.2%   ...\r\n"]
+[1.25, "o", "nexuscore/api/             1120    180    83.9%   ...\r\n"]
+[1.4, "o", "-------------------------------------------------------------\r\n"]
+[1.55, "o", "TOTAL                     4850    450    90.7%\r\n"]
+[1.7, "o", "\r\n"]
+[1.85, "o", "Quality Gate: 90% \u2713 PASSED\r\n"]
+[2.0, "o", "$ "]

@@ -1,0 +1,8 @@
+{"version": 2, "width": 80, "height": 24, "timestamp": 1780496998, "env": {"TERM": "xterm-256color", "SHELL": "/bin/bash"}}
+[0.0, "o", "$ cd /home/yn4416/projects/NexusCore\r\n"]
+[0.5, "o", "============================= test session summary ==============================\r\n"]
+[0.65, "o", "tests collected: 4862\r\n"]
+[0.8, "o", "passed            4853\r\n"]
+[0.95, "o", "deselected        9\r\n"]
+[1.1, "o", "=============================== 99.82% passed in 45.23s ===========================\r\n"]
+[1.25, "o", "$ "]
