@@ -1,0 +1,15 @@
+title: NexusCore
+description: マルチエージェントAI開発フレームワーク — 機能ショーケース
+remote_theme: just-the-docs/just-the-docs
+
+baseurl: /NexusCore
+url: https://fukukei23.github.io
+
+color_scheme: light
+search_enabled: true
+
+aux_links:
+  "📂 GitHub リポジトリ":
+    - "https://github.com/fukukei23/NexusCore"
+
+nav_enabled: true
