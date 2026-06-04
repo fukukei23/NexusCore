@@ -145,7 +145,7 @@ nexuscore/api/             1120    180    83.9%   ...
 -------------------------------------------------------------
 TOTAL                     4850    450    90.7%
 
-Quality Gate: 90% ✓ PASSED"""
+Quality Gate: 90% [PASS]"""
     },
     {
         "id": 5,
@@ -186,9 +186,9 @@ Cost Optimization: 67% reduction
 [TesterAgent] Creating tests...
 [GuardianAgent] Quality gate...
 
-✓ Generated: hello.py, tests/test_hello.py, README.md
-✓ Smoke test: PASSED
-✓ All quality gates: PASSED"""
+[OK] Generated: hello.py, tests/test_hello.py, README.md
+[OK] Smoke test: PASSED
+[OK] All quality gates: PASSED"""
     },
 ]
 
@@ -218,7 +218,7 @@ def check_tools():
             missing.append(name)
 
     if missing:
-        print(f"⚠️  不足ツール: {', '.join(missing)}")
+        print(f"[WARN]  不足ツール: {', '.join(missing)}")
         print("   インストール:")
         if "asciinema" in missing:
             print("     pip install asciinema --user --break-system-packages")
@@ -233,7 +233,7 @@ def check_tools():
 def cast_to_svg(cast_path: Path, svg_path: Path, duration: float) -> bool:
     """asciinema cast → SVG 変換"""
     if not cast_path.exists():
-        print(f"   ❌ castファイルなし: {cast_path}")
+        print(f"   [FAIL] castファイルなし: {cast_path}")
         return False
 
     print(f"   🎨 SVG変換中...")
@@ -246,17 +246,17 @@ def cast_to_svg(cast_path: Path, svg_path: Path, duration: float) -> bool:
             text=True
         )
         if result.returncode != 0:
-            print(f"   ❌ svg-term失敗: {result.stderr}")
+            print(f"   [FAIL] svg-term失敗: {result.stderr}")
             return False
 
         if not svg_path.exists():
-            print(f"   ❌ SVGファイル未生成")
+            print(f"   [FAIL] SVGファイル未生成")
             return False
 
-        print(f"   ✅ SVG生成: {svg_path.name} ({svg_path.stat().st_size // 1024}KB)")
+        print(f"   [OK] SVG生成: {svg_path.name} ({svg_path.stat().st_size // 1024}KB)")
         return True
     except Exception as e:
-        print(f"   ❌ SVG変換エラー: {e}")
+        print(f"   [FAIL] SVG変換エラー: {e}")
         return False
 
 
@@ -331,9 +331,9 @@ def svg_to_png(svg_path: Path, png_dir: Path, fps: int, duration: float,
                             color = prompt_color
                         elif line_text.startswith("===") or line_text.startswith("---"):
                             color = header_color
-                        elif line_text.startswith("✓") or line_text.startswith("passed"):
+                        elif line_text.startswith("[OK]") or line_text.startswith("passed"):
                             color = (106, 153, 78)  # green
-                        elif line_text.startswith("❌") or line_text.startswith("failed"):
+                        elif line_text.startswith("[FAIL]") or line_text.startswith("failed"):
                             color = (204, 85, 85)  # red
                         else:
                             color = text_color
@@ -347,9 +347,9 @@ def svg_to_png(svg_path: Path, png_dir: Path, fps: int, duration: float,
         png_files.append(frame_path)
 
         if (i + 1) % 50 == 0:
-            print(f"   📊 {i + 1}/{total_frames} フレーム")
+            print(f"   [STAT] {i + 1}/{total_frames} フレーム")
 
-    print(f"   ✅ PNG生成完了: {len(png_files)} フレーム")
+    print(f"   [OK] PNG生成完了: {len(png_files)} フレーム")
     return png_files
 
 
@@ -376,10 +376,10 @@ def png_to_gif(png_files: list, gif_path: Path, fps: int) -> bool:
             str(gif_path)
         ], check=True, capture_output=True)
 
-        print(f"   ✅ GIF生成: {gif_path.name} ({gif_path.stat().st_size // 1024}KB)")
+        print(f"   [OK] GIF生成: {gif_path.name} ({gif_path.stat().st_size // 1024}KB)")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"   ❌ GIF生成失敗: {e.stderr.decode() if e.stderr else e}")
+        print(f"   [FAIL] GIF生成失敗: {e.stderr.decode() if e.stderr else e}")
         return False
     finally:
         Path(concat_file).unlink()
@@ -409,10 +409,10 @@ def png_to_mp4(png_files: list, mp4_path: Path, fps: int) -> bool:
             str(mp4_path)
         ], check=True, capture_output=True)
 
-        print(f"   ✅ MP4生成: {mp4_path.name} ({mp4_path.stat().st_size // 1024}KB)")
+        print(f"   [OK] MP4生成: {mp4_path.name} ({mp4_path.stat().st_size // 1024}KB)")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"   ❌ MP4生成失敗: {e.stderr.decode() if e.stderr else e}")
+        print(f"   [FAIL] MP4生成失敗: {e.stderr.decode() if e.stderr else e}")
         return False
     finally:
         Path(concat_file).unlink()
@@ -459,7 +459,7 @@ def generate_sample_cast(scene: dict) -> Path:
         # 最後にプロンプト
         f.write(json.dumps([round(timestamp, 4), "o", "$ "]) + "\n")
 
-    print(f"   ✅ Cast生成: {cast_path.name} ({timestamp:.1f}秒)")
+    print(f"   [OK] Cast生成: {cast_path.name} ({timestamp:.1f}秒)")
     return cast_path
 
 
@@ -490,7 +490,7 @@ def process_scene(scene: dict, generate: bool = True) -> dict:
     png_dir = PNG_DIR / scene["name"]
     png_files = svg_to_png(svg_path, png_dir, FPS, scene["duration"], scene=scene)
     if not png_files:
-        print(f"   ⚠️  PNGフレーム生成失敗")
+        print(f"   [WARN]  PNGフレーム生成失敗")
         return result
 
     # 4. GIF生成
@@ -527,7 +527,7 @@ def main():
     ensure_dirs()
 
     if args.list:
-        print("\n📋 シーン一覧:")
+        print("\n[LIST] シーン一覧:")
         print("-" * 50)
         for s in SCENES:
             print(f"  {s['id']:2}. {s['title']:<25} ({s['duration']}秒)")
@@ -556,12 +556,12 @@ def main():
             print("\n⏹ 中断")
             break
         except Exception as e:
-            print(f"\n❌ エラー: {e}")
+            print(f"\n[FAIL] エラー: {e}")
             continue
 
     # 結果サマリー
     print("\n" + "=" * 50)
-    print("📊 処理結果")
+    print("[STAT] 処理結果")
     print("=" * 50)
 
     success_count = sum(1 for r in results if r["success"])
