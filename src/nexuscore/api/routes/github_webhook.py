@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import logging
@@ -168,11 +169,9 @@ async def github_webhook_endpoint(
             delivery=delivery,
         )
 
-        # PR コメント投稿（オプション）
-        _post_pr_comment_if_configured(result, payload_dict)
-
-        # Slack 通知送信（オプション）
-        _send_slack_notification_if_configured(result, payload_dict)
+        # PR コメント投稿・Slack通知（fire-and-forget: イベントループをブロックしない）
+        asyncio.create_task(asyncio.to_thread(_post_pr_comment_if_configured, result, payload_dict))
+        asyncio.create_task(asyncio.to_thread(_send_slack_notification_if_configured, result, payload_dict))
 
         # レスポンスを構築
         return GitHubWebhookResponse(

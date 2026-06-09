@@ -26,6 +26,9 @@ build/
 dist/
 *.egg-info/
 exports/
+# デモGIF生成の中間ファイル（scripts/record_demo.py で再生成可能）
+docs/demo/frames/
+docs/demo/svgs/
 
 # --- Node.js ---
 node_modules/
