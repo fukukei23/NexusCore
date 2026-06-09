@@ -457,3 +457,87 @@ class TestErrorsCoverageGaps:
         # SandboxSecurityError 自体は classify_error の isinstance チェックに含まれない
         # NexusCoreError の isinstance チェックに達し、"unexpected" になる可能性
         assert result in ("sandbox", "unexpected", "security")
+
+
+class TestClassifyErrorMutationTests:
+    """mutmut survived mutants をキルするためのテスト群"""
+
+    # ---- キーワードマッチング エッジケース ----
+
+    def test_classify_ratelimit_in_type_name(self):
+        """型名に 'ratelimit' が含まれる場合 rate_limit に分類（mutant_54 対策）"""
+        class RateLimitError(Exception):
+            pass
+
+        exc = RateLimitError("too many requests")
+        assert classify_error(exc) == "rate_limit"
+
+    def test_classify_timeout_in_type_name_only(self):
+        """型名に 'timeout' のみがある場合 timeout に分類（mutant_65 対策）"""
+        class TimeoutError(Exception):
+            pass
+
+        exc = TimeoutError("something happened")
+        assert classify_error(exc) == "timeout"
+
+    def test_classify_resolve_in_error_str(self):
+        """メッセージに 'resolve' が含まれる場合 connection に分類（mutant_84 対策）"""
+        exc = Exception("Failed to resolve DNS for api.example.com")
+        assert classify_error(exc) == "connection"
+
+    def test_classify_connect_in_error_type(self):
+        """型名に 'connect' のみがある場合 connection に分類（mutant_91 対策）"""
+        class ConnectedProcessError(Exception):
+            pass
+
+        exc = ConnectedProcessError("failed")
+        assert classify_error(exc) == "connection"
+
+    def test_classify_connection_keyword_all_variants(self):
+        """connection 関連キーワードの全パターンを検証（mutant_76 対策）"""
+        for keyword in ["connection", "connect", "network", "dns", "resolve"]:
+            exc = Exception(f"Error: {keyword} failed")
+            assert classify_error(exc) == "connection", f"keyword '{keyword}' should classify as connection"
+
+    def test_classify_timeout_keyword_variants(self):
+        """timeout 関連キーワードの全パターンを検証"""
+        exc1 = Exception("Request timeout")
+        assert classify_error(exc1) == "timeout"
+
+        exc2 = Exception("Operation timed out")
+        assert classify_error(exc2) == "timeout"
+
+    def test_classify_rate_limit_priority_over_timeout(self):
+        """rate_limit キーワードが timeout より優先されることを検証"""
+        exc = Exception("429 rate limit timeout occurred")
+        assert classify_error(exc) == "rate_limit"
+
+    def test_classify_connection_priority_over_invalid_output(self):
+        """connection キーワードが invalid_output より優先されることを検証"""
+        exc = Exception("Connection failed: invalid json parse")
+        assert classify_error(exc) == "connection"
+
+    def test_classify_sandbox_priority_over_patch(self):
+        """sandbox キーワードが patch より優先されることを検証"""
+        exc = Exception("Sandbox patch execution failed")
+        assert classify_error(exc) == "sandbox"
+
+    def test_classify_decode_keyword_in_message(self):
+        """メッセージに 'decode' が含まれる場合 invalid_output に分類"""
+        exc = Exception("Failed to decode response: bad format")
+        assert classify_error(exc) == "invalid_output"
+
+    def test_classify_invalid_format_keyword(self):
+        """メッセージに 'invalid format' が含まれる場合 invalid_output に分類"""
+        exc = Exception("Response has invalid format")
+        assert classify_error(exc) == "invalid_output"
+
+    def test_classify_execution_failed_in_message(self):
+        """メッセージに 'execution failed' が含まれる場合 sandbox に分類"""
+        exc = Exception("Command execution failed with code 1")
+        assert classify_error(exc) == "sandbox"
+
+    def test_classify_apply_keyword(self):
+        """メッセージに 'apply' が含まれる場合 patch_apply に分類"""
+        exc = Exception("Failed to apply configuration")
+        assert classify_error(exc) == "patch_apply"

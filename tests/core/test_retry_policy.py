@@ -4,6 +4,9 @@ Tests for CR-NEXUS-051-B: Retry Policy
 このテストは Decision Table を機械的に検証し、有限性・Unexpected 処理・Backoff を担保する。
 """
 
+import os
+from unittest.mock import patch
+
 import pytest
 
 from nexuscore.core.errors import (
@@ -16,7 +19,13 @@ from nexuscore.core.errors import (
     SandboxSecurityError,
     UnexpectedSystemError,
 )
-from nexuscore.core.retry_policy import decide_retry
+from nexuscore.core.retry_policy import (
+    _calculate_exponential_backoff,
+    _calculate_linear_backoff,
+    _env_float,
+    _env_int,
+    decide_retry,
+)
 
 # ===== Decision Table 検証 =====
 
@@ -397,3 +406,146 @@ class TestValidateDecisionTable:
         monkeypatch.setattr(retry_policy, "DECISION_TABLE", bad_table)
         errors = retry_policy.validate_decision_table()
         assert any("non-negative" in e for e in errors)
+
+
+class TestDecideRetryMutationTests:
+    """mutmut survived mutants をキルするためのテスト群"""
+
+    def test_unknown_error_type_returns_abort_with_type_name(self):
+        """Decision Table にない例外型の reason に型名が含まれる（mutant_7/10 対策）"""
+        exc = ValueError("test error")
+        decision = decide_retry(exc, 1)
+        assert decision.action == "abort"
+        assert "ValueError" in decision.reason
+        assert decision.wait_seconds == 0.0
+        assert decision.should_retry is False
+
+    def test_unknown_error_type_max_attempts_reason(self):
+        """max_attempts 超過時の reason に max_attempts 値が含まれる（mutant_52/53 対策）"""
+        exc = ModelRateLimitError("rate limit")
+        decision = decide_retry(exc, 6)
+        assert decision.action == "abort"
+        assert "5" in decision.reason
+        assert decision.should_retry is False
+
+    def test_unknown_error_type_immediate_abort_reason(self):
+        """max_attempts=0 の abort reason に max_attempts 値が含まれる"""
+        exc = SandboxExecutionError("sandbox error")
+        decision = decide_retry(exc, 1)
+        assert decision.action == "abort"
+        assert "0" in decision.reason
+        assert decision.should_retry is False
+
+    def test_retry_decision_reason_contains_attempt_info(self):
+        """retry 判断の reason に attempt 数が含まれる（mutant_26 対策）"""
+        exc = ModelTimeoutError("timeout")
+        decision = decide_retry(exc, 2)
+        assert decision.action == "retry"
+        assert "2/3" in decision.reason
+        assert decision.should_retry is True
+        assert decision.wait_seconds > 0
+
+    def test_rate_limit_retry_decision(self):
+        """ModelRateLimitError の retry 判断の戻り値を検証"""
+        exc = ModelRateLimitError("429")
+        decision = decide_retry(exc, 3)
+        assert decision.action == "retry"
+        assert decision.should_retry is True
+        assert decision.wait_seconds > 0
+        assert "3/5" in decision.reason
+
+    def test_connection_retry_decision(self):
+        """ModelConnectionError の retry 判断の戻り値を検証"""
+        exc = ModelConnectionError("connection refused")
+        decision = decide_retry(exc, 1)
+        assert decision.action == "retry"
+        assert decision.should_retry is True
+        assert decision.wait_seconds > 0
+
+    def test_invalid_output_retry_decision(self):
+        """InvalidModelOutputError の retry 判断の戻り値を検証"""
+        exc = InvalidModelOutputError("bad json")
+        decision = decide_retry(exc, 2)
+        assert decision.action == "retry"
+        assert decision.should_retry is True
+        assert decision.wait_seconds > 0
+
+    def test_context_passed_through(self):
+        """context パラメータが retry 判断に影響しないことを確認"""
+        exc = ModelRateLimitError("rate limit")
+        d1 = decide_retry(exc, 1, context={"task": "test"})
+        d2 = decide_retry(exc, 1, context=None)
+        assert d1.action == d2.action
+        assert d1.should_retry == d2.should_retry
+
+
+class TestEnvHelperMutationTests:
+    """_env_float / _env_int / backoff の mutmut survived mutants 対策"""
+
+    def test_env_float_returns_default_when_not_set(self, monkeypatch):
+        """環境変数未設定時にデフォルト値を返す"""
+        monkeypatch.delenv("NEXUS_RETRY_EXPONENTIAL_BASE", raising=False)
+        assert _env_float("NEXUS_RETRY_EXPONENTIAL_BASE", 2.0) == 2.0
+
+    def test_env_float_parses_valid_value(self, monkeypatch):
+        """有効な環境変数をパースする"""
+        monkeypatch.setenv("NEXUS_RETRY_EXPONENTIAL_BASE", "3.5")
+        assert _env_float("NEXUS_RETRY_EXPONENTIAL_BASE", 2.0) == 3.5
+
+    def test_env_float_returns_default_on_invalid(self, monkeypatch):
+        """不正値の時デフォルト値を返す"""
+        monkeypatch.setenv("NEXUS_RETRY_EXPONENTIAL_BASE", "not_a_number")
+        assert _env_float("NEXUS_RETRY_EXPONENTIAL_BASE", 2.0) == 2.0
+
+    def test_env_int_returns_default_when_not_set(self, monkeypatch):
+        """環境変数未設定時にデフォルト値を返す"""
+        monkeypatch.delenv("NEXUS_RETRY_MAX_RATE_LIMIT", raising=False)
+        assert _env_int("NEXUS_RETRY_MAX_RATE_LIMIT", 5) == 5
+
+    def test_env_int_parses_valid_value(self, monkeypatch):
+        """有効な整数環境変数をパースする"""
+        monkeypatch.setenv("NEXUS_RETRY_MAX_RATE_LIMIT", "10")
+        assert _env_int("NEXUS_RETRY_MAX_RATE_LIMIT", 5) == 10
+
+    def test_env_int_returns_default_on_invalid(self, monkeypatch):
+        """不正値の時デフォルト値を返す"""
+        monkeypatch.setenv("NEXUS_RETRY_MAX_RATE_LIMIT", "abc")
+        assert _env_int("NEXUS_RETRY_MAX_RATE_LIMIT", 5) == 5
+
+    def test_env_float_returns_default_on_empty(self, monkeypatch):
+        """空文字列の時デフォルト値を返す"""
+        monkeypatch.setenv("NEXUS_RETRY_EXPONENTIAL_BASE", "")
+        assert _env_float("NEXUS_RETRY_EXPONENTIAL_BASE", 2.0) == 2.0
+
+    def test_env_int_returns_default_on_empty(self, monkeypatch):
+        """空文字列の時デフォルト値を返す"""
+        monkeypatch.setenv("NEXUS_RETRY_MAX_RATE_LIMIT", "")
+        assert _env_int("NEXUS_RETRY_MAX_RATE_LIMIT", 5) == 5
+
+    def test_exponential_backoff_uses_random_jitter(self):
+        """exponential backoff が random.uniform(0, jitter_max) を使用する"""
+        with patch("nexuscore.core.retry_policy.random.uniform", return_value=0.5) as mock_uniform:
+            result = _calculate_exponential_backoff(attempt=2, base=2.0, jitter_max=1.0)
+            assert result == 4.5  # 2^2 + 0.5
+            mock_uniform.assert_called_once_with(0, 1.0)
+
+    def test_exponential_backoff_default_params(self):
+        """デフォルトパラメータで正常動作することを確認"""
+        result = _calculate_exponential_backoff(attempt=1)
+        assert result >= 2.0  # base^1 = 2.0, jitter >= 0
+        assert result <= 3.0  # jitter_max = 1.0
+
+    def test_linear_backoff_returns_base_interval(self):
+        """linear backoff が base_interval をそのまま返す"""
+        assert _calculate_linear_backoff(10.0) == 10.0
+        assert _calculate_linear_backoff(5.0) == 5.0
+
+    def test_exponential_backoff_scaling(self):
+        """backoff が指数関数的に増加することを確認"""
+        with patch("nexuscore.core.retry_policy.random.uniform", return_value=0.0):
+            t1 = _calculate_exponential_backoff(attempt=1, base=2.0, jitter_max=0.0)
+            t2 = _calculate_exponential_backoff(attempt=2, base=2.0, jitter_max=0.0)
+            t3 = _calculate_exponential_backoff(attempt=3, base=2.0, jitter_max=0.0)
+            assert t1 == 2.0
+            assert t2 == 4.0
+            assert t3 == 8.0
