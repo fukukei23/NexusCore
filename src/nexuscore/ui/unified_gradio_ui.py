@@ -4,9 +4,8 @@ import gradio as gr
 
 from ._state import AppState
 from .ai_revision_tab import build_ai_revision_tab
-
-
 from .code_prompt_tab import build_code_prompt_tab
+from .dynamic_run_tab import build_dynamic_run_tab
 from .history_diff_tab import build_history_diff_tab
 from .settings_tab import build_settings_tab
 from .test_runner_tab import build_test_runner_tab
@@ -32,6 +31,9 @@ def build_unified_ui() -> gr.Blocks:
 
             with gr.Tab("History & Diff"):
                 build_history_diff_tab(app_state)
+
+            with gr.Tab("Dynamic Run"):
+                build_dynamic_run_tab()
 
             with gr.Tab("Settings"):
                 build_settings_tab(app_state)

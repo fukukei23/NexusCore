@@ -38,23 +38,23 @@ except Exception:  # noqa: BLE001 — パス操作のフォールバック
 
 from nexuscore.agents.architect_agent import ArchitectAgent
 from nexuscore.agents.coder_agent import CoderAgent
+from nexuscore.agents.constitutional_council_agent import ConstitutionalCouncilAgent
 from nexuscore.agents.debugger_agent import DebuggerAgent
 from nexuscore.agents.guardian_agent import GuardianAgent
 from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
-from nexuscore.agents.constitutional_council_agent import ConstitutionalCouncilAgent
-from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.agents.planner_agent import PlannerAgent
 from nexuscore.agents.policy_agent import PolicyAgent
 from nexuscore.agents.postmortem_agent import PostmortemAgent
 from nexuscore.agents.requirement_agent import RequirementAgent
 from nexuscore.agents.tester_agent import TesterAgent
-
-from nexuscore.core.session_control import SessionController
+from nexuscore.core.agent_factory import (
+    assemble_agent_team,  # noqa: F401 — re-exported for test imports
+)
 from nexuscore.core.orchestrator_models import OrchestratorContext
 from nexuscore.core.phase_runner_mixin import PhaseRunnerMixin
-from nexuscore.core.agent_factory import assemble_agent_team  # noqa: F401 — re-exported for test imports
+from nexuscore.core.session_control import SessionController
 from nexuscore.llm.llm_router import LLMRouter
-
+from nexuscore.services.patch_applier import PatchApplier
 
 # ==============================================================================
 # Orchestrator 本体
@@ -90,6 +90,7 @@ class Orchestrator(PhaseRunnerMixin):
 
     # --- optional agents (not required for pipeline) ---
     constitutional_council_agent: ConstitutionalCouncilAgent | None = None
+    context_agent: Any | None = None
 
     session_controller: SessionController | None = None
 

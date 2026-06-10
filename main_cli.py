@@ -8,12 +8,12 @@
 #      - ユーザー実装の堅牢なCLI引数、ロギング、品質ゲート設定を完全に継承。
 #      - これがNexusCoreの新しい中核エントリーポイントとなる。
 # ==============================================================================
-import sys
-import os
 import argparse
 import logging
+import os
 import shutil
 import subprocess
+import sys
 from datetime import datetime
 
 # ------------------------------------------------------------------------------
@@ -30,21 +30,29 @@ if project_root not in sys.path:
 # 必要なモジュールとエージェントのインポート
 # ------------------------------------------------------------------------------
 # ▼▼▼▼▼ 統合点 (1/4): RequirementAgentをインポートリストに追加 ▼▼▼▼▼
-from nexuscore.agents.requirement_agent import RequirementAgent
-# ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-from nexuscore.core.orchestrator import Orchestrator
 from nexuscore.agents.architect_agent import ArchitectAgent
-from nexuscore.agents.planner_agent import PlannerAgent
 from nexuscore.agents.coder_agent import CoderAgent
-from nexuscore.agents.tester_agent import TesterAgent
+from nexuscore.agents.constitutional_council_agent import ConstitutionalCouncilAgent
 from nexuscore.agents.debugger_agent import DebuggerAgent
 from nexuscore.agents.guardian_agent import GuardianAgent
+from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
+from nexuscore.agents.planner_agent import PlannerAgent
 from nexuscore.agents.policy_agent import PolicyAgent
 from nexuscore.agents.postmortem_agent import PostmortemAgent
-from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
-from nexuscore.agents.constitutional_council_agent import ConstitutionalCouncilAgent
-from nexuscore.services.patch_applier import PatchApplier
+from nexuscore.agents.requirement_agent import RequirementAgent
+from nexuscore.agents.tester_agent import TesterAgent
+from nexuscore.core.dynamic_orchestrator import DynamicRunLoop
+from nexuscore.core.dynamic_router import ActionRegistry
+
+# CR-NEXUS-054: 動的オーケストレーション
+from nexuscore.core.goal_spec import GoalSpec, standard_criteria
+from nexuscore.core.llm_assisted_router import LLMAssistedRouter
+
+# ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+from nexuscore.core.orchestrator import Orchestrator
 from nexuscore.llm.llm_router import LLMRouter
+from nexuscore.services.patch_applier import PatchApplier
+
 # from nexuscore.utils.config import config # .envからの読み込みはdotenvで直接行う
 
 # ------------------------------------------------------------------------------
@@ -144,6 +152,52 @@ def _save_codex_artifacts(status_tag: str) -> None:
         logging.warning("Codex artifact export failed: %s", artifact_error, exc_info=True)
 
 
+def run_dynamic_mode(orchestrator, llm_router, args) -> int:
+    """CR-NEXUS-054: 動的オーケストレーションループを実行する。
+
+    Args:
+        orchestrator: 初期化済みの Orchestrator インスタンス。
+        llm_router: LLMルーティング用インスタンス（--dynamic-llm-routing 時に使用）。
+        args: コマンドライン引数（requirement / language / dynamic_llm_routing /
+              max_actions / skip_actions を参照）。
+
+    Returns:
+        int: 成功なら 0、ゴール未達なら 1。
+    """
+    skip_actions = frozenset(
+        action.strip() for action in args.skip_actions.split(",") if action.strip()
+    )
+
+    goal = GoalSpec(
+        description=args.requirement,
+        criteria=standard_criteria(),
+        max_actions=args.max_actions,
+        skip_actions=skip_actions,
+    )
+
+    router = None
+    if args.dynamic_llm_routing:
+        registry = ActionRegistry.from_orchestrator(orchestrator)
+        router = LLMAssistedRouter.from_llm_router(
+            llm_router=llm_router,
+            registry=registry,
+            goal_description=args.requirement,
+            skip_actions=skip_actions,
+        )
+
+    run_loop = DynamicRunLoop(orchestrator=orchestrator, goal=goal, router=router)
+    result = run_loop.run(user_requirement=args.requirement, language=args.language)
+
+    logging.info(result.message)
+    logging.info("実行アクション数: %d", result.actions_executed)
+    logging.info("=== Decision Trace ===\n%s", result.trace.summary())
+
+    if not result.success:
+        logging.error("未達条件: %s", ", ".join(result.unsatisfied_criteria))
+        return 1
+    return 0
+
+
 def main():
     """
     コマンドラインからタスクを受け取り、Orchestratorを実行するメイン関数。
@@ -190,6 +244,30 @@ def main():
         action="store_true",
         help="RequirementAgentのGradio UIを起動して対話的に要件を決める場合に指定します。"
     )
+    # ▼▼▼ CR-NEXUS-054: 動的オーケストレーション ▼▼▼
+    parser.add_argument(
+        "--dynamic",
+        action="store_true",
+        help="ゴール駆動の動的オーケストレーションで実行します（固定パイプラインの代わり）。"
+    )
+    parser.add_argument(
+        "--dynamic-llm-routing",
+        action="store_true",
+        help="--dynamic 時に、軽量LLMによる次アクション提案を有効にします（無効提案は自動でルールベースにフォールバック）。"
+    )
+    parser.add_argument(
+        "--max-actions",
+        type=int,
+        default=12,
+        help="--dynamic 時の最大アクション数（暴走防止予算。既定: 12）。"
+    )
+    parser.add_argument(
+        "--skip-actions",
+        type=str,
+        default="",
+        help="--dynamic 時にスキップするアクションのカンマ区切りリスト。例: architecture,review"
+    )
+    # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
     args = parser.parse_args()
 
@@ -282,12 +360,20 @@ def main():
         )
 
         # --- 5. 開発プロセスの開始 ---
-        logging.info("Starting full development process...")
-        # 新しい一括実行メソッドを、CLI引数を渡して呼び出す
-        orchestrator.run_full_project(
-            user_requirement=args.requirement,
-            language=args.language
-        )
+        if args.dynamic:
+            # CR-NEXUS-054: ゴール駆動の動的オーケストレーション
+            logging.info("Starting dynamic goal-driven process (CR-NEXUS-054)...")
+            dynamic_exit = run_dynamic_mode(orchestrator, llm_router, args)
+            if dynamic_exit != 0:
+                run_status = "failure"
+                raise SystemExit(dynamic_exit)
+        else:
+            logging.info("Starting full development process...")
+            # 従来の固定パイプライン（後方互換）
+            orchestrator.run_full_project(
+                user_requirement=args.requirement,
+                language=args.language
+            )
         logging.info("Development process finished successfully.")
 
         # --- 6. 成果物チェック（Smoke Test Gate） ---
@@ -315,7 +401,7 @@ def main():
                     timeout=10
                 )
                 if result.returncode == 0 and "Hello" in result.stdout:
-                    logging.info(f"Smoke Test PASSED: hello.py executed successfully")
+                    logging.info("Smoke Test PASSED: hello.py executed successfully")
                 else:
                     logging.warning(f"Smoke Test WARNING: hello.py execution returned code {result.returncode}")
             except Exception as e:
@@ -330,7 +416,7 @@ def main():
     except Exception as e:
         run_status = "failure"
         logging.critical(f"An unexpected error occurred in the main CLI: {e}", exc_info=True)
-        raise SystemExit(1)
+        raise SystemExit(1) from e
     finally:
         _save_codex_artifacts(run_status)
 

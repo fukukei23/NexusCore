@@ -1,7 +1,7 @@
 # CR-NEXUS-054： ゴール駆動・動的オーケストレーション（Dynamic Goal-Driven Orchestration）
 
 - **CR-ID**: CR-NEXUS-054
-- **Status**: In-Progress
+- **Status**: Completed (2026-06-10)
 - **Author**: Claude Fable 5（設計） / GLM-5.1（テスト・ドキュメント量産）
 - **Date**: 2026-06-10
 - **Related CR**: CR-NEXUS-017（Resume再構築）, CR-NEXUS-019（状態機械契約）, CR-NEXUS-052（品質ゲート）
@@ -42,9 +42,14 @@
 - `core/measured_criteria.py`: 実測ベース SuccessCriterion（`QualityRegenLoop` 統合）
   - `coverage_criterion` / `lint_clean_criterion` + `PhaseCachedCheck`（phase_log変化時のみ再計測）
 
-### Out of Scope（Phase C以降に分割）
+### In Scope（Phase C — 2026-06-10 完了）
 
-- CLI `--dynamic` フラグ・Gradio UI統合 → Phase C
+- `main_cli.py`: `--dynamic` / `--dynamic-llm-routing` / `--max-actions` / `--skip-actions` フラグと `run_dynamic_mode()`
+- `ui/dynamic_run_tab.py`: 統合UI「Dynamic Run」タブ（結果 + DecisionTrace表示）
+- 既存バグ修正: `Orchestrator` に `context_agent` フィールドを追加（CLI起動不能バグの解消）
+
+### Out of Scope
+
 - `run_full_project()` の置き換え・廃止（後方互換のため当面併存）
 
 ## 4. 実装方針（Design / Implementation Plan）
@@ -113,9 +118,11 @@ class GoalSpec:
 - [x] Phase A テストパス（新規48テスト、ruff / mypy クリーン）— 2026-06-10
 - [x] Phase B コード実装完了（llm_assisted_router / measured_criteria）— 2026-06-10
 - [x] Phase B テストパス（新規18テスト、ruff / mypy クリーン）— 2026-06-10
-- [ ] Spec 更新（本書 Status → Completed）※Phase C 完了時
+- [x] Phase C コード実装完了（CLI `--dynamic` / Dynamic Run タブ / context_agentバグ修正）— 2026-06-10
+- [x] Phase C テストパス（新規6テスト、ruff / mypy クリーン）— 2026-06-10
+- [x] Spec 更新（本書 Status → Completed）— 2026-06-10
 - [x] docs/変更履歴.md 追記 — 2026-06-10
-- [ ] 完了レポート作成（Phase C完了時）
+- [x] 完了レポート作成（`docs/completion_reports/DYNAMIC_ORCHESTRATION_COMPLETION_REPORT.md`）— 2026-06-10
 
 ## 7. 参照（References）
 
