@@ -24,6 +24,7 @@ class User(db.Model):
     name = Column(String(255))
     avatar_url = Column(String(512))
     email = Column(String(255), nullable=True)
+    openrouter_key_enc = Column(String(512), nullable=True)  # AES-256-GCM暗号化済みOpenRouterキー
     created_at = Column(DateTime, default=datetime.now(UTC), nullable=False)
     updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC), nullable=False)
 

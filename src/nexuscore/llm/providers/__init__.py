@@ -8,6 +8,7 @@ from .minimax_provider import MiniMaxLLM
 from .moonshot_provider import MoonshotLLM
 from .openai_compat import OpenAICompatLLM
 from .openai_provider import OpenAILLM
+from .openrouter_provider import OpenRouterLLM
 
 __all__ = [
     "AnthropicLLM",
@@ -20,4 +21,5 @@ __all__ = [
     "MoonshotLLM",
     "OpenAICompatLLM",
     "OpenAILLM",
+    "OpenRouterLLM",
 ]

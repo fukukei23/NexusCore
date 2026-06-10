@@ -11,7 +11,7 @@ def model_family(name: str) -> str:
     """Return provider family string based on a model identifier."""
     n = name.lower().strip()
     # Direct family match
-    known_families = {"glm", "minimax", "openai", "anthropic", "google", "deepseek", "moonshot", "local"}
+    known_families = {"glm", "minimax", "openai", "anthropic", "google", "deepseek", "moonshot", "local", "openrouter"}
     if n in known_families:
         return n
     # vendor:model format

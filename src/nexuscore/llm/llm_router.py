@@ -146,9 +146,13 @@ class LLMRouter:
     # -----------------------------------------------------------------
     # 内部: モデル名→LLMクライアント生成
     # -----------------------------------------------------------------
-    def _make_client(self, model_name: str) -> BaseLLM:
+    def _make_client(self, model_name: str, api_key: str | None = None) -> BaseLLM:
         model_name = normalize_model(model_name)
-        return create_provider(model_name)
+        return create_provider(model_name, api_key=api_key)
+
+    def make_openrouter_client(self, model_name: str, user_api_key: str) -> BaseLLM:
+        """ユーザーのOpenRouterキーを使ってクライアントを生成（BYOK用）"""
+        return create_provider(f"openrouter:{model_name}", api_key=user_api_key)
 
     # -----------------------------------------------------------------
     # public: エントリポイント

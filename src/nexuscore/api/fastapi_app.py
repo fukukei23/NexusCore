@@ -15,6 +15,7 @@ from .routes import (
     execute,
     github_webhook,
     health,
+    openrouter_key,
     plans,
     projects,
     run_view,
@@ -35,6 +36,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(plans.router, prefix="/api/v1")
     app.include_router(badges.router, prefix="/api/v1")
     app.include_router(api_keys.router, prefix="/api/v1")
+    app.include_router(openrouter_key.router, prefix="/api/v1")
     app.include_router(run_view.canonical_router, prefix="/api/v1")
 
 
