@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -42,10 +41,11 @@ class TestKeyStore:
         save_key("openrouter", "sk-or-test-key-123")
         assert load_key("openrouter") == "sk-or-test-key-123"
 
-    def test_save_and_load_plaintext_fallback(self, tmp_key_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_save_refuses_without_encryption_key(self, tmp_key_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Fail-closed: save_key MUST raise when NEXUS_ENCRYPTION_KEY is not set."""
         monkeypatch.delenv("NEXUS_ENCRYPTION_KEY", raising=False)
-        save_key("openrouter", "sk-or-plain-key")
-        assert load_key("openrouter") == "sk-or-plain-key"
+        with pytest.raises(ValueError, match="NEXUS_ENCRYPTION_KEY"):
+            save_key("openrouter", "sk-or-plain-key")
 
     def test_load_missing_returns_none(self, tmp_key_dir: Path) -> None:
         assert load_key("nonexistent") is None
@@ -78,3 +78,10 @@ class TestKeyStore:
         # File should be readable only by owner (0o600)
         mode = key_file.stat().st_mode & 0o777
         assert mode == 0o600
+
+    def test_no_plaintext_storage_on_disk(self, tmp_key_dir: Path, encryption_key: str) -> None:
+        """Stored file must never contain the raw key."""
+        secret = "sk-or-super-secret-key-do-not-leak"
+        save_key("openrouter", secret)
+        raw = (tmp_key_dir / "keys.json").read_text()
+        assert secret not in raw

@@ -1,9 +1,8 @@
 """Local BYOK key storage for Gradio UI (standalone mode).
 
 Stores encrypted API keys in ``~/.nexuscore/byok/keys.json``.
-Uses :mod:`nexuscore.utils.crypto_utils` for AES-256-GCM encryption
-when ``NEXUS_ENCRYPTION_KEY`` is available; otherwise falls back to
-plaintext storage (local development only).
+Always requires ``NEXUS_ENCRYPTION_KEY`` — **fail-closed**: refuses to
+save if the encryption key is not configured.
 """
 
 from __future__ import annotations
@@ -44,33 +43,30 @@ def _flush(keys: dict) -> None:
 
 
 def save_key(provider: str, api_key: str) -> None:
-    """Save an encrypted API key for *provider*."""
-    keys = _load_all()
-    try:
-        from nexuscore.utils.crypto_utils import encrypt_string
+    """Save an encrypted API key for *provider*.
 
-        keys[provider] = {"encrypted": encrypt_string(api_key)}
-    except ValueError:
-        # NEXUS_ENCRYPTION_KEY not set — plaintext fallback (local dev only)
-        logger.warning("NEXUS_ENCRYPTION_KEY not set; storing %s key in plaintext", provider)
-        keys[provider] = {"plain": api_key}
+    Raises ``ValueError`` if ``NEXUS_ENCRYPTION_KEY`` is not set
+    (fail-closed: never stores keys in plaintext).
+    """
+    from nexuscore.utils.crypto_utils import encrypt_string  # noqa: F811
+
+    keys = _load_all()
+    keys[provider] = {"encrypted": encrypt_string(api_key)}
     _flush(keys)
 
 
 def load_key(provider: str) -> str | None:
     """Load and decrypt the API key for *provider*.  Returns ``None`` if missing."""
     entry = _load_all().get(provider)
-    if not entry:
+    if not entry or "encrypted" not in entry:
         return None
-    if "encrypted" in entry:
-        try:
-            from nexuscore.utils.crypto_utils import decrypt_string
+    try:
+        from nexuscore.utils.crypto_utils import decrypt_string
 
-            return decrypt_string(entry["encrypted"])
-        except Exception:
-            logger.exception("Failed to decrypt %s key", provider)
-            return None
-    return entry.get("plain")
+        return decrypt_string(entry["encrypted"])
+    except Exception:
+        logger.exception("Failed to decrypt %s key", provider)
+        return None
 
 
 def delete_key(provider: str) -> bool:
