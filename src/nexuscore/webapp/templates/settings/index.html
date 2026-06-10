@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}NexusCore - Settings{% endblock %}
+
+{% block extra_style %}
+<style>
+  .settings-section {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+  .status-configured { color: #16a34a; font-weight: 600; }
+  .status-not-configured { color: #6b7280; }
+  input[type="password"] {
+    width: 300px;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    outline: none;
+  }
+  input[type="password"]:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+  .btn-danger {
+    background: #dc2626;
+    color: #fff;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .btn-danger:hover { background: #b91c1c; }
+  .btn-save {
+    background: #2563eb;
+    color: #fff;
+    padding: 6px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .btn-save:hover { background: #1d4ed8; }
+  .form-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .description { color: #4b5563; font-size: 14px; margin: 8px 0 16px; line-height: 1.6; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div style="max-width: 640px; margin: 0 auto;">
+  <h1 style="margin-bottom: 4px;">Settings</h1>
+  <p class="subtitle">Logged in as: <strong>{{ user_login }}</strong></p>
+
+  {% for msg in get_flashed_messages() %}
+  <div class="flash-message">{{ msg }}</div>
+  {% endfor %}
+
+  <a href="/" class="btn-link" style="margin-bottom: 20px; display: inline-block;">&larr; Dashboard</a>
+
+  <div class="settings-section" style="margin-top: 16px;">
+    <h2 style="margin-top: 0;">OpenRouter API Key (BYOK)</h2>
+    <p class="description">
+      OpenRouterのAPIキーを1本登録するだけで、OpenAI・Anthropic・Geminiなど100+モデルが使えます。
+    </p>
+
+    <p>
+      現在の状態:
+      {% if key_configured %}
+        <span class="status-configured">✅ 登録済み</span>
+      {% else %}
+        <span class="status-not-configured">未登録</span>
+      {% endif %}
+    </p>
+
+    <form method="post" action="/settings/openrouter-key">
+      <div class="form-row">
+        <input type="password" name="api_key" placeholder="sk-or-xxxx" required />
+        <button type="submit" class="btn-save">保存</button>
+      </div>
+    </form>
+
+    {% if key_configured %}
+    <div style="margin-top: 12px;">
+      <form method="post" action="/settings/openrouter-key/delete">
+        <button type="submit" class="btn-danger">削除</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

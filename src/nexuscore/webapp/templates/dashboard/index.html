@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}NexusCore - Dashboard{% endblock %}
+
+{% block body %}
+<h1>NexusCore Dashboard</h1>
+<p>Logged in as: {{ user_login }}</p>
+<hr>
+<h2>Statistics</h2>
+<ul>
+  <li>Total Runs: {{ total_runs }}</li>
+  <li>Success: {{ success_runs }}</li>
+  <li>Failed: {{ failed_runs }}</li>
+  <li>Success Rate: {{ "%.1f" | format(success_rate) }}%</li>
+</ul>
+<h2>LLM Usage</h2>
+<table class="simple">
+  <tr><th>Model</th><th>Calls</th><th>Cost (USD)</th></tr>
+  {% for s in llm_stats %}
+  <tr>
+    <td>{{ s.model }}</td>
+    <td>{{ s.call_count }}</td>
+    <td>${{ "%.4f" | format(s.cost_sum | float) }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<hr>
+<h2>Projects</h2>
+<ul>
+  {% for p in projects %}
+  <li><a href="/projects/{{ p.id }}">{{ p.name }}</a></li>
+  {% endfor %}
+</ul>
+<hr>
+<a href="/projects/">Back to Projects</a>
+&nbsp;|&nbsp;
+<a href="/settings/" class="btn-link">⚙️ Settings</a>
+{% endblock %}

@@ -64,12 +64,13 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     make_celery(app)  # Flask アプリと Celery を連携（タスクも自動登録される）
 
     # Blueprint登録
-    from nexuscore.webapp import views_dashboard, views_logs, views_projects
+    from nexuscore.webapp import views_dashboard, views_logs, views_projects, views_settings
 
     app.register_blueprint(auth.bp)
     app.register_blueprint(views_projects.bp)
     app.register_blueprint(views_logs.bp)
     app.register_blueprint(views_dashboard.bp)
+    app.register_blueprint(views_settings.bp)
     # api_badges と api_external は CR-FASTAPI-010 で削除済み（FastAPI に移行済み）
     # views_api_test は archive/ に移動（シミュレーションのみ、実用性なし）
 
