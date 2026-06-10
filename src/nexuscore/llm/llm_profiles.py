@@ -86,6 +86,42 @@ PROFILE_REGISTRY: dict[str, LLMProfile] = {
         description="MiniMax M2.7 for analytical and structured tasks",
         default_temperature=0.15,
     ),
+    # --- OpenRouter BYOK profiles (ユーザーのOpenRouterキーで100+モデルにアクセス) ---
+    "or_gpt_codex": LLMProfile(
+        name="or_gpt_codex",
+        provider="openrouter",
+        model="openai/gpt-4.1",
+        description="GPT-4.1 via OpenRouter — code generation",
+        default_temperature=0.2,
+    ),
+    "or_sonnet": LLMProfile(
+        name="or_sonnet",
+        provider="openrouter",
+        model="anthropic/claude-sonnet-4-6",
+        description="Claude Sonnet via OpenRouter — reviews & architecture",
+        default_temperature=0.15,
+    ),
+    "or_gemini": LLMProfile(
+        name="or_gemini",
+        provider="openrouter",
+        model="google/gemini-2.5-flash-preview",
+        description="Gemini 2.5 Flash via OpenRouter — secondary analysis",
+        default_temperature=0.2,
+    ),
+    "or_deepseek": LLMProfile(
+        name="or_deepseek",
+        provider="openrouter",
+        model="deepseek/deepseek-r1-0528",
+        description="DeepSeek R1 via OpenRouter — reasoning",
+        default_temperature=0.15,
+    ),
+    "or_glm": LLMProfile(
+        name="or_glm",
+        provider="openrouter",
+        model="thudm/glm-4-32k",
+        description="GLM-4 via OpenRouter — lightweight chat",
+        default_temperature=0.2,
+    ),
 }
 
 

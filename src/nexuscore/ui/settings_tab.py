@@ -80,6 +80,47 @@ def _runtime_status() -> str:
     return "\n".join(lines)
 
 
+# ---- OpenRouter BYOK helpers ----
+
+
+def _openrouter_byok_status() -> str:
+    """OpenRouter BYOK キーの状態を返す。"""
+    try:
+        from nexuscore.utils.key_store import has_key
+
+        if has_key("openrouter"):
+            return "✅ OpenRouter APIキー: 登録済み — 100+モデルに1キーでアクセス可能"
+        return "❌ OpenRouter APIキー: 未登録"
+    except Exception:
+        return "⚠️ キー状態の取得に失敗"
+
+
+def _save_openrouter_key(api_key: str) -> tuple[str, str]:
+    """OpenRouterキーを暗号化保存 → (結果メッセージ, ステータス表示)."""
+    if not api_key or not api_key.strip():
+        return "⚠️ APIキーを入力してください", _openrouter_byok_status()
+    try:
+        from nexuscore.utils.key_store import save_key
+
+        save_key("openrouter", api_key.strip())
+        return "✅ OpenRouter APIキーを保存しました", _openrouter_byok_status()
+    except Exception as e:
+        return f"❌ 保存エラー: {e}", _openrouter_byok_status()
+
+
+def _delete_openrouter_key() -> tuple[str, str]:
+    """OpenRouterキーを削除 → (結果メッセージ, ステータス表示)."""
+    try:
+        from nexuscore.utils.key_store import delete_key
+
+        existed = delete_key("openrouter")
+        if existed:
+            return "✅ OpenRouter APIキーを削除しました", _openrouter_byok_status()
+        return "ℹ️ 保存済みのキーはありません", _openrouter_byok_status()
+    except Exception as e:
+        return f"❌ 削除エラー: {e}", _openrouter_byok_status()
+
+
 def build_settings_tab(state: gr.State) -> None:
     with gr.Column():
         gr.Markdown("## Settings")
@@ -90,6 +131,34 @@ def build_settings_tab(state: gr.State) -> None:
 
         with gr.Accordion("API キー状態", open=True):
             provider_md = gr.Markdown(value=_provider_status_table())
+
+        # --- OpenRouter BYOK ---
+        with gr.Accordion("🔑 OpenRouter BYOK", open=True):
+            gr.Markdown(
+                "OpenRouter APIキーを1つ登録するだけで、OpenAI / Anthropic / Google など "
+                "100+モデルにアクセスできます。キーはAES-256-GCMで暗号化して保存されます。"
+            )
+            or_status = gr.Markdown(value=_openrouter_byok_status())
+            or_key_input = gr.Textbox(
+                label="OpenRouter APIキー",
+                placeholder="sk-or-v1-...",
+                type="password",
+            )
+            with gr.Row():
+                or_save_btn = gr.Button("💾 保存", variant="primary")
+                or_delete_btn = gr.Button("🗑️ 削除", variant="stop")
+
+            or_result = gr.Markdown()
+
+            or_save_btn.click(
+                fn=_save_openrouter_key,
+                inputs=[or_key_input],
+                outputs=[or_result, or_status],
+            )
+            or_delete_btn.click(
+                fn=_delete_openrouter_key,
+                outputs=[or_result, or_status],
+            )
 
         with gr.Accordion("LLM プロファイル一覧", open=False):
             profiles_md = gr.Markdown(value=_profiles_table())

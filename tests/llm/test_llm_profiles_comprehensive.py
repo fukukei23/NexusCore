@@ -310,7 +310,7 @@ class TestProfilesIntegration:
 
     def test_all_providers_are_valid(self):
         """全プロバイダーが既知のプロバイダー"""
-        valid_providers = {"openai", "anthropic", "google", "glm", "minimax", "deepseek", "moonshot", "local"}
+        valid_providers = {"openai", "anthropic", "google", "glm", "minimax", "deepseek", "moonshot", "local", "openrouter"}
         for profile in PROFILE_REGISTRY.values():
             assert profile.provider in valid_providers
 

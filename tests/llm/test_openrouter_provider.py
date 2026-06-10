@@ -33,3 +33,35 @@ def test_byok_injection_overrides_api_key(monkeypatch: pytest.MonkeyPatch) -> No
 def test_openrouter_default_base_url() -> None:
     assert OpenRouterLLM.default_base_url == "https://openrouter.ai/api/v1"
     assert OpenRouterLLM.env_key_name == "OPENROUTER_API_KEY"
+
+
+# ---- OpenRouter profiles in PROFILE_REGISTRY ----
+
+
+def test_openrouter_profiles_registered() -> None:
+    from nexuscore.llm.llm_profiles import PROFILE_REGISTRY
+
+    or_profiles = {k: v for k, v in PROFILE_REGISTRY.items() if v.provider == "openrouter"}
+    assert len(or_profiles) >= 5, "At least 5 OpenRouter profiles expected"
+    assert "or_gpt_codex" in or_profiles
+    assert "or_sonnet" in or_profiles
+    assert "or_gemini" in or_profiles
+    assert "or_deepseek" in or_profiles
+    assert "or_glm" in or_profiles
+
+
+def test_openrouter_profile_model_format() -> None:
+    """OpenRouter profile models must be ``vendor/model`` format (no openrouter: prefix)."""
+    from nexuscore.llm.llm_profiles import PROFILE_REGISTRY
+
+    for name, p in PROFILE_REGISTRY.items():
+        if p.provider == "openrouter":
+            assert "/" in p.model, f"OpenRouter model '{p.model}' in profile '{name}' must be vendor/model format"
+
+
+def test_openrouter_profile_to_model_name() -> None:
+    """profile_to_model_name should produce ``openrouter:vendor/model``."""
+    from nexuscore.llm.llm_profiles import profile_to_model_name
+
+    full_name = profile_to_model_name("or_gpt_codex")
+    assert full_name == "openrouter:openai/gpt-4.1"
