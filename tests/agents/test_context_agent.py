@@ -8,7 +8,7 @@ from nexuscore.analyzer.context_agent import ContextAgent
 @pytest.fixture(autouse=True)
 def disable_heavy_dependencies(monkeypatch):
     from nexuscore.analyzer import context_agent as context_module
-    from nexuscore.config import policy_interface as policy_module
+    from nexuscore.ui import policy_interface as policy_module
 
     class DummyPolicy:
         def launch_and_wait_for_input(self, timeout=180):

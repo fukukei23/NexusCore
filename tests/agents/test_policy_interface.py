@@ -1,7 +1,7 @@
 import pytest
 
-from nexuscore.config import policy_interface as policy_module
-from nexuscore.config.policy_interface import PolicyInterface
+from nexuscore.ui import policy_interface as policy_module
+from nexuscore.ui.policy_interface import PolicyInterface
 
 
 @pytest.fixture(autouse=True)

@@ -1,7 +1,7 @@
 **Title**: Development Roadmap and Milestones
-**Version**: v1.2
+**Version**: v1.3
 **Status**: CURRENT
-**Last reviewed**: 2026-04-19
+**Last reviewed**: 2026-06-10
 **Related docs**:
 - Charter: `docs/overview/NEXUSCORE_PRODUCT_CHARTER.md`
 - SRS: `docs/srs/NEXUSCORE_SRS.md`
@@ -17,9 +17,9 @@
 
 | Metric | Value |
 |---|---|
-| Test Coverage | 80.22% |
-| Test Cases | 4,895 |
-| LLM Providers | GLM-5.1 + MiniMax M2.7 (OpenAI SDK fully removed) |
+| Test Coverage | 81% |
+| Test Cases | 4,585 passed / 252 skipped / 24 xfailed (CI parallel, 80% coverage gate) |
+| LLM Providers | 8 providers (OpenAI GPT-5.5, Anthropic Sonnet 4.6, Google Gemini 3.1 Pro, GLM-5.1, MiniMax M2.7, DeepSeek, Moonshot, Local) + 2-layer routing (Quality/Lightweight tier) + Budget Manager |
 | Agents | 14 specialized agents |
 | Core Modules | NPE (Security Engine), FKB (Fault Knowledge Base) |
 
@@ -45,8 +45,8 @@
 
 - [x] Orchestrator basic routing implemented
 - [x] NPE and FKB foundation implemented
-- [ ] Gradio and UI component complete separation/integration (~60%)
-- [ ] DebuggerAgent auto PR generation logic (~40%)
+- [x] Gradio and UI component complete separation/integration (completed 2026-06-10 — zero Gradio deps outside ui/ layer)
+- [x] DebuggerAgent auto PR generation logic (implemented as `utils/github_pr_creator.py`; confirmed complete 2026-06-10)
 
 ### Related SRS Requirements
 
@@ -126,6 +126,7 @@ Roadmap covers future plans; for confirmed specifications, refer to SRS/Governan
 
 ## Revision History
 
+- 2026-06-10: v1.3 Updated achievements to actual values (coverage 81%, 8 LLM providers); marked Phase 1 UI separation and DebuggerAgent auto-PR as complete
 - 2026-04-19: v1.2 Added per-phase milestones, DoD, progress tracking, and SRS requirement mapping
 - 2026-04-17: v1.1 Removed [cite:] markers, updated Charter reference, updated FR numbering
 - 2025-12-16: v1.0 Initial version

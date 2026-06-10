@@ -16,7 +16,7 @@ from nexuscore.analyzer.context_analyzer import ContextAnalyzer
 _logger = logging.getLogger(__name__)
 
 try:
-    from nexuscore.config.policy_interface import PolicyInterface
+    from nexuscore.ui.policy_interface import PolicyInterface
 except ImportError:
     _logger.warning("policy_interface.pyが見つかりません。コマンドライン入力のみ利用可能です。")
     PolicyInterface = None

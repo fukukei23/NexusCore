@@ -1,10 +1,10 @@
-"""Tests for nexuscore.config.policy_interface"""
+"""Tests for nexuscore.ui.policy_interface"""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nexuscore.config import policy_interface
+from nexuscore.ui import policy_interface
 
 
 def test_policy_interface_init():
@@ -38,7 +38,7 @@ def test_policy_interface_get_default_policy():
     assert "test_import_policy" in policy
 
 
-@patch("nexuscore.config.policy_interface.GRADIO_AVAILABLE", False)
+@patch("nexuscore.ui.policy_interface.GRADIO_AVAILABLE", False)
 def test_launch_and_wait_for_input_no_gradio():
     """Gradioが利用できない場合のテスト"""
     pi = policy_interface.PolicyInterface()
@@ -50,8 +50,8 @@ def test_launch_and_wait_for_input_no_gradio():
     assert result["method"] == "safe_default"
 
 
-@patch("nexuscore.config.policy_interface.GRADIO_AVAILABLE", True)
-@patch("nexuscore.config.policy_interface.gr")
+@patch("nexuscore.ui.policy_interface.GRADIO_AVAILABLE", True)
+@patch("nexuscore.ui.policy_interface.gr")
 def test_create_gradio_interface(mock_gr):
     """Gradioインターフェース作成のテスト"""
     pi = policy_interface.PolicyInterface()
@@ -65,7 +65,7 @@ def test_create_gradio_interface(mock_gr):
     mock_gr.Blocks.assert_called_once()
 
 
-@patch("nexuscore.config.policy_interface.GRADIO_AVAILABLE", False)
+@patch("nexuscore.ui.policy_interface.GRADIO_AVAILABLE", False)
 def test_create_gradio_interface_no_gradio():
     """Gradioが利用できない場合のcreate_gradio_interfaceテスト"""
     pi = policy_interface.PolicyInterface()
@@ -74,8 +74,8 @@ def test_create_gradio_interface_no_gradio():
         pi.create_gradio_interface()
 
 
-@patch("nexuscore.config.policy_interface.GRADIO_AVAILABLE", True)
-@patch("nexuscore.config.policy_interface.gr")
+@patch("nexuscore.ui.policy_interface.GRADIO_AVAILABLE", True)
+@patch("nexuscore.ui.policy_interface.gr")
 def test_launch_and_wait_for_input_with_gradio(mock_gr):
     """Gradioが利用可能な場合のlaunch_and_wait_for_inputテスト"""
     pi = policy_interface.PolicyInterface()
@@ -104,8 +104,8 @@ def test_launch_and_wait_for_input_with_gradio(mock_gr):
         assert result["method"] == "gradio_ui"
 
 
-@patch("nexuscore.config.policy_interface.GRADIO_AVAILABLE", True)
-@patch("nexuscore.config.policy_interface.gr")
+@patch("nexuscore.ui.policy_interface.GRADIO_AVAILABLE", True)
+@patch("nexuscore.ui.policy_interface.gr")
 def test_launch_and_wait_for_input_timeout(mock_gr):
     """タイムアウト時のlaunch_and_wait_for_inputテスト"""
     pi = policy_interface.PolicyInterface()
@@ -185,8 +185,8 @@ def test_policy_interface_get_default_policy_consistency():
     assert default_policy["error_language"] == safe_policy["error_language"]
 
 
-@patch("nexuscore.config.policy_interface.GRADIO_AVAILABLE", True)
-@patch("nexuscore.config.policy_interface.gr")
+@patch("nexuscore.ui.policy_interface.GRADIO_AVAILABLE", True)
+@patch("nexuscore.ui.policy_interface.gr")
 def test_create_gradio_interface_components(mock_gr):
     """Gradioインターフェースのコンポーネント作成テスト"""
     pi = policy_interface.PolicyInterface()
@@ -236,8 +236,8 @@ def test_policy_interface_interface_initialization():
     assert hasattr(pi, "result_queue")
 
 
-@patch("nexuscore.config.policy_interface.GRADIO_AVAILABLE", True)
-@patch("nexuscore.config.policy_interface.gr")
+@patch("nexuscore.ui.policy_interface.GRADIO_AVAILABLE", True)
+@patch("nexuscore.ui.policy_interface.gr")
 def test_launch_and_wait_for_input_keyboard_interrupt(mock_gr):
     """KeyboardInterrupt時の動作テスト"""
     pi = policy_interface.PolicyInterface()
@@ -315,8 +315,8 @@ def test_policy_interface_default_policy_completeness():
         assert field in policy, f"Missing required field: {field}"
 
 
-@patch("nexuscore.config.policy_interface.GRADIO_AVAILABLE", True)
-@patch("nexuscore.config.policy_interface.gr")
+@patch("nexuscore.ui.policy_interface.GRADIO_AVAILABLE", True)
+@patch("nexuscore.ui.policy_interface.gr")
 def test_launch_and_wait_for_input_exception_handling(mock_gr):
     """例外処理のテスト"""
     pi = policy_interface.PolicyInterface()

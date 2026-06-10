@@ -13,8 +13,8 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-import nexuscore.config.policy_interface as pi_module
-from nexuscore.config.policy_interface import PolicyInterface
+import nexuscore.ui.policy_interface as pi_module
+from nexuscore.ui.policy_interface import PolicyInterface
 
 
 class TestLine30GradioAvailableButGrNone:
