@@ -34,10 +34,16 @@
 - 予算制御: `max_actions`（既定12）・アクション毎リトライ上限（既定2）
 - ユニットテスト（GLM生成→Fable検証）
 
-### Out of Scope（Phase B以降に分割）
+### In Scope（Phase B — 2026-06-10 完了）
 
-- LLM支援ルーティング（軽量ティアLLMが次アクションを提案、ルールベースにフォールバック）→ Phase B
-- カバレッジ%・lint結果など外部計測を伴う SuccessCriterion（`QualityRegenLoop` 統合）→ Phase B
+- `core/llm_assisted_router.py`: LLMAssistedRouter — LLM提案 + ルールベース必須フォールバック
+  - 設計原則: ①リトライ判断はLLMに委ねない（決定的）②無効提案・JSON破損・LLM障害・予算超過は必ずフォールバック ③`max_llm_calls` でルーティングLLMコストに上限
+  - `from_llm_router()` で既存 `nexuscore.llm.LLMRouter`（軽量ティア `task="classification"`）と統合
+- `core/measured_criteria.py`: 実測ベース SuccessCriterion（`QualityRegenLoop` 統合）
+  - `coverage_criterion` / `lint_clean_criterion` + `PhaseCachedCheck`（phase_log変化時のみ再計測）
+
+### Out of Scope（Phase C以降に分割）
+
 - CLI `--dynamic` フラグ・Gradio UI統合 → Phase C
 - `run_full_project()` の置き換え・廃止（後方互換のため当面併存）
 
@@ -103,11 +109,13 @@ class GoalSpec:
 
 ## 6. 完了条件（Definition of Done）
 
-- [x] コード実装完了（goal_spec / dynamic_router / dynamic_orchestrator）— 2026-06-10
-- [x] テストパス（新規48テスト、ruff / mypy クリーン）— 2026-06-10
-- [ ] Spec 更新（本書 Status → Completed）※Phase B/C 完了時
+- [x] Phase A コード実装完了（goal_spec / dynamic_router / dynamic_orchestrator）— 2026-06-10
+- [x] Phase A テストパス（新規48テスト、ruff / mypy クリーン）— 2026-06-10
+- [x] Phase B コード実装完了（llm_assisted_router / measured_criteria）— 2026-06-10
+- [x] Phase B テストパス（新規18テスト、ruff / mypy クリーン）— 2026-06-10
+- [ ] Spec 更新（本書 Status → Completed）※Phase C 完了時
 - [x] docs/変更履歴.md 追記 — 2026-06-10
-- [ ] 完了レポート作成（Phase A完了時）
+- [ ] 完了レポート作成（Phase C完了時）
 
 ## 7. 参照（References）
 
