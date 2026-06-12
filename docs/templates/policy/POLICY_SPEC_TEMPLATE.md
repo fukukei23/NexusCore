@@ -80,4 +80,4 @@ Decision Table と 1対1に対応したテスト観点を列挙する。
   - Spec: docs/spec/CR-NEXUS-051-B_RETRY_POLICY.md
   - Tests: tests/core/test_retry_policy.py
   - Impl: src/nexuscore/core/retry_policy.py
-  - Review Packet: ガバナンス/review_packets/RP-NEXUS-051-B_フェーズ25_リトライポリシー.md
+  - Review Packet: ガバナンス/review_packets/RP-NEXUS-051-B_フェーズ3_リトライポリシー.md

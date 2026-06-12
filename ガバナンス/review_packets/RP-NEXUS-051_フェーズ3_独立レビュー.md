@@ -1,4 +1,4 @@
-# Phase 2.5 Independent Review Packet
+# Phase 3 Independent Review Packet
 ## NexusCore / CR-NEXUS-051（実例）
 
 > **注意**: 本レビューは **実装者とは別コンテキスト** で実施されることを前提とする。
@@ -137,7 +137,7 @@ retry 間隔や backoff 戦略が仕様上は未定義。
 
 ```
 Date: 2025-01-05
-Phase: Phase 2.5 (Independent Review)
+Phase: Phase 3 (Independent Review)
 Target: CR-NEXUS-051_ERROR_CLASSIFICATION
 Verdict: Reject
 Key Issues:

@@ -238,9 +238,9 @@ def decide_retry(
 
 ---
 
-## 11. Phase 2.5 Review Checklist
+## 11. Phase 3 Review Checklist
 
-本 Spec は Phase 2.5 Independent Review で以下を評価する：
+本 Spec は Phase 3 Independent Review で以下を評価する：
 
 - [ ] Decision Table が唯一の真実として定義されているか
 - [ ] 有限性保証（無限リトライがない）が明示されているか

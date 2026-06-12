@@ -98,7 +98,7 @@
 
 - [CR と実装計画の結果の保存先](CR_AND_REPORTS_SAVE_LOCATIONS.md) - Spec / 完了レポートの保存場所、完了レポートに含める項目、テスト必須ルール
 - **STIT（Spec & Test Driven Iteration）**: 仕様・テスト・実装の順序と Gate は [ガバナンス/スペックテスト駆動イテレーション.md](../ガバナンス/スペックテスト駆動イテレーション.md) を参照
-- **Phase 2.5（IRG）**: [docs/ARCHITECTURE.md](ARCHITECTURE.md) および [ガバナンス/templates/レビューパケット_フェーズ25_テンプレート.md](../ガバナンス/templates/レビューパケット_フェーズ25_テンプレート.md) を参照
+- **Phase 3（IRG）**: [docs/ARCHITECTURE.md](ARCHITECTURE.md) および [ガバナンス/templates/レビューパケット_フェーズ3_テンプレート.md](../ガバナンス/templates/レビューパケット_フェーズ3_テンプレート.md) を参照
 
 ---
 

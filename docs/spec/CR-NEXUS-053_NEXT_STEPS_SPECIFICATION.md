@@ -156,7 +156,7 @@ NexusCoreはSTIT+IRGガバナンスを採用しているため、機能実装時
 ### 4.2 Gate分類
 
 - **P0（テスト修正）**: Fast Gate（既存機能の軽微な改善）
-- **P1（CR-051）**: Standard Gate（Phase 2.5承認済み）
+- **P1（CR-051）**: Standard Gate（Phase 3承認済み）
 - **P2（CR-052）**: Standard Gate（実装準備完了）
 - **P3（カバレッジ）**: Fast Gate
 - **P4-P5**: Fast Gate

@@ -1,5 +1,5 @@
 # Independent Review Packet
-## Phase 2.5 – NexusCore Architecture Normalization Review
+## Phase 3 – NexusCore Architecture Normalization Review
 
 ### Metadata
 - Project: NexusCore
@@ -55,7 +55,7 @@
 - [x] Canonical に情報欠落がない
 
 ### 5.2 STIT+IRG Alignment
-- [x] Phase 2.5 の存在意義と矛盾しない
+- [x] Phase 3 の存在意義と矛盾しない
 - [x] Guardian / Quality Gate 設計が明示されている
 
 ### 5.3 Risk Assessment

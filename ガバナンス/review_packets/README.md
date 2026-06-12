@@ -1,6 +1,6 @@
 # Review Packets Directory
 
-このディレクトリには、Independent Review Gate (Phase 2.5) のレビュー成果物を格納します。
+このディレクトリには、Independent Review Gate (Phase 3) のレビュー成果物を格納します。
 
 ## 目的
 

@@ -20,7 +20,7 @@
   - スコープ境界（やる/やらない）
   - 非機能要件（品質・安全・運用）
   - 禁止事項（やってはいけない）
-  - 変更管理（Spec / Phase 2.5 / Decision Log）
+  - 変更管理（Spec / Phase 3 / Decision Log）
 
 ---
 
@@ -52,7 +52,7 @@
 - 仕様（Spec）を先に書く。テスト可能な受入条件を含める。
 - 実装は Spec を満たす最小差分に限定する。
 
-### 3.3 IRG（Independent Review Gate / Phase 2.5）
+### 3.3 IRG（Independent Review Gate / Phase 3）
 - 実装者とは別コンテキスト（別チャット/別AI/別セッション）でレビューする。
 - IDE内の自己チェックは Gate 通過とみなさない。
 - 結果は Decision Log に必ず転記する（Reject含む）。

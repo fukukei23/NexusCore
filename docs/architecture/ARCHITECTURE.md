@@ -56,7 +56,7 @@ NexusCore の詳細なアーキテクチャ設計は、以下の **Canonical Des
 NexusCore は以下のガバナンスモデルに従う：
 
 - **STIT**: Spec & Test Driven Iteration
-- **IRG（Phase 2.5）**: Independent Review Gate
+- **IRG（Phase 3）**: Independent Review Gate
 
 重要な判断・却下・方針変更は、必ず以下に記録する：
 

@@ -1,6 +1,6 @@
 # Review Packet: CR-NEXUS-051-B (Retry Policy)
 
-**Review Type**: Phase 2.5 Independent Review
+**Review Type**: Phase 3 Independent Review
 **Review Date**: 2026-01-12
 **Reviewer**: Independent Context (Separate from Implementation)
 **Spec Version**: 1.0.0
@@ -24,9 +24,9 @@
 
 ---
 
-## 2. Phase 2.5 Review Criteria
+## 2. Phase 3 Review Criteria
 
-Phase 2.5 Review evaluates **"Is this Spec ready for implementation?"** based on:
+Phase 3 Review evaluates **"Is this Spec ready for implementation?"** based on:
 
 1. **Completeness**: Are all required specifications defined?
 2. **Safety**: Are retry/failure controls and infinite loop risks addressed?
@@ -110,7 +110,7 @@ None identified.
 **Evidence**:
 - Section 10.1: Function signature is marked as "例" (example)
 - Section 10.2: Responsibility boundaries are defined at architectural level, not code level
-- Section 11: Phase 2.5 checklist explicitly guards against "実装詳細の混入" (implementation detail leakage)
+- Section 11: Phase 3 checklist explicitly guards against "実装詳細の混入" (implementation detail leakage)
 
 ---
 
@@ -170,7 +170,7 @@ None identified.
 
 ---
 
-## 7. Phase 2.5 Checklist
+## 7. Phase 3 Checklist
 
 | Criteria | Status | Notes |
 |----------|--------|-------|
@@ -190,7 +190,7 @@ None identified.
 
 **Summary**:
 - CR-NEXUS-051-B Retry Policy Spec は実装フェーズへ進行可能
-- すべての Phase 2.5 評価基準を満たしている
+- すべての Phase 3 評価基準を満たしている
 - 安全性（有限性保証、Unexpected 処理）が明確に定義されている
 - テスト要件が明文化されており、実装の品質を担保できる
 
@@ -201,7 +201,7 @@ None. 無条件 Approve.
 - High Severity 事項なし
 - 051-A との整合性あり
 - 実装ガイダンスが適切（詳細すぎず、曖昧すぎない）
-- Phase 2.5 チェックリストすべて満たす
+- Phase 3 チェックリストすべて満たす
 
 ---
 

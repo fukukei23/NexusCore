@@ -3,7 +3,7 @@
 ## Spec
 - **Spec**: `docs/spec/CR-NEXUS-051_ERROR_CLASSIFICATION_SPECIFICATION.md` v1.1.1
 - **Gate**: Strict (エラー処理・再試行・自律挙動)
-- **IRG**: Phase 2.5 Approve (v2)
+- **IRG**: Phase 3 Approve (v2)
 
 ## 実装要件（Spec 3.3 / 3.4）
 

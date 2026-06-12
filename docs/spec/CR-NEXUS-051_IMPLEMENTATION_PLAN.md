@@ -1,7 +1,7 @@
 # CR-NEXUS-051 Implementation Plan
 
 **Spec**: `docs/spec/CR-NEXUS-051_ERROR_CLASSIFICATION_SPECIFICATION.md` (v1.1.1)
-**Status**: Phase 2.5 Approve（実装フェーズ移行可能）
+**Status**: Phase 3 Approve（実装フェーズ移行可能）
 **Created**: 2025-01-06
 
 ---
@@ -255,6 +255,6 @@ retry_utils.py
 ## 9. 関連ドキュメント
 
 - **Spec**: `docs/spec/CR-NEXUS-051_ERROR_CLASSIFICATION_SPECIFICATION.md` (v1.1.1)
-- **Phase 2.5 Review**: `ガバナンス/review_packets/RP-NEXUS-051_PHASE25_INDEPENDENT_REVIEW_v2.md`
+- **Phase 3 Review**: `ガバナンス/review_packets/RP-NEXUS-051_PHASE25_INDEPENDENT_REVIEW_v2.md`
 - **Decision Log**: `判断ログ/判断ログ.md`
 
