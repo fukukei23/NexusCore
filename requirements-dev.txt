@@ -18,3 +18,10 @@ pytest-mock>=3.12.0,<4.0.0
 # 型付きスタブ（よく使うライブラリ向け）
 types-requests>=2.31.0,<3.0.0
 types-PyYAML>=6.0.0,<7.0.0
+
+# セキュリティ監査ツール (Phase 0〜)
+# Phase 0 ベースラインで導入。SaaS 商用化に向けて継続的に走査する
+bandit==1.9.4
+semgrep==1.166.0
+pip-audit==2.10.1
+detect-secrets==1.5.0
