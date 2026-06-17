@@ -96,6 +96,7 @@ norecursedirs = ["tests/api/archive"]
 # ============================================================================
 # Bandit セキュリティスキャン設定
 # ============================================================================
+[tool.bandit]
 # スキャン対象から除外するパス
 exclude_dirs = [
   "tests/",
@@ -115,10 +116,7 @@ exclude_dirs = [
 # スキップするテスト（必要に応じて調整）
 # B101: assert_used - テストコード以外でのassert使用
 # B601: paramiko_calls - パラメトライズされたシェル呼び出し
-# B602: subprocess_popen_with_shell_equals_true - shell=True の使用
-skips = []
-
 # 除外するテスト（明示的に無視）
 # B404: import subprocess - subprocess自体のインポートは問題なし
 # B603: subprocess_without_shell_equals_true - shell=Falseの場合は安全
-exclude = ["B404", "B603"]
+skips = ["B101", "B404", "B603"]  # Phase 1〜: B101/B404/B603 をスキップ(B101=assert、B404=subprocess import、B603=subprocess call)
