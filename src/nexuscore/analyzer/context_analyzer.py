@@ -12,6 +12,26 @@ from typing import Any
 
 _logger = logging.getLogger(__name__)
 
+# フォールバック値のデフォルト（環境変数 NEXUSCORE_CONTEXT_* で上書き可能）
+_FALLBACK_FRAMEWORKS_DEFAULT = "gradio,openai"
+_FALLBACK_EXTERNAL_DEPS_DEFAULT = "gradio,openai,pytest"
+_FALLBACK_STANDARD_LIBS_DEFAULT = "os,sys,json,datetime"
+_FALLBACK_PYTHON_VERSION_DEFAULT = "3.11+"
+
+
+def _fallback_list(env_var: str, default: str) -> list[str]:
+    """環境変数からカンマ区切りのフォールバックリストを取得する。
+
+    環境変数が未設定の場合は default をカンマ分割して返す。空要素は除外する。
+    """
+    raw = os.getenv(env_var, default)
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _fallback_value(env_var: str, default: str) -> str:
+    """環境変数からフォールバック文字列を取得する（未設定時は default を返す）。"""
+    return os.getenv(env_var, default)
+
 
 class ContextAnalyzer:
     def __init__(self, project_root: str):
@@ -100,7 +120,9 @@ class ContextAnalyzer:
                 # ファイルサイズチェック
                 if os.path.getsize(req_file) > self.max_file_size:
                     _logger.warning("requirements.txtが大きすぎます")
-                    return ["gradio", "openai"]  # フォールバック
+                    return _fallback_list(  # フォールバック
+                        "NEXUSCORE_CONTEXT_FALLBACK_FRAMEWORKS", _FALLBACK_FRAMEWORKS_DEFAULT
+                    )
 
                 with open(req_file, encoding="utf-8") as f:
                     content = f.read()
@@ -125,7 +147,9 @@ class ContextAnalyzer:
 
             except (OSError, UnicodeDecodeError) as e:
                 _logger.warning("requirements.txt読み込みエラー: %s", e)
-                return ["gradio", "openai"]
+                return _fallback_list(
+                    "NEXUSCORE_CONTEXT_FALLBACK_FRAMEWORKS", _FALLBACK_FRAMEWORKS_DEFAULT
+                )
 
         return []
 
@@ -228,7 +252,9 @@ class ContextAnalyzer:
             # 基本的な依存関係を設定（AST解析回避）
             dependencies["external"] = self._safe_parse_requirements()
             dependencies["internal"] = ["nexuscore"]
-            dependencies["standard"] = ["os", "sys", "json", "datetime"]
+            dependencies["standard"] = _fallback_list(
+                "NEXUSCORE_CONTEXT_FALLBACK_STANDARD_LIBS", _FALLBACK_STANDARD_LIBS_DEFAULT
+            )
 
             # 簡単なインポート検索（危険なAST解析は使用しない）
             self._safe_scan_imports(dependencies)
@@ -236,7 +262,9 @@ class ContextAnalyzer:
         except Exception as e:  # noqa: BLE001
             _logger.warning("依存関係解析エラー: %s", e)
             # フォールバック
-            dependencies["external"] = ["gradio", "openai", "pytest"]
+            dependencies["external"] = _fallback_list(
+                "NEXUSCORE_CONTEXT_FALLBACK_EXTERNAL_DEPS", _FALLBACK_EXTERNAL_DEPS_DEFAULT
+            )
             dependencies["internal"] = ["nexuscore"]
 
         return dependencies
@@ -323,7 +351,10 @@ class ContextAnalyzer:
         except Exception as e:  # noqa: BLE001
             _logger.warning("環境検出エラー: %s", e)
             env_info = {
-                "python_version": "3.11+",
+                "python_version": _fallback_value(
+                    "NEXUSCORE_CONTEXT_FALLBACK_PYTHON_VERSION",
+                    _FALLBACK_PYTHON_VERSION_DEFAULT,
+                ),
                 "platform": os.name,
                 "virtual_env": {"active": False},
                 "env_files": [],
