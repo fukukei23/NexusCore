@@ -7,23 +7,30 @@ from typing import Any
 
 import git
 
-from .base_agent import BaseAgent
+from nexuscore.config.constitution_loader import get_constitution
+from nexuscore.utils.vcs import GitController
+
 from ._guardian_helpers.commit_workflow import execute_commit_workflow
 from ._guardian_helpers.diff_summary import generate_diff_summary
 from ._guardian_helpers.git_operations import generate_commit_message, prepare_branch
 from ._guardian_helpers.quality_gates import (
     format_quality_gates_summary,
-    review_code as _review_code_standalone,
-    run_quality_gates,
     review_with_llm,
+    run_quality_gates,
     summarize_diff_for_llm,
 )
+from ._guardian_helpers.quality_gates import (
+    review_code as _review_code_standalone,
+)
 from ._guardian_helpers.review_executor import execute_quality_gated_review
-from nexuscore.config.constitution_loader import get_constitution
-from nexuscore.utils.vcs import GitController
+from .base_agent import BaseAgent
 
 try:
-    from nexuscore.guard.guardian_auto_reviewer import GuardianAutoReviewer, ReviewDecision, ReviewResult
+    from nexuscore.guard.guardian_auto_reviewer import (
+        GuardianAutoReviewer,
+        ReviewDecision,
+        ReviewResult,
+    )
 except ImportError:
     GuardianAutoReviewer = None
     ReviewDecision = None
@@ -46,7 +53,10 @@ class GuardianAgent(BaseAgent):
 
     def __init__(self, api_key: str | None = None, model: str | None = None):
         super().__init__()
-        self.model = model or ""
+        # cred 出所の集約ポイント（A'案）: model/api_key は GuardianAgent 内で env を参照する。
+        # 呼出側は GuardianAgent() 引数なしで統一（3経路すべて）。api_key は後方互換のため引数保持。
+        # ※ api_key はデッド変数（実際のLLM認証は LLMRouter 層）。引数は外部プラグイン互換のため残置。
+        self.model = model or os.getenv("GUARDIAN_MODEL", "")
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
         try:
             self.vcs = GitController()

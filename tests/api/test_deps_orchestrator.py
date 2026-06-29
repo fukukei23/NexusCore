@@ -59,103 +59,78 @@ class TestPrepareLocalKnowledgeBase:
         assert result is None
 
 
-class TestLoadGuardianCredentials:
-    """Tests for _load_guardian_credentials function."""
-
-    def test_credentials_from_env(self):
-        """環境変数から認証情報を取得"""
-        from nexuscore.api.dependencies.orchestrator import _load_guardian_credentials
-
-        with patch.dict(os.environ, {"GUARDIAN_API_KEY": "test-key", "GUARDIAN_MODEL": "test-model"}):
-            api_key, model = _load_guardian_credentials()
-        assert api_key == "test-key"
-        assert model == "test-model"
-
-    def test_credentials_default_empty(self):
-        """環境変数が未設定の場合は空文字"""
-        from nexuscore.api.dependencies.orchestrator import _load_guardian_credentials
-
-        with patch.dict(os.environ, {}, clear=True):
-            api_key, model = _load_guardian_credentials()
-        assert api_key == ""
-        assert model == ""
-
-
 class TestGetOrchestrator:
-    """Tests for get_orchestrator function."""
+    """Tests for get_orchestrator function (assemble_agent_team 統合後)."""
 
-    @patch("nexuscore.api.dependencies.orchestrator.LLMRouter")
-    @patch("nexuscore.api.dependencies.orchestrator.PatchApplier")
-    @patch("nexuscore.api.dependencies.orchestrator.KnowledgeCuratorAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.PostmortemAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.PolicyAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.GuardianAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.TesterAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.DebuggerAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.CoderAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.PlannerAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.ArchitectAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.RequirementAgent")
+    @patch("nexuscore.api.dependencies.orchestrator.assemble_agent_team")
     @patch("nexuscore.api.dependencies.orchestrator.Orchestrator")
     @patch("nexuscore.api.dependencies.orchestrator._prepare_local_knowledge_base", return_value=None)
-    @patch("nexuscore.api.dependencies.orchestrator._load_guardian_credentials", return_value=("", ""))
-    def test_get_orchestrator_with_path(
-        self, mock_cred, mock_kb, mock_orch, mock_req, mock_arch, mock_plan,
-        mock_coder, mock_test, mock_debug, mock_guard, mock_policy,
-        mock_post, mock_curator, mock_patcher, mock_llm, tmp_path,
+    def test_get_orchestrator_uses_assemble_agent_team(
+        self, mock_kb, mock_orch, mock_assemble, tmp_path,
     ):
-        """project_path 指定で Orchestrator 生成"""
+        """get_orchestrator は assemble_agent_team 経由でエージェントを構築する（A'案の統合）"""
         from nexuscore.api.dependencies.orchestrator import get_orchestrator
 
+        mock_assemble.return_value = {"llm_router": MagicMock()}
         result = get_orchestrator(project_path=str(tmp_path))
+        mock_assemble.assert_called_once()
         mock_orch.assert_called_once()
         assert result == mock_orch.return_value
 
-    @patch("nexuscore.api.dependencies.orchestrator.LLMRouter")
-    @patch("nexuscore.api.dependencies.orchestrator.PatchApplier")
-    @patch("nexuscore.api.dependencies.orchestrator.KnowledgeCuratorAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.PostmortemAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.PolicyAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.GuardianAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.TesterAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.DebuggerAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.CoderAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.PlannerAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.ArchitectAgent")
-    @patch("nexuscore.api.dependencies.orchestrator.RequirementAgent")
+    @patch("nexuscore.api.dependencies.orchestrator.assemble_agent_team")
     @patch("nexuscore.api.dependencies.orchestrator.Orchestrator")
     @patch("nexuscore.api.dependencies.orchestrator._prepare_local_knowledge_base", return_value=None)
-    @patch("nexuscore.api.dependencies.orchestrator._load_guardian_credentials", return_value=("key", "model"))
+    def test_get_orchestrator_passes_language(
+        self, mock_kb, mock_orch, mock_assemble, tmp_path,
+    ):
+        """language 引数が assemble_agent_team に伝搬する"""
+        from nexuscore.api.dependencies.orchestrator import get_orchestrator
+
+        mock_assemble.return_value = {"llm_router": MagicMock()}
+        get_orchestrator(project_path=str(tmp_path), language="en")
+        _, kwargs = mock_assemble.call_args
+        assert kwargs.get("language") == "en"
+
+    @patch("nexuscore.api.dependencies.orchestrator.assemble_agent_team")
+    @patch("nexuscore.api.dependencies.orchestrator.Orchestrator")
+    @patch("nexuscore.api.dependencies.orchestrator._prepare_local_knowledge_base", return_value="/kb/path.json")
+    def test_get_orchestrator_passes_kb_path(
+        self, mock_kb, mock_orch, mock_assemble, tmp_path,
+    ):
+        """knowledge base パスが assemble_agent_team に伝搬する"""
+        from nexuscore.api.dependencies.orchestrator import get_orchestrator
+
+        mock_assemble.return_value = {"llm_router": MagicMock()}
+        get_orchestrator(project_path=str(tmp_path))
+        _, kwargs = mock_assemble.call_args
+        assert kwargs.get("knowledge_base_path") == "/kb/path.json"
+
+    @patch("nexuscore.api.dependencies.orchestrator.assemble_agent_team")
+    @patch("nexuscore.api.dependencies.orchestrator.Orchestrator")
+    @patch("nexuscore.api.dependencies.orchestrator._prepare_local_knowledge_base", return_value=None)
     def test_get_orchestrator_default_path(
-        self, mock_cred, mock_kb, mock_orch, mock_req, mock_arch, mock_plan,
-        mock_coder, mock_test, mock_debug, mock_guard, mock_policy,
-        mock_post, mock_curator, mock_patcher, mock_llm, tmp_path,
+        self, mock_kb, mock_orch, mock_assemble, tmp_path,
     ):
         """project_path 未指定時はデフォルトパスを使用"""
         from nexuscore.api.dependencies.orchestrator import get_orchestrator
 
+        mock_assemble.return_value = {"llm_router": MagicMock()}
         with patch.dict(os.environ, {"NEXUSCORE_PROJECT_PATH": str(tmp_path)}):
-            result = get_orchestrator()
-        mock_orch.assert_called_once()
+            get_orchestrator()
+        mock_assemble.assert_called_once()
 
-    def test_get_orchestrator_with_kb_path(self, tmp_path):
-        """Knowledge base パスが渡される"""
+    @patch("nexuscore.api.dependencies.orchestrator.assemble_agent_team")
+    @patch("nexuscore.api.dependencies.orchestrator.Orchestrator")
+    @patch("nexuscore.api.dependencies.orchestrator._prepare_local_knowledge_base", return_value=None)
+    def test_get_orchestrator_passes_agents_to_orchestrator(
+        self, mock_kb, mock_orch, mock_assemble, tmp_path,
+    ):
+        """assemble_agent_team の戻り値が Orchestrator に渡される"""
         from nexuscore.api.dependencies.orchestrator import get_orchestrator
 
-        with patch("nexuscore.api.dependencies.orchestrator._load_guardian_credentials", return_value=("key", "model")):
-            with patch("nexuscore.api.dependencies.orchestrator._prepare_local_knowledge_base", return_value="/kb/path.json"):
-                with patch("nexuscore.api.dependencies.orchestrator.Orchestrator"):
-                    with patch("nexuscore.api.dependencies.orchestrator.RequirementAgent"):
-                        with patch("nexuscore.api.dependencies.orchestrator.ArchitectAgent"):
-                            with patch("nexuscore.api.dependencies.orchestrator.PlannerAgent"):
-                                with patch("nexuscore.api.dependencies.orchestrator.CoderAgent"):
-                                    with patch("nexuscore.api.dependencies.orchestrator.TesterAgent"):
-                                        with patch("nexuscore.api.dependencies.orchestrator.DebuggerAgent") as mock_debug:
-                                            with patch("nexuscore.api.dependencies.orchestrator.GuardianAgent"):
-                                                with patch("nexuscore.api.dependencies.orchestrator.PolicyAgent"):
-                                                    with patch("nexuscore.api.dependencies.orchestrator.PostmortemAgent"):
-                                                        with patch("nexuscore.api.dependencies.orchestrator.KnowledgeCuratorAgent"):
-                                                            with patch("nexuscore.api.dependencies.orchestrator.PatchApplier"):
-                                                                with patch("nexuscore.api.dependencies.orchestrator.LLMRouter"):
-                                                                    get_orchestrator(project_path=str(tmp_path))
-                                                                    assert mock_debug.call_args[1]["knowledge_base_path"] == "/kb/path.json"
+        fake_agents = {"requirement_agent": MagicMock(), "llm_router": MagicMock()}
+        mock_assemble.return_value = fake_agents
+        get_orchestrator(project_path=str(tmp_path))
+        _, kwargs = mock_orch.call_args
+        assert kwargs["requirement_agent"] is fake_agents["requirement_agent"]
+        assert kwargs["llm_router"] is fake_agents["llm_router"]

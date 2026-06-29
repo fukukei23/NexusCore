@@ -108,19 +108,6 @@ def _prepare_local_knowledge_base(project_path: str) -> str | None:
     return project_kb_path
 
 
-def _load_guardian_credentials() -> tuple[str, str]:
-    """
-    Fetch GuardianAgent credentials from the environment with safe fallbacks.
-    """
-    api_key = os.getenv("GUARDIAN_API_KEY") or os.getenv("OPENAI_API_KEY") or "guardian-api-key-placeholder"
-    model = os.getenv("GUARDIAN_MODEL") or "gpt-5"
-
-    if api_key == "guardian-api-key-placeholder":
-        logging.warning("GUARDIAN_API_KEY/OPENAI_API_KEY is not set. Using placeholder key.")
-
-    logging.info("GuardianAgent configured with model '%s'.", model)
-    return api_key, model
-
 def _save_codex_artifacts(status_tag: str) -> None:
     """
     nexus_core_run.log と git diff を codex_history に自動保存する。
@@ -310,8 +297,7 @@ def main():
         tester = TesterAgent()
         # 外部パスの注入（旧コードの堅牢な実装を維持）
         debugger = DebuggerAgent(knowledge_base_path=local_kb_path)
-        guardian_api_key, guardian_model = _load_guardian_credentials()
-        guardian = GuardianAgent(api_key=guardian_api_key, model=guardian_model)
+        guardian = GuardianAgent()  # cred は GuardianAgent.__init__ 内で env 読込（GUARDIAN_MODEL/ANTHROPIC_API_KEY）
         policy_agent = PolicyAgent(policy_rules_path=os.path.join(project_root, "config", "policy_rules.json"))
         postmortem_agent = PostmortemAgent()
         knowledge_curator_agent = KnowledgeCuratorAgent()

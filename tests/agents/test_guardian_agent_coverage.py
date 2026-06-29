@@ -8,6 +8,7 @@ guardian_agent.py のカバレッジ向上テスト
 from __future__ import annotations
 
 import json
+import os
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -28,6 +29,22 @@ class TestGuardianAgentInit:
 
         agent = GuardianAgent(model="test-model")
         assert agent.model == "test-model"
+
+    def test_init_model_from_env(self):
+        """GUARDIAN_MODEL env 変数を参照する（cred集約: A'案の核心）"""
+        from nexuscore.agents.guardian_agent import GuardianAgent
+
+        with patch.dict(os.environ, {"GUARDIAN_MODEL": "claude-test-model"}, clear=False):
+            agent = GuardianAgent()
+        assert agent.model == "claude-test-model"
+
+    def test_init_api_key_from_env(self):
+        """api_key が未指定なら ANTHROPIC_API_KEY env を参照する（後方互換）"""
+        from nexuscore.agents.guardian_agent import GuardianAgent
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "anthropic-test-key"}, clear=False):
+            agent = GuardianAgent()
+        assert agent.api_key == "anthropic-test-key"
 
 
 class TestBudget:

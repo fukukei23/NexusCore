@@ -9,8 +9,19 @@ from nexuscore.plugins.registry import AgentRegistry
 from nexuscore.services.patch_applier import PatchApplier
 
 
-def assemble_agent_team(project_path: str) -> dict[str, Any]:
-    """Build the agent team using AgentRegistry for discovery."""
+def assemble_agent_team(
+    project_path: str,
+    language: str = "ja",
+    knowledge_base_path: str | None = None,
+) -> dict[str, Any]:
+    """Build the agent team using AgentRegistry for discovery.
+
+    Args:
+        project_path: Target project root path.
+        language: Language for RequirementAgent ("ja" or "en").
+        knowledge_base_path: Optional local KB path for DebuggerAgent
+            (API request-scoped でプロジェクト固有 KB を使用する場合に指定)。
+    """
     logger = logging.getLogger("AgentAssembler")
 
     # Ensure built-ins are registered
@@ -28,6 +39,16 @@ def assemble_agent_team(project_path: str) -> dict[str, Any]:
             agents[param_name] = AgentRegistry.get(registry_name)()
         else:
             logger.warning("Agent '%s' not found in registry, skipping.", registry_name)
+
+    # language を RequirementAgent に伝搬（デフォルト "ja"、get_orchestrator 経由で上書き可）
+    if AgentRegistry.has("requirement"):
+        agents["requirement_agent"] = AgentRegistry.get("requirement")(language=language)
+
+    # knowledge_base_path を DebuggerAgent に伝搬（プロジェクト固有 KB）
+    if knowledge_base_path is not None and AgentRegistry.has("debugger"):
+        agents["debugger_agent"] = AgentRegistry.get("debugger")(
+            knowledge_base_path=knowledge_base_path
+        )
 
     # PatchApplier is a service, not a BaseAgent
     agents["patch_applier_agent"] = PatchApplier()
