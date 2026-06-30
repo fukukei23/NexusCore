@@ -184,17 +184,19 @@ def run_brownfield_stream(
 ```
 
 **内部構造の注意点（振る舞い保存のため保持）**:
-- `emit(line, summary, zip_path)` は **クロージャ内 generator function**（`yield` を含む）。本体で `yield from emit(...)` ではなく `emit(...)` 呼出 → 現状コードでは generator が消費されない箇所がある可能性。**本リファクタは「振る舞い保存」のためこの挙動を保持**（別Issue で整理可）。
-- `stream_run`（utils）は `Generator[str, None, Tuple[bool, str]]`（行を yield・最終 `(ok, out)` を return）。subprocess 直依存・`SRC_DIR`/`PROJECT_TOP` で PYTHONPATH 構築。
+- `emit(line, summary, zip_path)` は**クロージャ内 generator function**（log_buf に蓄積→join して yield）。本体では **`yield from emit(...)` で正しく消費**される（第3回レビューで実測・第2回の「未消費」懸念は誤りと判明）。この `yield from emit` 構造をそのまま保持する。
+- `stream_run`（utils）は `Generator[str, None, Tuple[bool, str]]`（行を yield・最終 `(ok, out)` を return）。**return 値は呼出側で `StopIteration.value` から取り出す（模式B）**。subprocess 直依存・`SRC_DIR`/`PROJECT_TOP` で PYTHONPATH 構築。
 - `detect_latest_snapshot(out_root: str) -> str`：最新snapshot無しは**空文字列 `""` を返す**（例外なし）。
 
 ## 4. 検証戦略（baseline 前後比較）★致命的指摘(S2/S3)への対処
 
 smoke test（import + `--help`）だけでは「振る舞い保存」を保証できない。以下を最小構成で実施。
 
-### 4.0 mock の patch 境界（S2対策・決定）
-- **境界は `stream_run`（utils）**。subprocess は触らない。`monkeypatch.setattr(brownfield.core, "stream_run", fake_stream_run)` で置換。
-- `fake_stream_run(cmd, cwd)` は `Generator[str, None, Tuple[bool, str]]` を返す決定論的 fake（固定行リストを yield し `(True, "...")` を return）。
+### 4.0 mock の patch 境界（S2対策・N1修正・決定）
+- **境界は `stream_run`**。subprocess は触らない。
+- **★重要: core.py の import を `from .utils import stream_run` に固定**（N1対処）。これにより `brownfield.core` モジュール内に `stream_run` 名が束縛され、`monkeypatch.setattr(brownfield.core, "stream_run", fake_stream_run)` で**確実に置換**される（utils 側ではなく core が参照する名前を置き換える）。
+- **消費方式は模式B（実コード確定）**: `gen = stream_run(cmd_list, cwd=PROJECT_TOP); ... while True: yield from emit(next(gen)) except StopIteration as si: ok, out_text = si.value`。つまり **stream_run の return `(ok, out_text)` を `StopIteration.value` から取り出す**。
+- したがって `fake_stream_run(cmd, cwd)` は `Generator[str, None, Tuple[bool, str]]` を返し、**必ず return する**（例: 固定行を yield し `return (True, "fake output")`）。**return 忘れは `si.value` が None になりテスト破損**。
 - ファイルIO系（`load_policy_meta`, `inject_policy_meta_to_manifest`, `candidate_paths`）も `tmp_path` または mock で決定論化。
 - 旧コード（単一ファイル）と新コード（分割）で**同一の fake_stream_run** を使い、yield イベント列を比較。
 
@@ -245,7 +247,16 @@ def test_build_ui(monkeypatch):
 
 ### 4.6 テストファイル構成
 - `test_imports.py`: 各モジュール import + lazy `__getattr__` 動作（`import brownfield` で gradio 非読込を確認）
-- `test_shim_loader.py`: shim 経由 `main(["--help"])` 起動（SystemExit 0 を捕捉）+ `python -m brownfield` 等価確認
+- `test_shim_loader.py`: shim 経由 `main(["--help"])` 起動。test 骨格:
+```python
+def test_shim_help(monkeypatch, capsys):
+    import brownfield.__main__ as m
+    with pytest.raises(SystemExit) as exc:
+        m.main(["--help"])
+    assert exc.value.code == 0
+    assert "--ui" in capsys.readouterr().out
+```
+  + `python -m brownfield` 等価確認（`runpy.run_module("brownfield", run_name="__main__")` で SystemExit を捕捉）
 - `test_core_stream.py`: 4.1-4.3（mock でのイベント列前後比較・detect_latest_snapshot 3ケース）
 - `test_ui_build.py`: 4.4（build_ui 構築 + launch 引数 assert）
 
@@ -283,6 +294,14 @@ def test_build_ui(monkeypatch):
 - **S3修正**: `launch` を monkeypatch で潰し port bind なし（4.4）
 - 実コードから抽出: streaming契約訂正（yieldのみ・returnなし）・CLI引数10個・定数具体値・Path依存grep・pytest設定（Appendix）
 - W1/W2/W3/W6/W7/m1/m3/m4/m5/m8 を各セクションに反映
+
+### 第3回 MiniMax 弁証論レビュー（spec 補強稿）
+- 第2回17項のうち **13完全解決・2部分解決**（S2 mock対象・W13 強化）を指摘・第3回評価 6.5/10
+- **N1修正（致命）**: mock 対象の矛盾解消 → core.py の `from .utils import stream_run` import を固定・`monkeypatch.setattr(brownfield.core, "stream_run", ...)` で確実置換（4.0）
+- **模式B固定（致命）**: stream_run の return `(ok, out_text)` を `StopIteration.value` で消費（実コード確定）。fake は必ず return（4.0・3.6）
+- **emit 訂正**: 「未消費」懸念は誤り（`yield from emit(...)` で正しく消費）→ Known Limitation ではなく正常構造として保持に訂正（3.6）
+- **P1**: shim test 骨格（`pytest.raises(SystemExit)`）追記（4.6）
+- 第3回残り4項（P0×2 + P1×2）すべて解決 → **writing-plans 移行可（8.5/10）**
 
 ## 8. Appendix（実コード抽出・実装時参照）
 
