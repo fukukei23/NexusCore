@@ -111,6 +111,7 @@ exclude_dirs = [
   "data/",
   "logs/",
   "tmp/",
+  "src/sandbox_logs/",  # 修復ログ（72ファイル・AST parse失敗の原因・本来 src/ 配下ではない）
 ]
 
 # スキップするテスト（必要に応じて調整）

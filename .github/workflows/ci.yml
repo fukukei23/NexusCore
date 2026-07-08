@@ -80,8 +80,8 @@ jobs:
 
     strategy:
       matrix:
-        # Test on Python 3.9-3.12 to match development environment
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        # Test on Python 3.10-3.12 (3.9 excluded: 監査ツール semgrep/pip-audit/bandit 1.9系が Python 3.10+ 必須)
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - name: Checkout repository
@@ -103,17 +103,19 @@ jobs:
           pip install -r requirements.txt
           # Install dev dependencies (includes pytest-cov)
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-          pip install pytest-xdist
+          # pytest-xdist は requirements-dev.txt に既に含まれるが、並列実行しないため不要
+          # （2026-07-08 フレーク根絶のため -n auto オプション削除）
 
       - name: Run tests and generate coverage report
         run: |
           # --cov=src measures coverage for entire src folder
-          # --cov-report=xml generates XML report for Codecov
+          # --cov-report=xml generates XML report
           # --cov-report=term-missing shows missing lines
           # --cov-fail-under=80 ensures coverage doesn't drop below 80%
-          # -n auto --dist=loadfile enables parallel test execution
+          # 直列実行に変更（2026-07-08 ローカル検証で -n auto --dist=loadfile による5000件規模並列実行時に
+          # グローバル状態リーク起因のフレーク（run_view_coverage_boost の8件など）が確認されたため）
           python -m pytest --cov=src --cov-report=xml --cov-report=term-missing \
-            --cov-fail-under=80 --durations=20 -n auto --dist=loadfile
+            --cov-fail-under=80 --durations=20
 
       - name: Run webapp UI smoke tests
         run: |
@@ -140,12 +142,3 @@ jobs:
             coverage.xml
             test-results/
           retention-days: 7
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: true
