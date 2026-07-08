@@ -37,14 +37,14 @@ jobs:
           # -r: recursive scan
           # -f json: generate JSON report
           # -o: output file
-          # -ll: report Low+ severity issues
-          # --exclude src/sandbox_logs/: 72ファイルの修復ログ（AST parse失敗）を除外（pyproject.toml の exclude_dirs はCIで読まれないため明示）
-          bandit -r src/ --exclude src/sandbox_logs/ -f json -o bandit-report.json -ll || true
+          # -ll: report Low+ severity issues（display用）
+          # --exclude: src/sandbox_logs/（修復ログ・AST parse失敗）+ src/nexuscore/archive, src/nexuscore/api/archive（非現用コード）
+          bandit -r src/ --exclude src/sandbox_logs/,src/nexuscore/archive,src/nexuscore/api/archive -f json -o bandit-report.json -ll || true
 
           # Display results in terminal
           echo "=== Bandit Security Scan Results ==="
-          # || true: display目的（Low+ severity の偽陽性でexit 1にならないよう緩和。厳密判定は下の Check for critical vulnerabilities が -lll で担当）
-          bandit -r src/ --exclude src/sandbox_logs/ -ll || true
+          # 残る B108（/tmp の適切使用3件）は実コードで # nosec B108 明示済み・exit 0 になる
+          bandit -r src/ --exclude src/sandbox_logs/,src/nexuscore/archive,src/nexuscore/api/archive -ll
 
       - name: Upload Bandit report as artifact
         if: always()
@@ -56,15 +56,16 @@ jobs:
 
       - name: Check for critical vulnerabilities
         run: |
-          # Fail CI if High/Medium severity issues are found
-          bandit -r src/ --exclude src/sandbox_logs/ -lll -f json -o bandit-critical.json
+          # Fail CI if Medium+ severity issues are found（-lll High only → -ll Medium+ に厳密化・2026-07-08 セキュリティレビュー指摘対応）
+          # archive配下（非現用）は除外・B108（/tmp偽陽性3件）は実コードで # nosec B108 明示済み
+          bandit -r src/ --exclude src/sandbox_logs/,src/nexuscore/archive,src/nexuscore/api/archive -ll -f json -o bandit-critical.json
 
           # Count issues
           ISSUE_COUNT=$(python -c "import json; data=json.load(open('bandit-critical.json')); print(len(data.get('results', [])))")
 
           if [ "$ISSUE_COUNT" -gt 0 ]; then
             echo "❌ Found $ISSUE_COUNT critical security issues"
-            bandit -r src/ --exclude src/sandbox_logs/ -lll
+            bandit -r src/ --exclude src/sandbox_logs/,src/nexuscore/archive,src/nexuscore/api/archive -ll
             exit 1
           else
             echo "✅ No critical security issues found"
@@ -82,8 +83,8 @@ jobs:
 
     strategy:
       matrix:
-        # Test on Python 3.10-3.12 (3.9 excluded: 監査ツール semgrep/pip-audit/bandit 1.9系が Python 3.10+ 必須)
-        python-version: ["3.10", "3.11", "3.12"]
+        # pyproject.toml requires-python >=3.12 ・datetime.UTC（3.11+）広範使用のため 3.12 のみ
+        python-version: ["3.12"]
 
     steps:
       - name: Checkout repository

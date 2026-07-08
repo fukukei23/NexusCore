@@ -17,7 +17,7 @@ def _get_lock_dir() -> Path:
     run_state_dir = os.getenv("NEXUSCORE_RUN_STATE_DIR")
     if run_state_dir:
         return Path(run_state_dir) / "locks"
-    return Path("/tmp/nexuscore_locks")
+    return Path("/tmp/nexuscore_locks")  # nosec B108 — ロックファイル格納先（env NEXUSCORE_RUN_STATE_DIR で上書き可能）
 
 
 def _get_lock_ttl_seconds() -> int:

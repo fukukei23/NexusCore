@@ -112,6 +112,8 @@ exclude_dirs = [
   "logs/",
   "tmp/",
   "src/sandbox_logs/",  # 修復ログ（72ファイル・AST parse失敗の原因・本来 src/ 配下ではない）
+  "src/nexuscore/archive/",  # 非現用コード（Banditスキャン対象外）
+  "src/nexuscore/api/archive/",  # 非現用コード（Banditスキャン対象外）
 ]
 
 # スキップするテスト（必要に応じて調整）

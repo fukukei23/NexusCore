@@ -29,7 +29,7 @@ def build_dynamic_run_tab() -> None:
     )
 
     requirement = gr.Textbox(lines=3, label="要件", placeholder="例: フィボナッチ数列を計算する関数を作成して")
-    project_path = gr.Textbox(label="プロジェクトパス", placeholder="/tmp/demo")
+    project_path = gr.Textbox(label="プロジェクトパス", placeholder="/tmp/demo")  # nosec B108 — UI入力例（実パス操作なし）
     max_actions = gr.Slider(minimum=1, maximum=30, value=12, step=1, label="最大アクション数（暴走防止予算）")
 
     with gr.Row():

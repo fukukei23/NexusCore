@@ -88,7 +88,7 @@ def load_sandbox_policy(policy_path: str | None = None) -> dict[str, Any]:
             "denylist": [],
         },
         "filesystem": {
-            "allowed_paths": ["/tmp/nexuscore_sandbox"],
+            "allowed_paths": ["/tmp/nexuscore_sandbox"],  # nosec B108 — サンドボックス作業ディレクトリ（意図的な固定パス）
             "read_only_paths": ["/usr/lib"],
             "forbidden_paths": ["/", "/etc", "/var", "/home"],
         },
