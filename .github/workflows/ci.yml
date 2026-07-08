@@ -38,11 +38,12 @@ jobs:
           # -f json: generate JSON report
           # -o: output file
           # -ll: report Low+ severity issues
-          bandit -r src/ -f json -o bandit-report.json -ll || true
+          # --exclude src/sandbox_logs/: 72ファイルの修復ログ（AST parse失敗）を除外（pyproject.toml の exclude_dirs はCIで読まれないため明示）
+          bandit -r src/ --exclude src/sandbox_logs/ -f json -o bandit-report.json -ll || true
 
           # Display results in terminal
           echo "=== Bandit Security Scan Results ==="
-          bandit -r src/ -ll
+          bandit -r src/ --exclude src/sandbox_logs/ -ll
 
       - name: Upload Bandit report as artifact
         if: always()
@@ -55,14 +56,14 @@ jobs:
       - name: Check for critical vulnerabilities
         run: |
           # Fail CI if High/Medium severity issues are found
-          bandit -r src/ -lll -f json -o bandit-critical.json
+          bandit -r src/ --exclude src/sandbox_logs/ -lll -f json -o bandit-critical.json
 
           # Count issues
           ISSUE_COUNT=$(python -c "import json; data=json.load(open('bandit-critical.json')); print(len(data.get('results', [])))")
 
           if [ "$ISSUE_COUNT" -gt 0 ]; then
             echo "❌ Found $ISSUE_COUNT critical security issues"
-            bandit -r src/ -lll
+            bandit -r src/ --exclude src/sandbox_logs/ -lll
             exit 1
           else
             echo "✅ No critical security issues found"
