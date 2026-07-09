@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "components/status_badge.html" import status_badge %}
+
+{% block title %}NexusCore - {{ project.name }}{% endblock %}
+
+{% block body %}
+<h1>{{ project.name }}</h1>
+<p>Repo: {{ project.repo_url or 'N/A' }}</p>
+<p>Local Path: {{ project.local_path }}</p>
+<p>
+  <a href="/dashboard/projects/{{ project.id }}" class="btn-link">Open Project Dashboard</a>
+</p>
+<hr>
+
+{% if metrics_html %}
+{{ metrics_html | safe }}
+{% endif %}
+
+{% for category, message in flash_messages %}
+<div class="flash-message">{{ message }}</div>
+{% endfor %}
+
+<h2>Recent Runs ({{ runs_count }})</h2>
+{% include "components/run_table.html" %}
+<hr>
+<a href="/projects/">Back to Projects</a>
+{% endblock %}

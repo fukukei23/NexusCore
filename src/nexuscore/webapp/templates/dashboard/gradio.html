@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block title %}NexusCore - Gradio Dashboard: {{ project.name }}{% endblock %}
+
+{% block body %}
+<h1>Gradio Dashboard: {{ project.name }}</h1>
+<iframe src="{{ gradio_url }}" width="100%" height="800px"></iframe>
+<hr>
+<a href="/projects/">Back to Projects</a>
+{% endblock %}

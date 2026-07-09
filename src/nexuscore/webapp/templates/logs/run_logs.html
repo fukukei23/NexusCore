@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% from "components/status_badge.html" import status_badge %}
+
+{% block title %}NexusCore - Run: {{ run_id[:8] }}...{% endblock %}
+
+{% block body %}
+<div class="header" style="margin-bottom: 24px;">
+  <h1>Run: {{ run_id[:8] }}...</h1>
+  <p>Status: {{ status_badge_html | safe }}</p>
+  <p>Started: {{ started_str }}</p>
+  <p>Finished: {{ finished_str }}</p>
+</div>
+
+<!-- Self-Healing Metrics -->
+<div class="grid">
+  <div class="card">
+    <h2>Self-Healing Metrics</h2>
+    <div class="metric-row"><span class="metric-label">Model:</span><span class="metric-value">{{ model_name or 'N/A' }}</span></div>
+    <div class="metric-row"><span class="metric-label">Exec Time:</span><span class="metric-value">{{ duration_str }}</span></div>
+    <div class="metric-row"><span class="metric-label">Retry Count:</span><span class="metric-value">{{ retry_count }}</span></div>
+    <div class="metric-row"><span class="metric-label">Files Changed:</span><span class="metric-value">{{ files_changed }}</span></div>
+    <div class="metric-row"><span class="metric-label">Cost:</span><span class="metric-value">${{ "%.4f" | format(cost_usd) }} USD</span></div>
+    {% if last_error_class %}
+    <div class="metric-row"><span class="metric-label">Last Error:</span><span class="metric-value">{{ last_error_class }}</span></div>
+    {% endif %}
+  </div>
+
+  {% if guardian_review %}
+  <div class="card">
+    <h2>Guardian Review</h2>
+    <p><strong>Decision:</strong> {{ guardian_review.decision or 'N/A' }}</p>
+    <p><strong>Reason:</strong> {{ (guardian_review.reason or 'N/A')[:200] }}</p>
+  </div>
+  {% endif %}
+
+  {% if diff_summary %}
+  <div class="card">
+    <h2>AI Diff Summary</h2>
+    <pre style="white-space: pre-wrap; font-size: 0.85rem;">{{ diff_summary[:500] }}</pre>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Observability Links -->
+<div class="card" style="margin-top: 16px;">
+  <h2>Observability</h2>
+  <p>
+    <a href="/logs/runs/{{ run_id }}" class="btn-link">ExecutionLog 画面</a>
+    <a href="/projects/{{ project_id }}" class="btn-link">Project Detail</a>
+  </p>
+  <p>
+    <a href="/dashboard/projects/{{ project_id }}" class="btn-link">Project Dashboard</a>
+  </p>
+</div>
+
+<hr>
+<h2>Execution Logs</h2>
+<table class="simple">
+  <tr>
+    <th>Time</th>
+    <th>Source</th>
+    <th>Level</th>
+    <th>Message</th>
+    <th>Details</th>
+  </tr>
+  {% for log in logs_data %}
+  <tr>
+    <td>{{ log.created_at }}</td>
+    <td>{{ log.source }}</td>
+    <td>{{ log.level }}</td>
+    <td>{{ log.message[:100] }}</td>
+    <td><details><summary>JSON</summary><pre>{{ log.payload_preview }}</pre></details></td>
+  </tr>
+  {% endfor %}
+</table>
+<hr>
+<a href="/projects/">Back to Projects</a>
+{% endblock %}

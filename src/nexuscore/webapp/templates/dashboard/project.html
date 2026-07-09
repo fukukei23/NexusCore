@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "components/status_badge.html" import status_badge %}
+
+{% block title %}NexusCore Project Dashboard - {{ project.name }}{% endblock %}
+
+{% block body %}
+<h1>Project: {{ project.name }}</h1>
+<div class="subtitle">
+  Runs: {{ stats.total_runs }} / Success: {{ stats.success_runs }} / Failed: {{ stats.failed_runs }}
+  &nbsp; | &nbsp; Success Rate (last 30): {{ "%.1f" | format(stats.success_rate * 100) }}%
+</div>
+<p>
+  <a href="/projects/{{ project.id }}">Back to Project Detail</a>
+</p>
+
+<div class="grid">
+  <!-- Project Summary Card -->
+  <div class="card">
+    <h2>Project Summary</h2>
+    <div class="metric-main">{{ "%.1f" | format(stats.success_rate * 100) }}%</div>
+    <div class="metric-label">Success Rate (last 30 runs)</div>
+    <div class="metric-row"><span>Total Runs</span><span>{{ stats.total_runs }}</span></div>
+    <div class="metric-row"><span>Success</span><span>{{ stats.success_runs }}</span></div>
+    <div class="metric-row"><span>Failed</span><span>{{ stats.failed_runs }}</span></div>
+  </div>
+
+  <!-- Latest Run Summary Card -->
+  <div class="card">
+    <h2>Latest Run</h2>
+    <div class="metric-row"><span>Run ID</span><span>{{ latest_run_short }}</span></div>
+    <div class="metric-row"><span>Status</span><span>{{ latest_status_badge | safe }}</span></div>
+    <div class="metric-row"><span>Duration</span><span>{{ duration_str }}</span></div>
+    <div class="metric-row">
+      <span>Patches</span>
+      <span>{{ latest_run_metrics.patch_count if latest_run_metrics else 0 }} files: {{ latest_run_metrics.affected_files if latest_run_metrics else 0 }}</span>
+    </div>
+    <div class="metric-row"><span>LLM Calls</span><span>{{ latest_run_metrics.llm_call_count_total if latest_run_metrics else 0 }}</span></div>
+    <div class="metric-row">
+      <span>Estimated Cost</span>
+      <span>~{{ "%.2f" | format(latest_run_metrics.estimated_cost_total if latest_run_metrics else 0.0) }} JPY</span>
+    </div>
+  </div>
+
+  <!-- LLM Cost Breakdown Card -->
+  <div class="card">
+    <h2>LLM Cost Breakdown</h2>
+    {% if not llm_breakdown %}
+    <p>No LLM logs.</p>
+    {% else %}
+    <table class="simple">
+      <thead>
+        <tr><th>Model</th><th>Calls</th><th>Prompt</th><th>Completion</th><th>Total</th><th>Cost (JPY)</th></tr>
+      </thead>
+      <tbody>
+        {% for model, entry in llm_breakdown.items() %}
+        <tr>
+          <td>{{ model }}</td>
+          <td>{{ entry.call_count }}</td>
+          <td>{{ entry.token_prompt }}</td>
+          <td>{{ entry.token_completion }}</td>
+          <td>{{ entry.token_total }}</td>
+          <td>{{ "%.2f" | format(entry.cost_total) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+
+  <!-- Recent Runs Card -->
+  <div class="card">
+    <h2>Recent Runs</h2>
+    {% if not recent_runs %}
+    <p>No runs yet.</p>
+    {% else %}
+    <ul class="runs-list">
+      {% for r in recent_runs %}
+      <li>
+        <div>
+          <a href="/logs/runs/{{ r.run_id }}">{{ r.run_id[:8] }}...</a><br/>
+          <span class="metric-label">{{ r.started_at.isoformat(sep=' ', timespec='seconds') if r.started_at else '-' }}</span>
+        </div>
+        <div>{{ status_badge(r.status or '') }}</div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

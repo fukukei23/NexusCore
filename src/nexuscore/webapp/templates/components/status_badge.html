@@ -1,0 +1,13 @@
+{# Render a status badge. Usage: {{ status_badge("SUCCESS") }} #}
+{% macro status_badge(status) %}
+{% set s = (status or "") | upper %}
+{% if s == "RUNNING" %}
+<span class="status-badge status-running">&#9654; RUNNING</span>
+{% elif s == "SUCCESS" %}
+<span class="status-badge status-success">&#10004; SUCCESS</span>
+{% elif s == "FAILED" %}
+<span class="status-badge status-failed">&#10006; FAILED</span>
+{% else %}
+<span class="status-badge status-pending">&#9201; {{ s or "PENDING" }}</span>
+{% endif %}
+{% endmacro %}

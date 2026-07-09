@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "components/status_badge.html" import status_badge %}
+
+{% block title %}NexusCore - Projects{% endblock %}
+
+{% block extra_style %}
+<style>
+  .projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="header">
+  <h1>Projects</h1>
+  <div class="subtitle">Logged in as: {{ user_login }} | <a href="/auth/logout">Logout</a></div>
+</div>
+<div class="projects-grid">
+  {% for p in projects_data %}
+  <div class="card">
+    <h3><a href="/projects/{{ p.id }}">{{ p.name }}</a></h3>
+    <div class="metric-label" style="margin-bottom: 12px;">{{ p.repo_url or 'No repo URL' }}</div>
+    <div class="metric-row">
+      <span class="metric-label">Success Rate (30 runs):</span>
+      <span class="metric-value">{{ "%.1f" | format(p.success_rate * 100) }}%</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">Latest Status:</span>
+      <span>
+        {% if p.latest_run %}
+          {{ status_badge(p.latest_run.status) }}
+        {% else %}
+          -
+        {% endif %}
+      </span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">Exec Time:</span>
+      <span class="metric-value">{{ (p.latest_run.metrics.duration_str if p.latest_run and p.latest_run.metrics else 'N/A') }}</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">Retry:</span>
+      <span class="metric-value">{{ (p.latest_run.metrics.retry_count | string if p.latest_run and p.latest_run.metrics else '-') }}</span>
+    </div>
+    {% if p.latest_run and p.latest_run.metrics and p.latest_run.metrics.last_error_class and p.latest_run.metrics.last_error_class != '-' %}
+    <div class="metric-row">
+      <span class="metric-label">Last Error:</span>
+      <span class="metric-value">{{ p.latest_run.metrics.last_error_class }}</span>
+    </div>
+    {% endif %}
+    <a href="/projects/{{ p.id }}" class="btn-link">View Details</a>
+  </div>
+  {% endfor %}
+</div>
+<hr>
+<a href="/projects/new">Create New Project</a>
+{% endblock %}

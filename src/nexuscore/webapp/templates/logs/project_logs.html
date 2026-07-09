@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}NexusCore - Logs: {{ project.name }}{% endblock %}
+
+{% block body %}
+<h1>Logs: {{ project.name }}</h1>
+<p>Filters: source={{ source_filter or 'all' }}, level={{ level_filter or 'all' }}</p>
+<hr>
+<table class="simple">
+  <tr>
+    <th>Time</th>
+    <th>Source</th>
+    <th>Level</th>
+    <th>Message</th>
+    <th>Details</th>
+  </tr>
+  {% for log in logs_data %}
+  <tr>
+    <td>{{ log.created_at }}</td>
+    <td>{{ log.source }}</td>
+    <td>{{ log.level }}</td>
+    <td>{{ log.message[:100] }}</td>
+    <td><details><summary>JSON</summary><pre>{{ log.payload_preview }}</pre></details></td>
+  </tr>
+  {% endfor %}
+</table>
+<hr>
+<a href="/projects/">Back to Projects</a>
+{% endblock %}

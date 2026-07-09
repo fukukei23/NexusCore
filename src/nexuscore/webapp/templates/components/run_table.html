@@ -1,0 +1,23 @@
+{% from "components/status_badge.html" import status_badge %}
+<table class="run-table">
+  <thead>
+    <tr>
+      <th>Run ID</th>
+      <th>Status</th>
+      <th>Duration</th>
+      <th>Started</th>
+      <th>Finished</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in runs %}
+    <tr>
+      <td><a href="/logs/runs/{{ r.run_id }}">{{ r.run_id[:8] }}...</a></td>
+      <td>{{ status_badge(r.status or "") }}</td>
+      <td>{{ r._duration_str }}</td>
+      <td>{{ r._started_str }}</td>
+      <td>{{ r._finished_str }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

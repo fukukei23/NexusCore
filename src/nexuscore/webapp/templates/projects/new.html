@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}NexusCore - New Project{% endblock %}
+
+{% block body %}
+<h1>Create New Project</h1>
+<form method="POST">
+  <p>Name: <input type="text" name="name" required></p>
+  <p>Repo URL: <input type="text" name="repo_url" placeholder="https://github.com/user/repo"></p>
+  <p>Local Path: <input type="text" name="local_path" required placeholder="/path/to/project"></p>
+  <p><button type="submit">Create</button></p>
+</form>
+<a href="/projects/">Cancel</a>
+{% endblock %}
