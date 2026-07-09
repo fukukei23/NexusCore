@@ -216,10 +216,8 @@ jobs:
   daily-approval-summary:
     name: Daily approval summary
     runs-on: ubuntu-latest
-    schedule:
-      - cron: "0 9 * * 1-5" # Weekdays at 9 AM
 
-    if: false # Disabled by default, enable with workflow_dispatch or schedule
+    if: false # Disabled by default (enable via workflow_dispatch; schedule was job-level=invalid, removed)
 
     steps:
       - name: Checkout repository
