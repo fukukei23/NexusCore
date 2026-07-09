@@ -21,9 +21,9 @@ jobs:
     name: Notify STIT Gateway Issue
     runs-on: ubuntu-latest
     if: |
-      github.event.issue.title.startsWith('[STIT-GATE]') ||
-      github.event.issue.title.startsWith('[STIT-SPEC]') ||
-      github.event.issue.title.startsWith('[STIT-DECISION]')
+      startsWith(github.event.issue.title, '[STIT-GATE]') ||
+      startsWith(github.event.issue.title, '[STIT-SPEC]') ||
+      startsWith(github.event.issue.title, '[STIT-DECISION]')
 
     steps:
       - name: Checkout repository
@@ -135,7 +135,7 @@ jobs:
     name: Notify approval status changes
     runs-on: ubuntu-latest
     if: |
-      github.event.issue.title.startsWith('[STIT-GATE]') &&
+      startsWith(github.event.issue.title, '[STIT-GATE]') &&
       github.event.action == 'closed' &&
       github.event.issue.state_reason == 'completed'
 
