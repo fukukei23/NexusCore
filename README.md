@@ -2,7 +2,7 @@
 
 > **Multi-agent AI development framework with multi-tier quality gates**
 >
-> NexusCore is an autonomous multi-agent system where 14 specialized AI agents collaborate across the entire software development lifecycle — from requirements analysis to architecture design, code generation, testing, and quality assurance. Features intelligent LLM routing across 8 providers and a 2-tier quality gate system.
+> NexusCore is an autonomous multi-agent system where 12 specialized AI agents collaborate across the entire software development lifecycle — from requirements analysis to architecture design, code generation, testing, and quality assurance. Features intelligent LLM routing across 8 providers and a 2-tier quality gate system.
 
 ---
 
@@ -21,7 +21,7 @@
   <img src="docs/screenshots/cli-pipeline.png" width="500" alt="CLI パイプライン実行">
 </p>
 
-> `python main_cli.py --project-path /tmp/demo "フィボナッチ数列を計算する関数を作成して"` を実行した様子。ユーザーの自然言語入力を受け取り、14のAIエージェント（Requirement → Architect → Planner → Coder → Tester → Debugger → Guardian...）が順次起動。LLMルーティングがOpenAI/Gemini/Anthropic/GLM等8プロバイダーから用途に最適なモデルを自動選択し、コード生成 → レビュー → テスト生成までを一気通貫で実行します。
+> `python main_cli.py --project-path /tmp/demo "フィボナッチ数列を計算する関数を作成して"` を実行した様子。ユーザーの自然言語入力を受け取り、12のAIエージェント（Requirement → Architect → Planner → Coder → Tester → Debugger → Guardian...）が順次起動。LLMルーティングがOpenAI/Gemini/Anthropic/GLM等8プロバイダーから用途に最適なモデルを自動選択し、コード生成 → レビュー → テスト生成までを一気通貫で実行します。
 
 ### テストスイート（品質の証明）
 
@@ -83,7 +83,7 @@
   </tr>
   <tr>
     <td>CLIの使い方とオプション一覧</td>
-    <td>14の専門エージェントの協調動作フロー</td>
+    <td>12の専門エージェントの協調動作フロー</td>
     <td>5,465テストが全て通過（CI実測 2026-07-09）</td>
   </tr>
   <tr>
@@ -109,7 +109,7 @@
 
 ### マルチエージェントシステム
 
-14の専門エージェントが協調動作し、開発プロセス全体を自動化します。
+12の専門エージェントが協調動作し、開発プロセス全体を自動化します。
 
 | エージェント | 担当領域 |
 |-------------|---------|
@@ -177,7 +177,7 @@ User / Developer
        ↓
   ┌──────────────┐
   │ Agent Layer   │
-  │ 14 Specialized Agents
+  │ 12 Specialized Agents
   └──────┬───────┘
          ├→ LLM Router ──→ [GPT-5.5 | Sonnet 4.6 | Gemini 3.1 | GLM-5.1 | DeepSeek | Moonshot | MiniMax]
          │       ↕
@@ -220,7 +220,7 @@ User / Developer
 |------|-----|
 | テスト数 | 5,465 テストケース（CI自動検証・2026-07-09 実測） |
 | カバレッジ | 84.69%（CI実測 2026-07-09・branch 79.64%） |
-| エージェント数 | 14専門エージェント |
+| エージェント数 | 12専門エージェント |
 | LLMプロバイダー | 8プロバイダー（OpenAI, Anthropic, Google, GLM, MiniMax, DeepSeek, Moonshot, Local） |
 | 品質ゲート | 2層（静的解析 + 動的テスト） |
 | CI | GitHub Actions（push/PR時自動テスト + セキュリティスキャン） |
@@ -242,7 +242,7 @@ User / Developer
 ```
 NexusCore/
 ├── src/nexuscore/
-│   ├── agents/              # AIエージェント（14専門エージェント + BaseAgent）
+│   ├── agents/              # AIエージェント（12専門エージェント + BaseAgent）
 │   ├── analyzer/            # コード解析（AST, 依存グラフ）
 │   ├── api/                 # FastAPI公開API（/api/v1/*）
 │   ├── audio/               # 音声入力（Whisper統合）
