@@ -201,7 +201,10 @@ def test_implementation_phase_updates_context(orchestrator, initial_context):
     context = orchestrator.run_implementation_phase(initial_context)
 
     assert "IMPLEMENTATION" in context.phase_log
-    assert "code" in context.implementation
+    # plan に target_files が無いため main.py 1枚の劣化モードに縮退する（spec §3-1）
+    assert "files" in context.implementation
+    assert "main.py" in context.implementation["files"]
+    assert context.implementation["degraded"] is True
 
 
 def test_testing_phase_updates_context(orchestrator, initial_context):

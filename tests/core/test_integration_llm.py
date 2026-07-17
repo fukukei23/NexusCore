@@ -169,8 +169,10 @@ class TestPhaseExecutionIntegration:
         result = orch.run_implementation_phase(ctx)
         assert result.implementation is not None
         assert "IMPLEMENTATION" in result.phase_log
-        code = result.implementation.get("code", "")
-        assert len(code) > 0
+        # plan に target_files が無いため main.py 1枚の劣化モードに縮退する（spec §3-1）
+        files = result.implementation.get("files", {})
+        assert files, "at least one file should be generated"
+        assert any(len(code) > 0 for code in files.values())
 
     def test_testing_phase_with_real_agent(self, real_agents):
         """run_testing_phase with real TesterAgent produces test code."""
@@ -208,12 +210,13 @@ class TestFullPipelineIntegration:
             language="ja",
             fast_lane=False,
         )
-        # Verify all expected artifacts exist
-        hello = Path(project_path) / "hello.py"
+        # Verify all expected artifacts exist（target_files 契約により生成ファイル名は
+        # planner 出力に依存するため固定ファイル名 hello.py は前提にしない・spec §3-2）
         readme = Path(project_path) / "README.md"
-        assert hello.exists(), "hello.py should be generated"
+        generated_files = list(Path(project_path).rglob("*.py"))
+        assert generated_files, "at least one .py file should be generated"
         assert readme.exists(), "README.md should be generated"
-        content = hello.read_text(encoding="utf-8")
+        content = generated_files[0].read_text(encoding="utf-8")
         assert len(content) > 0
 
     def test_run_full_project_fast_lane(self, real_agents):
