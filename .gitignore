@@ -148,4 +148,6 @@ fkb_local.json
 
 # ランタイム状態・ローカル起動スクリプト
 .nexus/sessions/
+.nexus/api_runs/.nexus_context.json
+.auto-loop/
 run_unified_ui.py
