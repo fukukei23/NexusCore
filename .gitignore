@@ -146,9 +146,6 @@ coverage_reports/
 policies/
 fkb_local.json
 
-# エージェント残骸
-webapp/
-
 # ランタイム状態・ローカル起動スクリプト
 .nexus/sessions/
 run_unified_ui.py
