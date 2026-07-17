@@ -3,7 +3,27 @@ from __future__ import annotations
 
 import logging
 
+import pytest
+
 from nexuscore.core.plan_contract import extract_target_files
+
+
+@pytest.fixture(autouse=True)
+def _isolate_logging():
+    """フルスイート実行時の caplog 取りこぼし防止。
+
+    他テストがエージェントを生成すると nexuscore ロガーの propagate が
+    False に設定され、caplog（root ハンドラ）まで WARNING が伝播しなくなる。
+    対象ロガー系列の propagate を一時的に True へ強制し、後で復元する。
+    """
+    logging.disable(logging.NOTSET)
+    names = ["nexuscore", "nexuscore.core", "nexuscore.core.plan_contract"]
+    saved = {n: logging.getLogger(n).propagate for n in names}
+    for n in names:
+        logging.getLogger(n).propagate = True
+    yield
+    for n, value in saved.items():
+        logging.getLogger(n).propagate = value
 
 
 class TestExtractTargetFiles:
