@@ -88,6 +88,46 @@ class PhaseRunnerMixin:
         except Exception:  # noqa: BLE001 — clean_output失敗時は生テキストを返す
             return content
 
+    @staticmethod
+    def _coerce_plan(plan_output: Any) -> dict[str, Any]:
+        """planner 出力を dict に正規化する（dict / JSON文字列 / fence付き / 非JSON）。
+
+        dict はそのまま返す。文字列は素の JSON・コードフェンス付き JSON
+        （```json ... ``` / ``` ... ```）の順に解釈を試み、いずれも失敗する
+        場合は {"raw_plan": <元テキスト>} にフォールバックする。
+        """
+        if isinstance(plan_output, dict):
+            return plan_output
+
+        text = str(plan_output or "")
+        candidates = [text]
+
+        stripped = text.strip()
+        if stripped.startswith("```"):
+            lines = stripped.splitlines()
+            if lines:
+                lines = lines[1:]  # 先頭フェンス行（``` / ```json 等）を除去
+            if lines and lines[-1].strip().startswith("```"):
+                lines = lines[:-1]  # 末尾フェンス行を除去
+            candidates.append("\n".join(lines))
+
+        try:
+            from nexuscore.utils.clean_output import clean_output
+
+            candidates.append(clean_output(text))
+        except Exception:  # noqa: BLE001 — clean_output失敗時は他候補で継続
+            pass
+
+        for candidate in candidates:
+            try:
+                parsed = json.loads(candidate.strip())
+            except (json.JSONDecodeError, ValueError, AttributeError):
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+
+        return {"raw_plan": text}
+
     # ------------------------------------------------------------------
     # Phase 0: Context Analysis
     # ------------------------------------------------------------------
@@ -211,10 +251,7 @@ class PhaseRunnerMixin:
             else:
                 plan_text = _run_plan()
 
-            try:
-                plan = json.loads(plan_text)
-            except (json.JSONDecodeError, ValueError):
-                plan = {"raw_plan": plan_text}
+            plan = self._coerce_plan(plan_text)
 
             context.plan = plan
             self._maybe_stop(
