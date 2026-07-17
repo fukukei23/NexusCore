@@ -143,7 +143,7 @@ class Orchestrator(PhaseRunnerMixin):
         language: str = "ja",
         fast_lane: bool = False,
         run_db_id: int | None = None,
-    ) -> None:
+    ) -> OrchestratorContext | None:
         """高レベルな「フルプロジェクト」実行フロー。"""
         self.logger.info(f"=== Full Project Run Start === requirement='{user_requirement}'")
         task_id = uuid.uuid4().hex
@@ -186,12 +186,13 @@ class Orchestrator(PhaseRunnerMixin):
             self.logger.info(f"[{task_id}] Phase 3: Development Cycle (tasks={len(tasks)})")
             self.logger.info(f"=== Full Project Run Finished === requirement='{user_requirement}'")
             self._log_orch_event(run_db_id, "shutdown", "FINISHED", "Orchestrator run finished")
+            return context
 
         except RuntimeError as e:
             if str(e) == "SessionStopped":
                 self.logger.info("Project run stopped by user request. All generated files remain on disk.")
                 self._log_orch_event(run_db_id, "shutdown", "INTERRUPTED", "Orchestrator run stopped by user request")
-                return
+                return None
             raise
         except Exception as e:  # noqa: BLE001
             self.logger.error(f"[{task_id}] Orchestrator run failed: {e}", exc_info=True)
