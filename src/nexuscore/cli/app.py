@@ -71,7 +71,13 @@ def run(requirement: str, project_path: str, language: str, verbose: bool) -> No
         orchestrator = Orchestrator(**agents)
 
         result = orchestrator.run_full_project(requirement, language)
-        click.echo(f"Result: {result.get('status', 'unknown')}")
+        if result is None:
+            # run_full_project returns None only when stopped mid-flow (SessionStopped).
+            click.echo("Result: interrupted (run stopped before completion)")
+        else:
+            # Otherwise it returns a completed OrchestratorContext (a dataclass, not a dict).
+            phases = len(getattr(result, "phase_log", []) or [])
+            click.echo(f"Result: completed ({phases} phases)")
     except FileNotFoundError as e:
         click.echo(f"Error: Required file not found: {e}", err=True)
         click.echo("  Hint: Check that the project directory contains the expected files.", err=True)
