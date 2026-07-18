@@ -181,16 +181,6 @@ jobs:
           echo "Running tests for Python ${{ matrix.python-version }}..."
           python -m pytest --tb=short -v
 
-      - name: Upload coverage
-        if: matrix.coverage
-        uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: true
-
   stit-compliance-check:
     name: STIT Compliance Check
     runs-on: ubuntu-latest
