@@ -74,6 +74,13 @@ class PlannerAgent(BaseAgent):
   ]
 }}
 
+# 出力JSONに必ず含めるキー（追加仕様）
+"target_files": 生成すべきファイルの配列。各要素は {{"path": "<相対パス>", "role": "<implementation|test|config>"}}。
+- path はプロジェクトルートからの相対パス（絶対パス・"../" は禁止）
+- 実装本体は role="implementation"、テストは role="test"、設定ファイルは role="config"
+- 最低1つは role="implementation" を含めること
+例: "target_files": [{{"path": "app/calculator.py", "role": "implementation"}}, {{"path": "tests/test_calculator.py", "role": "test"}}]
+
 必ず上記スキーマ通りのJSONのみを返してください。追加の文章やコードフェンスは禁止です。
 """
         response_str = self.execute_llm_task(prompt, as_json=True)

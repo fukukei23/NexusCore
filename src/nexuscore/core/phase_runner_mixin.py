@@ -88,6 +88,46 @@ class PhaseRunnerMixin:
         except Exception:  # noqa: BLE001 — clean_output失敗時は生テキストを返す
             return content
 
+    @staticmethod
+    def _coerce_plan(plan_output: Any) -> dict[str, Any]:
+        """planner 出力を dict に正規化する（dict / JSON文字列 / fence付き / 非JSON）。
+
+        dict はそのまま返す。文字列は素の JSON・コードフェンス付き JSON
+        （```json ... ``` / ``` ... ```）の順に解釈を試み、いずれも失敗する
+        場合は {"raw_plan": <元テキスト>} にフォールバックする。
+        """
+        if isinstance(plan_output, dict):
+            return plan_output
+
+        text = str(plan_output or "")
+        candidates = [text]
+
+        stripped = text.strip()
+        if stripped.startswith("```"):
+            lines = stripped.splitlines()
+            if lines:
+                lines = lines[1:]  # 先頭フェンス行（``` / ```json 等）を除去
+            if lines and lines[-1].strip().startswith("```"):
+                lines = lines[:-1]  # 末尾フェンス行を除去
+            candidates.append("\n".join(lines))
+
+        try:
+            from nexuscore.utils.clean_output import clean_output
+
+            candidates.append(clean_output(text))
+        except Exception:  # noqa: BLE001 — clean_output失敗時は他候補で継続
+            pass
+
+        for candidate in candidates:
+            try:
+                parsed = json.loads(candidate.strip())
+            except (json.JSONDecodeError, ValueError, AttributeError):
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+
+        return {"raw_plan": text}
+
     # ------------------------------------------------------------------
     # Phase 0: Context Analysis
     # ------------------------------------------------------------------
@@ -211,10 +251,7 @@ class PhaseRunnerMixin:
             else:
                 plan_text = _run_plan()
 
-            try:
-                plan = json.loads(plan_text)
-            except (json.JSONDecodeError, ValueError):
-                plan = {"raw_plan": plan_text}
+            plan = self._coerce_plan(plan_text)
 
             context.plan = plan
             self._maybe_stop(
@@ -271,50 +308,77 @@ class PhaseRunnerMixin:
         if context.fast_lane and context.implementation:
             return context
 
-        def _run_code():
-            if hasattr(self.coder_agent, "implement_code"):
-                return self.coder_agent.implement_code(
-                    task_description=context.user_requirement,
-                    existing_code="",
-                    code_language=os.getenv("NEXUS_CODE_LANG", "python"),
-                )
-            return ""
+        from nexuscore.core.plan_contract import extract_target_files
 
-        code_result = _run_code()
-        context.implementation = {"code": code_result}
+        target_files, degraded = extract_target_files(context.plan)
+        impl_targets = [e for e in target_files if e["role"] in ("implementation", "config")]
 
-        if code_result:
-            try:
-                hello_path = Path(self.project_path) / "hello.py"
-                hello_path.parent.mkdir(parents=True, exist_ok=True)
-                hello_path.write_text(code_result, encoding="utf-8")
-                self.logger.info(f"Generated code saved to: {hello_path}")
+        # 生成順は plan の target_files 配列順（planner の列挙順＝依存順とみなす・spec §3-2）。
+        # existing_code 連結はファイル数増でトークンが増えるが、Stage 1 の生成規模では許容
+        # （選択的コンテキスト/RAG化はスコープ外・必要になったら起票）。
+        generated: dict[str, str] = {}
+        for entry in impl_targets:
+            code = self._generate_one_file(context, entry, generated)
+            out_path = Path(self.project_path) / entry["path"]
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(code, encoding="utf-8")
+            generated[entry["path"]] = code
+            self.logger.info(f"Generated code saved to: {out_path}")
 
-                readme_path = Path(self.project_path) / "README.md"
-                readme_content = f"""# {Path(self.project_path).name}
-
-## 概要
-{context.user_requirement}
-
-## 実行方法
-
-```bash
-python hello.py
-```
-
-## 生成されたファイル
-
-- `hello.py` - Hello World を表示する Python スクリプト
-
-## 作成日時
-{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-"""
-                readme_path.write_text(readme_content, encoding="utf-8")
-                self.logger.info(f"README.md saved to: {readme_path}")
-            except (OSError, UnicodeEncodeError) as e:
-                self.logger.warning(f"Failed to save files: {e}")
-
+        context.implementation = {"files": generated, "degraded": degraded}
+        self._write_generated_readme(context, generated)
         return context
+
+    def _generate_one_file(
+        self,
+        context: OrchestratorContext,
+        entry: dict[str, str],
+        generated: dict[str, str],
+    ) -> str:
+        """target_files の1エントリ分のコードを coder に生成させる。
+
+        生成済みファイルを existing_code として渡し、ファイル間整合を担保する（spec §3-2）。
+        空出力は失敗として扱う（spec §6-1）。
+        """
+        if not hasattr(self.coder_agent, "implement_code"):
+            raise RuntimeError("CoderAgent does not support implement_code")
+
+        task_description = (
+            f"要件: {context.user_requirement}\n"
+            f"生成対象ファイル: {entry['path']}（役割: {entry['role']}）\n"
+            f"計画: {json.dumps(context.plan.get('functions_to_implement', []), ensure_ascii=False)}"
+        )
+        existing = "\n\n".join(
+            f"# ==== {path} ====\n{code}" for path, code in generated.items()
+        )
+        code = self.coder_agent.implement_code(
+            task_description=task_description,
+            existing_code=existing,
+            code_language=os.getenv("NEXUS_CODE_LANG", "python"),
+        )
+        if not code or not str(code).strip():
+            raise RuntimeError(f"CoderAgent returned empty output for {entry['path']}")
+        return str(code)
+
+    def _write_generated_readme(
+        self, context: OrchestratorContext, generated: dict[str, str]
+    ) -> None:
+        """実際の生成ファイル一覧から README を組み立てる（固定文言廃止・spec §3-2）。"""
+        if not generated:
+            return
+        try:
+            file_lines = "\n".join(f"- `{p}`" for p in generated)
+            readme_content = (
+                f"# {Path(self.project_path).name}\n\n"
+                f"## 概要\n{context.user_requirement}\n\n"
+                f"## 生成されたファイル\n\n{file_lines}\n\n"
+                f"## 作成日時\n{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            )
+            readme_path = Path(self.project_path) / "README.md"
+            readme_path.write_text(readme_content, encoding="utf-8")
+            self.logger.info(f"README.md saved to: {readme_path}")
+        except (OSError, UnicodeEncodeError) as e:
+            self.logger.warning(f"Failed to save README: {e}")
 
     # ------------------------------------------------------------------
     # Phase 5: Testing

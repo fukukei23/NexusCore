@@ -139,6 +139,33 @@ def _save_codex_artifacts(status_tag: str) -> None:
         logging.warning("Codex artifact export failed: %s", artifact_error, exc_info=True)
 
 
+def run_smoke_gate(
+    project_path: str, target_files: list[dict[str, str]]
+) -> tuple[bool, list[str]]:
+    """成果物チェック（Smoke Test Gate）。
+
+    plan の target_files 全実在 + .py の py_compile 通過を成功条件とする（spec §3-3）。
+    role=test のファイルは Stage 1 時点では未生成のため検査対象外。
+    """
+    import py_compile
+
+    errors: list[str] = []
+    for entry in target_files:
+        if entry.get("role") == "test":
+            continue
+        rel = entry.get("path", "")
+        abs_path = os.path.join(project_path, rel)
+        if not os.path.exists(abs_path):
+            errors.append(f"missing artifact: {rel}")
+            continue
+        if rel.endswith(".py"):
+            try:
+                py_compile.compile(abs_path, doraise=True)
+            except py_compile.PyCompileError as e:
+                errors.append(f"syntax error in {rel}: {e.msg}")
+    return (not errors), errors
+
+
 def run_dynamic_mode(orchestrator, llm_router, args) -> int:
     """CR-NEXUS-054: 動的オーケストレーションループを実行する。
 
@@ -346,6 +373,7 @@ def main():
         )
 
         # --- 5. 開発プロセスの開始 ---
+        result_context = None
         if args.dynamic:
             # CR-NEXUS-054: ゴール駆動の動的オーケストレーション
             logging.info("Starting dynamic goal-driven process (CR-NEXUS-054)...")
@@ -356,42 +384,25 @@ def main():
         else:
             logging.info("Starting full development process...")
             # 従来の固定パイプライン（後方互換）
-            orchestrator.run_full_project(
+            result_context = orchestrator.run_full_project(
                 user_requirement=args.requirement,
                 language=args.language
             )
         logging.info("Development process finished successfully.")
 
-        # --- 6. 成果物チェック（Smoke Test Gate） ---
+        # --- 6. 成果物チェック（Smoke Test Gate・spec §3-3） ---
         exit_code = 0
-        hello_path = os.path.join(project_path, "hello.py")
-        readme_path = os.path.join(project_path, "README.md")
+        if not args.dynamic and result_context is not None:
+            from nexuscore.core.plan_contract import extract_target_files
 
-        missing_files = []
-        if not os.path.exists(hello_path):
-            missing_files.append("hello.py")
-        if not os.path.exists(readme_path):
-            missing_files.append("README.md")
-
-        if missing_files:
-            logging.error(f"Smoke Test FAILED: Missing required artifacts: {', '.join(missing_files)}")
-            exit_code = 1
-        else:
-            # hello.py の実行確認
-            try:
-                result = subprocess.run(
-                    ["python", hello_path],
-                    cwd=project_path,
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
-                if result.returncode == 0 and "Hello" in result.stdout:
-                    logging.info("Smoke Test PASSED: hello.py executed successfully")
-                else:
-                    logging.warning(f"Smoke Test WARNING: hello.py execution returned code {result.returncode}")
-            except Exception as e:
-                logging.warning(f"Smoke Test WARNING: Could not execute hello.py: {e}")
+            target_files, _degraded = extract_target_files(result_context.plan)
+            ok, smoke_errors = run_smoke_gate(project_path, target_files)
+            if ok:
+                logging.info("Smoke Test PASSED: all artifacts exist and compile")
+            else:
+                for err in smoke_errors:
+                    logging.error(f"Smoke Test FAILED: {err}")
+                exit_code = 1
 
         if exit_code != 0:
             run_status = "failure"
