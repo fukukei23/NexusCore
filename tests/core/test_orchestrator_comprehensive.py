@@ -180,6 +180,11 @@ class TestOrchestratorInit:
         debugger_agent.debug_and_patch = Mock(
             return_value={"fixed_code": "# fixed code", "patch": ""}
         )
+        guardian_agent = Mock()
+        # Phase6(review)がguardianループになったため、未設定Mockが自動生成する
+        # MagicMockはdecision=="APPROVE"を満たさずREJECTループに入ってしまう。
+        # 他フェーズのテストが影響を受けないようデフォルトはAPPROVE即承認にしておく。
+        guardian_agent.review = Mock(return_value={"decision": "APPROVE", "reason": "ok"})
         return {
             "requirement_agent": requirement_agent,
             "architect_agent": architect_agent,
@@ -187,7 +192,7 @@ class TestOrchestratorInit:
             "coder_agent": Mock(),
             "tester_agent": tester_agent,
             "debugger_agent": debugger_agent,
-            "guardian_agent": Mock(),
+            "guardian_agent": guardian_agent,
             "policy_agent": Mock(),
             "postmortem_agent": Mock(),
             "knowledge_curator_agent": Mock(),
@@ -1122,3 +1127,97 @@ class TestTestingPhaseDebugLoop:
         )
         written = Path(str(tmp_path)) / "tests" / "test_main.py"
         assert written.read_text(encoding="utf-8") == "def test_ok():\n    assert True"
+
+
+@pytest.mark.skipif(not HAS_ORCHESTRATOR, reason="orchestrator module not available")
+class TestReviewPhaseGuardianLoop:
+    """run_review_phase() のテスト（Stage 2・spec §4-3/4-4）"""
+
+    def _make_orchestrator(self, tmp_path, agents):
+        return Orchestrator(
+            project_path=str(tmp_path),
+            constitution={"rule": "x"},
+            llm_router=Mock(spec=LLMRouter),
+            **agents,
+        )
+
+    def _context_with_passing_tests(self, tmp_path):
+        context = OrchestratorContext(task_id="t1", user_requirement="req")
+        context.implementation = {"files": {"app.py": "code"}}
+        context.testing = {
+            "tests": "def test(): pass",
+            "passed": True,
+            "stdout": "1 passed",
+            "stderr": "",
+        }
+        return context
+
+    def test_review_phase_approves_on_first_pass(self, tmp_path):
+        agents = TestOrchestratorInit._create_mock_agents()
+        agents["guardian_agent"].review.return_value = {"decision": "APPROVE", "reason": "ok"}
+
+        orchestrator = self._make_orchestrator(tmp_path, agents)
+        context = self._context_with_passing_tests(tmp_path)
+
+        result = orchestrator.run_review_phase(context)
+
+        assert result.terminal_state == "APPROVED"
+        assert result.review_retries == 0
+        agents["coder_agent"].implement_code.assert_not_called()
+
+    def test_review_phase_reimplements_on_reject_then_approves(self, tmp_path):
+        agents = TestOrchestratorInit._create_mock_agents()
+        agents["guardian_agent"].review.side_effect = [
+            {
+                "decision": "REJECT",
+                "reason": "命名規則違反",
+                "feedback_for_coder": "スネークケースにせよ",
+            },
+            {"decision": "APPROVE", "reason": "ok"},
+        ]
+        agents["coder_agent"].implement_code.return_value = "fixed code"
+
+        orchestrator = self._make_orchestrator(tmp_path, agents)
+        context = self._context_with_passing_tests(tmp_path)
+
+        result = orchestrator.run_review_phase(context)
+
+        assert result.terminal_state == "APPROVED"
+        assert result.review_retries == 1
+        reimpl_kwargs = agents["coder_agent"].implement_code.call_args.kwargs
+        assert "スネークケースにせよ" in reimpl_kwargs["task_description"]
+
+    def test_review_phase_exhausts_retries_needs_human_review(self, tmp_path):
+        agents = TestOrchestratorInit._create_mock_agents()
+        agents["guardian_agent"].review.return_value = {
+            "decision": "REJECT",
+            "reason": "重大な問題",
+            "feedback_for_coder": "全面修正が必要",
+        }
+        agents["coder_agent"].implement_code.return_value = "still bad code"
+
+        orchestrator = self._make_orchestrator(tmp_path, agents)
+        context = self._context_with_passing_tests(tmp_path)
+
+        result = orchestrator.run_review_phase(context)
+
+        assert result.terminal_state == "NEEDS_HUMAN_REVIEW"
+        assert result.review_retries == 2  # REVIEW_MAX_RETRIES
+        report_path = tmp_path / "review_report.md"
+        assert report_path.exists()
+        assert "全面修正が必要" in report_path.read_text(encoding="utf-8")
+
+    def test_review_phase_skips_guardian_when_tests_still_failing(self, tmp_path):
+        agents = TestOrchestratorInit._create_mock_agents()
+
+        orchestrator = self._make_orchestrator(tmp_path, agents)
+        context = OrchestratorContext(task_id="t1", user_requirement="req")
+        context.implementation = {"files": {"app.py": "code"}}
+        context.testing = {"tests": "t", "passed": False, "stdout": "", "stderr": "still failing"}
+
+        result = orchestrator.run_review_phase(context)
+
+        assert result.terminal_state == "NEEDS_HUMAN_REVIEW"
+        agents["guardian_agent"].review.assert_not_called()
+        report_path = tmp_path / "review_report.md"
+        assert report_path.exists()

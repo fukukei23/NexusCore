@@ -495,15 +495,86 @@ class PhaseRunnerMixin:
         return context
 
     # ------------------------------------------------------------------
-    # Phase 6: Review
+    # Phase 6: Review（guardianループ・3値終端状態・spec §4-3/4-4）
     # ------------------------------------------------------------------
     def run_review_phase(self, context: OrchestratorContext) -> OrchestratorContext:
         self.logger.info(f"[{context.task_id}] Phase 6: Review")
         context.phase_log.append("REVIEW")
-        context.review = {}
+
+        # spec §4-4(b): debugリトライ枯渇でテスト失敗のままの場合はguardianを呼ばずNEEDS_HUMAN_REVIEW
+        if not context.testing.get("passed", False):
+            context.terminal_state = "NEEDS_HUMAN_REVIEW"
+            self._write_review_report(
+                context, feedback=f"テストが失敗したまま解消できませんでした:\n{context.testing.get('stderr', '')}"
+            )
+            self._maybe_run_constitutional_review(context)
+            return context
+
+        code_draft = "\n\n".join(context.implementation.get("files", {}).values())
+        test_code = context.testing.get("tests", "")
+        test_result = f"stdout={context.testing.get('stdout', '')}\nstderr={context.testing.get('stderr', '')}"
+        constitution_str = json.dumps(self.constitution, ensure_ascii=False)
+
+        review_data = self.guardian_agent.review(
+            code_draft, test_code, test_result, "", constitution_str, context.user_requirement,
+        )
+
+        while review_data.get("decision") != "APPROVE" and context.review_retries < REVIEW_MAX_RETRIES:
+            context.review_retries += 1
+            feedback = review_data.get("feedback_for_coder", review_data.get("reason", ""))
+
+            reimpl_description = (
+                f"要件: {context.user_requirement}\n"
+                f"前回コード:\n{code_draft}\n"
+                f"guardianフィードバック: {feedback}\n"
+                f"直前のテスト結果: {test_result}"
+            )
+            new_code = self.coder_agent.implement_code(
+                task_description=reimpl_description,
+                existing_code=code_draft,
+                code_language=os.getenv("NEXUS_CODE_LANG", "python"),
+            )
+            if new_code and str(new_code).strip():
+                code_draft = str(new_code)
+                for path in context.implementation.get("files", {}):
+                    (Path(self.project_path) / path).write_text(code_draft, encoding="utf-8")
+                    context.implementation["files"][path] = code_draft
+                    break  # 単一ファイル前提（複数ファイル分配はスコープ外・spec §7準拠）
+
+            review_data = self.guardian_agent.review(
+                code_draft, test_code, test_result, "", constitution_str, context.user_requirement,
+            )
+
+        if review_data.get("decision") == "APPROVE":
+            context.terminal_state = "APPROVED"
+            context.review = review_data
+        else:
+            context.terminal_state = "NEEDS_HUMAN_REVIEW"
+            context.review = review_data
+            self._write_review_report(
+                context, feedback=review_data.get("feedback_for_coder", review_data.get("reason", ""))
+            )
 
         self._maybe_run_constitutional_review(context)
         return context
+
+    def _write_review_report(self, context: OrchestratorContext, feedback: str) -> None:
+        """NEEDS_HUMAN_REVIEW時にguardianの最終フィードバック+成果物一覧を保存する（spec §4-4）。"""
+        artifacts = "\n".join(f"- `{p}`" for p in context.implementation.get("files", {}))
+        report = (
+            f"# レビュー結果: 人間レビューが必要です\n\n"
+            f"## フィードバック\n{feedback}\n\n"
+            f"## 成果物一覧\n{artifacts or '(なし)'}\n"
+        )
+        context.review_report = {"feedback": feedback, "artifacts": list(context.implementation.get("files", {}))}
+        report_path = Path(self.project_path) / "review_report.md"
+        try:
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(report, encoding="utf-8")
+        except (OSError, UnicodeEncodeError) as e:
+            # terminal_state/review_report は既にcontextへ反映済みなので、
+            # ファイル書き込み失敗時もループ結果の正しさ自体は損なわれない（spec §4-4）。
+            self.logger.warning(f"Failed to save review_report.md: {e}")
 
     def _maybe_run_constitutional_review(self, context: OrchestratorContext) -> None:
         """Trigger ConstitutionalCouncil when systemic issues are detected."""
