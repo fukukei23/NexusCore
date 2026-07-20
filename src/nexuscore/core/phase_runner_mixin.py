@@ -501,6 +501,11 @@ class PhaseRunnerMixin:
         self.logger.info(f"[{context.task_id}] Phase 6: Review")
         context.phase_log.append("REVIEW")
 
+        if context.fast_lane:
+            context.terminal_state = "APPROVED"
+            self._maybe_run_constitutional_review(context)
+            return context
+
         # spec §4-4(b): debugリトライ枯渇でテスト失敗のままの場合はguardianを呼ばずNEEDS_HUMAN_REVIEW
         if not context.testing.get("passed", False):
             context.terminal_state = "NEEDS_HUMAN_REVIEW"

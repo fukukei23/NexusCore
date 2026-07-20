@@ -129,3 +129,24 @@ class TestReviewPhaseGuardianLoop:
         agents["guardian_agent"].review.assert_not_called()
         report_path = tmp_path / "review_report.md"
         assert report_path.exists()
+
+    def test_review_phase_bypasses_guardian_in_fast_lane(self, tmp_path):
+        """fast_lane時はStage2のguardianループ/NEEDS_HUMAN_REVIEW強制をバイパスする
+        （Stage2導入前の挙動を復元・回帰テスト）。
+
+        fast_laneのcontext.testingは{"tests": ...}のみで"passed"キーを持たない
+        （run_planning_phaseがそのまま設定し、run_testing_phaseのfast_lane早期
+        リターンでも補完されない）ため、"passed"キーの有無に関わらずAPPROVEDに
+        なることを確認する。
+        """
+        agents = _create_mock_agents()
+
+        orchestrator = self._make_orchestrator(tmp_path, agents)
+        context = OrchestratorContext(task_id="t1", user_requirement="req", fast_lane=True)
+        context.implementation = {"files": {"app.py": "code"}}
+        context.testing = {"tests": "some test code"}  # fast_lane shape, no "passed" key
+
+        result = orchestrator.run_review_phase(context)
+
+        assert result.terminal_state == "APPROVED"
+        agents["guardian_agent"].review.assert_not_called()
