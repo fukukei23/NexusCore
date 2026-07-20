@@ -211,17 +211,25 @@ def test_implementation_phase_updates_context(orchestrator, initial_context):
     assert context.implementation["degraded"] is True
 
 
-def test_testing_phase_updates_context(orchestrator, initial_context):
+def test_testing_phase_updates_context(orchestrator, initial_context, tmp_path):
     """Testing フェーズがコンテキストを更新することを確認"""
     # tester_agent のモック設定
     orchestrator.tester_agent.generate_tests = MagicMock(
         return_value="def test_hello():\n    assert hello() == 'Hello'"
     )
+    orchestrator.project_path = str(tmp_path)
 
-    context = orchestrator.run_testing_phase(initial_context)
+    with patch(
+        "nexuscore.core.phase_runner_mixin.run_in_sandbox"
+    ) as mock_sandbox:
+        mock_sandbox.return_value = MagicMock(
+            stdout="1 passed", stderr="", returncode=0
+        )
+        context = orchestrator.run_testing_phase(initial_context)
 
     assert "TESTING" in context.phase_log
     assert "tests" in context.testing
+    assert context.testing["passed"] is True
 
 
 def test_review_phase_updates_context(orchestrator, initial_context):

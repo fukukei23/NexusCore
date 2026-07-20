@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from nexuscore.core.orchestrator_models import OrchestratorContext
+from nexuscore.core.sandbox_executor import run_in_sandbox
 from nexuscore.npe.engine import guarded_llm_call
 from nexuscore.core.retry_policy import _env_int
 
@@ -407,19 +408,90 @@ class PhaseRunnerMixin:
     # Phase 5: Testing
     # ------------------------------------------------------------------
     def run_testing_phase(self, context: OrchestratorContext) -> OrchestratorContext:
+        """Phase 5: tester にテストを生成させ、サンドボックスで実行する（spec §4-2）。
+
+        失敗した場合は DEBUG_MAX_RETRIES 回まで debugger にパッチさせ、
+        実装ファイルへ書き戻して再テストする（デバッグループ）。
+        """
         self.logger.info(f"[{context.task_id}] Phase 5: Testing")
         context.phase_log.append("TESTING")
 
         if context.fast_lane and context.testing:
             return context
 
-        def _run_test():
-            if hasattr(self.tester_agent, "generate_tests"):
-                return self.tester_agent.generate_tests(context.user_requirement)
-            return ""
+        test_code = ""
+        if hasattr(self.tester_agent, "generate_tests"):
+            test_code = self.tester_agent.generate_tests(context.user_requirement) or ""
 
-        test_result = _run_test()
-        context.testing = {"tests": test_result}
+        from nexuscore.core.plan_contract import extract_target_files
+
+        target_files, _degraded = extract_target_files(context.plan)
+        test_entry = next((e for e in target_files if e.get("role") == "test"), None)
+        if test_entry:
+            test_rel_path = test_entry["path"]
+        else:
+            test_rel_path = "tests/test_main.py"
+            self.logger.warning(
+                f"[{context.task_id}] No role=test entry in plan.target_files. "
+                f"Falling back to {test_rel_path}"
+            )
+
+        test_abs_path = Path(self.project_path) / test_rel_path
+        test_abs_path.parent.mkdir(parents=True, exist_ok=True)
+        test_abs_path.write_text(test_code, encoding="utf-8")
+
+        result = run_in_sandbox(
+            ["python", "-m", "pytest", str(test_abs_path), "-q"],
+            cwd=self.project_path,
+        )
+        passed = result.returncode == 0
+
+        impl_files: dict[str, str] = dict((context.implementation or {}).get("files", {}))
+        primary_impl_path = next(iter(impl_files), None)
+
+        debug_retries = 0
+        while (
+            not passed
+            and primary_impl_path
+            and hasattr(self, "debugger_agent")
+            and self.debugger_agent is not None
+            and debug_retries < DEBUG_MAX_RETRIES
+        ):
+            debug_retries += 1
+            error_log = f"{result.stdout}\n{result.stderr}"
+            source = impl_files[primary_impl_path]
+
+            debug_result = self.debugger_agent.debug_and_patch(
+                error_log, {primary_impl_path: source}, self.project_path
+            )
+            fixed_code = (debug_result or {}).get("fixed_code")
+            if not fixed_code:
+                self.logger.warning(
+                    f"[{context.task_id}] DebuggerAgent produced no fixed_code "
+                    f"(attempt {debug_retries}/{DEBUG_MAX_RETRIES}). Stopping debug loop."
+                )
+                break
+
+            impl_abs_path = Path(self.project_path) / primary_impl_path
+            impl_abs_path.parent.mkdir(parents=True, exist_ok=True)
+            impl_abs_path.write_text(str(fixed_code), encoding="utf-8")
+            impl_files[primary_impl_path] = str(fixed_code)
+            context.implementation["files"] = impl_files
+
+            result = run_in_sandbox(
+                ["python", "-m", "pytest", str(test_abs_path), "-q"],
+                cwd=self.project_path,
+            )
+            passed = result.returncode == 0
+
+        context.debug_retries = debug_retries
+        context.testing = {
+            "tests": test_code,
+            "test_path": str(test_abs_path),
+            "passed": passed,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
         return context
 
     # ------------------------------------------------------------------
