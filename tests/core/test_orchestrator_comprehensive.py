@@ -164,9 +164,13 @@ class TestOrchestratorInit:
         """モックエージェント群を作成"""
         requirement_agent = Mock()
         requirement_agent.use_ui = False  # Mockのtruthy属性でGradio UIパスに入らないようにする
+        architect_agent = Mock()
+        architect_agent.design_architecture.return_value = {
+            "design_directive": "test design directive"
+        }
         return {
             "requirement_agent": requirement_agent,
-            "architect_agent": Mock(),
+            "architect_agent": architect_agent,
             "planner_agent": Mock(),
             "coder_agent": Mock(),
             "tester_agent": Mock(),
@@ -922,3 +926,58 @@ class TestEdgeCases:
 
         # JSONパースに失敗してもコードからテスト生成に移行する
         assert result == "Tests from code"
+
+
+@pytest.mark.skipif(not HAS_ORCHESTRATOR, reason="orchestrator module not available")
+class TestOrchestratorArchitecturePhase:
+    """run_architecture_phase() のテスト（Stage 2・spec §4-1）"""
+
+    def test_architecture_phase_calls_architect_and_stores_result(self, tmp_path):
+        agents = TestOrchestratorInit._create_mock_agents()
+        agents["architect_agent"].design_architecture.return_value = {
+            "design_directive": "レイヤードアーキテクチャ"
+        }
+        orchestrator = Orchestrator(
+            project_path=str(tmp_path), constitution={}, llm_router=Mock(spec=LLMRouter), **agents,
+        )
+        context = OrchestratorContext(task_id="t1", user_requirement="req")
+        context.specs = {"raw_requirement": "req"}
+        context.plan = {"functions_to_implement": ["a"]}
+
+        result = orchestrator.run_architecture_phase(context)
+
+        agents["architect_agent"].design_architecture.assert_called_once_with(
+            context.specs, context.plan
+        )
+        assert result.architecture == {"design_directive": "レイヤードアーキテクチャ"}
+
+    def test_architecture_phase_empty_directive_raises(self, tmp_path):
+        agents = TestOrchestratorInit._create_mock_agents()
+        agents["architect_agent"].design_architecture.return_value = {"design_directive": ""}
+        orchestrator = Orchestrator(
+            project_path=str(tmp_path), constitution={}, llm_router=Mock(spec=LLMRouter), **agents,
+        )
+        context = OrchestratorContext(task_id="t1", user_requirement="req")
+
+        with pytest.raises(RuntimeError, match="ArchitectAgent returned empty design_directive"):
+            orchestrator.run_architecture_phase(context)
+
+
+@pytest.mark.skipif(not HAS_ORCHESTRATOR, reason="orchestrator module not available")
+class TestGenerateOneFileWithArchitecture:
+    """_generate_one_file() への design_directive 注入テスト（spec §4-1）"""
+
+    def test_generate_one_file_injects_design_directive_into_prompt(self, tmp_path):
+        agents = TestOrchestratorInit._create_mock_agents()
+        agents["coder_agent"].implement_code.return_value = "print('ok')"
+        orchestrator = Orchestrator(
+            project_path=str(tmp_path), constitution={}, llm_router=Mock(spec=LLMRouter), **agents,
+        )
+        context = OrchestratorContext(task_id="t1", user_requirement="req")
+        context.plan = {"functions_to_implement": []}
+        context.architecture = {"design_directive": "レイヤードアーキテクチャで実装せよ"}
+
+        orchestrator._generate_one_file(context, {"path": "app.py", "role": "implementation"}, {})
+
+        call_kwargs = agents["coder_agent"].implement_code.call_args.kwargs
+        assert "レイヤードアーキテクチャで実装せよ" in call_kwargs["task_description"]

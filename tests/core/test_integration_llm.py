@@ -139,7 +139,7 @@ class TestPhaseExecutionIntegration:
         assert "PLAN" in result.phase_log
 
     def test_architecture_phase(self, real_agents):
-        """Architecture phase is a stub but context flows correctly."""
+        """Architecture phase calls the real ArchitectAgent and stores design_directive (spec §4-1)."""
         agents, project_path = real_agents
         ctx = OrchestratorContext(
             task_id="integ-arch-001",
@@ -151,7 +151,7 @@ class TestPhaseExecutionIntegration:
             **agents,
         )
         result = orch.run_architecture_phase(ctx)
-        assert result.architecture == {}
+        assert result.architecture.get("design_directive")
         assert "ARCHITECTURE" in result.phase_log
 
     def test_implementation_phase_with_real_agent(self, real_agents):

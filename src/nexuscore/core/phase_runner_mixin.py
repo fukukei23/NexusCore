@@ -297,12 +297,26 @@ class PhaseRunnerMixin:
         return context
 
     # ------------------------------------------------------------------
-    # Phase 3: Architecture (stub)
+    # Phase 3: Architecture
     # ------------------------------------------------------------------
     def run_architecture_phase(self, context: OrchestratorContext) -> OrchestratorContext:
+        """Phase 3: architect にコード設計方針(design_directive)を出させる（spec §4-1）。
+
+        空出力は失敗として扱う（spec §6-1・_generate_one_file の既存パターンに倣う）。
+        """
         self.logger.info(f"[{context.task_id}] Phase 3: Architecture")
         context.phase_log.append("ARCHITECTURE")
-        context.architecture = {}
+
+        if not hasattr(self.architect_agent, "design_architecture"):
+            context.architecture = {"design_directive": ""}
+            return context
+
+        result = self.architect_agent.design_architecture(context.specs, context.plan)
+        directive = (result or {}).get("design_directive", "")
+        if not directive or not str(directive).strip():
+            raise RuntimeError("ArchitectAgent returned empty design_directive")
+
+        context.architecture = result
         return context
 
     # ------------------------------------------------------------------
@@ -350,10 +364,12 @@ class PhaseRunnerMixin:
         if not hasattr(self.coder_agent, "implement_code"):
             raise RuntimeError("CoderAgent does not support implement_code")
 
+        design_directive = (context.architecture or {}).get("design_directive", "")
         task_description = (
             f"要件: {context.user_requirement}\n"
             f"生成対象ファイル: {entry['path']}（役割: {entry['role']}）\n"
             f"計画: {json.dumps(context.plan.get('functions_to_implement', []), ensure_ascii=False)}"
+            + (f"\n設計方針: {design_directive}" if design_directive else "")
         )
         existing = "\n\n".join(
             f"# ==== {path} ====\n{code}" for path, code in generated.items()

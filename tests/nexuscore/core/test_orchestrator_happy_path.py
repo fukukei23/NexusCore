@@ -184,11 +184,15 @@ def test_planning_phase_updates_context(orchestrator, initial_context):
 
 
 def test_architecture_phase_updates_context(orchestrator, initial_context):
-    """Architecture フェーズがコンテキストを更新することを確認"""
+    """Architecture フェーズがコンテキストを更新することを確認（spec §4-1）"""
+    orchestrator.architect_agent.design_architecture = MagicMock(
+        return_value={"design_directive": "レイヤードアーキテクチャ"}
+    )
+
     context = orchestrator.run_architecture_phase(initial_context)
 
     assert "ARCHITECTURE" in context.phase_log
-    assert context.architecture == {}
+    assert context.architecture == {"design_directive": "レイヤードアーキテクチャ"}
 
 
 def test_implementation_phase_updates_context(orchestrator, initial_context):
