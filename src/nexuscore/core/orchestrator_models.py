@@ -37,3 +37,7 @@ class OrchestratorContext:
     context_profile: dict[str, Any] = field(default_factory=dict)
     error_prevention_rules: dict[str, Any] = field(default_factory=dict)
     postmortem_report: dict[str, Any] = field(default_factory=dict)
+    debug_retries: int = 0
+    review_retries: int = 0
+    terminal_state: str = "APPROVED"
+    review_report: dict[str, Any] = field(default_factory=dict)
