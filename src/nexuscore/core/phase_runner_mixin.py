@@ -9,6 +9,13 @@ from typing import TYPE_CHECKING, Any
 
 from nexuscore.core.orchestrator_models import OrchestratorContext
 from nexuscore.npe.engine import guarded_llm_call
+from nexuscore.core.retry_policy import _env_int
+
+DEBUG_MAX_RETRIES: int = _env_int("NEXUS_DEBUG_MAX_RETRIES", 3)
+"""デバッグループ（テスト失敗→debugger修正→再テスト）の最大リトライ回数（spec §4-5）"""
+
+REVIEW_MAX_RETRIES: int = _env_int("NEXUS_REVIEW_MAX_RETRIES", 2)
+"""レビューループ（guardian REJECT→再実装→再テスト→再レビュー）の最大リトライ回数（spec §4-5）"""
 
 if TYPE_CHECKING:
     import logging
