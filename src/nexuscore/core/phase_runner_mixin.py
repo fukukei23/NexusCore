@@ -607,11 +607,24 @@ class PhaseRunnerMixin:
 
         # 意図的な再レビュー: 上のself.guardian_agent.reviewとは別に、commit直前の最終ゲートとして
         # policy監査結果(allow_commit)を渡して再度guardianに判定させる（冗長呼び出しではない・spec §5）
-        return guardian_agent.review_and_commit(
+        result = guardian_agent.review_and_commit(
             code_draft, test_code, test_result, "", constitution_str, context.user_requirement,
             changed_files=list(files.keys()),
             allow_commit=allow_commit,
         )
+
+        if not allow_commit and result.get("decision") == "APPROVE":
+            # policy違反でコミットがブロックされた場合、guardianの2回目レビューが
+            # 独立してAPPROVEしても terminal_state=APPROVED にはしない
+            # （policyゲートの実効性を担保するため NEEDS_HUMAN_REVIEW 扱いにする・spec §5）
+            violations = audit_result.get("violations")
+            result["decision"] = "REJECT"
+            result["reason"] = f"ポリシー違反によりコミットがブロックされました: {violations}"
+            result["feedback_for_coder"] = (
+                f"ポリシー違反によりコミットがブロックされました: {violations}"
+            )
+
+        return result
 
     def _run_postmortem_learning(self, context: OrchestratorContext, error_log: str) -> None:
         """postmortemで失敗分析→knowledge_curatorで検証→検証済みのみFKBへ永続化する（spec §5）。

@@ -178,14 +178,22 @@ class TestReviewPhaseGuardianLoop:
         assert result.review["commit"] == "deadbeef"
 
     def test_review_phase_blocks_commit_on_policy_violation(self, tmp_path):
-        """policy_agent.auditがREJECTEDならallow_commit=Falseで渡し、review_and_commitがREJECTを返したらNEEDS_HUMAN_REVIEWになること"""
+        """policy_agent.auditがREJECTEDならallow_commit=Falseで渡す。
+        review_and_commit は allow_commit=False かつ2回目のguardianレビューが
+        独立してAPPROVEした場合、実際には decision="APPROVE"・
+        commit="Commit blocked by autonomy policy (review-only)." を返す
+        （GuardianAgent.review_and_commit の実挙動）。
+        _run_policy_gated_commit 側でこれをREJECTに上書きし、
+        NEEDS_HUMAN_REVIEW になることを検証する。"""
         agents = _create_mock_agents()
         agents["guardian_agent"].review.return_value = {"decision": "APPROVE", "reason": "ok"}
         agents["policy_agent"].audit.return_value = {
             "result": "REJECTED", "violations": ["banned pattern"],
         }
         agents["guardian_agent"].review_and_commit.return_value = {
-            "decision": "REJECT", "reason": "policy blocked", "feedback_for_coder": "ポリシー違反",
+            "decision": "APPROVE",
+            "reason": "ok",
+            "commit": "Commit blocked by autonomy policy (review-only).",
         }
 
         orchestrator = self._make_orchestrator(tmp_path, agents)
