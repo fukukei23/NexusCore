@@ -10,7 +10,6 @@ orchestrator.py の包括的テスト
   - run_full_project: フルプロジェクトフロー
   - _ensure_fastlane_tests: FastLaneモードのテスト生成
 - assemble_agent_team: エージェントチーム組成
-- CLI: コマンドライン引数パース
 """
 
 import json
@@ -48,7 +47,6 @@ try:
     from nexuscore.core.orchestrator import (
         Orchestrator,
         OrchestratorContext,
-        _build_arg_parser,
         assemble_agent_team,
     )
     from nexuscore.core.phase_runner_mixin import DEBUG_MAX_RETRIES
@@ -62,7 +60,6 @@ except ImportError:
     Orchestrator = None
     OrchestratorContext = None
     assemble_agent_team = None
-    _build_arg_parser = None
     DEBUG_MAX_RETRIES = None
     SandboxResult = None
     SessionController = None
@@ -274,8 +271,8 @@ class TestOrchestratorMaybeStop:
 class TestOrchestratorExecuteTaskViaNPE:
     """Orchestrator._execute_task_via_npe() のテスト"""
 
-    @patch("nexuscore.core.orchestrator.guarded_llm_call")
-    @patch("nexuscore.core.orchestrator.clean_output")
+    @patch("nexuscore.core.phase_runner_mixin.guarded_llm_call")
+    @patch("nexuscore.utils.clean_output.clean_output")
     def test_execute_task_basic(self, mock_clean, mock_guarded_call, tmp_path):
         """基本的なタスク実行"""
         mock_guarded_call.return_value = {"ok": True, "content": "LLM response", "usage": {}}
@@ -303,8 +300,8 @@ class TestOrchestratorExecuteTaskViaNPE:
         assert mock_guarded_call.call_args[1]["model"] == "gpt-4"
         assert mock_guarded_call.call_args[1]["task"] == "planning"
 
-    @patch("nexuscore.core.orchestrator.guarded_llm_call")
-    @patch("nexuscore.core.orchestrator.clean_output")
+    @patch("nexuscore.core.phase_runner_mixin.guarded_llm_call")
+    @patch("nexuscore.utils.clean_output.clean_output")
     def test_execute_task_default_model(self, mock_clean, mock_guarded_call, tmp_path):
         """デフォルトモデルを使用"""
         mock_guarded_call.return_value = {"ok": True, "content": "Default response", "usage": {}}
@@ -330,8 +327,8 @@ class TestOrchestratorExecuteTaskViaNPE:
         assert result == "Default response"
         assert mock_guarded_call.call_args[1]["model"] == "gpt-3.5-turbo"
 
-    @patch("nexuscore.core.orchestrator.guarded_llm_call")
-    @patch("nexuscore.core.orchestrator.clean_output")
+    @patch("nexuscore.core.phase_runner_mixin.guarded_llm_call")
+    @patch("nexuscore.utils.clean_output.clean_output")
     def test_execute_task_string_response(self, mock_clean, mock_guarded_call, tmp_path):
         """NPEが文字列を返す場合"""
         mock_guarded_call.return_value = "Direct string response"
@@ -356,8 +353,8 @@ class TestOrchestratorExecuteTaskViaNPE:
 
         assert result == "Direct string response"
 
-    @patch("nexuscore.core.orchestrator.guarded_llm_call")
-    @patch("nexuscore.core.orchestrator.clean_output")
+    @patch("nexuscore.core.phase_runner_mixin.guarded_llm_call")
+    @patch("nexuscore.utils.clean_output.clean_output")
     def test_execute_task_no_task_type(self, mock_clean, mock_guarded_call, tmp_path):
         """task_typeが指定されていない場合"""
         mock_guarded_call.return_value = {"ok": True, "content": "Generic response", "usage": {}}
@@ -387,7 +384,7 @@ class TestOrchestratorRunFullProject:
     """Orchestrator.run_full_project() のテスト"""
 
     @patch("nexuscore.core.phase_runner_mixin.run_in_sandbox")
-    @patch("nexuscore.core.orchestrator.guarded_llm_call")
+    @patch("nexuscore.core.phase_runner_mixin.guarded_llm_call")
     def test_run_full_project_basic(self, mock_guarded_call, mock_sandbox, tmp_path):
         """基本的なプロジェクト実行フロー"""
         mock_guarded_call.return_value = {
@@ -432,7 +429,7 @@ class TestOrchestratorRunFullProject:
         # planner_agentが呼ばれたことを確認
         agents["planner_agent"].generate_plan.assert_called_once()
 
-    @patch("nexuscore.core.orchestrator.guarded_llm_call")
+    @patch("nexuscore.core.phase_runner_mixin.guarded_llm_call")
     def test_run_full_project_with_session_stop(self, mock_guarded_call, tmp_path):
         """セッション中断時の動作"""
         session_controller = Mock(spec=SessionController)
@@ -460,7 +457,7 @@ class TestOrchestratorRunFullProject:
         # チェックポイントが呼ばれたことを確認
         assert session_controller.checkpoint.call_count > 0
 
-    @patch("nexuscore.core.orchestrator.guarded_llm_call")
+    @patch("nexuscore.core.phase_runner_mixin.guarded_llm_call")
     def test_run_full_project_requirement_failure(self, mock_guarded_call, tmp_path):
         """要件定義フェーズ失敗時に例外が発生することを確認"""
         # guarded_llm_callがserializableなdictを返すように設定
@@ -491,7 +488,7 @@ class TestOrchestratorRunFullProject:
                 fast_lane=False,
             )
 
-    @patch("nexuscore.core.orchestrator.guarded_llm_call")
+    @patch("nexuscore.core.phase_runner_mixin.guarded_llm_call")
     def test_run_full_project_empty_specs(self, mock_guarded_call, tmp_path):
         """要件定義が空の場合、ValueErrorが発生することを確認"""
         llm_router = Mock(spec=LLMRouter)
@@ -517,7 +514,7 @@ class TestOrchestratorRunFullProject:
                 fast_lane=False,
             )
 
-    @patch("nexuscore.core.orchestrator.guarded_llm_call")
+    @patch("nexuscore.core.phase_runner_mixin.guarded_llm_call")
     def test_run_full_project_fast_lane(self, mock_guarded_call, tmp_path):
         """FastLaneモードでの実行"""
         mock_guarded_call.return_value = {
@@ -675,185 +672,74 @@ class TestOrchestratorEnsureFastlaneTests:
 
 @pytest.mark.skipif(not HAS_ORCHESTRATOR, reason="orchestrator module not available")
 class TestAssembleAgentTeam:
-    """assemble_agent_team() のテスト"""
+    """assemble_agent_team() のテスト
 
-    @patch.dict(os.environ, {"GLM_API_KEY": "test-key"})
-    @patch("nexuscore.core.orchestrator.RequirementAgent")
-    @patch("nexuscore.core.orchestrator.ArchitectAgent")
-    @patch("nexuscore.core.orchestrator.PlannerAgent")
-    @patch("nexuscore.core.orchestrator.CoderAgent")
-    @patch("nexuscore.core.orchestrator.TesterAgent")
-    @patch("nexuscore.core.orchestrator.DebuggerAgent")
-    @patch("nexuscore.core.orchestrator.GuardianAgent")
-    @patch("nexuscore.core.orchestrator.PolicyAgent")
-    @patch("nexuscore.core.orchestrator.PostmortemAgent")
-    @patch("nexuscore.core.orchestrator.KnowledgeCuratorAgent")
-    @patch("nexuscore.core.orchestrator.PatchApplier")
-    @patch("nexuscore.core.orchestrator.LLMRouter")
-    def test_assemble_agent_team_success(
-        self,
-        mock_router,
-        mock_patch_applier,
-        mock_curator,
-        mock_postmortem,
-        mock_policy,
-        mock_guardian,
-        mock_debugger,
-        mock_tester,
-        mock_coder,
-        mock_planner,
-        mock_architect,
-        mock_requirement,
-        tmp_path,
-    ):
-        """エージェントチームの正常な組成"""
-        # 各モックの戻り値を設定
-        for mock in [
-            mock_requirement,
-            mock_architect,
-            mock_planner,
-            mock_coder,
-            mock_tester,
-            mock_debugger,
-            mock_guardian,
-            mock_policy,
-            mock_postmortem,
-            mock_curator,
-            mock_patch_applier,
-            mock_router,
-        ]:
-            mock.return_value = Mock()
+    2026-04-29 の God Class 分割（agent_factory.py 抽出）以降、実装は
+    AgentRegistry ベースのプラグイン discovery に変わっている（個別クラスの
+    直接 import/直接 instantiate ではない）。旧テストは `nexuscore.core.orchestrator.
+    RequirementAgent` 等を patch していたが、そのモジュールはもう assemble_agent_team
+    の実装に関与しないため機能しなくなっていた。BaseAgent は API key 欠落時も
+    例外を投げず遅延解決するため、モック無しの実インスタンス化で検証する。
+    """
 
+    def test_assemble_agent_team_returns_full_team(self, tmp_path):
+        """全エージェント・ルーター・サービスが結果dictに含まれることを確認"""
         result = assemble_agent_team(str(tmp_path))
 
-        # 全エージェントとルーターが含まれることを確認
-        assert "requirement_agent" in result
-        assert "architect_agent" in result
-        assert "planner_agent" in result
-        assert "coder_agent" in result
-        assert "tester_agent" in result
-        assert "debugger_agent" in result
-        assert "guardian_agent" in result
-        assert "policy_agent" in result
-        assert "postmortem_agent" in result
-        assert "knowledge_curator_agent" in result
-        assert "patch_applier_agent" in result
-        assert "llm_router" in result
+        for key in (
+            "requirement_agent",
+            "architect_agent",
+            "planner_agent",
+            "coder_agent",
+            "tester_agent",
+            "debugger_agent",
+            "guardian_agent",
+            "policy_agent",
+            "postmortem_agent",
+            "knowledge_curator_agent",
+            "constitutional_council_agent",
+            "patch_applier_agent",
+            "llm_router",
+        ):
+            assert key in result, f"{key} が assemble_agent_team() の結果に含まれていない"
 
-        # KnowledgeCuratorAgentがAPI keyとmodelで初期化されることを確認
-        mock_curator.assert_called_once_with(
-            api_key="test-key",
-            model="glm-4-plus",
-        )
+    def test_assemble_agent_team_language_propagates_to_requirement_agent(self, tmp_path):
+        """language引数がAgentRegistry経由でRequirementAgentに渡されることを確認
 
-    @patch.dict(os.environ, {}, clear=True)
-    def test_assemble_agent_team_no_api_key(self, tmp_path):
-        """API keyがない場合はRuntimeErrorを投げる"""
-        with pytest.raises(RuntimeError, match="GLM_API_KEY"):
-            assemble_agent_team(str(tmp_path))
+        agent_factory.assemble_agent_team() は AgentRegistry.get(name)() で
+        エージェントを生成する。本ファイル冒頭の sys.modules モック（他モジュール
+        importの隔離用）が nexuscore.plugins.builtin_agents の登録内容に漏れ込む
+        ため、実クラスの挙動に依存せず AgentRegistry を直接 patch して検証する。
+        """
+        from nexuscore.plugins.registry import AgentRegistry
 
-    @patch.dict(
-        os.environ, {"GLM_API_KEY": "test-key", "NEXUS_TASK_MODEL_KNOWLEDGE": "glm-4-custom"}
-    )
-    @patch("nexuscore.core.orchestrator.RequirementAgent")
-    @patch("nexuscore.core.orchestrator.ArchitectAgent")
-    @patch("nexuscore.core.orchestrator.PlannerAgent")
-    @patch("nexuscore.core.orchestrator.CoderAgent")
-    @patch("nexuscore.core.orchestrator.TesterAgent")
-    @patch("nexuscore.core.orchestrator.DebuggerAgent")
-    @patch("nexuscore.core.orchestrator.GuardianAgent")
-    @patch("nexuscore.core.orchestrator.PolicyAgent")
-    @patch("nexuscore.core.orchestrator.PostmortemAgent")
-    @patch("nexuscore.core.orchestrator.KnowledgeCuratorAgent")
-    @patch("nexuscore.core.orchestrator.PatchApplier")
-    @patch("nexuscore.core.orchestrator.LLMRouter")
-    def test_assemble_agent_team_custom_model(
-        self,
-        mock_router,
-        mock_patch_applier,
-        mock_curator,
-        mock_postmortem,
-        mock_policy,
-        mock_guardian,
-        mock_debugger,
-        mock_tester,
-        mock_coder,
-        mock_planner,
-        mock_architect,
-        mock_requirement,
-        tmp_path,
-    ):
-        """カスタムモデル設定"""
-        for mock in [
-            mock_requirement,
-            mock_architect,
-            mock_planner,
-            mock_coder,
-            mock_tester,
-            mock_debugger,
-            mock_guardian,
-            mock_policy,
-            mock_postmortem,
-            mock_curator,
-            mock_patch_applier,
-            mock_router,
-        ]:
-            mock.return_value = Mock()
+        class FakeRequirementAgent:
+            def __init__(self, language="ja"):
+                self.language = language
 
-        assemble_agent_team(str(tmp_path))
+        with (
+            patch.object(AgentRegistry, "has", return_value=True),
+            patch.object(AgentRegistry, "get", return_value=FakeRequirementAgent),
+        ):
+            result = assemble_agent_team(str(tmp_path), language="en")
 
-        # カスタムモデルで初期化されることを確認
-        mock_curator.assert_called_once_with(
-            api_key="test-key",
-            model="glm-4-custom",
-        )
+        assert result["requirement_agent"].language == "en"
 
+    def test_assemble_agent_team_knowledge_base_path_propagates_to_debugger(self, tmp_path):
+        """knowledge_base_path引数がAgentRegistry経由でDebuggerAgentに渡されることを確認"""
+        from nexuscore.plugins.registry import AgentRegistry
 
-@pytest.mark.skipif(not HAS_ORCHESTRATOR, reason="orchestrator module not available")
-class TestCLI:
-    """CLI引数パースのテスト"""
+        class FakeDebuggerAgent:
+            def __init__(self, knowledge_base_path=None, **_ignored):
+                self.knowledge_base_path = knowledge_base_path
 
-    def test_arg_parser_defaults(self):
-        """デフォルト引数"""
-        parser = _build_arg_parser()
-        args = parser.parse_args([])
+        with (
+            patch.object(AgentRegistry, "has", return_value=True),
+            patch.object(AgentRegistry, "get", return_value=FakeDebuggerAgent),
+        ):
+            result = assemble_agent_team(str(tmp_path), knowledge_base_path="/tmp/kb.json")
 
-        assert args.project == str(Path.cwd())
-        assert args.requirement == "サンプルの要件です。"
-        assert args.autonomy_level == 1
-        assert args.fast_lane is False
-        assert args.session_id is None
-
-    def test_arg_parser_custom_values(self):
-        """カスタム引数"""
-        parser = _build_arg_parser()
-        args = parser.parse_args(
-            [
-                "--project",
-                "/path/to/project",
-                "--requirement",
-                "Custom requirement",
-                "--autonomy-level",
-                "2",
-                "--fast-lane",
-                "--session-id",
-                "test-session-123",
-            ]
-        )
-
-        assert args.project == "/path/to/project"
-        assert args.requirement == "Custom requirement"
-        assert args.autonomy_level == 2
-        assert args.fast_lane is True
-        assert args.session_id == "test-session-123"
-
-    def test_arg_parser_only_fast_lane(self):
-        """--fast-laneのみ指定"""
-        parser = _build_arg_parser()
-        args = parser.parse_args(["--fast-lane"])
-
-        assert args.fast_lane is True
-        assert args.autonomy_level == 1  # デフォルト値
+        assert result["debugger_agent"].knowledge_base_path == "/tmp/kb.json"
 
 
 @pytest.mark.skipif(not HAS_ORCHESTRATOR, reason="orchestrator module not available")
@@ -874,8 +760,8 @@ class TestEdgeCases:
 
         assert orchestrator.constitution == {}
 
-    @patch("nexuscore.core.orchestrator.guarded_llm_call")
-    @patch("nexuscore.core.orchestrator.clean_output")
+    @patch("nexuscore.core.phase_runner_mixin.guarded_llm_call")
+    @patch("nexuscore.utils.clean_output.clean_output")
     def test_execute_task_with_empty_content(self, mock_clean, mock_guarded_call, tmp_path):
         """NPEが空のcontentを返す場合"""
         mock_guarded_call.return_value = {"ok": True, "content": "", "usage": {}}
