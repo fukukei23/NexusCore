@@ -509,6 +509,8 @@ class PhaseRunnerMixin:
         # spec §4-4(b): debugリトライ枯渇でテスト失敗のままの場合はguardianを呼ばずNEEDS_HUMAN_REVIEW
         if not context.testing.get("passed", False):
             context.terminal_state = "NEEDS_HUMAN_REVIEW"
+            error_log = f"{context.testing.get('stdout', '')}\n{context.testing.get('stderr', '')}"
+            self._run_postmortem_learning(context, error_log)
             self._write_review_report(
                 context, feedback=f"テストが失敗したまま解消できませんでした:\n{context.testing.get('stderr', '')}"
             )
@@ -562,6 +564,79 @@ class PhaseRunnerMixin:
 
         self._maybe_run_constitutional_review(context)
         return context
+
+    def _run_postmortem_learning(self, context: OrchestratorContext, error_log: str) -> None:
+        """postmortemで失敗分析→knowledge_curatorで検証→検証済みのみFKBへ永続化する（spec §5）。
+
+        分析結果は検証の成否に関わらず context.postmortem_report に格納し、
+        既存の _maybe_run_constitutional_review に渡す（同フックは実装済みだが
+        postmortem_report が常に空だったため今まで発火していなかった）。
+        """
+        postmortem_agent = getattr(self, "postmortem_agent", None)
+        if postmortem_agent is None or not hasattr(
+            postmortem_agent, "analyze_failure_and_suggest_fkb_entry"
+        ):
+            return
+
+        impl_files = (context.implementation or {}).get("files", {})
+        source_rel_path = next(iter(impl_files), None)
+        test_abs_path = context.testing.get("test_path")
+        if not source_rel_path or not test_abs_path:
+            return
+
+        source_code = impl_files[source_rel_path]
+        source_abs_path = str(Path(self.project_path) / source_rel_path)
+        try:
+            test_code = Path(test_abs_path).read_text(encoding="utf-8")
+        except OSError:
+            test_code = context.testing.get("tests", "")
+
+        try:
+            suggestion = postmortem_agent.analyze_failure_and_suggest_fkb_entry(
+                error_log=error_log,
+                source_code=source_code,
+                test_code=test_code,
+                source_file_path=source_abs_path,
+                test_file_path=str(test_abs_path),
+            )
+        except Exception as e:  # noqa: BLE001 — optional learning step, graceful skip
+            self.logger.warning(f"[{context.task_id}] PostmortemAgent failed (graceful skip): {e}")
+            return
+
+        if not suggestion:
+            return
+
+        context.postmortem_report = suggestion
+
+        curator = getattr(self, "knowledge_curator_agent", None)
+        if curator is None or not hasattr(curator, "validate_fkb_suggestion"):
+            return
+
+        try:
+            validated = curator.validate_fkb_suggestion(
+                suggestion=suggestion,
+                original_project_path=self.project_path,
+                failed_test_path=str(test_abs_path),
+                related_source_path=source_abs_path,
+                original_test_output=error_log,
+            )
+        except Exception as e:  # noqa: BLE001 — optional learning step, graceful skip
+            self.logger.warning(f"[{context.task_id}] KnowledgeCuratorAgent validation failed: {e}")
+            return
+
+        if not validated:
+            self.logger.info(
+                f"[{context.task_id}] FKB suggestion failed sandbox validation; not persisted (spec §5)."
+            )
+            return
+
+        try:
+            from database.knowledge_base import knowledge_base
+
+            status = knowledge_base.add_knowledge(suggestion)
+            self.logger.info(f"[{context.task_id}] FKB entry persisted: status={status}")
+        except Exception as e:  # noqa: BLE001 — optional learning step, graceful skip
+            self.logger.warning(f"[{context.task_id}] Failed to persist FKB entry: {e}")
 
     def _write_review_report(self, context: OrchestratorContext, feedback: str) -> None:
         """NEEDS_HUMAN_REVIEW時にguardianの最終フィードバック+成果物一覧を保存する（spec §4-4）。"""
