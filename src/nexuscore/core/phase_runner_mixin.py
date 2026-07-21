@@ -605,6 +605,8 @@ class PhaseRunnerMixin:
                 f"[{context.task_id}] Commit blocked by policy audit: {audit_result.get('violations')}"
             )
 
+        # 意図的な再レビュー: 上のself.guardian_agent.reviewとは別に、commit直前の最終ゲートとして
+        # policy監査結果(allow_commit)を渡して再度guardianに判定させる（冗長呼び出しではない・spec §5）
         return guardian_agent.review_and_commit(
             code_draft, test_code, test_result, "", constitution_str, context.user_requirement,
             changed_files=list(files.keys()),
