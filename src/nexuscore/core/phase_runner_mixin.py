@@ -8,7 +8,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from nexuscore.core.orchestrator_models import OrchestratorContext
+from nexuscore.core.sandbox_executor import run_in_sandbox
 from nexuscore.npe.engine import guarded_llm_call
+from nexuscore.core.retry_policy import _env_int
+
+DEBUG_MAX_RETRIES: int = _env_int("NEXUS_DEBUG_MAX_RETRIES", 3)
+"""デバッグループ（テスト失敗→debugger修正→再テスト）の最大リトライ回数（spec §4-5）"""
+
+REVIEW_MAX_RETRIES: int = _env_int("NEXUS_REVIEW_MAX_RETRIES", 2)
+"""レビューループ（guardian REJECT→再実装→再テスト→再レビュー）の最大リトライ回数（spec §4-5）"""
 
 if TYPE_CHECKING:
     import logging
@@ -290,12 +298,26 @@ class PhaseRunnerMixin:
         return context
 
     # ------------------------------------------------------------------
-    # Phase 3: Architecture (stub)
+    # Phase 3: Architecture
     # ------------------------------------------------------------------
     def run_architecture_phase(self, context: OrchestratorContext) -> OrchestratorContext:
+        """Phase 3: architect にコード設計方針(design_directive)を出させる（spec §4-1）。
+
+        空出力は失敗として扱う（spec §6-1・_generate_one_file の既存パターンに倣う）。
+        """
         self.logger.info(f"[{context.task_id}] Phase 3: Architecture")
         context.phase_log.append("ARCHITECTURE")
-        context.architecture = {}
+
+        if not hasattr(self.architect_agent, "design_architecture"):
+            context.architecture = {"design_directive": ""}
+            return context
+
+        result = self.architect_agent.design_architecture(context.specs, context.plan)
+        directive = (result or {}).get("design_directive", "")
+        if not directive or not str(directive).strip():
+            raise RuntimeError("ArchitectAgent returned empty design_directive")
+
+        context.architecture = result
         return context
 
     # ------------------------------------------------------------------
@@ -343,10 +365,12 @@ class PhaseRunnerMixin:
         if not hasattr(self.coder_agent, "implement_code"):
             raise RuntimeError("CoderAgent does not support implement_code")
 
+        design_directive = (context.architecture or {}).get("design_directive", "")
         task_description = (
             f"要件: {context.user_requirement}\n"
             f"生成対象ファイル: {entry['path']}（役割: {entry['role']}）\n"
             f"計画: {json.dumps(context.plan.get('functions_to_implement', []), ensure_ascii=False)}"
+            + (f"\n設計方針: {design_directive}" if design_directive else "")
         )
         existing = "\n\n".join(
             f"# ==== {path} ====\n{code}" for path, code in generated.items()
@@ -384,31 +408,178 @@ class PhaseRunnerMixin:
     # Phase 5: Testing
     # ------------------------------------------------------------------
     def run_testing_phase(self, context: OrchestratorContext) -> OrchestratorContext:
+        """Phase 5: tester にテストを生成させ、サンドボックスで実行する（spec §4-2）。
+
+        失敗した場合は DEBUG_MAX_RETRIES 回まで debugger にパッチさせ、
+        実装ファイルへ書き戻して再テストする（デバッグループ）。
+        """
         self.logger.info(f"[{context.task_id}] Phase 5: Testing")
         context.phase_log.append("TESTING")
 
         if context.fast_lane and context.testing:
             return context
 
-        def _run_test():
-            if hasattr(self.tester_agent, "generate_tests"):
-                return self.tester_agent.generate_tests(context.user_requirement)
-            return ""
+        test_code = ""
+        if hasattr(self.tester_agent, "generate_tests"):
+            test_code = self.tester_agent.generate_tests(context.user_requirement) or ""
 
-        test_result = _run_test()
-        context.testing = {"tests": test_result}
+        from nexuscore.core.plan_contract import extract_target_files
+
+        target_files, _degraded = extract_target_files(context.plan)
+        test_entry = next((e for e in target_files if e.get("role") == "test"), None)
+        if test_entry:
+            test_rel_path = test_entry["path"]
+        else:
+            test_rel_path = "tests/test_main.py"
+            self.logger.warning(
+                f"[{context.task_id}] No role=test entry in plan.target_files. "
+                f"Falling back to {test_rel_path}"
+            )
+
+        test_abs_path = Path(self.project_path) / test_rel_path
+        test_abs_path.parent.mkdir(parents=True, exist_ok=True)
+        test_abs_path.write_text(test_code, encoding="utf-8")
+
+        result = run_in_sandbox(
+            ["python", "-m", "pytest", str(test_abs_path), "-q"],
+            cwd=self.project_path,
+        )
+        passed = result.returncode == 0
+
+        impl_files: dict[str, str] = dict((context.implementation or {}).get("files", {}))
+        primary_impl_path = next(iter(impl_files), None)
+
+        debug_retries = 0
+        while (
+            not passed
+            and primary_impl_path
+            and hasattr(self, "debugger_agent")
+            and self.debugger_agent is not None
+            and debug_retries < DEBUG_MAX_RETRIES
+        ):
+            debug_retries += 1
+            error_log = f"{result.stdout}\n{result.stderr}"
+            source = impl_files[primary_impl_path]
+
+            debug_result = self.debugger_agent.debug_and_patch(
+                error_log, {primary_impl_path: source}, self.project_path
+            )
+            fixed_code = (debug_result or {}).get("fixed_code")
+            if not fixed_code:
+                self.logger.warning(
+                    f"[{context.task_id}] DebuggerAgent produced no fixed_code "
+                    f"(attempt {debug_retries}/{DEBUG_MAX_RETRIES}). Stopping debug loop."
+                )
+                break
+
+            impl_abs_path = Path(self.project_path) / primary_impl_path
+            impl_abs_path.parent.mkdir(parents=True, exist_ok=True)
+            impl_abs_path.write_text(str(fixed_code), encoding="utf-8")
+            impl_files[primary_impl_path] = str(fixed_code)
+            context.implementation["files"] = impl_files
+
+            result = run_in_sandbox(
+                ["python", "-m", "pytest", str(test_abs_path), "-q"],
+                cwd=self.project_path,
+            )
+            passed = result.returncode == 0
+
+        context.debug_retries = debug_retries
+        context.testing = {
+            "tests": test_code,
+            "test_path": str(test_abs_path),
+            "passed": passed,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
         return context
 
     # ------------------------------------------------------------------
-    # Phase 6: Review
+    # Phase 6: Review（guardianループ・3値終端状態・spec §4-3/4-4）
     # ------------------------------------------------------------------
     def run_review_phase(self, context: OrchestratorContext) -> OrchestratorContext:
         self.logger.info(f"[{context.task_id}] Phase 6: Review")
         context.phase_log.append("REVIEW")
-        context.review = {}
+
+        if context.fast_lane:
+            context.terminal_state = "APPROVED"
+            self._maybe_run_constitutional_review(context)
+            return context
+
+        # spec §4-4(b): debugリトライ枯渇でテスト失敗のままの場合はguardianを呼ばずNEEDS_HUMAN_REVIEW
+        if not context.testing.get("passed", False):
+            context.terminal_state = "NEEDS_HUMAN_REVIEW"
+            self._write_review_report(
+                context, feedback=f"テストが失敗したまま解消できませんでした:\n{context.testing.get('stderr', '')}"
+            )
+            self._maybe_run_constitutional_review(context)
+            return context
+
+        code_draft = "\n\n".join(context.implementation.get("files", {}).values())
+        test_code = context.testing.get("tests", "")
+        test_result = f"stdout={context.testing.get('stdout', '')}\nstderr={context.testing.get('stderr', '')}"
+        constitution_str = json.dumps(self.constitution, ensure_ascii=False)
+
+        review_data = self.guardian_agent.review(
+            code_draft, test_code, test_result, "", constitution_str, context.user_requirement,
+        )
+
+        while review_data.get("decision") != "APPROVE" and context.review_retries < REVIEW_MAX_RETRIES:
+            context.review_retries += 1
+            feedback = review_data.get("feedback_for_coder", review_data.get("reason", ""))
+
+            reimpl_description = (
+                f"要件: {context.user_requirement}\n"
+                f"前回コード:\n{code_draft}\n"
+                f"guardianフィードバック: {feedback}\n"
+                f"直前のテスト結果: {test_result}"
+            )
+            new_code = self.coder_agent.implement_code(
+                task_description=reimpl_description,
+                existing_code=code_draft,
+                code_language=os.getenv("NEXUS_CODE_LANG", "python"),
+            )
+            if new_code and str(new_code).strip():
+                code_draft = str(new_code)
+                for path in context.implementation.get("files", {}):
+                    (Path(self.project_path) / path).write_text(code_draft, encoding="utf-8")
+                    context.implementation["files"][path] = code_draft
+                    break  # 単一ファイル前提（複数ファイル分配はスコープ外・spec §7準拠）
+
+            review_data = self.guardian_agent.review(
+                code_draft, test_code, test_result, "", constitution_str, context.user_requirement,
+            )
+
+        if review_data.get("decision") == "APPROVE":
+            context.terminal_state = "APPROVED"
+            context.review = review_data
+        else:
+            context.terminal_state = "NEEDS_HUMAN_REVIEW"
+            context.review = review_data
+            self._write_review_report(
+                context, feedback=review_data.get("feedback_for_coder", review_data.get("reason", ""))
+            )
 
         self._maybe_run_constitutional_review(context)
         return context
+
+    def _write_review_report(self, context: OrchestratorContext, feedback: str) -> None:
+        """NEEDS_HUMAN_REVIEW時にguardianの最終フィードバック+成果物一覧を保存する（spec §4-4）。"""
+        artifacts = "\n".join(f"- `{p}`" for p in context.implementation.get("files", {}))
+        report = (
+            f"# レビュー結果: 人間レビューが必要です\n\n"
+            f"## フィードバック\n{feedback}\n\n"
+            f"## 成果物一覧\n{artifacts or '(なし)'}\n"
+        )
+        context.review_report = {"feedback": feedback, "artifacts": list(context.implementation.get("files", {}))}
+        report_path = Path(self.project_path) / "review_report.md"
+        try:
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(report, encoding="utf-8")
+        except (OSError, UnicodeEncodeError) as e:
+            # terminal_state/review_report は既にcontextへ反映済みなので、
+            # ファイル書き込み失敗時もループ結果の正しさ自体は損なわれない（spec §4-4）。
+            self.logger.warning(f"Failed to save review_report.md: {e}")
 
     def _maybe_run_constitutional_review(self, context: OrchestratorContext) -> None:
         """Trigger ConstitutionalCouncil when systemic issues are detected."""

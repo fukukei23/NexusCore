@@ -390,7 +390,7 @@ def main():
             )
         logging.info("Development process finished successfully.")
 
-        # --- 6. 成果物チェック（Smoke Test Gate・spec §3-3） ---
+        # --- 6. 成果物チェック（Smoke Test Gate・spec §3-3）+ 品質ループ終端状態（spec §4-4） ---
         exit_code = 0
         if not args.dynamic and result_context is not None:
             from nexuscore.core.plan_contract import extract_target_files
@@ -403,6 +403,15 @@ def main():
                 for err in smoke_errors:
                     logging.error(f"Smoke Test FAILED: {err}")
                 exit_code = 1
+
+            terminal_state = getattr(result_context, "terminal_state", "APPROVED")
+            if terminal_state == "NEEDS_HUMAN_REVIEW":
+                logging.warning(
+                    "Quality loop terminal state: NEEDS_HUMAN_REVIEW — see review_report.md"
+                )
+                exit_code = 2
+            elif terminal_state == "APPROVED" and exit_code == 0:
+                logging.info("Quality loop terminal state: APPROVED")
 
         if exit_code != 0:
             run_status = "failure"
