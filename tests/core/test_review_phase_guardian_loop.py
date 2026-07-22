@@ -34,6 +34,11 @@ def _create_mock_agents() -> dict[str, Any]:
     )
     guardian_agent = Mock()
     guardian_agent.review = Mock(return_value={"decision": "APPROVE", "reason": "ok"})
+    guardian_agent.review_and_commit = Mock(
+        return_value={"decision": "APPROVE", "reason": "ok", "commit": "abc123"}
+    )
+    policy_agent = Mock()
+    policy_agent.audit = Mock(return_value={"result": "APPROVED", "violations": []})
     return {
         "requirement_agent": requirement_agent,
         "architect_agent": architect_agent,
@@ -42,7 +47,7 @@ def _create_mock_agents() -> dict[str, Any]:
         "tester_agent": tester_agent,
         "debugger_agent": debugger_agent,
         "guardian_agent": guardian_agent,
-        "policy_agent": Mock(),
+        "policy_agent": policy_agent,
         "postmortem_agent": Mock(),
         "knowledge_curator_agent": Mock(),
         "patch_applier_agent": Mock(),
@@ -150,3 +155,54 @@ class TestReviewPhaseGuardianLoop:
 
         assert result.terminal_state == "APPROVED"
         agents["guardian_agent"].review.assert_not_called()
+
+    def test_review_phase_calls_review_and_commit_with_policy_allow_commit(self, tmp_path):
+        """guardian APPROVE後、policy_agent.auditの結果がallow_commitとしてreview_and_commitに渡ること"""
+        agents = _create_mock_agents()
+        agents["guardian_agent"].review.return_value = {"decision": "APPROVE", "reason": "ok"}
+        agents["guardian_agent"].review_and_commit.return_value = {
+            "decision": "APPROVE", "reason": "ok", "commit": "deadbeef",
+        }
+
+        orchestrator = self._make_orchestrator(tmp_path, agents)
+        context = self._context_with_passing_tests(tmp_path)
+
+        result = orchestrator.run_review_phase(context)
+
+        assert result.terminal_state == "APPROVED"
+        agents["policy_agent"].audit.assert_called_once()
+        agents["guardian_agent"].review_and_commit.assert_called_once()
+        call_kwargs = agents["guardian_agent"].review_and_commit.call_args.kwargs
+        assert call_kwargs["allow_commit"] is True
+        assert call_kwargs["changed_files"] == ["app.py"]
+        assert result.review["commit"] == "deadbeef"
+
+    def test_review_phase_blocks_commit_on_policy_violation(self, tmp_path):
+        """policy_agent.auditがREJECTEDならallow_commit=Falseで渡す。
+        review_and_commit は allow_commit=False かつ2回目のguardianレビューが
+        独立してAPPROVEした場合、実際には decision="APPROVE"・
+        commit="Commit blocked by autonomy policy (review-only)." を返す
+        （GuardianAgent.review_and_commit の実挙動）。
+        _run_policy_gated_commit 側でこれをREJECTに上書きし、
+        NEEDS_HUMAN_REVIEW になることを検証する。"""
+        agents = _create_mock_agents()
+        agents["guardian_agent"].review.return_value = {"decision": "APPROVE", "reason": "ok"}
+        agents["policy_agent"].audit.return_value = {
+            "result": "REJECTED", "violations": ["banned pattern"],
+        }
+        agents["guardian_agent"].review_and_commit.return_value = {
+            "decision": "APPROVE",
+            "reason": "ok",
+            "commit": "Commit blocked by autonomy policy (review-only).",
+        }
+
+        orchestrator = self._make_orchestrator(tmp_path, agents)
+        context = self._context_with_passing_tests(tmp_path)
+
+        result = orchestrator.run_review_phase(context)
+
+        call_kwargs = agents["guardian_agent"].review_and_commit.call_args.kwargs
+        assert call_kwargs["allow_commit"] is False
+        assert result.terminal_state == "NEEDS_HUMAN_REVIEW"
+        report_path = tmp_path / "review_report.md"
+        assert "ポリシー違反" in report_path.read_text(encoding="utf-8")

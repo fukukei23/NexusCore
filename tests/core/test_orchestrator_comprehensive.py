@@ -182,6 +182,14 @@ class TestOrchestratorInit:
         # MagicMockはdecision=="APPROVE"を満たさずREJECTループに入ってしまう。
         # 他フェーズのテストが影響を受けないようデフォルトはAPPROVE即承認にしておく。
         guardian_agent.review = Mock(return_value={"decision": "APPROVE", "reason": "ok"})
+        # guardian承認後は_run_policy_gated_commit経由でreview_and_commitが呼ばれる（spec §5）。
+        # hasattr(Mock(), "audit"/"review_and_commit")は未設定でもTrueになり
+        # 「未配線」フォールバック分岐がスキップされてしまうため、デフォルトのAPPROVED経路を明示しておく。
+        guardian_agent.review_and_commit = Mock(
+            return_value={"decision": "APPROVE", "reason": "ok"}
+        )
+        policy_agent = Mock()
+        policy_agent.audit = Mock(return_value={"result": "APPROVED", "violations": []})
         return {
             "requirement_agent": requirement_agent,
             "architect_agent": architect_agent,
@@ -190,7 +198,7 @@ class TestOrchestratorInit:
             "tester_agent": tester_agent,
             "debugger_agent": debugger_agent,
             "guardian_agent": guardian_agent,
-            "policy_agent": Mock(),
+            "policy_agent": policy_agent,
             "postmortem_agent": Mock(),
             "knowledge_curator_agent": Mock(),
             "patch_applier_agent": Mock(),
