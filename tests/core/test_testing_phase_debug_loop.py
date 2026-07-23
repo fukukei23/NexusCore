@@ -176,3 +176,163 @@ class TestTestingPhaseDebugLoop:
         )
         written = Path(str(tmp_path)) / "tests" / "test_main.py"
         assert written.read_text(encoding="utf-8") == "def test_ok():\n    assert True"
+
+
+# =============================================================================
+# 破損根本防止テスト（層1 AST + 層3 実行検証 + 例外安全な最終ロールバック）
+# spec: 2026-07-24-nexuscore-debugger-patch破損根本防止 / plan Task4
+# =============================================================================
+from nexuscore.core.phase_runner_mixin import AST_FAIL_LIMIT  # noqa: E402
+
+
+class TestDebugLoopCorruptionPrevention:
+    """DebuggerAgent 経由の LLM説明文によるファイル破損を根本防止するテスト群。"""
+
+    @staticmethod
+    def _make_orchestrator(tmp_path, agents=None):
+        agents = agents or _create_mock_agents()
+        orchestrator = Orchestrator(
+            project_path=str(tmp_path),
+            constitution={},
+            llm_router=Mock(spec=LLMRouter),
+            **agents,
+        )
+        return orchestrator, agents
+
+    @staticmethod
+    def _base_context(tmp_path):
+        context = OrchestratorContext(task_id="t1", user_requirement="req")
+        context.plan = {"target_files": [{"path": "tests/test_main.py", "role": "test"}]}
+        context.implementation = {"files": {"main.py": "print('original')\n"}}
+        return context
+
+    @patch("nexuscore.core.phase_runner_mixin.run_in_sandbox")
+    def test_ast_ng_explanation_does_not_corrupt_file(self, mock_sandbox, tmp_path):
+        """LLMが説明文(構文NG)を返す場合、ファイルは書き換えられず元のまま。"""
+        mock_sandbox.return_value = SandboxResult(stdout="", stderr="fail", returncode=1)
+        orchestrator, agents = self._make_orchestrator(tmp_path)
+        agents["debugger_agent"].debug_and_patch.return_value = {
+            "fixed_code": "これは修正の説明文です。コードではありません。"
+        }
+        context = self._base_context(tmp_path)
+
+        result = orchestrator.run_testing_phase(context)
+
+        # AST NG 連続 AST_FAIL_LIMIT 回で早期脱出・ファイルは不変
+        assert agents["debugger_agent"].debug_and_patch.call_count == AST_FAIL_LIMIT
+        assert result.debug_retries == AST_FAIL_LIMIT
+        assert result.testing["passed"] is False
+        main_path = Path(str(tmp_path)) / "main.py"
+        assert main_path.read_text(encoding="utf-8") == "print('original')\n"
+
+    @patch("nexuscore.core.phase_runner_mixin.run_in_sandbox")
+    def test_ast_fail_limit_early_exit(self, mock_sandbox, tmp_path):
+        """AST NG が連続 AST_FAIL_LIMIT 回に達したら早期脱出（sandbox呼出は初回のみ）。"""
+        mock_sandbox.return_value = SandboxResult(stdout="", stderr="fail", returncode=1)
+        orchestrator, agents = self._make_orchestrator(tmp_path)
+        agents["debugger_agent"].debug_and_patch.return_value = {
+            "fixed_code": "説明文 only"
+        }
+        context = self._base_context(tmp_path)
+
+        result = orchestrator.run_testing_phase(context)
+
+        # ループ内 sandbox は呼ばれない（AST NG で pytest 実行前）・初回のみ
+        assert mock_sandbox.call_count == 1
+        assert result.debug_retries == AST_FAIL_LIMIT
+
+    @patch("nexuscore.core.phase_runner_mixin.run_in_sandbox")
+    def test_ast_ng_ok_ng_does_not_exit_on_non_consecutive(self, mock_sandbox, tmp_path):
+        """AST NG→OK→NG は連続ではないので AST_FAIL_LIMIT で早期脱出しない。"""
+        mock_sandbox.return_value = SandboxResult(stdout="", stderr="fail", returncode=1)
+        orchestrator, agents = self._make_orchestrator(tmp_path)
+        # [説明文(NG), 正しいコード(OK・pytest失敗), 説明文(NG)] → 連続1ずつ・脱出しない
+        agents["debugger_agent"].debug_and_patch.side_effect = [
+            {"fixed_code": "説明文1"},
+            {"fixed_code": "x = 1\n"},   # 構文OK・pytest失敗
+            {"fixed_code": "説明文2"},   # 連続1（直前OKでリセット）
+        ]
+        context = self._base_context(tmp_path)
+
+        result = orchestrator.run_testing_phase(context)
+
+        # DEBUG_MAX_RETRIES(3) 到達で終了・AST_FAIL_LIMIT 早期脱出は起きない
+        assert result.debug_retries == DEBUG_MAX_RETRIES
+        assert agents["debugger_agent"].debug_and_patch.call_count == DEBUG_MAX_RETRIES
+
+    @patch("nexuscore.core.phase_runner_mixin.run_in_sandbox")
+    def test_empty_fixed_code_breaks_and_rolls_back(self, mock_sandbox, tmp_path):
+        """fixed_code 空 → break・not passed なので最終ロールバックで original へ。"""
+        mock_sandbox.return_value = SandboxResult(stdout="", stderr="fail", returncode=1)
+        orchestrator, agents = self._make_orchestrator(tmp_path)
+        agents["debugger_agent"].debug_and_patch.return_value = {"fixed_code": ""}
+        context = self._base_context(tmp_path)
+
+        result = orchestrator.run_testing_phase(context)
+
+        assert result.debug_retries == 1  # 1回目で break
+        assert result.testing["passed"] is False
+        main_path = Path(str(tmp_path)) / "main.py"
+        assert main_path.read_text(encoding="utf-8") == "print('original')\n"
+        assert any(h.get("status") == "no_fixed_code" for h in result.debug_history)
+
+    @patch("nexuscore.core.phase_runner_mixin.run_in_sandbox")
+    def test_sandbox_exception_triggers_finally_rollback(self, mock_sandbox, tmp_path):
+        """run_in_sandbox 例外 → finally で original_source 復元（例外安全）。"""
+        # 初回テスト実行は成功（passed=True・ループに入らない）を避けるため初回から例外
+        mock_sandbox.side_effect = TimeoutError("sandbox timeout")
+        orchestrator, agents = self._make_orchestrator(tmp_path)
+        context = self._base_context(tmp_path)
+
+        # 初回 sandbox 例外で run_testing_phase がどう振る舞うかは実装依存。
+        # ループ内 sandbox 例外のロールバックを検証するため、初回は失敗させてループに入れる。
+        mock_sandbox.side_effect = [
+            SandboxResult(stdout="", stderr="fail", returncode=1),  # 初回失敗→ループへ
+            TimeoutError("sandbox timeout in loop"),                # ループ内例外
+        ]
+        agents["debugger_agent"].debug_and_patch.return_value = {
+            "fixed_code": "x = 1\n"
+        }
+
+        result = orchestrator.run_testing_phase(context)
+
+        assert result.testing["passed"] is False
+        main_path = Path(str(tmp_path)) / "main.py"
+        assert main_path.read_text(encoding="utf-8") == "print('original')\n"
+        assert any(h.get("status") == "sandbox_error" for h in result.debug_history)
+
+    @patch("nexuscore.core.phase_runner_mixin.run_in_sandbox")
+    def test_rolls_back_to_original_on_exhausted_retries(self, mock_sandbox, tmp_path):
+        """構文OKだが pytest失敗が続く→DEBUG_MAX_RETRIES枯渇後・original_source へ復元。"""
+        mock_sandbox.return_value = SandboxResult(stdout="", stderr="still fail", returncode=1)
+        orchestrator, agents = self._make_orchestrator(tmp_path)
+        agents["debugger_agent"].debug_and_patch.return_value = {
+            "fixed_code": "x = 999\n"   # 構文OK・意味NG
+        }
+        context = self._base_context(tmp_path)
+
+        result = orchestrator.run_testing_phase(context)
+
+        assert result.debug_retries == DEBUG_MAX_RETRIES
+        assert result.testing["passed"] is False
+        main_path = Path(str(tmp_path)) / "main.py"
+        # 最終ロールバックで original へ戻る（破損残存防止）
+        assert main_path.read_text(encoding="utf-8") == "print('original')\n"
+
+    @patch("nexuscore.core.phase_runner_mixin.run_in_sandbox")
+    def test_debug_history_accumulates(self, mock_sandbox, tmp_path):
+        """各試行が debug_history に status キーで記録される。"""
+        mock_sandbox.return_value = SandboxResult(stdout="", stderr="fail", returncode=1)
+        orchestrator, agents = self._make_orchestrator(tmp_path)
+        agents["debugger_agent"].debug_and_patch.return_value = {
+            "fixed_code": "x = 1\n"
+        }
+        context = self._base_context(tmp_path)
+
+        result = orchestrator.run_testing_phase(context)
+
+        assert len(result.debug_history) == DEBUG_MAX_RETRIES
+        for h in result.debug_history:
+            assert "attempt" in h
+            assert "status" in h   # status キー統一
+

@@ -464,43 +464,117 @@ class PhaseRunnerMixin:
 
         impl_files: dict[str, str] = dict((context.implementation or {}).get("files", {}))
         primary_impl_path = next(iter(impl_files), None)
-
         debug_retries = 0
-        while (
-            not passed
-            and primary_impl_path
-            and hasattr(self, "debugger_agent")
-            and self.debugger_agent is not None
-            and debug_retries < DEBUG_MAX_RETRIES
-        ):
-            debug_retries += 1
-            error_log = f"{result.stdout}\n{result.stderr}"
-            source = impl_files[primary_impl_path]
 
-            debug_result = self.debugger_agent.debug_and_patch(
-                error_log, {primary_impl_path: source}, self.project_path
+        # --- 自己修復デバッグループ（層1 AST + 層3 実行検証 + 例外安全な最終ロールバック）---
+        # context.implementation None 対策（planレビュー #1・両LLM critical）
+        if context.implementation is None:
+            context.implementation = {}
+        original_source = impl_files[primary_impl_path] if primary_impl_path else ""
+        current_source = original_source          # インクリメンタル修正のベース（更新対象）
+        ast_fail_streak = 0
+        debug_history: list[dict] = list(context.debug_history) if context.debug_history else []
+        error_log = f"{result.stdout}\n{result.stderr}"
+        impl_abs_path = Path(self.project_path) / primary_impl_path if primary_impl_path else None
+        # パストラバーサルガード＋親dir作成はループ前1回（planレビュー #5/#6）
+        if impl_abs_path is not None:
+            _proj_root = Path(self.project_path).resolve()
+            assert impl_abs_path.resolve().is_relative_to(_proj_root), (
+                f"impl path outside project root: {impl_abs_path}"
             )
-            fixed_code = (debug_result or {}).get("fixed_code")
-            if not fixed_code:
-                self.logger.warning(
-                    f"[{context.task_id}] DebuggerAgent produced no fixed_code "
-                    f"(attempt {debug_retries}/{DEBUG_MAX_RETRIES}). Stopping debug loop."
-                )
-                break
-
-            impl_abs_path = Path(self.project_path) / primary_impl_path
             impl_abs_path.parent.mkdir(parents=True, exist_ok=True)
-            impl_abs_path.write_text(str(fixed_code), encoding="utf-8")
-            impl_files[primary_impl_path] = str(fixed_code)
-            context.implementation["files"] = impl_files
 
-            result = run_in_sandbox(
-                ["python", "-m", "pytest", str(test_abs_path), "-q"],
-                cwd=self.project_path,
-            )
-            passed = result.returncode == 0
+        try:                                       # 例外安全: sandbox/LLM API 例外でもロールバック保証
+            while (
+                not passed
+                and primary_impl_path
+                and getattr(self, "debugger_agent", None) is not None
+                and debug_retries < DEBUG_MAX_RETRIES
+            ):
+                debug_retries += 1
+                debug_result = self.debugger_agent.debug_and_patch(
+                    error_log, {primary_impl_path: current_source}, self.project_path
+                )
+                if not isinstance(debug_result, dict):   # 型安全
+                    debug_result = {}
+                fixed_code = debug_result.get("fixed_code")
+                # 型チェック（planレビュー #4・非 str は却下）
+                if not fixed_code or not isinstance(fixed_code, str):
+                    debug_history.append({"attempt": debug_retries, "status": "no_fixed_code"})
+                    self.logger.warning(
+                        f"[{context.task_id}] DebuggerAgent produced no valid fixed_code "
+                        f"(attempt {debug_retries}/{DEBUG_MAX_RETRIES}). Stopping debug loop."
+                    )
+                    break
 
+                # 層1: AST構文検査（適用前・説明文を早期弾く）
+                ok, err = validate_python_syntax(fixed_code)
+                if not ok:
+                    ast_fail_streak += 1
+                    error_log = (
+                        f"SyntaxError: 生成コードが不正({err})。"
+                        f"コードのみを出力してください。"
+                    )
+                    debug_history.append({"attempt": debug_retries, "status": "ast_fail", "err": err})
+                    if ast_fail_streak >= AST_FAIL_LIMIT:
+                        self.logger.warning(
+                            f"[{context.task_id}] AST validation failed {ast_fail_streak} "
+                            f"consecutive times. Early exit (LLM returns prose only)."
+                        )
+                        break
+                    continue                                  # current_source 維持（ベース変わらず）
+
+                ast_fail_streak = 0
+                # 層3: 適用（都度復元しない・積み重ね修正）
+                impl_abs_path.write_text(fixed_code, encoding="utf-8")
+                current_source = fixed_code
+                impl_files[primary_impl_path] = current_source
+                context.implementation["files"] = impl_files
+
+                self._clean_pytest_cache(self.project_path)
+                # run_in_sandbox 例外安全（planレビュー #2・MiniMax critical）
+                try:
+                    result = run_in_sandbox(
+                        ["python", "-m", "pytest", str(test_abs_path), "-q"],
+                        cwd=self.project_path,
+                    )
+                    passed = result.returncode == 0
+                    debug_history.append({
+                        "attempt": debug_retries,
+                        "status": "pytest_pass" if passed else "pytest_fail",
+                        "passed": passed,
+                    })
+                    if not passed:
+                        error_log = f"{result.stdout}\n{result.stderr}"
+                except Exception as sandbox_err:  # noqa: BLE001
+                    passed = False
+                    error_log = f"SandboxError: {sandbox_err}"
+                    debug_history.append({
+                        "attempt": debug_retries,
+                        "status": "sandbox_error",
+                        "err": str(sandbox_err)[:200],
+                    })
+                    self.logger.warning(
+                        f"[{context.task_id}] run_in_sandbox raised {sandbox_err!r}. "
+                        f"Stopping debug loop (rolling back to original)."
+                    )
+                    break
+        finally:
+            # 例外時含め・脱出後 not passed なら original_source へ復元（破損残存防止）
+            # original_source 空ガード（planレビュー #8）
+            if (
+                not passed
+                and primary_impl_path
+                and impl_abs_path is not None
+                and original_source
+            ):
+                impl_abs_path.write_text(original_source, encoding="utf-8")
+                impl_files[primary_impl_path] = original_source
+                context.implementation["files"] = impl_files
+
+        # result は前段(初回 sandbox)で定義済・例外時も前段値が残る（Python 関数スコープ）
         context.debug_retries = debug_retries
+        context.debug_history = debug_history
         context.testing = {
             "tests": test_code,
             "test_path": str(test_abs_path),
