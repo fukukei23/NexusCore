@@ -38,6 +38,7 @@ class OrchestratorContext:
     error_prevention_rules: dict[str, Any] = field(default_factory=dict)
     postmortem_report: dict[str, Any] = field(default_factory=dict)
     debug_retries: int = 0
+    debug_history: list = field(default_factory=list)   # 自己修復デバッグループ各試行の履歴
     review_retries: int = 0
     terminal_state: str = "APPROVED"
     review_report: dict[str, Any] = field(default_factory=dict)
