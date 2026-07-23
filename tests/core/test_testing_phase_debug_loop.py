@@ -15,8 +15,6 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import Mock, patch
 
-import pytest
-
 from nexuscore.core.orchestrator import Orchestrator, OrchestratorContext
 from nexuscore.core.phase_runner_mixin import DEBUG_MAX_RETRIES
 from nexuscore.core.sandbox_executor import SandboxResult

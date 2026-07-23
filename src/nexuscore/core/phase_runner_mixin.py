@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from nexuscore.core.orchestrator_models import OrchestratorContext
-from nexuscore.core.sandbox_executor import run_in_sandbox
 from nexuscore.core.retry_policy import _env_int
+from nexuscore.core.sandbox_executor import run_in_sandbox
 from nexuscore.npe.engine import guarded_llm_call
 from nexuscore.utils.syntax_validator import validate_python_syntax
 
@@ -27,9 +27,10 @@ REVIEW_MAX_RETRIES: int = _env_int("NEXUS_REVIEW_MAX_RETRIES", 2)
 if TYPE_CHECKING:
     import logging
 
-    from nexuscore.agents.base_agent import BaseAgent
     from nexuscore.core.session_controller import SessionController
     from nexuscore.llm.router import LLMRouter
+
+    from nexuscore.agents.base_agent import BaseAgent
 
 
 class PhaseRunnerMixin:
@@ -488,11 +489,14 @@ class PhaseRunnerMixin:
             while (
                 not passed
                 and primary_impl_path
-                and getattr(self, "debugger_agent", None) is not None
+                and impl_abs_path is not None
                 and debug_retries < DEBUG_MAX_RETRIES
             ):
                 debug_retries += 1
-                debug_result = self.debugger_agent.debug_and_patch(
+                debugger = getattr(self, "debugger_agent", None)
+                if debugger is None:
+                    break
+                debug_result = debugger.debug_and_patch(
                     error_log, {primary_impl_path: current_source}, self.project_path
                 )
                 if not isinstance(debug_result, dict):   # 型安全
