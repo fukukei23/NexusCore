@@ -70,7 +70,10 @@ class CoderAgent(BaseAgent):
             )
             # フィードバックをプロンプトに追記して再試行
             prompt += f"\n# AST検査フィードバック: {err}\n# 構文エラーを必ず修正してください。"
-        return code
+        # fail-safe: RETRY枯渇時はAST不正のコード(説明文等)を返さず空文字を返す。
+        # 呼び出し元(phase_runner_mixin._generate_one_file)の空チェックが保存を弾き、
+        # ファイル破損を防ぐ(2026-07-23 事故: 説明文が__init__.pyに保存されSyntaxError)。
+        return ""
 
     def _extract_code_from_response(self, response: str, language: str = "python") -> str:
         """

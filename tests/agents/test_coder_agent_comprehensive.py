@@ -135,7 +135,7 @@ class TestImplementCode:
     @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
     @patch("nexuscore.agents.base_agent.LLMRouter")
     def test_implement_code_max_retries_exceeded(self, mock_router_class):
-        """最大リトライ回数を超えた場合は最後の結果を返す"""
+        """最大リトライ回数を超えた場合は空文字を返す(fail-safe・不正コード保存防止)"""
         invalid_code = "def broken(\n    pass"
 
         mock_llm = Mock()
@@ -150,8 +150,9 @@ class TestImplementCode:
             task_description="Create a function", existing_code="", code_language="python"
         )
 
-        # RETRY_LIMIT回試行しても失敗した場合は最後の結果を返す
-        assert result == invalid_code
+        # RETRY_LIMIT回試行してもAST検査失敗時は空文字を返す(不正コードを保存させない)
+        # 旧仕様(fail-open)は最後の不正コードを返し __init__.py 破損事故(2026-07-23)を引き起こした
+        assert result == ""
         assert mock_llm.execute.call_count == agent.RETRY_LIMIT
 
     @patch("nexuscore.agents.base_agent.HAS_RETRY", False)
