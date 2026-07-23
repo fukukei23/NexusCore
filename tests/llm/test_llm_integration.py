@@ -29,6 +29,7 @@ from nexuscore.agents.base_agent import BaseAgent
 from nexuscore.llm.llm_router import LLMRouter, RoutedLLM
 from nexuscore.llm.providers.anthropic_provider import AnthropicLLM
 from nexuscore.llm.providers.gemini_provider import GeminiLLM
+from nexuscore.llm.providers.minimax_provider import MiniMaxLLM
 from nexuscore.llm.providers.openai_provider import OpenAILLM
 
 
@@ -67,15 +68,16 @@ def test_base_agent_initialization():
 @pytest.mark.parametrize(
     "task_description, router_llm_response, expected_worker_llm_class, expected_worker_model",
     [
-        ("新しい主力商品の革新的な名前を10個考えて", "creative", OpenAILLM, "gpt-5.1"),
-        ("この関数の複雑なバグを修正して", "analytical", GeminiLLM, "gemini-2.5-pro-latest"),
+        # 3LLM集約（2026-07-23）: creative/analytical/secure/general は全て MiniMax(minimax-m3)
+        ("新しい主力商品の革新的な名前を10個考えて", "creative", MiniMaxLLM, "minimax-m3"),
+        ("この関数の複雑なバグを修正して", "analytical", MiniMaxLLM, "minimax-m3"),
         (
             "この顧客データは個人情報保護法に違反していないかレビューして",
             "secure",
-            AnthropicLLM,
-            "claude-3.5-sonnet",
+            MiniMaxLLM,
+            "minimax-m3",
         ),
-        ("日本の首都はどこですか？", "general", GeminiLLM, "gemini-2.5-flash-latest"),
+        ("日本の首都はどこですか？", "general", MiniMaxLLM, "minimax-m3"),
     ],
 )
 def test_router_end_to_end_decision_making(
@@ -91,13 +93,21 @@ def test_router_end_to_end_decision_making(
     mock_worker_llm_instance.last_call_mode = "real"  # JSONシリアライズ安全化
     mock_worker_llm_instance.execute.return_value = "worker llm executed successfully"
 
-    def side_effect_make_client(model_name):
-        if model_name == LLMRouter.CLASSIFIER_MODEL:
+    def side_effect_make_client(model_name, api_key=None):
+        # 3LLM集約で分類(routing_classify)と分析系(creative/analytical/...)が同 model(minimax-m3)
+        # になったため、model_name による分岐は不可。呼び出し順で分類(1回目)とworker(2回目以降)を区別。
+        if not hasattr(side_effect_make_client, "_calls"):
+            side_effect_make_client._calls = 0
+        side_effect_make_client._calls += 1
+        if side_effect_make_client._calls == 1:
+            # 1回目 = __init__ の classifier 用
             classifier_mock = MagicMock(spec=GeminiLLM)
+            classifier_mock.model_name = model_name
             classifier_mock.last_call_mode = "real"
             classifier_mock.execute.return_value = f'{{"task_type":"{router_llm_response}"}}'
             return classifier_mock
         else:
+            # 2回目以降 = worker 用
             return mock_worker_llm_instance
 
     mocker.patch.object(LLMRouter, "_make_client", side_effect=side_effect_make_client)

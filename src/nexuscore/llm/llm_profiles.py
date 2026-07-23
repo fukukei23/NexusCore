@@ -52,38 +52,38 @@ PROFILE_REGISTRY: dict[str, LLMProfile] = {
     "gemini_secondary": LLMProfile(
         name="gemini_secondary",
         provider="google",
-        model="gemini-3.1-pro",
-        description="Gemini 3.1 Pro for secondary analysis",
+        model="gemini-3.1-pro-preview",
+        description="Gemini 3.1 Pro Preview for secondary analysis",
         default_temperature=0.2,
     ),
     # --- GLM (Zhipu AI) profiles ---
     "glm_default": LLMProfile(
         name="glm_default",
         provider="glm",
-        model="glm-5.1",
-        description="GLM-5.1 for lightweight general tasks",
+        model="glm-5.2",
+        description="GLM-5.2 for lightweight general tasks",
         default_temperature=0.2,
     ),
     "glm_strict": LLMProfile(
         name="glm_strict",
         provider="glm",
-        model="glm-5.1",
-        description="GLM-5.1 for lightweight high-accuracy tasks",
+        model="glm-5.2",
+        description="GLM-5.2 for lightweight high-accuracy tasks",
         default_temperature=0.15,
     ),
     # --- MiniMax profiles ---
     "minimax_default": LLMProfile(
         name="minimax_default",
         provider="minimax",
-        model="minimax-m2.7",
-        description="MiniMax M2.7 for general chat and creative tasks",
+        model="minimax-m3",
+        description="MiniMax M3 for general chat and creative tasks",
         default_temperature=0.2,
     ),
     "minimax_analytical": LLMProfile(
         name="minimax_analytical",
         provider="minimax",
-        model="minimax-m2.7",
-        description="MiniMax M2.7 for analytical and structured tasks",
+        model="minimax-m3",
+        description="MiniMax M3 for analytical and structured tasks",
         default_temperature=0.15,
     ),
     # --- OpenRouter BYOK profiles (ユーザーのOpenRouterキーで100+モデルにアクセス) ---

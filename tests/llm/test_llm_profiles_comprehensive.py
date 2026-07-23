@@ -36,14 +36,14 @@ class TestLLMProfile:
         profile = LLMProfile(
             name="custom",
             provider="minimax",
-            model="minimax-m2.7",
+            model="minimax-m3",
             description="Test profile",
             default_temperature=0.5,
         )
 
         assert profile.name == "custom"
         assert profile.provider == "minimax"
-        assert profile.model == "minimax-m2.7"
+        assert profile.model == "minimax-m3"
         assert profile.description == "Test profile"
         assert profile.default_temperature == 0.5
 
@@ -89,7 +89,7 @@ class TestProfileRegistry:
 
         assert profile.name == "glm_default"
         assert profile.provider == "glm"
-        assert profile.model == "glm-5.1"
+        assert profile.model == "glm-5.2"
         assert profile.description is not None
         assert profile.default_temperature == 0.2
 
@@ -99,7 +99,7 @@ class TestProfileRegistry:
 
         assert profile.name == "minimax_default"
         assert profile.provider == "minimax"
-        assert profile.model == "minimax-m2.7"
+        assert profile.model == "minimax-m3"
         assert profile.default_temperature == 0.2
 
     def test_registry_all_profiles_have_required_fields(self):
@@ -212,13 +212,13 @@ class TestProfileToModelName:
         """glm_defaultを正しく変換"""
         model_name = profile_to_model_name("glm_default")
 
-        assert model_name == "glm:glm-5.1"
+        assert model_name == "glm:glm-5.2"
 
     def test_profile_to_model_name_minimax_default(self):
         """minimax_defaultを正しく変換"""
         model_name = profile_to_model_name("minimax_default")
 
-        assert model_name == "minimax:minimax-m2.7"
+        assert model_name == "minimax:minimax-m3"
 
     def test_profile_to_model_name_gpt_codex(self):
         """gpt_codexを正しく変換"""
@@ -228,7 +228,7 @@ class TestProfileToModelName:
         """minimax_analyticalを正しく変換"""
         model_name = profile_to_model_name("minimax_analytical")
 
-        assert model_name == "minimax:minimax-m2.7"
+        assert model_name == "minimax:minimax-m3"
 
     def test_profile_to_model_name_all_profiles(self):
         """全プロファイルが変換可能"""
@@ -258,7 +258,7 @@ class TestProfileToModelName:
         parts = model_name.split(":")
         assert len(parts) == 2
         assert parts[0] == "glm"  # provider
-        assert parts[1] == "glm-5.1"  # model
+        assert parts[1] == "glm-5.2"  # model
 
 
 # ============================================================================

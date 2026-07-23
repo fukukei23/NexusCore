@@ -122,6 +122,16 @@ class LLMRouter:
     # 内部: モデル検出（_model_detection.py へのデリゲート）
     # -----------------------------------------------------------------
     def _detect_and_update_models(self) -> None:
+        # 2026-07-23 ローカル追加: task_model_map.py の静的マッピング（3LLM集約）を
+        # _model_detection で上書きさせないためのスキップスイッチ。
+        # .env で NEXUS_DISABLE_MODEL_DETECTION=1 を指定すると OpenAI/Gemini の
+        # models.list 検出による task_model_map 上書きを無効化し、3LLM集約を維持する。
+        if self.env.get("NEXUS_DISABLE_MODEL_DETECTION"):
+            self.logger.info(
+                "[Model Detection] DISABLED by NEXUS_DISABLE_MODEL_DETECTION — "
+                "static task_model_map (3LLM集約) を維持"
+            )
+            return
         detected = detect_available_models(self.logger)
         self._apply_detected_models(detected)
 

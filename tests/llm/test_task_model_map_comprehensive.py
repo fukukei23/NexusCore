@@ -138,36 +138,37 @@ class TestTaskModelConfigs:
             assert len(config.fallback) > 0
 
     def test_code_generate_config(self):
-        """code_generateタスクの設定を検証"""
+        """code_generateタスクの設定を検証（3LLM集約+Gemini節約）"""
         config = TASK_MODEL_CONFIGS["code_generate"]
-
-        assert config.primary == "gpt_codex"
-        assert "sonnet_code" in config.secondary
-        assert config.fallback == "glm_default"
-        assert config.temperature == 0.2
-
-    def test_code_review_config(self):
-        """code_reviewタスクの設定を検証"""
-        config = TASK_MODEL_CONFIGS["code_review"]
-
-        assert config.primary == "sonnet_review"
-        assert "gpt_strict" in config.secondary
-        assert config.fallback == "glm_strict"
-
-    def test_self_heal_config(self):
-        """self_healタスクの設定を検証"""
-        config = TASK_MODEL_CONFIGS["self_heal"]
-
-        assert config.primary == "gpt_codex"
-        assert "sonnet_code" in config.secondary
-        assert config.fallback == "glm_default"
-
-    def test_routing_classify_config(self):
-        """routing_classifyタスクの設定を検証"""
-        config = TASK_MODEL_CONFIGS["routing_classify"]
 
         assert config.primary == "glm_default"
         assert "minimax_default" in config.secondary
+        assert "gemini_secondary" not in config.secondary  # Gemini節約
+        assert config.fallback == "minimax_default"
+        assert config.temperature == 0.2
+
+    def test_code_review_config(self):
+        """code_reviewタスクの設定を検証（3LLM集約: Gemini維持）"""
+        config = TASK_MODEL_CONFIGS["code_review"]
+
+        assert config.primary == "gemini_secondary"
+        assert "minimax_analytical" in config.secondary
+        assert config.fallback == "glm_strict"
+
+    def test_self_heal_config(self):
+        """self_healタスクの設定を検証（3LLM集約: GLM生成）"""
+        config = TASK_MODEL_CONFIGS["self_heal"]
+
+        assert config.primary == "glm_strict"
+        assert "glm_default" in config.secondary
+        assert config.fallback == "glm_default"
+
+    def test_routing_classify_config(self):
+        """routing_classifyタスクの設定を検証（3LLM集約: MiniMax分類）"""
+        config = TASK_MODEL_CONFIGS["routing_classify"]
+
+        assert config.primary == "minimax_default"
+        assert "glm_default" in config.secondary
         assert config.fallback == "glm_default"
 
     def test_all_primary_profiles_are_strings(self):
@@ -267,11 +268,11 @@ class TestBuildTaskModelMapDict:
             assert isinstance(entry["fallbacks"], list)
 
     def test_build_code_generate_entry(self):
-        """code_generateエントリの構造を検証"""
+        """code_generateエントリの構造を検証（3LLM集約: GLM生成）"""
         result = build_task_model_map_dict()
         entry = result["code_generate"]
 
-        assert entry["primary"].startswith("openai:")
+        assert entry["primary"].startswith("glm:")
         assert isinstance(entry["fallbacks"], list)
         assert len(entry["fallbacks"]) > 0
         assert "temperature" in entry
