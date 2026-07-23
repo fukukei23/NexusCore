@@ -104,7 +104,8 @@ def standard_criteria(
         ),
         SuccessCriterion(
             name="has_implementation",
-            check=lambda ctx: _non_empty(ctx.implementation.get("code")),
+            check=lambda ctx: _non_empty(ctx.implementation.get("code"))
+            or _non_empty(ctx.implementation.get("files")),
             description="実装コードが生成されている",
         ),
     ]

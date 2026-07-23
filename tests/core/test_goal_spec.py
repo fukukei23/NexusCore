@@ -305,3 +305,26 @@ class TestStandardCriteria:
             testing={"tests": "t"},
         )
         assert evaluator.satisfied(ctx) is True
+
+    def test_implementation_files形式でもhas_implementationは達成(self):
+        """implementation が run_implementation_phase 形式({"files": {...}})のとき has_implementation が達成されることを確認する。
+
+        背景: 2026-07-23 問題②。通常パイプライン(phase_runner_mixin.py:350)は
+        {"files": generated} を設定するが、criterion が .get("code") のみ見て
+        永遠未達→dynamicループ予算枯渇。fast_lane({"code":...})だけ動いて見えた。
+        """
+        evaluator = GoalEvaluator(GoalSpec(description="g", criteria=standard_criteria()))
+        ctx = self._ctx(implementation={"files": {"cli.py": "print('hi')"}})
+        results = {r.name: r for r in evaluator.evaluate(ctx)}
+        assert results["has_implementation"].satisfied is True
+
+    def test_implementation_filesが空dictならhas_implementationは未達(self):
+        """implementation が {"files": {}}(実装ゼロ) のとき has_implementation が未達になることを確認する。
+
+        空 dict を完了と誤判定しない保険（multi-llm-review で MiniMax が指摘した懸念）。
+        _non_empty=bool なので空 dict は False になるが、将来の退化を防止する回帰テスト。
+        """
+        evaluator = GoalEvaluator(GoalSpec(description="g", criteria=standard_criteria()))
+        ctx = self._ctx(implementation={"files": {}})
+        results = {r.name: r for r in evaluator.evaluate(ctx)}
+        assert results["has_implementation"].satisfied is False
