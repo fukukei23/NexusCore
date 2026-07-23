@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -9,11 +10,16 @@ from typing import TYPE_CHECKING, Any
 
 from nexuscore.core.orchestrator_models import OrchestratorContext
 from nexuscore.core.sandbox_executor import run_in_sandbox
-from nexuscore.npe.engine import guarded_llm_call
 from nexuscore.core.retry_policy import _env_int
+from nexuscore.npe.engine import guarded_llm_call
+from nexuscore.utils.syntax_validator import validate_python_syntax
 
 DEBUG_MAX_RETRIES: int = _env_int("NEXUS_DEBUG_MAX_RETRIES", 3)
 """デバッグループ（テスト失敗→debugger修正→再テスト）の最大リトライ回数（spec §4-5）"""
+
+AST_FAIL_LIMIT: int = _env_int("NEXUS_AST_FAIL_LIMIT", 2)
+"""AST検査NGが「連続」でこの回数に達したら早期脱出（LLMが説明文しか返さない故障検知）。
+pytest失敗(debug_retries)とは独立カウント。将来のA/Bで3に拡張余地(env上書き可)。"""
 
 REVIEW_MAX_RETRIES: int = _env_int("NEXUS_REVIEW_MAX_RETRIES", 2)
 """レビューループ（guardian REJECT→再実装→再テスト→再レビュー）の最大リトライ回数（spec §4-5）"""
@@ -407,6 +413,16 @@ class PhaseRunnerMixin:
     # ------------------------------------------------------------------
     # Phase 5: Testing
     # ------------------------------------------------------------------
+    @staticmethod
+    def _clean_pytest_cache(project_path: str) -> None:
+        """pytest 実行前にキャッシュ副産物を削除（CI flaky 回避・安全側）。
+
+        mtime 検知で再コンパイルされるが、古い .pyc 参照リスクを確実に排除する。
+        project_path は cwd 共有（run_in_sandbox と同一）。
+        """
+        for name in ("__pycache__", ".pytest_cache"):
+            shutil.rmtree(Path(project_path) / name, ignore_errors=True)
+
     def run_testing_phase(self, context: OrchestratorContext) -> OrchestratorContext:
         """Phase 5: tester にテストを生成させ、サンドボックスで実行する（spec §4-2）。
 
