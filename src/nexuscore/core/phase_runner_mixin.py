@@ -587,6 +587,26 @@ class PhaseRunnerMixin:
     # ------------------------------------------------------------------
     # Phase 6: Review（guardianループ・3値終端状態・spec §4-3/4-4）
     # ------------------------------------------------------------------
+    @staticmethod
+    def _format_debug_history(history: list) -> str:
+        """debug_history を人間可読の要約に整形（status キー統一・末尾10件・err truncate）。"""
+        if not history:
+            return "（デバッグ試行なし）"
+        lines = []
+        for h in history[-10:]:                       # 末尾N件（planレビュー #10）
+            attempt = h.get("attempt", "?")
+            status = h.get("status", "?")
+            err = str(h.get("err", ""))[:200]
+            if status == "no_fixed_code":
+                lines.append(f"  attempt {attempt}: fixed_code 生成なし")
+            elif status == "ast_fail":
+                lines.append(f"  attempt {attempt}: 構文NG({err})")
+            elif status == "sandbox_error":
+                lines.append(f"  attempt {attempt}: sandbox例外({err})")
+            else:  # pytest_pass / pytest_fail
+                passed = h.get("passed")
+                lines.append(f"  attempt {attempt}: 構文OK・pytest={'通過' if passed else '失敗'}")
+        return "\n".join(lines)
     def run_review_phase(self, context: OrchestratorContext) -> OrchestratorContext:
         self.logger.info(f"[{context.task_id}] Phase 6: Review")
         context.phase_log.append("REVIEW")
@@ -601,8 +621,15 @@ class PhaseRunnerMixin:
             context.terminal_state = "NEEDS_HUMAN_REVIEW"
             error_log = f"{context.testing.get('stdout', '')}\n{context.testing.get('stderr', '')}"
             self._run_postmortem_learning(context, error_log)
+            # デバッグループ各試行の履歴を review_report に添付（人間診断コスト低下）
+            history_summary = self._format_debug_history(context.debug_history)
             self._write_review_report(
-                context, feedback=f"テストが失敗したまま解消できませんでした:\n{context.testing.get('stderr', '')}"
+                context,
+                feedback=(
+                    f"テストが失敗したまま解消できませんでした:\n"
+                    f"{context.testing.get('stderr', '')}\n\n"
+                    f"--- デバッグ試行履歴 ---\n{history_summary}"
+                ),
             )
             self._maybe_run_constitutional_review(context)
             return context
