@@ -18,7 +18,7 @@ def test_implement_code_success(monkeypatch):
 
     def fake_execute(self, prompt, task_type=None):
         execute_calls.append((prompt, task_type))
-        return "print('ok')"
+        return "```python\nprint('ok')\n```"
 
     monkeypatch.setattr(CoderAgent, "execute_llm_task", fake_execute)
 
@@ -42,7 +42,7 @@ def test_implement_code_retries_on_syntax_error(monkeypatch):
     agent.logger = logging.getLogger("test")
 
     prompts = []
-    outputs = ["bad-code", "good_code"]
+    outputs = ["```python\nbad-code\n```", "```python\ngood_code\n```"]
 
     def fake_execute(self, prompt, task_type=None):
         prompts.append(prompt)

@@ -50,6 +50,7 @@ class CoderAgent(BaseAgent):
 もしタスク内容に `[Orchestratorからの具体的指示]` や `[Guardianからのフィードバック]` が含まれている場合は、元のタスクよりも、そのフィードバックの内容を解決することを最優先してください。
 
 # 絶対的な出力ルール
+- **必ずマークダウンコードブロック（```python 〜 ```）で囲んでコードを出力してください。コードブロックの外側にテキストを一切含めないでください。**
 - **修正後の完全なPythonコードのみ**を出力してください。
 - コードの前に前置きや言い訳、後に結びの言葉や要約など、**コード以外のテキストは一切含めないでください。**
 - あなたの思考プロセスや解釈を、Pythonのコメント（`#`）以外でコードに含めてはなりません。
@@ -103,31 +104,17 @@ class CoderAgent(BaseAgent):
                     break
             return "\n".join(lines[start_idx:]).strip()
 
-        # コードブロックが見つからない場合は、レスポンス全体から不要な前置きを削除
-        lines = response.split("\n")
-        cleaned_lines = []
-        code_started = False
-        for line in lines:
-            stripped = line.strip()
-            # コードらしい行が見つかったら開始
-            if (
-                not code_started
-                and stripped
-                and (
-                    stripped.startswith(("import ", "from ", "def ", "class ", "print", "#"))
-                    or stripped.startswith(("if ", "for ", "while ", "return "))
-                )
-            ):
-                code_started = True
-            if code_started or stripped.startswith("#") or stripped.startswith('"""'):
-                cleaned_lines.append(line)
-
-        cleaned = "\n".join(cleaned_lines).strip()
-        # コードらしい行が一切検出できない場合は、レスポンス全体を返す
-        # （テストや短いコード片の生成で、単一行が返るケースを想定）
-        return cleaned if cleaned else response.strip()
+        # コードブロックが見つからない場合は空文字を返す（案X′: 説明文をコード扱いしない）
+        # プロンプトでマークダウンコードブロック囲みを強制しているため、コードブロック無しは
+        # LLMがコードを出さなかった（説明文のみを返した）と判断する。
+        # 空文字は _validate_code の空ガードで不合格扱いとなり、RETRY経路でLLMに再生成を促す。
+        return ""
 
     def _validate_code(self, language: str, code: str) -> tuple[bool, str]:
+        # 空ガード: 空白のみは言語問わず不合格（ast.parse("")が成功する問題の対策・案X′）
+        # _validate_code層（言語ディスパッチ）に置くことでSRPを保つ（空は構文以前・言語非依存）。
+        if not code or not code.strip():
+            return False, "empty code"
         lang = (language or "python").lower()
         if lang == "python":
             return self._validate_python_syntax(code)

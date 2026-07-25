@@ -7,7 +7,7 @@ def test_coder_agent_ast_retry(mocker):
     mocker.patch.object(
         agent,
         "execute_llm_task",
-        side_effect=["def bad(:\n", "print('ok')"],
+        side_effect=["```python\ndef bad(:\n```", "```python\nprint('ok')\n```"],
     )
     result = agent.implement_code("do something", "pass")
     assert result == "print('ok')"

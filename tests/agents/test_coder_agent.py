@@ -12,7 +12,7 @@ def disable_llm_router(monkeypatch):
 
 def test_implement_code_returns_first_valid_result():
     agent = CoderAgent()
-    agent.execute_llm_task = lambda *args, **kwargs: "print('ok')"
+    agent.execute_llm_task = lambda *args, **kwargs: "```python\nprint('ok')\n```"
     agent._validate_code = lambda lang, code: (True, "")
 
     result = agent.implement_code("task", "pass")
@@ -22,7 +22,7 @@ def test_implement_code_returns_first_valid_result():
 def test_implement_code_retries_and_appends_feedback(monkeypatch):
     agent = CoderAgent()
     calls = []
-    responses = iter(["bad code", "good code"])
+    responses = iter(["```python\nbad code\n```", "```python\ngood code\n```"])
 
     def fake_execute(prompt, **kwargs):
         calls.append(prompt)

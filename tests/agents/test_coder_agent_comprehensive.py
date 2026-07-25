@@ -94,7 +94,7 @@ class TestImplementCode:
         valid_code = "def hello():\n    return 'Hello, World!'"
 
         mock_llm = Mock()
-        mock_llm.execute.return_value = valid_code
+        mock_llm.execute.return_value = f"```python\n{valid_code}\n```"
 
         mock_router = Mock()
         mock_router.get_llm_for_task.return_value = mock_llm
@@ -117,7 +117,7 @@ class TestImplementCode:
         valid_code = "def fixed():\n    pass"
 
         mock_llm = Mock()
-        mock_llm.execute.side_effect = [invalid_code, valid_code]
+        mock_llm.execute.side_effect = [f"```python\n{invalid_code}\n```", f"```python\n{valid_code}\n```"]
 
         mock_router = Mock()
         mock_router.get_llm_for_task.return_value = mock_llm
@@ -163,7 +163,7 @@ class TestImplementCode:
         new_code = "def old():\n    return 'updated'"
 
         mock_llm = Mock()
-        mock_llm.execute.return_value = new_code
+        mock_llm.execute.return_value = f"```python\n{new_code}\n```"
 
         mock_router = Mock()
         mock_router.get_llm_for_task.return_value = mock_llm
@@ -257,7 +257,7 @@ class TestEdgeCases:
         valid_code = "def 挨拶():\n    return 'こんにちは'"
 
         mock_llm = Mock()
-        mock_llm.execute.return_value = valid_code
+        mock_llm.execute.return_value = f"```python\n{valid_code}\n```"
 
         mock_router = Mock()
         mock_router.get_llm_for_task.return_value = mock_llm
@@ -277,7 +277,7 @@ class TestEdgeCases:
         code = "def test():\n    return True"
 
         mock_llm = Mock()
-        mock_llm.execute.return_value = code
+        mock_llm.execute.return_value = f"```python\n{code}\n```"
 
         mock_router = Mock()
         mock_router.get_llm_for_task.return_value = mock_llm

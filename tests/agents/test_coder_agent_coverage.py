@@ -83,23 +83,44 @@ class TestExtractCodeFromResponse:
         result = agent._extract_code_from_response(response)
         assert "print('hello')" in result
 
-    def test_no_code_block_returns_cleaned_response(self):
-        """コードブロックがない場合、レスポンスから不要な前置きを削除"""
+    def test_no_code_block_returns_empty(self):
+        """コードブロックがない場合、空文字を返す（説明文をコード扱いしない・案X′）"""
         from nexuscore.agents.coder_agent import CoderAgent
 
         agent = CoderAgent()
+        # 素のコード（囲みなし）が含まれていても、コードブロックが無ければ空
         response = "Sure! Here is the code:\ndef hello():\n    return 'hello'\n"
         result = agent._extract_code_from_response(response)
-        assert "def hello():" in result
+        assert result == ""
 
-    def test_no_code_block_no_code_lines_returns_full(self):
-        """コードブロックもコード行もない場合、レスポンス全体を返す"""
+    def test_no_code_block_plain_text_returns_empty(self):
+        """コードブロックもコード行もない場合、空文字を返す（説明文フォールバック廃止・案X′）"""
         from nexuscore.agents.coder_agent import CoderAgent
 
         agent = CoderAgent()
         response = "Just plain text without code"
         result = agent._extract_code_from_response(response)
-        assert result == "Just plain text without code"
+        assert result == ""
+
+    def test_explanation_only_response_returns_empty(self):
+        """説明文のみのレスポンスは空（LLMがコードを出さなかったケース・案X′）"""
+        from nexuscore.agents.coder_agent import CoderAgent
+
+        agent = CoderAgent()
+        response = (
+            "このタスクについては、既存のコード構造を分析した結果、"
+            "特別な修正は不要と判断しました。現在の実装で十分に機能しています。"
+        )
+        result = agent._extract_code_from_response(response)
+        assert result == ""
+
+    def test_empty_response_returns_empty(self):
+        """空レスポンスは空（境界ケース・案X′）"""
+        from nexuscore.agents.coder_agent import CoderAgent
+
+        agent = CoderAgent()
+        result = agent._extract_code_from_response("")
+        assert result == ""
 
 
 class TestValidateCode:
@@ -210,6 +231,33 @@ class TestValidateCode:
         with patch.dict("sys.modules", {"nexuscore.utils.tree_sitter_checker": None}):
             ok, err = agent._validate_code("rust", "fn main() {}")
             assert ok is True
+
+    def test_empty_code_returns_false(self):
+        """空コードは不合格（ast.parse("")が成功する問題の対策・言語非依存・案X′）"""
+        from nexuscore.agents.coder_agent import CoderAgent
+
+        agent = CoderAgent()
+        ok, err = agent._validate_code("python", "")
+        assert ok is False
+        assert "empty" in err.lower()
+
+    def test_whitespace_only_code_returns_false(self):
+        """空白のみのコードは不合格（言語非依存ガード・案X′）"""
+        from nexuscore.agents.coder_agent import CoderAgent
+
+        agent = CoderAgent()
+        ok, err = agent._validate_code("python", "   \n  \t  \n")
+        assert ok is False
+        assert "empty" in err.lower()
+
+    def test_empty_code_non_python_returns_false(self):
+        """空コードは言語問わず不合格（_validate_code層でガード・案X′）"""
+        from nexuscore.agents.coder_agent import CoderAgent
+
+        agent = CoderAgent()
+        ok, err = agent._validate_code("javascript", "")
+        assert ok is False
+        assert "empty" in err.lower()
 
 
 class TestImplementCode:
