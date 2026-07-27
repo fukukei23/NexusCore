@@ -77,7 +77,7 @@ def _call_minimax(messages: list[dict], temperature: float = 0.3) -> str:
     """Call MiniMax chat completions API via HTTP."""
     api_key = os.getenv("MINIMAX_API_KEY")
     api_base = os.getenv("MINIMAX_API_BASE", "https://api.minimax.chat/v1")
-    model = os.getenv("MINIMAX_MODEL", "MiniMax-M2.7")
+    model = os.getenv("MINIMAX_MODEL", "MiniMax-M3")
     if not api_key:
         raise ValueError("MINIMAX_API_KEY environment variable is not set")
     response = requests.post(

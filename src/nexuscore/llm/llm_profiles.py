@@ -75,14 +75,14 @@ PROFILE_REGISTRY: dict[str, LLMProfile] = {
     "minimax_default": LLMProfile(
         name="minimax_default",
         provider="minimax",
-        model="minimax-m3",
+        model="MiniMax-M3",
         description="MiniMax M3 for general chat and creative tasks",
         default_temperature=0.2,
     ),
     "minimax_analytical": LLMProfile(
         name="minimax_analytical",
         provider="minimax",
-        model="minimax-m3",
+        model="MiniMax-M3",
         description="MiniMax M3 for analytical and structured tasks",
         default_temperature=0.15,
     ),
