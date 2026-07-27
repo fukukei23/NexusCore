@@ -36,14 +36,14 @@ class TestLLMProfile:
         profile = LLMProfile(
             name="custom",
             provider="minimax",
-            model="minimax-m3",
+            model="MiniMax-M3",
             description="Test profile",
             default_temperature=0.5,
         )
 
         assert profile.name == "custom"
         assert profile.provider == "minimax"
-        assert profile.model == "minimax-m3"
+        assert profile.model == "MiniMax-M3"
         assert profile.description == "Test profile"
         assert profile.default_temperature == 0.5
 
@@ -99,7 +99,7 @@ class TestProfileRegistry:
 
         assert profile.name == "minimax_default"
         assert profile.provider == "minimax"
-        assert profile.model == "minimax-m3"
+        assert profile.model == "MiniMax-M3"
         assert profile.default_temperature == 0.2
 
     def test_registry_all_profiles_have_required_fields(self):
@@ -218,7 +218,7 @@ class TestProfileToModelName:
         """minimax_defaultを正しく変換"""
         model_name = profile_to_model_name("minimax_default")
 
-        assert model_name == "minimax:minimax-m3"
+        assert model_name == "minimax:MiniMax-M3"
 
     def test_profile_to_model_name_gpt_codex(self):
         """gpt_codexを正しく変換"""
@@ -228,7 +228,7 @@ class TestProfileToModelName:
         """minimax_analyticalを正しく変換"""
         model_name = profile_to_model_name("minimax_analytical")
 
-        assert model_name == "minimax:minimax-m3"
+        assert model_name == "minimax:MiniMax-M3"
 
     def test_profile_to_model_name_all_profiles(self):
         """全プロファイルが変換可能"""

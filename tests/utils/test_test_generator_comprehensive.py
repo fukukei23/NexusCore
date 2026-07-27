@@ -152,11 +152,11 @@ class TestCallMinimax:
         mock_response.raise_for_status = MagicMock()
         mock_post.return_value = mock_response
 
-        with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}):
+        with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key", "MINIMAX_MODEL": "MiniMax-M3"}):
             _call_minimax([{"role": "user", "content": "hello"}], temperature=0.5)
 
         call_kwargs = mock_post.call_args
-        assert call_kwargs[1]["json"]["model"] == "MiniMax-M2.7"
+        assert call_kwargs[1]["json"]["model"] == "MiniMax-M3"
         assert call_kwargs[1]["json"]["temperature"] == 0.5
 
     @patch("nexuscore.utils.test_generator.requests.post")
