@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import logging
+import os
 from dataclasses import dataclass
 
-from .llm_profiles import profile_to_model_name
+from .llm_profiles import get_profile, profile_to_model_name
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -198,13 +202,79 @@ LEGACY_TO_TASK = {
 }
 
 
+# ---------------------------------------------------------------------------
+# env 上書き: NEXUS_TASK_MODEL_CODING/REVIEW/GENERAL で各カテゴリの primary を切替
+#   7-23監査④デッドキー是正。値は profile ID（glm_default/gemini_secondary 等）。
+#   未設定時は既定（TASK_MODEL_CONFIGS の primary）を維持。
+#   カテゴリは 2026-07-23 3LLM集約構成（生成=GLM / レビュー=Gemini / 分析分類=MiniMax）に準拠。
+# ---------------------------------------------------------------------------
+_TASK_CATEGORY: dict[str, str] = {
+    # CODING系（生成: 書く・直す・テスト生成・デバッグ・自己修復）
+    "code_generate": "coding",
+    "code_refactor": "coding",
+    "code_explain": "coding",
+    "test_generate": "coding",
+    "debug": "coding",
+    "self_heal": "coding",
+    # REVIEW系（レビュー: 品質チェック・設計・要件・計画・ポリシー・ポストモーテム）
+    "code_review": "review",
+    "architect": "review",
+    "arch_design": "review",
+    "plan_generate": "review",
+    "requirement": "review",
+    "requirement_elicit": "review",
+    "policy_check": "review",
+    "postmortem_analyze": "review",
+    # GENERAL系（分析/分類ほか）は _TASK_CATEGORY 未登録タスクを "general" にフォールバック
+}
+
+# alias（testing/review/planning 等）は target と同カテゴリを継承
+for _alias, _target in _TASK_ALIAS_SOURCE.items():
+    if _target in _TASK_CATEGORY:
+        _TASK_CATEGORY[_alias] = _TASK_CATEGORY[_target]
+
+_CATEGORY_ENV: dict[str, str] = {
+    "coding": "NEXUS_TASK_MODEL_CODING",
+    "review": "NEXUS_TASK_MODEL_REVIEW",
+    "general": "NEXUS_TASK_MODEL_GENERAL",
+}
+
+
+def _resolve_primary(task: str, default_profile: str) -> str:
+    """Return the primary profile id, overridden by env when set.
+
+    env の値は profile ID（glm_default/gemini_secondary 等）として扱う。
+    未知の値（model name 形式や typo 等）の場合は既定にフォールバックし
+    警告1回を出力（移行安全性: 既存 .env の古い値でクラッシュしない）。
+    """
+    category = _TASK_CATEGORY.get(task, "general")
+    env_key = _CATEGORY_ENV[category]
+    override = os.environ.get(env_key, "").strip()
+    if not override:
+        return default_profile
+    if get_profile(override) is None:
+        # env キーごと1回だけ警告（起動時に大量の重複ログを出さない）
+        if env_key not in _WARNED_BAD_ENV:
+            _WARNED_BAD_ENV.add(env_key)
+            logger.warning(
+                "%s=%r は未知の profile ID です（既定 %r を使用）。"
+                "profile ID（glm_default/gemini_secondary/minimax_default 等）を指定してください。",
+                env_key, override, default_profile,
+            )
+        return default_profile
+    return override
+
+
+_WARNED_BAD_ENV: set[str] = set()
+
+
 def build_task_model_map_dict() -> dict[str, dict[str, object]]:
     """
     Build a dict matching the legacy TASK_MODEL_MAP_DEFAULT structure.
     """
     result: dict[str, dict[str, object]] = {}
     for task, cfg in TASK_MODEL_CONFIGS.items():
-        primary_model = profile_to_model_name(cfg.primary)
+        primary_model = profile_to_model_name(_resolve_primary(task, cfg.primary))
         fallbacks = [profile_to_model_name(profile_id) for profile_id in cfg.secondary]
         fallback_model = profile_to_model_name(cfg.fallback)
         if fallback_model not in fallbacks:
