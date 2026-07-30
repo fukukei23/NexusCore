@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from nexuscore.llm.helpers import DEFAULT_STUB_CONTENT, normalize_model
 from nexuscore.llm.http_client import RequestsHTTPError
@@ -79,6 +79,14 @@ class BaseLLM:
     ) -> str:
         """Build a stub response when real calls are disabled."""
         self.last_call_mode = "stub"
+        # silent failure 対策: real呼出無効時(APIキー無し等)に黙ってダミー応答すると
+        # 「本物のLLMが動いたか」が判別不能になるため、明示的に WARN を出す。
+        self.logger.warning(
+            "%s STUB response (real calls disabled): model=%s — "
+            "本物のLLMは呼ばれていません（APIキー未設定/real_calls=False 等の可能性）",
+            self.__class__.__name__,
+            self.model_name,
+        )
         fake = {
             "model": self.model_name,
             "mode": f"{mode_prefix}-stub",
