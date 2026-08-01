@@ -5,7 +5,6 @@ import os
 
 import gradio as gr
 
-from ._state import AppState
 
 logger = logging.getLogger(__name__)
 
