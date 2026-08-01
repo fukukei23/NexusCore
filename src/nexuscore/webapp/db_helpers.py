@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from flask import request
 from sqlalchemy import desc
 from sqlalchemy.orm import Query, subqueryload
@@ -47,14 +49,12 @@ def project_runs_with_logs(project_id: int, limit: int = 50) -> list[Run]:
 
 def projects_with_latest_run(user_id: int) -> list[Project]:
     """ユーザーのプロジェクト一覧を最新Run付きで取得"""
-    return (
-        Project.query.filter_by(owner_id=user_id)
-        .order_by(desc(Project.updated_at))
-        .all()
-    )
+    return Project.query.filter_by(owner_id=user_id).order_by(desc(Project.updated_at)).all()
 
 
-def paginate_query(query: Query, order_column=None, per_page: int = 50) -> tuple:
+def paginate_query(
+    query: Query, order_column=None, per_page: int = 50
+) -> tuple[Any, dict[str, int]]:
     """
     クエリをページングして (paginated_result, pagination_dict) を返す。
 
@@ -145,9 +145,7 @@ def run_llm_cost(run_id: int) -> tuple[int, float, dict]:
         )
 
         cost = (
-            payload.get("estimated_cost")
-            or payload.get("cost_jpy")
-            or usage.get("cost_jpy", 0.0)
+            payload.get("estimated_cost") or payload.get("cost_jpy") or usage.get("cost_jpy", 0.0)
         )
         try:
             total_cost += float(cost)

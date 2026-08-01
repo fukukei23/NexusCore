@@ -18,6 +18,8 @@ Web UI と API を提供するための Flask アプリケーション。
 
 from __future__ import annotations
 
+import os
+
 from flask import Flask
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -78,8 +80,15 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     try:
         from flask_cors import CORS
 
-        # /api/v1/* に対して CORS を許可（開発フェーズでは "*"、本番はホスト制限を推奨）
-        CORS(app, resources={r"/api/v1/*": {"origins": "*"}})
+        # /api/v1/* に対して CORS を許可
+        # NEXUS_CORS_ORIGINS 未設定時は "*"（開発）。本番はカンマ区切りでホスト指定を推奨
+        _origins_env = os.getenv("NEXUS_CORS_ORIGINS", "*")
+        _cors_origins: str | list[str] = (
+            _origins_env
+            if _origins_env == "*"
+            else [o.strip() for o in _origins_env.split(",") if o.strip()]
+        )
+        CORS(app, resources={r"/api/v1/*": {"origins": _cors_origins}})
     except ImportError:
         # flask-cors がインストールされていない場合はスキップ
         import logging
