@@ -21,7 +21,7 @@ def get_error_header(traceback_str: str) -> str:
     for line in lines:
         if "Error:" in line:
             return line
-    return ""  # Return None if no error message is found
+    return ""
 
 
 def clean_error_msg(error_str: str = "") -> str:

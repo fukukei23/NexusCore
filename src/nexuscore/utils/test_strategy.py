@@ -94,8 +94,12 @@ class TestStrategyManager:
         :param config_path: 設定ファイルのパス（省略時は tests/test_config.yml）
         """
         if config_path is None:
-            # プロジェクトルートを探す
-            project_root = os.getenv("NEXUS_PROJECT_ROOT", os.getcwd())
+            # プロジェクトルートを探す（NEXUS_PROJECT_ROOT 未設定時は cwd）
+            try:
+                default_root = os.getcwd()
+            except OSError:
+                default_root = "."
+            project_root = os.getenv("NEXUS_PROJECT_ROOT", default_root)
             config_path = os.path.join(project_root, "tests", "test_config.yml")
 
         self.config_path = Path(config_path)
