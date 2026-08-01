@@ -1,3 +1,9 @@
+"""BaseAgent のフォールバック定義。
+
+base_agent モジュールが import 失敗する環境でも agents パッケージが
+import 可能となるよう、最小限のスタブ実装を提供する。
+"""
+
 from __future__ import annotations
 
 import logging

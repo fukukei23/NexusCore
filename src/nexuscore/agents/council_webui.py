@@ -1,10 +1,14 @@
+"""Constitutional Council のFlask Web UI。
+
+ConstitutionalCouncilAgent を操作するための軽量なブラウザ UI を提供する。
+"""
+
 from __future__ import annotations
 
 import json
 import logging
 import os
 import re
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from flask import Flask, flash, redirect, render_template_string, url_for

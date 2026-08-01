@@ -10,13 +10,11 @@ class PolicyAgent(BaseAgent):
     LLMを呼び出さず、設定ファイルに基づいて機械的にチェックを行う。
     """
 
-    # ▼▼▼【アーキテクチャ統一】ここから▼▼▼
     def __init__(self, policy_rules_path: str = "config/policy_rules.json"):
         """
         PolicyAgentを初期化する。
         """
         super().__init__()  # 引数なしで呼び出すのが正しい作法
-        # ▲▲▲【アーキテク-チャ統一】ここまで▲▲▲
 
         try:
             with open(policy_rules_path, encoding="utf-8") as f:
