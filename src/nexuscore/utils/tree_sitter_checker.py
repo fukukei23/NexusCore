@@ -8,15 +8,15 @@
 
 import argparse
 import json
+import logging as _logging
 import sys
 from pathlib import Path
 
-from nexuscore.utils.tree_sitter._config import CONFIG, Fore, HAS_EXTRAS, TREE_SITTER_AVAILABLE, Style
-from nexuscore.utils.tree_sitter._analyzer import SemanticAnalyzer
-from nexuscore.utils.tree_sitter._report import ReportGenerator
 from nexuscore.analyzer.unified_analyzer import AnalysisResult  # noqa: F401 — legacy re-export
+from nexuscore.utils.tree_sitter._analyzer import SemanticAnalyzer
+from nexuscore.utils.tree_sitter._config import Fore
+from nexuscore.utils.tree_sitter._report import ReportGenerator
 
-import logging as _logging
 _logger = _logging.getLogger(__name__)
 
 
@@ -29,7 +29,7 @@ def main():
     args = parser.parse_args()
 
     if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
+        _logging.basicConfig(level=_logging.DEBUG)
 
     analyzer = SemanticAnalyzer()
     if not analyzer.setup_parsers():
