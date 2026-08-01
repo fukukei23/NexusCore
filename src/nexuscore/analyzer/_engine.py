@@ -14,8 +14,8 @@ if TREE_SITTER_AVAILABLE:
 class AnalysisResult:
     def __init__(self, success: bool = False, **kwargs):
         self.success = success
-        self.timestamp = datetime.now().isoformat()
-        self.data = kwargs
+        self.timestamp: str = datetime.now().isoformat()
+        self.data: dict[str, Any] = kwargs
 
     def __getitem__(self, key):
         return self.data.get(key)

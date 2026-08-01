@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 r"""
 Context Agent - 完全版（simple版の安定性 + 元版の全機能）
-📁 C:\Users\USER\tools\NexusCore\src\nexuscore\agents\context_agent.py
 """
 
 import json

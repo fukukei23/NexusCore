@@ -24,7 +24,9 @@ class DependencyGraphBuilder:
 
     def __init__(self):
         if not nx:
-            raise ImportError("networkx is required for graph building.")
+            raise ImportError(
+                "networkx is required for graph building. Install with: pip install networkx"
+            )
         self.graph = nx.DiGraph()
         self.definitions: dict[str, list[str]] = {}  # {symbol_name: full_node_id list}
 

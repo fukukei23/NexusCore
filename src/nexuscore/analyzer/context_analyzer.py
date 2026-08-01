@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 r"""
 Context Analyzer - 安全版（simple版の安定性を統合）
-📁 C:\Users\USER\tools\NexusCore\src\nexuscore\agents\context_analyzer.py
 """
 
 import logging
@@ -101,7 +100,7 @@ class ContextAnalyzer:
         # 安全なツール検出
         try:
             tech_stack["tools"] = self._safe_detect_tools()
-        except (OSError,) as e:
+        except OSError as e:
             _logger.warning("ツール検出エラー: %s", e)
 
         return tech_stack
@@ -173,7 +172,7 @@ class ContextAnalyzer:
                 file_path = os.path.join(self.project_root, file_pattern)
                 if os.path.exists(file_path):
                     tools.append(tool)
-        except (OSError,) as e:
+        except OSError as e:
             _logger.warning("ツールファイル検索エラー: %s", e)
 
         return tools
@@ -234,7 +233,7 @@ class ContextAnalyzer:
                     if len(structure["test_dirs"]) < 10:  # 制限
                         structure["test_dirs"].append(rel_path)
 
-        except (OSError,) as e:
+        except OSError as e:
             _logger.warning("ファイル構造スキャンエラー: %s", e)
 
         return structure
@@ -312,7 +311,7 @@ class ContextAnalyzer:
 
                         scanned_files += 1
 
-        except (OSError,) as e:
+        except OSError as e:
             _logger.warning("インポートスキャンエラー: %s", e)
 
     def _categorize_import(self, module: str, dependencies: dict):
@@ -380,7 +379,7 @@ class ContextAnalyzer:
                 venv_info["active"] = True
                 venv_info["type"] = "conda"
                 venv_info["path"] = conda_env
-        except (OSError,):
+        except OSError:
             pass
 
         return venv_info
@@ -395,7 +394,7 @@ class ContextAnalyzer:
                 file_path = os.path.join(self.project_root, pattern)
                 if os.path.exists(file_path):
                     env_files.append(pattern)
-        except (OSError,):
+        except OSError:
             pass
 
         return env_files
@@ -413,7 +412,7 @@ class ContextAnalyzer:
             for file_name, manager in manager_files.items():
                 if os.path.exists(os.path.join(self.project_root, file_name)):
                     managers.append(manager)
-        except (OSError,):
+        except OSError:
             pass
 
         return managers
