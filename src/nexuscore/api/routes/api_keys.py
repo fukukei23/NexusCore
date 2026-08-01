@@ -1,4 +1,5 @@
 import logging
+import os
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.exc import SQLAlchemyError
@@ -21,8 +22,11 @@ router = APIRouter(tags=["api-keys"])
 
 logger = logging.getLogger(__name__)
 
-# API Key 発行数の上限（1ユーザーあたり）
-MAX_API_KEYS_PER_USER = 5
+# API Key 発行数の上限（1ユーザーあたり・環境変数 NEXUS_MAX_API_KEYS_PER_USER で調整可）
+try:
+    MAX_API_KEYS_PER_USER = max(1, int(os.getenv("NEXUS_MAX_API_KEYS_PER_USER", "5")))
+except (ValueError, TypeError):
+    MAX_API_KEYS_PER_USER = 5
 
 
 @router.post(
