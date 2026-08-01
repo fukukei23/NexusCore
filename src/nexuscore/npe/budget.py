@@ -24,9 +24,7 @@ DEFAULT_COST_TABLE = {
 
 def _cost(model: str, kind: str) -> float:
     # env override: NPE_COST_{MODEL_UPPER}_{PROMPT|COMPLETION}
-    key = (
-        f"NPE_COST_{model.replace('-', '_').upper()}_{'PROMPT' if kind=='prompt' else 'COMPLETION'}"
-    )
+    key = f"NPE_COST_{model.replace('-', '_').upper()}_{'PROMPT' if kind == 'prompt' else 'COMPLETION'}"
     if key in os.environ:
         try:
             return float(os.environ[key])
@@ -86,22 +84,31 @@ def _estimate_cost_jpy(model: str, prompt_tokens: int, completion_tokens: int) -
     return (prompt_tokens / 1000.0) * jp + (completion_tokens / 1000.0) * jc
 
 
+def _parse_ledger_cost(line: str, day: str) -> float:
+    """台帳1行から指定日のコスト(JPY)を抽出する。不正行は 0.0 を返す。"""
+    try:
+        row = json.loads(line)
+    except (json.JSONDecodeError, ValueError) as e:
+        logging.getLogger("npe.budget").warning("Skipping malformed ledger line: %s", e)
+        return 0.0
+    if row.get("day") != day:
+        return 0.0
+    try:
+        return float(row.get("cost_jpy", 0.0))
+    except (TypeError, ValueError) as e:
+        logging.getLogger("npe.budget").warning("Skipping malformed ledger cost: %s", e)
+        return 0.0
+
+
 def _read_today_total() -> float:
-    total = 0.0
     day = _day_key()
     if not USAGE_LEDGER.exists():
         return 0.0
+    total = 0.0
     with _lock:
         try:
             with USAGE_LEDGER.open("r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        row = json.loads(line)
-                        if row.get("day") == day:
-                            total += float(row.get("cost_jpy", 0.0))
-                    except (json.JSONDecodeError, KeyError, ValueError) as e:
-                        logging.getLogger("npe.budget").warning("Skipping malformed ledger line: %s", e)
-                        continue
+                total = sum(_parse_ledger_cost(line, day) for line in f)
         except OSError:
             return total
     return total
