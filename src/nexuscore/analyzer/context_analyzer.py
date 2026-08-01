@@ -9,6 +9,9 @@ import platform
 import sys
 from typing import Any
 
+# ファイル内容プレビュー読込上限(バイト) - インポート検出用途
+_PREVIEW_READ_BYTES = 10000
+
 _logger = logging.getLogger(__name__)
 
 # フォールバック値のデフォルト（環境変数 NEXUSCORE_CONTEXT_* で上書き可能）
@@ -286,7 +289,7 @@ class ContextAnalyzer:
 
                         try:
                             with open(file_path, encoding="utf-8") as f:
-                                content = f.read(10000)  # 最初の10KB のみ
+                                content = f.read(_PREVIEW_READ_BYTES)  # 最初の10KB のみ
 
                             # 簡単な正規表現でインポート検索
                             import_lines = []
