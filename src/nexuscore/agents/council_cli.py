@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_cli_menu(agent: ConstitutionalCouncilAgent) -> None:
+    """Constitutional Council の対話型CLIメニューを起動する。"""
     logger.info("--- [Constitutional Council CLI] ---")
     while True:
         try:
