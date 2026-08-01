@@ -7,6 +7,11 @@ from typing import Any
 
 _logger = logging.getLogger(__name__)
 
+# Extracted modules
+from nexuscore.llm._adapters import BUDGET_API, BudgetManager, log_transaction  # noqa: F401
+from nexuscore.llm._model_detection import apply_detected_models, detect_available_models
+from nexuscore.llm._routed_llm import RoutedLLM  # noqa: F401
+from nexuscore.llm._router_utils import estimate_tokens
 from nexuscore.llm.helpers import (
     normalize_model,
 )
@@ -17,13 +22,6 @@ from nexuscore.llm.routing_policy import (
     TASK_MODEL_MAP_DEFAULT,
     model_family,
 )
-from nexuscore.llm.runtime import REQUEST_TIMEOUT
-
-# Extracted modules
-from nexuscore.llm._adapters import BUDGET_API, BudgetManager, log_transaction  # noqa: F401
-from nexuscore.llm._model_detection import apply_detected_models, detect_available_models
-from nexuscore.llm._routed_llm import RoutedLLM  # noqa: F401
-from nexuscore.llm._router_utils import estimate_tokens
 
 
 # -----------------------------------------------------------------------------
