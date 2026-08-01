@@ -7,6 +7,7 @@ import gradio as gr
 
 from ._llm_init import HAS_LLM, _router
 from ._state import AppState
+from .code_prompt_tab import _strip_code_block
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,9 @@ def build_ai_revision_tab(state: gr.State) -> None:
 
         with gr.Row():
             with gr.Column():
-                load_code_btn = gr.Button("Code/Promptで生成したコードを読み込む", variant="secondary")
+                load_code_btn = gr.Button(
+                    "Code/Promptで生成したコードを読み込む", variant="secondary"
+                )
 
                 code_input = gr.Code(
                     label="修正対象コード",
@@ -86,13 +89,15 @@ def build_ai_revision_tab(state: gr.State) -> None:
                 revised = result.get("content", "") if result.get("ok") else ""
                 if not revised:
                     return "", f"LLM Error: {result.get('reason', 'unknown')}", current_state
-                if revised.startswith("```"):
-                    lines = revised.split("\n")
-                    revised = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+                revised = _strip_code_block(revised)
             else:
                 return "", "LLM Router が初期化されていません。", current_state
 
-            return revised, "修正コードを生成しました。「ファイルに書き戻す」で保存できます。", current_state
+            return (
+                revised,
+                "修正コードを生成しました。「ファイルに書き戻す」で保存できます。",
+                current_state,
+            )
         except Exception as e:  # noqa: BLE001
             logger.error(f"Patch generation failed: {e}", exc_info=True)
             return "", f"Error: {e}", current_state
@@ -115,7 +120,10 @@ def build_ai_revision_tab(state: gr.State) -> None:
                 file_path.write_text(patch, encoding="utf-8")
                 return f"{file_path} に書き戻しました。", current_state
             else:
-                return "書き戻し先ファイルが見つかりません。Code/Promptでコードを保存してから使ってください。", current_state
+                return (
+                    "書き戻し先ファイルが見つかりません。Code/Promptでコードを保存してから使ってください。",
+                    current_state,
+                )
         except Exception as e:  # noqa: BLE001
             logger.error(f"Patch apply failed: {e}", exc_info=True)
             return f"Error: {e}", current_state
