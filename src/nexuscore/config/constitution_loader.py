@@ -12,6 +12,10 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# 憲法ファイル読込失敗時のフォールバック値
+_FALLBACK_PROJECT_NAME = "NexusCore"
+_FALLBACK_PROJECT_VERSION = "7.25.0"
+
 
 class ConstitutionLoader:
     """
@@ -239,7 +243,7 @@ class ConstitutionLoader:
             Dict[str, Any]: デフォルト憲法
         """
         return {
-            "project": {"name": "NexusCore", "version": "7.25.0"},
+            "project": {"name": _FALLBACK_PROJECT_NAME, "version": _FALLBACK_PROJECT_VERSION},
             "quality_gates": {
                 "tier1": {
                     "test_coverage_min": 90,
