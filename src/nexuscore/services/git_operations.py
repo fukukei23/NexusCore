@@ -32,7 +32,7 @@ def clone_or_update_repo(
         shutil.rmtree(target_dir)
     target_dir.parent.mkdir(parents=True, exist_ok=True)
 
-    base_dir = os.getenv("NEXUS_REPO_BASE_DIR")
+    base_dir: str | None = os.getenv("NEXUS_REPO_BASE_DIR")
     if base_dir:
         from_repo = Path(base_dir) / repo_full_name
         if from_repo.exists():
