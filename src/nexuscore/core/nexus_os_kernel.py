@@ -1,3 +1,5 @@
+from typing import Any
+
 from nexuscore.code_interpreter.sandbox_runner import SandboxRunner
 from nexuscore.utils.logger import logger  # あなたのカスタムロガーを使用
 
@@ -43,7 +45,7 @@ class NexusOSKernel:
     # Service Provider Methods
     # --------------------------------------------------------------------------
 
-    def get_service(self, service_name: str):
+    def get_service(self, service_name: str) -> Any:
         """
         [Kernel Service] Returns a trusted, pre-configured service instance.
         アプリケーションは、このメソッドを通じてOSの共有機能を利用します。
