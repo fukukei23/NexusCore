@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from datetime import UTC
 from pathlib import Path
@@ -59,7 +60,8 @@ class SelfHealingService:
     ) -> None:
         self.project_root = Path(project_root).resolve()
         self.session_controller = session_controller or SessionController(
-            session_id="self_healing_default", root_dir=".nexus/sessions"
+            session_id=os.getenv("NEXUS_SELF_HEALING_SESSION_ID", "self_healing_default"),
+            root_dir=".nexus/sessions",
         )
         self.debugger_agent = debugger_agent
         self.patch_applier = patch_applier or PatchApplier()
