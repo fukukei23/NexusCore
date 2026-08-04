@@ -6,8 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nexuscore.core.quality_regen_loop import QualityRegenLoop, QualityRegenResult
-
+from nexuscore.core.quality_regen_loop import QualityRegenLoop
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -62,6 +61,18 @@ class TestMeasureCoverage:
             mock_run.return_value = MagicMock(stdout=output, stderr="")
             loop.measure_coverage("tests/")
             assert mock_run.call_args.kwargs["cwd"] == "/fake/project"
+
+    def test_uses_sys_executable_as_interpreter(self, loop):
+        """pytest 呼び出しは PATH の 'python' でなく sys.executable を使う（venv 不整合防止）。"""
+        import sys
+
+        output = "TOTAL   100  10   90%\n"
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout=output, stderr="")
+            loop.measure_coverage("tests/")
+            cmd = mock_run.call_args.args[0]
+            assert cmd[0] == sys.executable
+            assert "python" not in cmd  # リテラル "python" でないこと
 
     def test_stderr_also_searched(self, loop):
         stderr = "TOTAL   200  30   85%\n"

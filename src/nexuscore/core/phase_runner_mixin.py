@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -458,7 +459,7 @@ class PhaseRunnerMixin:
         test_abs_path.write_text(test_code, encoding="utf-8")
 
         result = run_in_sandbox(
-            ["python", "-m", "pytest", str(test_abs_path), "-q"],
+            [sys.executable, "-m", "pytest", str(test_abs_path), "-q"],
             cwd=self.project_path,
         )
         passed = result.returncode == 0
@@ -539,7 +540,7 @@ class PhaseRunnerMixin:
                 # run_in_sandbox 例外安全（planレビュー #2・MiniMax critical）
                 try:
                     result = run_in_sandbox(
-                        ["python", "-m", "pytest", str(test_abs_path), "-q"],
+                        [sys.executable, "-m", "pytest", str(test_abs_path), "-q"],
                         cwd=self.project_path,
                     )
                     passed = result.returncode == 0

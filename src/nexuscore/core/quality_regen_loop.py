@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -40,7 +41,7 @@ class QualityRegenLoop:
     def measure_coverage(self, test_path: str = "tests/") -> float:
         """Run pytest with coverage and return total coverage percentage (0.0 on failure)."""
         cmd = [
-            "python", "-m", "pytest",
+            sys.executable, "-m", "pytest",
             "--cov=src", "--cov-report=term-missing", "-q",
             test_path,
         ]
