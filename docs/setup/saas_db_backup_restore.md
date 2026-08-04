@@ -47,4 +47,5 @@ docker compose -f docker-compose.saas.yml exec -T db sh -c \
 
 - **PITR 未対応**（WAL アーカイブ + pg_basebackup 等が必要）→ 別タスク
 - **バックアップの外部転送未対応**（S3/GCS 等へのコピー）→ 別タスク
+- **バックアップの暗号化 at rest 未対応**（backup_data ボリュームは平文・gpg 等の鍵管理設計が別途必要・外部転送とセットで段階導入）→ 別タスク
 - **実際の本番 PostgreSQL での動作検証** は本番運用開始時が初回

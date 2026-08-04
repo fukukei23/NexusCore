@@ -64,7 +64,7 @@ services:
     image: postgres:15-alpine
     environment:
       - POSTGRES_USER=nexuscore
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required (fail-closed)}
       - POSTGRES_DB=nexuscore
     ports:
       - "5432:5432"
@@ -85,7 +85,7 @@ services:
     environment:
       - POSTGRES_HOST=db
       - POSTGRES_USER=nexuscore
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required (fail-closed)}
       - POSTGRES_DB=nexuscore
       - BACKUP_RETENTION_DAYS=7
     depends_on:
