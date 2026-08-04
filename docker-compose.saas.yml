@@ -70,8 +70,35 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - backup_data:/backups:ro     # リストア用（db-backup と共有・読取専用）
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexuscore -d nexuscore"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # PostgreSQL 日次バックアップ sidecar（C1・2026-08-05・Qiita六か条監査 CRITICAL #1）
+  # 24h ループで pg_dump + gzip・BACKUP_RETENTION_DAYS 日分保持・PITR は別タスク
+  db-backup:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=nexuscore
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+      - POSTGRES_DB=nexuscore
+      - BACKUP_RETENTION_DAYS=7
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - backup_data:/backups
+      - ./scripts/backup-db.sh:/backup-db.sh:ro
+    entrypoint: ["/bin/sh", "/backup-db.sh"]
+    restart: unless-stopped
 
 volumes:
   redis_data:
   postgres_data:
+  backup_data:
 
