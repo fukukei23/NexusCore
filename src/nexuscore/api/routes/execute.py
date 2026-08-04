@@ -4,7 +4,7 @@ import sys
 import threading
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..dependencies.auth import AuthenticatedUser, get_current_user
 from ..schemas.error import ErrorResponse
@@ -12,6 +12,60 @@ from ..schemas.execute import ExecuteRequest, ExecuteResponse, ExecuteStatusResp
 from ..utils.errors import make_not_found_error
 
 router = APIRouter(tags=["execute"])
+
+# --- project_path 安全性検証（C4: パスインジェクション型IDOR対策・2026-08-05）---
+# 機密システムパス（realpath 解決後・前方一致）。配下を指すことを禁ずる。
+_FORBIDDEN_PATH_PREFIXES = (
+    "/etc",
+    "/root",
+    "/var/log",
+    "/proc",
+    "/sys",
+    "/dev",
+    "/boot",
+    "/usr",
+    "/sbin",
+    "/bin",
+    "/lib",
+    "/lib64",
+)
+
+# パス要素のいずれかとして現れてはならない機密ディレクトリ名（クレデンシャル配置箇所）
+_SENSITIVE_DIR_NAMES = frozenset({".ssh", ".gnupg", ".aws"})
+
+
+def validate_project_path(raw_path: str) -> str:
+    """project_path の安全性を検証し、realpath 解決済みの絶対パスを返す。
+
+    - os.path.realpath でシンボリックリンクを解決（/tmp/evil -> /etc の回避）
+    - 機密システムパス配下・機密ディレクトリ名を含む場合は ValueError を送出
+    - 完全なユーザー別プロジェクト隔離（project_id 経由）は別タスク（M粒度）
+
+    Args:
+        raw_path: ユーザー入力の project_path
+
+    Returns:
+        検証済み絶対パス（realpath 解決済み）
+
+    Raises:
+        ValueError: 機密パス・シンボリックリンク攻撃の疑いがある場合
+    """
+    resolved = os.path.realpath(raw_path)
+
+    for forbidden in _FORBIDDEN_PATH_PREFIXES:
+        if resolved == forbidden or resolved.startswith(forbidden + os.sep):
+            raise ValueError(
+                f"project_path は機密システムパス（{forbidden}）配下を指せません"
+            )
+
+    parts = set(resolved.split(os.sep))
+    sensitive_hit = parts & _SENSITIVE_DIR_NAMES
+    if sensitive_hit:
+        raise ValueError(
+            f"project_path に機密ディレクトリ({sorted(sensitive_hit)})を含められません"
+        )
+
+    return resolved
 
 # --- パス設定（既存の Flask 実装と同様） ---
 try:
@@ -47,9 +101,9 @@ except ImportError:
 
 
 from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
-from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.agents.postmortem_agent import PostmortemAgent
 from nexuscore.llm.llm_router import LLMRouter
+from nexuscore.services.patch_applier import PatchApplier
 
 # --- グローバル変数 ---
 # server.py (deprecated Flask) から移行済み。tasks はこのモジュールで管理。
@@ -187,7 +241,13 @@ async def execute_endpoint(
         HTTPException: バリデーションエラーまたは内部エラー時
     """
     task_id = str(uuid.uuid4())
-    project_path = os.path.abspath(payload.project_path)
+    try:
+        project_path = validate_project_path(payload.project_path)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
     constitution = {"description": payload.constitution_text or "Default constitution."}
 

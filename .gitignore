@@ -3,7 +3,8 @@
 
 # --- Secrets ---
 # APIキーやパスワードなどの秘密情報
-.env
+# .env* で .env/.env.bak.*/.env.local 等の派生を包括無視（誤 git add による公開事故防止）
+.env*
 !.env.template
 # secrets.py は追跡しない
 src/nexuscore/config/secrets.py
