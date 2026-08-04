@@ -72,6 +72,25 @@ jobs:
           fi
 
   # ============================================================================
+  # Secret Scan (gitleaks) / シークレット走査（git 履歴含む・2026-08-05 追加・C6段階的）
+  # ============================================================================
+  secret-scan:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # git 履歴全体を走査するため
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
+        continue-on-error: true  # 警告モード（初回導入・既存検出でCI赤にしない・順次厳密化）
+
+  # ============================================================================
   # Test and Coverage / テスト実行とカバレッジ測定
   # ============================================================================
   test:
