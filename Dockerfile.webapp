@@ -40,7 +40,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONFAULTHANDLER=1 \
     PATH="/opt/venv/bin:$PATH" \
-    APP_HOME="/app"
+    APP_HOME="/app" \
+    FLASK_APP="nexuscore.webapp:create_app" \
+    PYTHONPATH="/app/src"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
