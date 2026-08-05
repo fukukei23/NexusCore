@@ -143,18 +143,32 @@ def _finalize_run(run: Run, project: Project, status: str) -> None:
         logger.warning(f"Failed to generate run report: {e}", exc_info=True)
 
     try:
+        from sqlalchemy.exc import IntegrityError
+
         from nexuscore.core.notifier import get_notifier
+        from nexuscore.webapp.models import NotificationLog
 
         notifier = get_notifier()
         if notifier:
-            session_id = run.run_id or str(run.id)
-            notifier.notify_orchestrator_complete(
-                project_path=project.local_path,
-                requirement=run.requirement,
-                status=status,
-                session_id=session_id,
-                details={"Run ID": run.run_id, "プロジェクト名": project.name},
-            )
+            event_type = "orchestrator_complete" if status == "success" else "orchestrator_failed"
+            # C3: 冪等ガード（NotificationLog UNIQUE 制約で Slack 重複送信防止）
+            try:
+                db.session.add(NotificationLog(run_id=run.id, event_type=event_type))
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+                logger.info(
+                    f"Notification {event_type} for run {run.id} already sent — skipping (idempotency)"
+                )
+            else:
+                session_id = run.run_id or str(run.id)
+                notifier.notify_orchestrator_complete(
+                    project_path=project.local_path,
+                    requirement=run.requirement,
+                    status=status,
+                    session_id=session_id,
+                    details={"Run ID": run.run_id, "プロジェクト名": project.name},
+                )
     except Exception as e:  # noqa: BLE001
         logger.warning(f"Failed to send Slack notification: {e}", exc_info=True)
 
