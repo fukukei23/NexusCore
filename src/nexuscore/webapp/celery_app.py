@@ -4,12 +4,36 @@ import os
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+import redis
+import sqlalchemy
 from celery import Celery
 
 from nexuscore.config.unified_config import get_config
 
 celery: Celery | None = None
 run_orchestrator_task: Callable | None = None
+
+# C3: run_orchestrator タスクの装飾子オプション（テストで静的検証）
+# - acks_late/reject_on_worker_lost: worker 落ちで broker へ再配送（タスクロスト防止）
+# - autoretry_for: 一時的例外のみ自動再試行（Orchestrator 例外は部分適用リスクで対象外）
+# - retry_backoff/jitter: 指数バックオフ + ジッタでレート制限・スタampede 回避
+TASK_OPTIONS: dict = dict(
+    name="nexuscore.run_orchestrator",
+    bind=True,
+    acks_late=True,
+    reject_on_worker_lost=True,
+    autoretry_for=(
+        sqlalchemy.exc.OperationalError,
+        redis.exceptions.ConnectionError,
+        redis.exceptions.TimeoutError,
+        TimeoutError,
+        ConnectionError,
+    ),
+    retry_backoff=True,
+    retry_backoff_max=120,
+    retry_jitter=True,
+    max_retries=5,
+)
 
 
 def make_celery(flask_app) -> Celery:
@@ -138,8 +162,8 @@ def _register_tasks(celery_instance: Celery) -> None:
     """Celery タスクを登録する"""
     global run_orchestrator_task
 
-    @celery_instance.task(name="nexuscore.run_orchestrator")
-    def _run_orchestrator_task_internal(run_db_id: int) -> None:
+    @celery_instance.task(**TASK_OPTIONS)
+    def _run_orchestrator_task_internal(self, run_db_id: int) -> None:
         """
         単一 Run を対象に Orchestrator を非同期実行する Celery タスク（JobStateMachine統合版）。
 
