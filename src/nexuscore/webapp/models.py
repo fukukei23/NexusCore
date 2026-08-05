@@ -4,7 +4,17 @@ import hashlib
 import secrets
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 
 # db は __init__.py からインポート
@@ -183,3 +193,24 @@ class ApiKey(db.Model):
 
     def __repr__(self) -> str:
         return f"<ApiKey(id={self.id}, user_id={self.user_id}, name='{self.name}')>"
+
+
+class NotificationLog(db.Model):
+    """通知送信ログ（Slack 等の重複送信防止・C3）。
+
+    UNIQUE(run_id, event_type) で同一 Run の同一イベント種別は1回のみ送信を保証。
+    """
+
+    __tablename__ = "notification_logs"
+
+    id = Column(Integer, primary_key=True)
+    run_id = Column(Integer, ForeignKey("runs.id"), nullable=True, index=True)
+    event_type = Column(String(64), nullable=False)  # orchestrator_complete / orchestrator_failed 等
+    sent_at = Column(DateTime, default=datetime.now(UTC), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("run_id", "event_type", name="uq_notification_logs_run_event"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<NotificationLog(run_id={self.run_id}, event_type='{self.event_type}')>"
