@@ -26,3 +26,7 @@ bandit==1.9.4
 semgrep==1.166.0
 pip-audit==2.10.1
 detect-secrets==1.5.0
+
+# C3 Celery冪等性テスト用（task_lock の Redis 分散ロック検証）
+fakeredis>=2.20.0
+lupa>=2.0
