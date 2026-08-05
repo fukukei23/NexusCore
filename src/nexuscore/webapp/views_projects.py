@@ -216,9 +216,27 @@ def create_project():
 
 def _dispatch_celery_run(run: Run, project: Project):
     """Celery非同期でRunを実行し、レスポンスを返す。"""
+    from nexuscore.webapp import task_lock
     from nexuscore.webapp.celery_app import run_orchestrator_task
 
-    run_orchestrator_task.delay(run.id)
+    # C3: producer 側ガード（短時間の重複 enqueue 防止・二重防御）
+    redis_client = task_lock.get_redis()
+    if not task_lock.producer_lock(redis_client, run.id, ttl=10):
+        if request.accept_mimetypes.best == "application/json":
+            return (
+                jsonify({
+                    "run_id": run.run_id,
+                    "status": run.status,
+                    "message": "Run already queued (duplicate prevented).",
+                }),
+                409,
+            )
+        flash("この Run は既にキューに入っています（重複防止）。", "warning")
+        return redirect(url_for("views_projects.project_detail", project_id=project.id))
+
+    # C3: 決定論的 task_id（broker レベルで重複 enqueue 拒否）
+    task_id = task_lock.deterministic_task_id(run.id)
+    run_orchestrator_task.apply_async(args=[run.id], task_id=task_id)
 
     if request.accept_mimetypes.best == "application/json":
         return (

@@ -82,7 +82,16 @@ async def trigger_project_run(
         use_celery = os.getenv("NEXUS_USE_CELERY", "1") == "1"
 
         if use_celery:
-            run_orchestrator_task.delay(run.id)
+            # C3: producer 側ガード（重複 enqueue 防止）＋決定論的 task_id（broker レベルで重複拒否）
+            from fastapi import HTTPException
+
+            from nexuscore.webapp import task_lock
+
+            redis_client = task_lock.get_redis()
+            if not task_lock.producer_lock(redis_client, run.id, ttl=10):
+                raise HTTPException(status_code=409, detail="Run already queued (duplicate prevented).")
+            task_id = task_lock.deterministic_task_id(run.id)
+            run_orchestrator_task.apply_async(args=[run.id], task_id=task_id)
             queue_mode = "async"
             status_code = status.HTTP_202_ACCEPTED
         else:
