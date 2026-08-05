@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 import redis
 import sqlalchemy
@@ -158,6 +159,29 @@ def _finalize_run(run: Run, project: Project, status: str) -> None:
         logger.warning(f"Failed to send Slack notification: {e}", exc_info=True)
 
 
+def _acquire_execution_lock(run: Run, worker_id: str, redis_client: Any = None) -> tuple[bool, Any, str]:
+    """C3 冪等ガンド: SUCCESS skip + Redis SETNX ロック取得。
+
+    戻り値: (実行可, redis_client, lock_key)。
+    - run.status == "SUCCESS" → (False, client, key)（2重実行防止）
+    - ロック取得失敗（別 worker 実行中）→ (False, client, key)
+    - ロック取得成功 → (True, client, key)
+    ※ redis_client はテストで fakeredis を注入可能。
+    """
+    from nexuscore.webapp import task_lock
+
+    client = redis_client if redis_client is not None else task_lock.get_redis()
+    lock_key = task_lock.task_lock_key(run.id)
+
+    if run.status == "SUCCESS":
+        return (False, client, lock_key)
+
+    if not task_lock.acquire_lock(client, lock_key, worker_id, ttl=30):
+        return (False, client, lock_key)
+
+    return (True, client, lock_key)
+
+
 def _register_tasks(celery_instance: Celery) -> None:
     """Celery タスクを登録する"""
     global run_orchestrator_task
@@ -180,58 +204,70 @@ def _register_tasks(celery_instance: Celery) -> None:
             logger.error(f"Run not found: run_db_id={run_db_id}")
             return
 
-        project: Project = run.project
-        job_id = run.run_id or str(run.id)
-
-        if not run.requirement:
-            logger.error(f"Run.requirement is empty for run_id={run.id}")
-            run.status = "FAILED"
-            run.finished_at = datetime.now(UTC)
-            db.session.commit()
+        # C3: 冪等ガード（SUCCESS skip + Redis SETNX ロック・Race Condition 回避）
+        can_run, redis_client, lock_key = _acquire_execution_lock(run, self.request.id)
+        if not can_run:
+            logger.info(f"Run {run_db_id} skipped by idempotency guard (status={run.status} or locked)")
             return
 
-        session_controller = SessionController(
-            session_id=job_id,
-            root_dir=os.path.join(project.local_path, ".nexus", "sessions"),
-        )
-        history_logger = RunHistoryLogger(project_root=project.local_path)
-        state_machine = JobStateMachine(
-            job_id=job_id,
-            session_controller=session_controller,
-            history_logger=history_logger,
-            job_type="orchestrator",
-        )
-
-        final_status = "error"
         try:
-            state_machine.start()
-            run.status = "RUNNING"
-            run.started_at = datetime.now(UTC)
-            db.session.commit()
+            project: Project = run.project
+            job_id = run.run_id or str(run.id)
 
-            run_orchestrator_sync(
-                project_path=project.local_path,
-                user_requirement=run.requirement,
-                run_db_id=run.id,
-                autonomy_level=run.autonomy_level or 1,
-                language="ja",
-                fast_lane=False,
+            if not run.requirement:
+                logger.error(f"Run.requirement is empty for run_id={run.id}")
+                run.status = "FAILED"
+                run.finished_at = datetime.now(UTC)
+                db.session.commit()
+                return
+
+            session_controller = SessionController(
+                session_id=job_id,
+                root_dir=os.path.join(project.local_path, ".nexus", "sessions"),
+            )
+            history_logger = RunHistoryLogger(project_root=project.local_path)
+            state_machine = JobStateMachine(
+                job_id=job_id,
+                session_controller=session_controller,
+                history_logger=history_logger,
+                job_type="orchestrator",
             )
 
-            state_machine.complete(details={"run_db_id": run.id, "project_name": project.name})
-            run.status = "SUCCESS"
-            final_status = "success"
+            final_status = "error"
+            try:
+                state_machine.start()
+                run.status = "RUNNING"
+                run.started_at = datetime.now(UTC)
+                db.session.commit()
 
-        except Exception as exc:  # noqa: BLE001
-            logger.error(f"Orchestrator execution failed for run_id={run.id}: {exc}", exc_info=True)
-            state_machine.fail(
-                error_message=str(exc),
-                details={"run_db_id": run.id, "project_name": project.name, "exception_type": type(exc).__name__},
-            )
-            run.status = "FAILED"
+                run_orchestrator_sync(
+                    project_path=project.local_path,
+                    user_requirement=run.requirement,
+                    run_db_id=run.id,
+                    autonomy_level=run.autonomy_level or 1,
+                    language="ja",
+                    fast_lane=False,
+                )
+
+                state_machine.complete(details={"run_db_id": run.id, "project_name": project.name})
+                run.status = "SUCCESS"
+                final_status = "success"
+
+            except Exception as exc:  # noqa: BLE001
+                logger.error(f"Orchestrator execution failed for run_id={run.id}: {exc}", exc_info=True)
+                state_machine.fail(
+                    error_message=str(exc),
+                    details={"run_db_id": run.id, "project_name": project.name, "exception_type": type(exc).__name__},
+                )
+                run.status = "FAILED"
+
+            finally:
+                _finalize_run(run, project, final_status)
 
         finally:
-            _finalize_run(run, project, final_status)
+            # C3: ロック解放（所有者のみ・例外時も確実に解放）
+            from nexuscore.webapp import task_lock
+            task_lock.release_lock(redis_client, lock_key, self.request.id)
 
     run_orchestrator_task = _run_orchestrator_task_internal
 
