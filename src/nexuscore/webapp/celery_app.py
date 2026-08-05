@@ -14,6 +14,24 @@ from nexuscore.config.unified_config import get_config
 celery: Celery | None = None
 run_orchestrator_task: Callable | None = None
 
+
+def _celery_idempotency_config() -> dict:
+    """C3: 冪等性・再実行保護のための Celery 設定（環境変数から・テスト可能）。
+
+    - task_acks_late/task_reject_on_worker_lost: worker落ちで再配送
+    - task_track_started: STARTED 状態を追跡（モニタリング向上）
+    - broker_transport_options.visibility_timeout: Redis broker の再配送閾値
+      （acks_late + 長時間タスクには visibility_timeout 延長が必須・デフォルト3600s→7200s推奨）
+    """
+    return {
+        "task_acks_late": os.getenv("CELERY_TASK_ACKS_LATE", "0") == "1",
+        "task_reject_on_worker_lost": os.getenv("CELERY_TASK_REJECT_ON_WORKER_LOST", "0") == "1",
+        "task_track_started": os.getenv("CELERY_TASK_TRACK_STARTED", "0") == "1",
+        "broker_transport_options": {
+            "visibility_timeout": int(os.getenv("CELERY_BROKER_VISIBILITY_TIMEOUT", "3600")),
+        },
+    }
+
 # C3: run_orchestrator タスクの装飾子オプション（テストで静的検証）
 # - acks_late/reject_on_worker_lost: worker 落ちで broker へ再配送（タスクロスト防止）
 # - autoretry_for: 一時的例外のみ自動再試行（Orchestrator 例外は部分適用リスクで対象外）
@@ -59,6 +77,8 @@ def make_celery(flask_app) -> Celery:
         backend=_cfg.celery.result_backend,
     )
     celery_app.conf.update(flask_app.config)
+    # C3: 冪等性・再実行保護設定（環境変数から・_celery_idempotency_config で検証）
+    celery_app.conf.update(_celery_idempotency_config())
 
     # Flask アプリコンテキスト内でタスクを実行するためのカスタムタスククラス
     class ContextTask(celery_app.Task):  # type: ignore[name-defined]

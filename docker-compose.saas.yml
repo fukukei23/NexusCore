@@ -49,6 +49,11 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
       - NEXUS_USE_CELERY=1
+      # C3: Celery 冪等性・再実行保護の設定（acks_late 長時間タスクには visibility_timeout 延長が必須）
+      - CELERY_TASK_ACKS_LATE=1
+      - CELERY_TASK_REJECT_ON_WORKER_LOST=1
+      - CELERY_TASK_TRACK_STARTED=1
+      - CELERY_BROKER_VISIBILITY_TIMEOUT=7200
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
       - GITHUB_REDIRECT_URI=${GITHUB_REDIRECT_URI}
@@ -75,6 +80,11 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
       - NEXUS_USE_CELERY=1
+      # C3: Celery 冪等性・再実行保護の設定（worker 側も同一）
+      - CELERY_TASK_ACKS_LATE=1
+      - CELERY_TASK_REJECT_ON_WORKER_LOST=1
+      - CELERY_TASK_TRACK_STARTED=1
+      - CELERY_BROKER_VISIBILITY_TIMEOUT=7200
     depends_on:
       redis:
         condition: service_started
