@@ -32,7 +32,7 @@ async def save_openrouter_key(
         user.openrouter_key_enc = encrypt_string(request.api_key)
     except ValueError as e:
         logger.error("Encryption failed for OpenRouter key storage")
-        raise HTTPException(status_code=500, detail="NEXUS_ENCRYPTION_KEY is not configured.")
+        raise HTTPException(status_code=500, detail="NEXUS_ENCRYPTION_KEY is not configured.") from e
     db.session.commit()
     return {"message": "OpenRouter key saved"}
 

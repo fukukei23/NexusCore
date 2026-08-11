@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import uuid
 
@@ -22,15 +21,13 @@ from nexuscore.webapp.db_helpers import (
     projects_with_latest_run,
     run_logs_payload,
     user_project_or_404,
-    user_projects_query,
 )
 from nexuscore.webapp.models import Project, Run
 
 from ._projects_helpers import (
     _compute_run_duration,
     _format_duration,
-    _render_run_status_badge,
-    render_run_table,
+    _render_run_status_badge,  # noqa: F401 — re-exported for views_dashboard/views_logs
 )
 
 bp = Blueprint("views_projects", __name__, url_prefix="/projects")

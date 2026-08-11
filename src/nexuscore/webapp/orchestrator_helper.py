@@ -4,12 +4,15 @@ import logging
 import os
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from nexuscore.config.unified_config import get_config
-from nexuscore.core.orchestrator import Orchestrator
 from nexuscore.core.agent_factory import assemble_agent_team
+from nexuscore.core.orchestrator import Orchestrator
 from nexuscore.core.session_control import SessionController
+
+if TYPE_CHECKING:
+    from nexuscore.webapp.models import Project, Run
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +111,8 @@ def run_orchestrator_sync(
 
 
 def run_orchestrator_inline(
-    run: "Run",  # type: ignore[name-defined]
-    project: "Project",  # type: ignore[name-defined]
+    run: Run,
+    project: Project,
     requirement: str,
     autonomy_level: int = 1,
     fast_lane: bool = False,
@@ -124,7 +127,6 @@ def run_orchestrator_inline(
         fast_lane: 高速レーン実行フラグ
     """
     from nexuscore.webapp import db
-    from nexuscore.webapp.models import Project, Run
 
     status = "SUCCESS"
     try:

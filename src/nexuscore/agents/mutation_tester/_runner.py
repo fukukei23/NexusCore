@@ -6,7 +6,11 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from nexuscore.agents.mutation_tester._models import Mutant, MutationTestError, MutationTestTimeoutError
+from nexuscore.agents.mutation_tester._models import (
+    Mutant,
+    MutationTestError,
+    MutationTestTimeoutError,
+)
 
 
 def run_mutmut(source_path: str, test_path: str, timeout: int, logger) -> dict[str, int]:

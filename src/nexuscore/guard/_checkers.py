@@ -5,7 +5,6 @@ from collections.abc import Sequence
 
 from nexuscore.guard._models import FileChange, ReviewIssue
 
-
 # ── Pattern constants ──────────────────────────────────────────────────────
 
 SYSTEM_PATH_PATTERNS = [

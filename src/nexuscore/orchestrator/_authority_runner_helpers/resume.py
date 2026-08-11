@@ -10,7 +10,6 @@ from ..run_state_schema_validator import validate_run_state
 from ..run_state_store import load_state, save_state, update_state
 from .lock_lease import RunLockLease
 
-
 _RESUME_ORCHESTRATOR: Any = None
 _RESUME_ORCHESTRATOR_FACTORY: Callable[[], Any] | None = None
 
@@ -199,6 +198,7 @@ def resume_run(
             _execute_remaining_phases(orchestrator, state)
 
             import time
+
             from ..run_lock import _get_lock_refresh_seconds
 
             refresh_interval = float(_get_lock_refresh_seconds())

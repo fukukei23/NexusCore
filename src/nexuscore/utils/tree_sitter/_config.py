@@ -21,7 +21,7 @@ CONFIG: dict[str, Any] = {
 
 try:
     from tree_sitter import Node, Parser
-    from tree_sitter_language_pack import get_language, get_parser
+    from tree_sitter_language_pack import get_language, get_parser  # noqa: F401
 
     TREE_SITTER_AVAILABLE = True
 except ImportError:

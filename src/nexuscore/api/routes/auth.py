@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import os
 import logging
+import os
 
 import requests
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+
 from nexuscore.webapp import db
 from nexuscore.webapp.models import User
 

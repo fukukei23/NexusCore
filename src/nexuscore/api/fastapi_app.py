@@ -5,7 +5,6 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
-
 from starlette.middleware.sessions import SessionMiddleware
 
 from .routes import (

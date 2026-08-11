@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 def summarize_patch(patch_str: str) -> tuple[int, int]:
     """
     unified diff から行数とファイル数を計算する。

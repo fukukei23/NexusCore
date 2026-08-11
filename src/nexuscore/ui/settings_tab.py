@@ -5,7 +5,6 @@ import os
 
 import gradio as gr
 
-
 logger = logging.getLogger(__name__)
 
 # APIキー環境変数名 → 表示名
@@ -126,10 +125,10 @@ def build_settings_tab(state: gr.State) -> None:
         gr.Markdown("LLM プロバイダー・プロファイル・タスクルーティングの読み取り専用ダッシュボードです。")
 
         with gr.Accordion("ランタイム状態", open=True):
-            runtime_md = gr.Markdown(value=_runtime_status())
+            gr.Markdown(value=_runtime_status())
 
         with gr.Accordion("API キー状態", open=True):
-            provider_md = gr.Markdown(value=_provider_status_table())
+            gr.Markdown(value=_provider_status_table())
 
         # --- OpenRouter BYOK ---
         with gr.Accordion("🔑 OpenRouter BYOK", open=True):
@@ -160,7 +159,7 @@ def build_settings_tab(state: gr.State) -> None:
             )
 
         with gr.Accordion("LLM プロファイル一覧", open=False):
-            profiles_md = gr.Markdown(value=_profiles_table())
+            gr.Markdown(value=_profiles_table())
 
         with gr.Accordion("タスクルーティングマップ", open=False):
-            taskmap_md = gr.Markdown(value=_task_map_summary())
+            gr.Markdown(value=_task_map_summary())

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 
 import requests
@@ -10,6 +11,8 @@ from nexuscore.webapp import db
 from nexuscore.webapp.models import User
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
+
+logger = logging.getLogger(__name__)
 
 _HTTP_TIMEOUT = int(os.getenv("NEXUS_HTTP_TIMEOUT", "10"))
 

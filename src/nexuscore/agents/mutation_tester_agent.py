@@ -11,8 +11,14 @@ from .mutation_tester._models import (  # noqa: F401 — legacy re-exports
 )
 from .mutation_tester._runner import (
     get_survived_mutants as _get_survived_mutants,
+)
+from .mutation_tester._runner import (
     parse_mutmut_output as _parse_mutmut_output,
+)
+from .mutation_tester._runner import (
     parse_survived_mutants as _parse_survived_mutants,
+)
+from .mutation_tester._runner import (
     run_mutmut as _run_mutmut,
 )
 

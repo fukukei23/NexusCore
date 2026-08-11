@@ -5,8 +5,8 @@ import re
 from pathlib import Path
 
 from nexuscore.guard._checkers import (  # noqa: F401 — legacy re-exports
-    DOMESTIC_DOMAIN_PATTERNS,
     DANGEROUS_COMMAND_PATTERNS,
+    DOMESTIC_DOMAIN_PATTERNS,
     MEANINGLESS_ASSERT_PATTERNS,
     SYSTEM_PATH_PATTERNS,
     check_atelier_specific,

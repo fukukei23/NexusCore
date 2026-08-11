@@ -6,9 +6,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+from nexuscore.services.patch_applier import PatchApplier
+
 from .base_agent import BaseAgent
 from .debugger_agent import DebuggerAgent
-from nexuscore.services.patch_applier import PatchApplier
 
 
 class KnowledgeCuratorAgent(BaseAgent):

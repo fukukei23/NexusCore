@@ -3,7 +3,12 @@
 from .context import default_context_factory
 from .lock_lease import RunLockLease
 from .phase_logging import log_phase_done, log_phase_pause, log_phase_start
-from .resume import _execute_remaining_phases, resume_run, set_resume_orchestrator, set_resume_orchestrator_factory
+from .resume import (
+    _execute_remaining_phases,
+    resume_run,
+    set_resume_orchestrator,
+    set_resume_orchestrator_factory,
+)
 from .state import (
     apply_context_snapshot,
     extract_context_snapshot,

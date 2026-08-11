@@ -7,7 +7,7 @@ from enum import Enum
 from functools import wraps
 from typing import Any, TypeVar
 
-from nexuscore.core.errors import NexusCoreError, classify_error
+from nexuscore.core.errors import classify_error
 from nexuscore.logging_standard import get_logger
 
 logger = get_logger(__name__)

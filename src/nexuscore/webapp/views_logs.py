@@ -13,7 +13,7 @@ from nexuscore.webapp.db_helpers import (
     run_patch_files,
     user_project_or_404,
 )
-from nexuscore.webapp.models import ExecutionLog, Project, Run
+from nexuscore.webapp.models import ExecutionLog, Run
 from nexuscore.webapp.views_projects import (
     _compute_run_duration,
     _format_duration,

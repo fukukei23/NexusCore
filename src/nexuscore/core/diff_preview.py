@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 def truncate_diff(diff_text: str, max_lines: int = 200) -> str:
     """
     diff が長すぎる場合に先頭 max_lines 行だけ残し、

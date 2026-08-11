@@ -13,12 +13,13 @@ try:
 except ImportError:
     _HAS_TQDM = False
 
-from .constants import AuthorityLevel
-from .explainability import build_explainability  # noqa: F401
-
 from ._authority_runner_helpers.context import default_context_factory
 from ._authority_runner_helpers.lock_lease import RunLockLease  # noqa: F401
-from ._authority_runner_helpers.phase_logging import log_phase_done, log_phase_pause, log_phase_start
+from ._authority_runner_helpers.phase_logging import (
+    log_phase_done,
+    log_phase_pause,
+    log_phase_start,
+)
 from ._authority_runner_helpers.resume import (  # noqa: F401
     _execute_remaining_phases,
     resume_run,
@@ -32,10 +33,11 @@ from ._authority_runner_helpers.state import (
     persist_run_state,
     set_stop_policy,
 )
+from .constants import AuthorityLevel
+from .explainability import build_explainability  # noqa: F401
 
 # Backward-compatible re-exports for tests and external callers
 from .run_state_store import load_state, save_state, update_state  # noqa: F401
-
 
 PHASES_ORDER: tuple[str, ...] = (
     "requirements",

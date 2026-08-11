@@ -1,5 +1,6 @@
-import git
 import logging
+
+import git
 
 _logger = logging.getLogger(__name__)
 

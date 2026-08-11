@@ -7,9 +7,6 @@ from functools import wraps
 
 from flask import Flask, jsonify, request
 
-def require_auth(f):
-    """認証パススルー（Flask APIは非推奨、認証はFastAPI側で実施）"""
-    return f
 
 def generate_token(user_id, expires_in_hours=24):
     return "dev-token-auth-disabled"
@@ -51,9 +48,9 @@ except ImportError:
 
 
 from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
-from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.agents.postmortem_agent import PostmortemAgent
 from nexuscore.llm.llm_router import LLMRouter
+from nexuscore.services.patch_applier import PatchApplier
 
 # --- グローバル変数 ---
 app = Flask(__name__)

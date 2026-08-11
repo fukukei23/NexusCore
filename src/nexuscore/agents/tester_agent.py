@@ -9,12 +9,6 @@ import os
 from pathlib import Path
 
 from .base_agent import BaseAgent
-from .tester._generation import (
-    build_tests_and_testimony_prompt,
-    build_tests_from_plan_prompt,
-    build_tests_from_requirement_prompt,
-    extract_test_code_from_response,
-)
 from .tester._coverage import (
     count_test_functions,
     get_coverage_for_module,
@@ -25,11 +19,17 @@ from .tester._file_ops import (
     resolve_test_file_path,
     write_test_file,
 )
+from .tester._generation import (
+    build_tests_and_testimony_prompt,
+    build_tests_from_plan_prompt,
+    build_tests_from_requirement_prompt,
+    extract_test_code_from_response,
+)
 
 try:
+    from nexuscore.core.test_metrics import TestMetricsCollector
     from nexuscore.utils.test_generator_prompt import build_test_generation_prompt
     from nexuscore.utils.test_strategy import TestStrategyManager
-    from nexuscore.core.test_metrics import TestMetricsCollector
 except ImportError:
     TestStrategyManager = None
     build_test_generation_prompt = None
