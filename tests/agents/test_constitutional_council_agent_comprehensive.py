@@ -9,14 +9,13 @@ Comprehensive Tests for constitutional_council_agent.py
 ============================================================================
 """
 
-import sys
-from unittest.mock import MagicMock
-
 import json
+import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
+
 
 # Flask をモック化する autouse fixture（テスト終了後に自動復元）
 @pytest.fixture(autouse=True)

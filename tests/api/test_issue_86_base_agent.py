@@ -5,11 +5,7 @@ execute_llm_task分岐（no router, as_json fallback, error fallback）
 """
 
 import json
-import sys
-import types
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 
 class TestBaseAgentFallbacks:

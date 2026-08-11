@@ -7,9 +7,7 @@ postmortem_agent.py のカバレッジ向上テスト
 from __future__ import annotations
 
 import json
-from unittest.mock import Mock, patch
-
-import pytest
+from unittest.mock import patch
 
 
 class TestTruncate:

@@ -1,7 +1,7 @@
 """run_view.py の未カバー行テスト（エラーハンドリング, deprecated endpoints, ステータスマッピング）"""
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI

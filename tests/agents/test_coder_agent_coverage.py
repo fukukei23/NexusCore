@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from unittest.mock import Mock, patch
 
-import pytest
-
 
 class TestValidatePythonSyntax:
     """_validate_python_syntax のテスト"""

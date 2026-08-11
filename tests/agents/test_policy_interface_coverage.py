@@ -6,8 +6,6 @@ policy_interface.py のカバレッジ向上テスト
 
 from __future__ import annotations
 
-import queue
-from datetime import datetime
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest

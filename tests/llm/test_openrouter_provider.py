@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from nexuscore.llm.provider_factory import create_provider, PROVIDER_CLASSES
+from nexuscore.llm.provider_factory import PROVIDER_CLASSES, create_provider
 from nexuscore.llm.providers.openrouter_provider import OpenRouterLLM
 from nexuscore.llm.routing_policy import model_family
 

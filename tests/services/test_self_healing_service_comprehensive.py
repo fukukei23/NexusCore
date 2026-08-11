@@ -13,10 +13,10 @@ sys.modules["patch"] = MagicMock()
 
 from nexuscore.config.self_healing_config import SelfHealingConfig
 from nexuscore.core.run_history import RunHistoryLogger
-from nexuscore.services.self_healing_service import SelfHealingService
 from nexuscore.services.git_operations import clone_or_update_repo, get_changed_files
-from nexuscore.services.test_runner import run_tests
 from nexuscore.services.patch_workflow import collect_relevant_files, generate_patch_via_debugger
+from nexuscore.services.self_healing_service import SelfHealingService
+from nexuscore.services.test_runner import run_tests
 
 
 # ============================================================================

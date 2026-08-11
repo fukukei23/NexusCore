@@ -1,6 +1,5 @@
 """guardian_agent.py カバレッジブースト — _prepare_branch, _generate_multi_file_diff_summary, auto_review"""
-import os
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -32,7 +31,9 @@ class TestPrepareBranch:
 
 class TestGenerateMultiFileDiffSummary:
     def _call(self, file_diffs, **kwargs):
-        from nexuscore.agents._guardian_helpers.diff_summary import _generate_multi_file_diff_summary
+        from nexuscore.agents._guardian_helpers.diff_summary import (
+            _generate_multi_file_diff_summary,
+        )
         execute_llm_fn = kwargs.get("execute_llm_fn", MagicMock())
         logger = kwargs.get("logger", MagicMock())
         return _generate_multi_file_diff_summary(execute_llm_fn, file_diffs, logger=logger)

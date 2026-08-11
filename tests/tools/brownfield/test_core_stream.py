@@ -1,8 +1,8 @@
 """run_brownfield_stream の baseline 剴後比較テスト（振る舞い保存の正体）。"""
 import json
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator, Tuple
 
 _BASELINE = Path(__file__).parent / "_baseline_events.json"
 
@@ -12,7 +12,7 @@ _BASELINE = Path(__file__).parent / "_baseline_events.json"
 # ここでも tempfile 単層生成を使いパス形状を baseline に合わせる。
 
 
-def _fake_stream_run(cmd, cwd) -> Generator[str, None, Tuple[bool, str]]:
+def _fake_stream_run(cmd, cwd) -> Generator[str, None, tuple[bool, str]]:
     """Task1 の _baseline_capture.py の fake と完全一致させること。"""
     yield "--- [fake] phase line 1\n"
     yield "--- [fake] phase line 2\n"
@@ -22,6 +22,7 @@ def _fake_stream_run(cmd, cwd) -> Generator[str, None, Tuple[bool, str]]:
 def test_run_brownfield_stream_matches_baseline(monkeypatch):
     """新 core.run_brownfield_stream のイベント列が baseline と完全一致（正規化後）。"""
     from brownfield import core
+
     from tests.tools.brownfield._baseline_capture import normalize  # Task1 共通正規化関数
 
     # ★ Task1 と同一の mock 2つ（必須・漏れ注意）

@@ -30,12 +30,12 @@ from nexuscore.agents.coder_agent import CoderAgent
 from nexuscore.agents.debugger_agent import DebuggerAgent
 from nexuscore.agents.guardian_agent import GuardianAgent
 from nexuscore.agents.knowledge_curator_agent import KnowledgeCuratorAgent
-from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.agents.planner_agent import PlannerAgent
 from nexuscore.agents.postmortem_agent import PostmortemAgent
 from nexuscore.agents.requirement_agent import RequirementAgent
 from nexuscore.agents.tester_agent import TesterAgent
 from nexuscore.core.orchestrator import Orchestrator
+from nexuscore.services.patch_applier import PatchApplier
 
 try:
     from nexuscore.agents.policy_agent import PolicyAgent

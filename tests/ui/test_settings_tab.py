@@ -110,8 +110,8 @@ class TestBuildSettingsTab:
         """build_settings_tab が例外を投げない。"""
         import gradio as gr
 
-        from nexuscore.ui.settings_tab import build_settings_tab
         from nexuscore.ui._state import AppState
+        from nexuscore.ui.settings_tab import build_settings_tab
 
         with gr.Blocks():
             state = gr.State(value=AppState())

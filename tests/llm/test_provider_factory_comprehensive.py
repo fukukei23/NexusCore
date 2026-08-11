@@ -13,8 +13,8 @@ from nexuscore.llm.provider_factory import (
     get_provider_class,
 )
 from nexuscore.llm.providers import (
-    BaseLLM,
     GLMLLM,
+    BaseLLM,
     MiniMaxLLM,
 )
 

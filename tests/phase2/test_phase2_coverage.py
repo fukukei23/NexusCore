@@ -10,13 +10,10 @@ Phase 2 Coverage Tests — NexusCore 75%台モジュール底上げ
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # =============================================================================
 # cli/run_view.py
@@ -326,7 +323,6 @@ class TestLoadApiKey:
         secrets_file = tmp_path / "secrets.json"
         secrets_file.write_text(json.dumps({"NEXUSCORE_API_KEY": "file-key-456"}))
 
-        from nexuscore.api.dependencies.auth import load_api_key
 
         with patch("nexuscore.api.dependencies.auth.Path.__truediv__", return_value=secrets_file):
             with patch.object(Path, "exists", return_value=True):
@@ -840,7 +836,7 @@ class TestLLMRouterComplete:
 
     def test_complete_with_explicit_model(self):
         """complete() with model= parameter"""
-        from nexuscore.llm.llm_router import LLMRouter, RoutedLLM
+        from nexuscore.llm.llm_router import LLMRouter
 
         mock_inner = MagicMock()
         mock_inner.model_name = "custom-model"

@@ -929,7 +929,10 @@ class TestImportGuards:
 
     def test_check_tree_sitter_availability_true(self):
         """check_tree_sitter_availability True パス (line 734)"""
-        from nexuscore.analyzer.unified_analyzer import check_tree_sitter_availability, TREE_SITTER_AVAILABLE
+        from nexuscore.analyzer.unified_analyzer import (
+            TREE_SITTER_AVAILABLE,
+            check_tree_sitter_availability,
+        )
 
         if TREE_SITTER_AVAILABLE:
             ok, msg = check_tree_sitter_availability()

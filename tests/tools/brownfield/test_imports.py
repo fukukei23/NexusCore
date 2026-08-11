@@ -1,6 +1,7 @@
 """パッケージ import と lazy __getattr__ の検証。"""
 import sys
 
+
 def test_import_brownfield_does_not_load_gradio():
     """import brownfield だけでは gradio を読み込まない（lazy __getattr__）。"""
     sys.modules.pop("gradio", None)

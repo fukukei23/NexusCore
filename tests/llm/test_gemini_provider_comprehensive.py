@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+
 # google-generativeai is not required at install time — tests mock it via
 # sys.modules.  Provide a baseline mock so the module-level TYPE_CHECKING
 # import in gemini_provider.py resolves during collection.

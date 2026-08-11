@@ -10,7 +10,6 @@ directory runs and restores it afterwards, so each module starts clean.
 """
 
 import sys
-from unittest.mock import MagicMock
 
 import pytest
 

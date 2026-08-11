@@ -12,7 +12,6 @@ from fastapi import HTTPException
 
 import nexuscore.api.dependencies.auth as auth_module
 from nexuscore.api.dependencies.auth import (
-    AuthenticatedUser,
     get_api_key,
     get_current_user,
     get_current_user_optional,

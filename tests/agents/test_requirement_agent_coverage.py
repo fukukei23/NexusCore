@@ -7,7 +7,7 @@ requirement_agent.py のカバレッジ向上テスト
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -137,7 +137,6 @@ class TestRequirementAgentHeadless:
     @patch("nexuscore.agents.requirement_agent.BaseAgent.execute_llm_task")
     def test_analyze_requirement_with_valid_llm_response(self, mock_llm):
         """LLMが有効なJSONを返す場合"""
-        import json
         from nexuscore.agents.requirement_agent import RequirementAgent
 
         mock_llm.return_value = json.dumps({
@@ -153,7 +152,6 @@ class TestRequirementAgentHeadless:
     @patch("nexuscore.agents.requirement_agent.BaseAgent.execute_llm_task")
     def test_analyze_requirement_empty_uses_initial(self, mock_llm):
         """空入力→initial_requirementを使用"""
-        import json
         from nexuscore.agents.requirement_agent import RequirementAgent
 
         mock_llm.return_value = json.dumps({
@@ -171,7 +169,6 @@ class TestRequirementAgentHeadless:
     @patch("nexuscore.agents.requirement_agent.BaseAgent.execute_llm_task")
     def test_analyze_requirement_no_req_no_initial(self, mock_llm):
         """要件もinitialも空→No requirement provided."""
-        import json
         from nexuscore.agents.requirement_agent import RequirementAgent
 
         mock_llm.return_value = json.dumps({
@@ -204,7 +201,6 @@ class TestImportFallback:
         """フォールバックBaseAgentがexecute_llm_taskを持つ"""
         # モジュールレベルで既にインポート成功しているので、
         # フォールバッククラスの振る舞いを直接テスト
-        from nexuscore.agents.requirement_agent import BaseAgent as ImportedBaseAgent
 
         # フォールバックコードの振る舞いをシミュレート
         class FallbackBaseAgent:

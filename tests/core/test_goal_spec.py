@@ -1,8 +1,15 @@
 """CR-NEXUS-054: goal_spec モジュールのユニットテスト（MiniMax生成・Fable検証済み）。"""
 
-from nexuscore.core.goal_spec import CriterionResult, GoalEvaluator, GoalSpec, SuccessCriterion, standard_criteria
-from nexuscore.core.orchestrator_models import OrchestratorContext
 import pytest
+
+from nexuscore.core.goal_spec import (
+    CriterionResult,
+    GoalEvaluator,
+    GoalSpec,
+    SuccessCriterion,
+    standard_criteria,
+)
+from nexuscore.core.orchestrator_models import OrchestratorContext
 
 
 class TestGoalSpecValidation:

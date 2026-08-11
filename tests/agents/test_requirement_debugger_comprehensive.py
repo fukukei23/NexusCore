@@ -7,9 +7,7 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
-from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -17,52 +15,6 @@ from nexuscore.agents.debugger_agent import DebuggerAgent
 from nexuscore.agents.requirement_agent import RequirementAgent
 
 # StateMachine and TextLocalization were removed from requirement_agent.py
-
-
-# ---------------------------------------------------------------------------
-# TextLocalization
-# ---------------------------------------------------------------------------
-
-@pytest.mark.skip("TextLocalization removed from requirement_agent.py")
-class TestTextLocalization:
-    def test_ja_getitem(self):
-        loc = TextLocalization("ja")
-        assert loc["title"] == "NexusCore: 対話型 要件定義エージェント"
-
-    def test_en_getitem(self):
-        loc = TextLocalization("en")
-        assert loc["title"] == "NexusCore: Interactive Requirement Agent"
-
-    def test_unknown_language_falls_back_to_en(self):
-        loc = TextLocalization("fr")
-        assert loc["title"] == "NexusCore: Interactive Requirement Agent"
-
-    def test_missing_key_returns_placeholder(self):
-        loc = TextLocalization("ja")
-        assert loc["nonexistent_key"] == "<nonexistent_key>"
-
-
-# ---------------------------------------------------------------------------
-# StateMachine
-# ---------------------------------------------------------------------------
-
-@pytest.mark.skip("StateMachine removed from requirement_agent.py")
-class TestStateMachine:
-    @patch.object(RequirementAgent, "execute_llm_task")
-    def test_transition_returns_tuples(self, mock_execute):
-        mock_execute.return_value = "テスト応答"
-        agent = RequirementAgent()
-        sm = StateMachine(agent)
-        result = sm.transition("test")
-        assert isinstance(result, list)
-        assert len(result) == 1
-        assert isinstance(result[0], tuple)
-
-    def test_transition_sets_collecting_from_init(self):
-        agent = RequirementAgent()
-        sm = StateMachine(agent)
-        sm.transition()
-        assert sm.state["state"] == "COLLECTING"
 
 
 # ---------------------------------------------------------------------------

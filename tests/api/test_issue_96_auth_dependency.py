@@ -6,13 +6,10 @@ get_current_user（DB未初期化・fallback認証）、get_current_user_optiona
 
 import json
 import os
-import types
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 
 class TestLoadApiKey:
@@ -34,7 +31,6 @@ class TestLoadApiKey:
 
     def test_load_from_secrets_json(self, tmp_path):
         """secrets.jsonからAPI keyを読込"""
-        from nexuscore.api.dependencies import auth as auth_module
 
         secrets = {"NEXUSCORE_API_KEY": "json-test-key"}
         secrets_file = tmp_path / "secrets.json"
@@ -76,8 +72,8 @@ class TestGetApiKey:
 
     def test_raises_on_empty_api_key(self):
         """API keyが空文字の場合500エラーを発生"""
-        from nexuscore.api.dependencies.auth import get_api_key, _cached_api_key
         import nexuscore.api.dependencies.auth as auth_mod
+        from nexuscore.api.dependencies.auth import get_api_key
 
         # キャッシュをリセット
         original = auth_mod._cached_api_key
@@ -158,7 +154,7 @@ class TestGetUserIdFromAuth:
 
     def test_converts_str_to_int(self):
         """AuthenticatedUser.user_id (str) を int に変換"""
-        from nexuscore.api.dependencies.auth import get_user_id_from_auth, AuthenticatedUser
+        from nexuscore.api.dependencies.auth import AuthenticatedUser, get_user_id_from_auth
         user = AuthenticatedUser(user_id="42", roles=["api_user"])
         result = get_user_id_from_auth(user)
         assert result == 42

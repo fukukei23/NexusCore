@@ -1,6 +1,6 @@
 """utils.py の純粋関数テスト。"""
-from pathlib import Path
 from brownfield import utils as U
+
 
 def test_repo_root_resolves_to_nexuscore_root():
     """REPO_ROOT は NexusCore 仓库根（.git があるディレクトリ）。"""

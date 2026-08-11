@@ -1,15 +1,13 @@
 """Issue #74: test_generator の未カバー行テスト"""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 from nexuscore.utils.test_generator import (
     TestGenConfig,
+    generate_and_validate_test_code,
     generate_template_tests,
     generate_tests_for_module,
-    generate_and_validate_test_code,
 )
 
 

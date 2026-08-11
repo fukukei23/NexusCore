@@ -4,8 +4,6 @@ Celery タスクと JobStateMachine の統合テスト
 
 from __future__ import annotations
 
-import importlib
-import sys
 import tempfile
 from unittest.mock import MagicMock, patch
 

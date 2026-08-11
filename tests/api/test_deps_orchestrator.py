@@ -5,8 +5,6 @@ Tests for nexuscore.api.dependencies.orchestrator module.
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestPrepareLocalKnowledgeBase:
     """Tests for _prepare_local_knowledge_base function."""

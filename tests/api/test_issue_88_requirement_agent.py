@@ -7,8 +7,6 @@ analyze_requirement空メッセージ/不正JSON、generate_final_spec
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestFallbacksBaseAgent:
     """_fallbacks.pyのフォールバックBaseAgentが正常動作することを確認"""
@@ -33,9 +31,10 @@ class TestFallbacksBaseAgent:
         # base_agentのimportが成功する環境では、_fallbacks.py内の
         # BaseAgentは実際のbase_agent.BaseAgentと同じものになる
         # フォールバッククラス自体は、base_agent.pyがimportできない場合のみ使われる
-        import nexuscore.agents._fallbacks as fallback_mod
         # フォールバッククラスのソースコードを確認
         import inspect
+
+        import nexuscore.agents._fallbacks as fallback_mod
         source = inspect.getsource(fallback_mod)
         assert "_call_llm" in source or "execute_llm_task" in source
 

@@ -508,7 +508,6 @@ def test_async():
     @patch("subprocess.run")
     def test_run_tests_and_get_coverage_success(self, mock_subprocess, mock_router_class, tmp_path):
         """テスト実行成功時のカバレッジ取得"""
-        import json as _json
         mock_router = Mock()
         mock_router_class.return_value = mock_router
 

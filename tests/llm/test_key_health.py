@@ -4,14 +4,8 @@ Tests for API key health checker (Phase 2: Security Baseline).
 
 from __future__ import annotations
 
-import os
-from unittest.mock import patch
-
-import pytest
-
 from nexuscore.llm.key_health import (
     PLACEHOLDERS,
-    KeyReport,
     check_all_keys,
     log_key_health,
 )

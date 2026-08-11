@@ -10,7 +10,6 @@ from unittest.mock import Mock, patch
 import pytest
 
 from nexuscore.core.errors import (
-    InvalidModelOutputError,
     ModelConnectionError,
     ModelRateLimitError,
     ModelTimeoutError,

@@ -18,7 +18,6 @@ import pytest
 
 from nexuscore.llm.fallback import FallbackTracker, RateLimitEntry
 
-
 # ---------------------------------------------------------------------------
 # FallbackTracker unit tests
 # ---------------------------------------------------------------------------
@@ -129,8 +128,8 @@ class TestRoutedLLMFallback:
 
     def test_429_triggers_fallback(self):
         """429 → 次の候補モデルにフォールバック"""
-        from nexuscore.llm.llm_router import RoutedLLM
         from nexuscore.llm.http_client import RequestsHTTPError
+        from nexuscore.llm.llm_router import RoutedLLM
 
         router = _make_router()
         error_response = MagicMock()
@@ -149,8 +148,8 @@ class TestRoutedLLMFallback:
 
     def test_all_exhausted_raises(self):
         """全候補失敗時はRuntimeError"""
-        from nexuscore.llm.llm_router import RoutedLLM
         from nexuscore.llm.http_client import RequestsHTTPError
+        from nexuscore.llm.llm_router import RoutedLLM
 
         router = _make_router()
         error_response = MagicMock()
@@ -168,8 +167,8 @@ class TestRoutedLLMFallback:
 
     def test_cooldown_skips_provider(self):
         """429直後の同一プロバイダーはスキップ"""
-        from nexuscore.llm.llm_router import RoutedLLM
         from nexuscore.llm.http_client import RequestsHTTPError
+        from nexuscore.llm.llm_router import RoutedLLM
 
         router = _make_router()
         error_response = MagicMock()

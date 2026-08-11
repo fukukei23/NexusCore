@@ -1,6 +1,5 @@
 """Issue #74: trace_writer の未カバー行テスト"""
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from nexuscore.guard.policy_engine import GuardDecision, GuardInput, GuardResult, SecurityInput

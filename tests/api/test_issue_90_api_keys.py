@@ -4,15 +4,13 @@
 FastAPI DependencyOverridesを使用してget_current_userをモック
 """
 
-import os
 from unittest.mock import MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from nexuscore.api.dependencies.auth import AuthenticatedUser
-from nexuscore.api.routes.api_keys import router, MAX_API_KEYS_PER_USER
+from nexuscore.api.routes.api_keys import MAX_API_KEYS_PER_USER, router
 
 
 def _create_test_app():

@@ -19,7 +19,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # =============================================================================
 # webapp/views_projects.py — helper functions
 # =============================================================================
@@ -62,14 +61,15 @@ class TestComputeRunDuration:
         return run
 
     def test_no_times(self):
+
         from nexuscore.webapp._projects_helpers import _compute_run_duration
-        from datetime import datetime
         run = self._make_run(started_at=None, finished_at=None)
         assert _compute_run_duration(run) is None
 
     def test_only_start(self):
-        from nexuscore.webapp._projects_helpers import _compute_run_duration
         from datetime import datetime
+
+        from nexuscore.webapp._projects_helpers import _compute_run_duration
         run = MagicMock()
         run.started_at = datetime(2026, 1, 1, 10, 0)
         # finished_at attribute missing entirely → getattr returns MagicMock which is truthy
@@ -78,8 +78,9 @@ class TestComputeRunDuration:
         assert _compute_run_duration(run) is None
 
     def test_both_datetimes(self):
-        from nexuscore.webapp._projects_helpers import _compute_run_duration
         from datetime import datetime
+
+        from nexuscore.webapp._projects_helpers import _compute_run_duration
         start = datetime(2026, 1, 1, 10, 0, 0)
         end = datetime(2026, 1, 1, 10, 5, 30)
         run = self._make_run(started_at=start, finished_at=end)
@@ -113,8 +114,9 @@ class TestRenderRunTable:
 
     @patch("nexuscore.webapp._projects_helpers.render_template", return_value="<table>SUCCESS</table>")
     def test_with_runs(self, mock_rt):
-        from nexuscore.webapp._projects_helpers import render_run_table
         from datetime import datetime
+
+        from nexuscore.webapp._projects_helpers import render_run_table
         project = MagicMock()
         run = MagicMock()
         run.id = 1

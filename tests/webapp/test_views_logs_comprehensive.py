@@ -11,7 +11,6 @@ in-memory SQLite + mock で外部依存を分離。
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
@@ -19,7 +18,6 @@ import pytest
 
 from nexuscore.webapp import create_app, db
 from nexuscore.webapp.models import ExecutionLog, PatchRecord, Project, Run, User
-
 
 # ============================================================================
 # Fixtures

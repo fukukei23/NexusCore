@@ -4,10 +4,8 @@
 validation_exception_handler、general_exception_handler
 """
 
-import pytest
 from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
-from pydantic import BaseModel
 
 
 def _create_app_with_handlers():

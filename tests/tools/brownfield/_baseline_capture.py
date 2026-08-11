@@ -1,7 +1,9 @@
 """旧 brownfield_orchestrator.py から baseline イベント列を取得（リファクタ前）。"""
-import json, re, sys
+import json
+import re
+import sys
+from collections.abc import Generator
 from pathlib import Path
-from typing import List, Tuple, Optional, Generator
 
 
 def normalize(events):
@@ -24,13 +26,14 @@ _TOOLS = Path(__file__).resolve().parents[3] / "tools"
 sys.path.insert(0, str(_TOOLS))
 import brownfield_orchestrator as old  # 旧485行ファイル（まだ shim 化前）
 
-def fake_stream_run(cmd, cwd) -> Generator[str, None, Tuple[bool, str]]:
+
+def fake_stream_run(cmd, cwd) -> Generator[str, None, tuple[bool, str]]:
     """決定論的 fake。stream_run と同じ形状（yield 行 → return (ok, out)）。"""
     yield "--- [fake] phase line 1\n"
     yield "--- [fake] phase line 2\n"
     return (True, "fake output")
 
-def capture(tmp_path: Path) -> List[Tuple[str, str, Optional[str]]]:
+def capture(tmp_path: Path) -> list[tuple[str, str, str | None]]:
     events = []
     # stream_run を fake に置換（旧モジュール内の参照）
     old.stream_run = fake_stream_run

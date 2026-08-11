@@ -1,9 +1,7 @@
 """glm_provider.py のテスト — カバレッジ56%→向上"""
 import json
 import os
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from nexuscore.llm.providers.glm_provider import GLMLLM
 

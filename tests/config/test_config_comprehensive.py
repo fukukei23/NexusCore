@@ -10,7 +10,6 @@ unified_config.py の包括的テスト
 - get_config / set_config: グローバル設定アクセス
 """
 
-import os
 
 import pytest
 

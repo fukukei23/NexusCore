@@ -3,8 +3,9 @@
 # Issue #50: MC1-2 DebuggerAgent自動PR生成ロジックの完成
 # ==============================================================================
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, call
 
 from nexuscore.agents.debugger_agent import DebuggerAgent
 
@@ -336,7 +337,7 @@ class TestGitHubPRCreatorExtensions:
         assert result["reason"] == "no_changes"
 
     def test_create_fix_pr_skips_oversized_diff(self):
-        from nexuscore.utils.github_pr_creator import GitHubPRCreator, MAX_DIFF_LINES
+        from nexuscore.utils.github_pr_creator import GitHubPRCreator
         creator = GitHubPRCreator(token="fake", max_diff_lines=10)
         big_code = "\n".join([f"line {i}" for i in range(100)])
         fixed_code = "\n".join([f"fixed {i}" for i in range(100)])
@@ -389,8 +390,9 @@ class TestGitHubPRCreatorExtensions:
             assert resp == mock_resp
 
     def test_request_with_retry_exhausts_retries(self):
-        from nexuscore.utils.github_pr_creator import GitHubPRCreator
         import requests as req
+
+        from nexuscore.utils.github_pr_creator import GitHubPRCreator
         creator = GitHubPRCreator(token="fake")
         with patch("nexuscore.utils.github_pr_creator.requests.request",
                    side_effect=req.RequestException("fail")), \

@@ -10,102 +10,14 @@ Comprehensive Tests for RequirementAgent
 """
 
 import json
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import MagicMock, patch
 
 from nexuscore.agents.requirement_agent import RequirementAgent
 
 # StateMachine and TextLocalization were removed from requirement_agent.py
 # Tests using these are skipped below.
-
-# ============================================================================
-# Tests: TextLocalization
-# ============================================================================
-
-
-@pytest.mark.skip("TextLocalization removed from requirement_agent.py")
-class TestTextLocalization:
-    def test_init_with_japanese(self):
-        """日本語で初期化"""
-        text = TextLocalization(language="ja")
-        assert text.language == "ja"
-        assert text["title"] == "NexusCore: 対話型 要件定義エージェント"
-
-    def test_init_with_english(self):
-        """英語で初期化"""
-        text = TextLocalization(language="en")
-        assert text.language == "en"
-        assert text["title"] == "NexusCore: Interactive Requirement Agent"
-
-    def test_fallback_to_english(self):
-        """未知の言語は英語にフォールバック"""
-        text = TextLocalization(language="fr")
-        assert text["title"] == "NexusCore: Interactive Requirement Agent"
-
-    def test_unknown_key_returns_placeholder(self):
-        """未知のキーはプレースホルダーを返す"""
-        text = TextLocalization()
-        assert text["unknown_key"] == "<unknown_key>"
-
-    def test_all_japanese_keys_exist(self):
-        """すべての日本語キーが存在"""
-        text = TextLocalization(language="ja")
-        required_keys = [
-            "title",
-            "boot_msg",
-            "initial_greeting",
-            "status_ready",
-            "status_thinking",
-            "status_suggesting",
-            "status_finished",
-            "input_placeholder",
-            "send_button",
-            "finish_button",
-            "final_output_label",
-            "yes_button",
-            "no_button",
-            "suggest_button",
-        ]
-        for key in required_keys:
-            assert text[key] != f"<{key}>"
-
-    def test_all_english_keys_exist(self):
-        """すべての英語キーが存在"""
-        text = TextLocalization(language="en")
-        required_keys = ["title", "boot_msg", "initial_greeting", "status_ready"]
-        for key in required_keys:
-            assert text[key] != f"<{key}>"
-
-
-# ============================================================================
-# Tests: StateMachine
-# ============================================================================
-
-
-@pytest.mark.skip("StateMachine removed from requirement_agent.py")
-class TestStateMachine:
-    def test_init_with_agent(self):
-        """エージェントで初期化"""
-        agent = RequirementAgent()
-        fsm = StateMachine(agent)
-        assert fsm.agent == agent
-        assert fsm.state is not None
-        assert "state" in fsm.state
-
-    def test_transition_updates_state(self):
-        """遷移が状態を更新"""
-        agent = RequirementAgent()
-        fsm = StateMachine(agent)
-        initial_state = fsm.state["state"]
-
-        responses = fsm.transition("ユーザー入力")
-
-        # 状態が変わる
-        assert fsm.state["state"] != initial_state
-        # レスポンスが返される
-        assert isinstance(responses, list)
-
 
 # ============================================================================
 # Tests: RequirementAgent.__init__
@@ -381,28 +293,6 @@ class TestIntegrationScenarios:
         assert len(result["features"]) == 3
         assert agent.final_requirements == result
 
-    @patch.object(RequirementAgent, "execute_llm_task")
-    def test_state_machine_integration(self, mock_execute):
-        """StateMachineとの統合"""
-        mock_execute.return_value = "ご要件を承りました。"
-        agent = RequirementAgent()
-        fsm = StateMachine(agent)
-
-        # 初期状態
-        assert fsm.state["state"] == "INIT"
-
-        # INIT → COLLECTING
-        fsm.transition("要件を入力")
-        assert fsm.state["state"] == "COLLECTING"
-
-        # COLLECTING → SUGGESTING
-        fsm.transition("追加要件")
-        assert fsm.state["state"] == "SUGGESTING"
-
-        # SUGGESTING → FINALIZING
-        fsm.transition("はい")
-        assert fsm.state["state"] == "FINALIZING"
-
 
 # ============================================================================
 # Additional Tests: Edge Cases and Uncovered Paths
@@ -528,14 +418,6 @@ class TestRequirementAgentEdgeCases:
         agent.set_initial_requirement("")
         assert agent._initial_requirement == ""
 
-    @pytest.mark.skip("TextLocalization removed from requirement_agent.py")
-    def test_text_localization_with_empty_language(self):
-        """空の言語コードでのTextLocalization"""
-        text = TextLocalization(language="")
-
-        # 空の言語コードは英語にフォールバック
-        assert "Interactive" in text["title"] or "対話型" in text["title"]
-
     @patch.object(RequirementAgent, "execute_llm_task")
     def test_multiple_requirement_updates_workflow(self, mock_execute):
         """複数回の要件更新ワークフロー"""
@@ -558,25 +440,6 @@ class TestRequirementAgentEdgeCases:
         assert result2["summary"] == "v2"
         # final_requirementsが更新される
         assert agent.final_requirements["summary"] == "v2"
-
-    @pytest.mark.skip("StateMachine removed from requirement_agent.py")
-    @patch.object(RequirementAgent, "execute_llm_task")
-    def test_state_machine_multiple_transitions(self, mock_execute):
-        """StateMachineの複数回遷移"""
-        mock_execute.return_value = "了解しました。"
-        agent = RequirementAgent()
-        fsm = StateMachine(agent)
-
-        # 初期状態
-        assert fsm.state["state"] == "INIT"
-
-        # INIT → COLLECTING
-        fsm.transition("入力1")
-        assert fsm.state["state"] == "COLLECTING"
-
-        # COLLECTING → SUGGESTING
-        fsm.transition("入力2")
-        assert fsm.state["state"] == "SUGGESTING"
 
 
 class TestRequirementAgentAdvancedScenarios:

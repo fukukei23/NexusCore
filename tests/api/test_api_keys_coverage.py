@@ -10,7 +10,6 @@ api_keys.py 未カバー行のテスト (Issue #90)
 - L296-301: revoke_api_key unexpected non-HTTPException
 """
 
-from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest

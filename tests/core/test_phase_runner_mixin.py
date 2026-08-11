@@ -1,5 +1,4 @@
 import importlib
-import os
 
 
 def test_default_retry_limits(monkeypatch):

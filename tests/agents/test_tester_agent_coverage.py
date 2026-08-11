@@ -13,8 +13,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import pytest
-
 
 class TestTesterAgentInit:
     """TesterAgent 初期化テスト"""

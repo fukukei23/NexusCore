@@ -1,11 +1,11 @@
 """llm_router.py のカバレッジブースト — 未カバー行（362-540, 196-205）を対象"""
-import os
 import json
-from unittest.mock import patch, MagicMock, PropertyMock
+import os
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-from nexuscore.llm.llm_router import LLMRouter, RoutedLLM, BudgetManager, log_transaction
-
+from nexuscore.llm.llm_router import BudgetManager, LLMRouter, RoutedLLM, log_transaction
 
 # --- Helpers ---
 
@@ -317,6 +317,5 @@ class TestLogTransactionFallback:
     def test_fallback_log_handles_bad_path(self):
         # The actual log_transaction may raise on truly invalid paths.
         # Just verify it doesn't crash the import flow.
-        import importlib
         import nexuscore.llm.llm_router as mod
         assert hasattr(mod, "log_transaction")

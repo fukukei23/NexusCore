@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from nexuscore.core.orchestrator_models import OrchestratorContext
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 from unittest.mock import MagicMock
 
-import pytest
-
 from nexuscore.core.orchestrator_models import OrchestratorContext
 from nexuscore.core.phase_runner_mixin import PhaseRunnerMixin
 

@@ -4,10 +4,7 @@
 Flask Blueprintのためモックベースでテスト
 """
 
-import types
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 
 class TestOAuthNotConfigured:
@@ -24,7 +21,6 @@ class TestOAuthNotConfigured:
              patch("nexuscore.webapp.auth.jsonify", flask_jsonify):
 
             # login_github関数を直接importしてテスト
-            from nexuscore.webapp.auth import bp
             # Blueprintのrouteハンドラはテストしにくいので、
             # 代わりにロジックの条件分岐を直接確認
             assert True  # 設定なし環境では500が返る構造になっている

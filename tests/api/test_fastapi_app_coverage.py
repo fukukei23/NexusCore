@@ -10,9 +10,8 @@ fastapi_app.py 例外ハンドラ 未カバー行テスト (Issue #92)
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from fastapi.exceptions import RequestValidationError
 
 from nexuscore.api.fastapi_app import create_app
 

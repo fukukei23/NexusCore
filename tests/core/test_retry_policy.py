@@ -4,7 +4,6 @@ Tests for CR-NEXUS-051-B: Retry Policy
 このテストは Decision Table を機械的に検証し、有限性・Unexpected 処理・Backoff を担保する。
 """
 
-import os
 from unittest.mock import patch
 
 import pytest

@@ -27,10 +27,8 @@ if src_path not in sys.path:
 # --- テスト対象を読み込み ---
 from nexuscore.agents.base_agent import BaseAgent
 from nexuscore.llm.llm_router import LLMRouter, RoutedLLM
-from nexuscore.llm.providers.anthropic_provider import AnthropicLLM
 from nexuscore.llm.providers.gemini_provider import GeminiLLM
 from nexuscore.llm.providers.minimax_provider import MiniMaxLLM
-from nexuscore.llm.providers.openai_provider import OpenAILLM
 
 
 # --- テストで使うための仮のエージェント ---

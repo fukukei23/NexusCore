@@ -1130,7 +1130,8 @@ class TestCoverageGapsRetryUtils:
 
     def test_classification_error_with_logger(self, mock_sleep):
         """classification_error 時の logger_instance.warning 呼び出し（L268-275 カバー）"""
-        from unittest.mock import patch, Mock
+        from unittest.mock import Mock, patch
+
         from nexuscore.core.retry_utils import retry_with_context
 
         mock_logger = Mock()
@@ -1148,6 +1149,7 @@ class TestCoverageGapsRetryUtils:
     def test_final_failure_logs_with_logger(self, mock_sleep):
         """最終失敗時の logger.error 呼び出し（L283-289 カバー）"""
         from unittest.mock import Mock
+
         from nexuscore.core.retry_utils import retry_with_context
 
         mock_logger = Mock()
@@ -1167,6 +1169,7 @@ class TestCoverageGapsRetryUtils:
     def test_retry_warning_logs_with_logger(self, mock_sleep):
         """リトライ時の logger.warning 呼び出し（L293-299 カバー）"""
         from unittest.mock import Mock
+
         from nexuscore.core.retry_utils import retry_with_context
 
         mock_logger = Mock()

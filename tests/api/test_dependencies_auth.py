@@ -85,8 +85,9 @@ class TestGetApiKey:
     @patch("nexuscore.api.dependencies.auth.load_api_key", return_value=None)
     def test_raises_when_no_key(self, mock_load):
         """API Key 未設定時はエラー"""
-        from nexuscore.api.dependencies import auth
         from fastapi import HTTPException
+
+        from nexuscore.api.dependencies import auth
 
         auth._cached_api_key = None
         try:
@@ -103,7 +104,6 @@ class TestGetCurrentUser:
     @patch("nexuscore.api.dependencies.auth.get_api_key", return_value="test-key")
     def test_fallback_auth_success(self, mock_get_key):
         """ImportError フォールバック認証成功"""
-        from nexuscore.api.dependencies.auth import get_current_user, _cached_api_key
 
         # webapp.models のインポートを失敗させる
         with patch.dict("sys.modules", {"nexuscore.webapp.models": None}):
@@ -243,6 +243,7 @@ class TestGetCurrentUserOptional:
     def test_invalid_key_raises_401(self, mock_get_key):
         """無効なキーで 401"""
         from fastapi import HTTPException
+
         from nexuscore.api.dependencies.auth import get_current_user_optional
 
         with pytest.raises(HTTPException) as exc_info:

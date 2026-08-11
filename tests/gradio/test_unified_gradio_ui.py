@@ -8,10 +8,10 @@ unified_gradio_ui.py ベースの Gradio UI について、
 
 from __future__ import annotations
 
+import sys
 from unittest.mock import Mock, patch
 
 import pytest
-import sys
 
 try:
     import gradio as gr

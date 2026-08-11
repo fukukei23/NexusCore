@@ -1,6 +1,6 @@
-import json
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 MODULE_PATH = "nexuscore.agents.base_agent"
 

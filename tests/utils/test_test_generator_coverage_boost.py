@@ -3,13 +3,11 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from nexuscore.utils.test_generator import (
-    DEFAULT_CONFIG,
     TestGenConfig,
     generate_and_validate_test_code,
     generate_tests_for_module,

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 from nexuscore.agents.base_agent import BaseAgent
 from nexuscore.plugins.registry import AgentRegistry
 

@@ -18,7 +18,6 @@ Comprehensive Tests for authority_runner.py
 
 from __future__ import annotations
 
-import threading
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -26,8 +25,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from nexuscore.orchestrator.authority_runner import (
-    PHASES_ORDER,
     PHASE_TO_METHOD,
+    PHASES_ORDER,
     RunLockLease,
     RunnerConfig,
     _apply_context_snapshot,
@@ -45,7 +44,6 @@ from nexuscore.orchestrator.authority_runner import (
     stop_before_phases_for_authority_level,
 )
 from nexuscore.orchestrator.constants import AuthorityLevel
-
 
 # ============================================================================
 # Fixtures

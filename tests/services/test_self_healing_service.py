@@ -1,21 +1,21 @@
 """self_healing_service.py のテスト"""
 
 import os
-from unittest.mock import MagicMock, patch
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.core.run_history import RunHistoryLogger
 from nexuscore.core.session_control import SessionController
-from nexuscore.services.self_healing_service import SelfHealingService
 from nexuscore.services.git_operations import clone_or_update_repo, get_changed_files
-from nexuscore.services.test_runner import run_tests
+from nexuscore.services.patch_applier import PatchApplier
 from nexuscore.services.patch_workflow import (
     collect_relevant_files,
     generate_patch_via_debugger,
 )
+from nexuscore.services.self_healing_service import SelfHealingService
+from nexuscore.services.test_runner import run_tests
 
 
 def test_self_healing_service_initialization(tmp_path):

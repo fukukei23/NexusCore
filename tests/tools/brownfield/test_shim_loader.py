@@ -1,6 +1,8 @@
 """shim 経由起動と main(argv) のテスト。"""
 import sys
+
 import pytest
+
 
 def test_main_help_exits_zero(capsys):
     """main(['--help']) は SystemExit(0)。"""
