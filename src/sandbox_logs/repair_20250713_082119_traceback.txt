@@ -1,7 +1,0 @@
-Traceback (most recent call last):
-  File "C:\Users\USER\tools\OpenCodeInterpreter\src\code_interpreter\sandbox_runner.py", line 22, in run_code
-    exec(code, {})
-  File "<string>", line 1
-    def hello()
-               ^
-SyntaxError: expected ':'

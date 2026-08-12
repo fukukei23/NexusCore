@@ -146,6 +146,14 @@ sandbox_output/
 coverage_reports/
 policies/
 fkb_local.json
+# 実行時生成物（sandbox_logs / history / 依存関係スナップショット・再生成可能）
+history/
+src/history_*.json
+src/env_sorted.txt
+src/lock_sorted.txt
+src/requirements_lock.tx
+src/requirements_lock.txt
+src/sandbox_logs/
 
 # ランタイム状態・ローカル起動スクリプト
 .nexus/sessions/
