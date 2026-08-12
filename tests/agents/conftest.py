@@ -6,6 +6,8 @@ This conftest.py prevents collection of test files with missing dependencies.
 
 import os
 
+import pytest
+
 
 def pytest_collection_modifyitems(session, config, items):
     """Skip collection of test files with missing dependencies."""
@@ -48,3 +50,12 @@ def pytest_ignore_collect(collection_path, config):
         return True
 
     return False
+
+
+@pytest.fixture(autouse=True)
+def _allow_stub_fallback_default(monkeypatch):
+    """C5 後方互換: tests/agents は execute_llm_task の従来フォールバック({}/「」)をデフォルト許可。
+
+    フラグOFF(本番=例外送出)は tests/llm/test_stub_fallback_exception.py で検証。
+    """
+    monkeypatch.setenv("NEXUSCORE_ALLOW_STUB_FALLBACK", "1")

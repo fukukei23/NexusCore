@@ -7,9 +7,16 @@ execute_llm_task分岐（no router, as_json fallback, error fallback）
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 class TestBaseAgentFallbacks:
     """BaseAgentのインポートフォールバックとLLM実行分岐をテスト"""
+
+    @pytest.fixture(autouse=True)
+    def _allow_stub_fallback(self, monkeypatch):
+        """C5 後方互換: execute_llm_task の従来フォールバック({}/「」)を許可。"""
+        monkeypatch.setenv("NEXUSCORE_ALLOW_STUB_FALLBACK", "1")
 
     def _import_base_agent(self):
         from nexuscore.agents.base_agent import BaseAgent

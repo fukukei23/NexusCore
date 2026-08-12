@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from nexuscore.llm.helpers import _env_flag
 from nexuscore.logging_standard import get_logger
 
 # .env を環境にロード（既存環境変数は上書きしない = 環境変数が最優先）
@@ -162,13 +163,17 @@ class BaseAgent:
                 return wrapped_func()
             except Exception as e:  # noqa: BLE001
                 self.logger.error(f"LLM 実行エラー（Retry 後も失敗）: {e}", exc_info=True)
-                # フォールバック
-                return "{}" if as_json else ""
+                # C5(α): フラグOFF(本番)は例外伝播・ON(テスト保護)は従来{}/「」
+                if _env_flag("NEXUSCORE_ALLOW_STUB_FALLBACK", False):
+                    return "{}" if as_json else ""
+                raise
         else:
             # Retry が利用できない場合は従来通り
             try:
                 return _execute_llm_internal()
             except Exception as e:  # noqa: BLE001
                 self.logger.error(f"LLM 実行エラー: {e}", exc_info=True)
-                # フォールバック
-                return "{}" if as_json else ""
+                # C5(α): フラグOFF(本番)は例外伝播・ON(テスト保護)は従来{}/「」
+                if _env_flag("NEXUSCORE_ALLOW_STUB_FALLBACK", False):
+                    return "{}" if as_json else ""
+                raise
