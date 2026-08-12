@@ -22,14 +22,14 @@ from nexuscore.llm.providers.openai_provider import OpenAILLM
 class TestOpenAIProviderInit:
     """Test OpenAI provider initialization"""
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_init_without_api_key_uses_stub_mode(self):
         """Should use stub mode when API key is missing"""
         provider = OpenAILLM("gpt-5.1")
         assert provider.real_calls is False
         assert provider.api_key is None
 
-    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_provider.HTTP_CLIENT_FACTORY")
     def test_init_with_api_key_uses_real_mode(self, mock_factory, mock_real_enabled):
@@ -79,7 +79,7 @@ class TestOpenAIProviderInit:
         assert provider.azure is True
         assert provider.azure_deployment == "gpt-5-deploy"
 
-    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "OPENAI_AZURE": "1"}, clear=True)
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "OPENAI_AZURE": "1", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_provider.HTTP_CLIENT_FACTORY")
     def test_init_azure_without_deployment_raises_error(self, mock_factory, mock_real_enabled):
@@ -95,7 +95,7 @@ class TestOpenAIProviderInit:
 class TestOpenAIProviderExecute:
     """Test OpenAI provider execute method"""
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_execute_stub_mode_returns_default_content(self):
         """Should return default stub content in stub mode"""
         provider = OpenAILLM("gpt-5.1")
@@ -104,7 +104,7 @@ class TestOpenAIProviderExecute:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_provider.HTTP_CLIENT_FACTORY")
     def test_execute_real_mode_calls_api(self, mock_factory, mock_real_enabled):
@@ -126,7 +126,7 @@ class TestOpenAIProviderExecute:
         assert result == "AI response"
         mock_session.post.assert_called_once()
 
-    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_provider.HTTP_CLIENT_FACTORY")
     def test_execute_with_json_mode(self, mock_factory, mock_real_enabled):
@@ -151,7 +151,7 @@ class TestOpenAIProviderExecute:
         assert "response_format" in payload
         assert payload["response_format"]["type"] == "json_object"
 
-    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_provider.HTTP_CLIENT_FACTORY")
     def test_execute_with_custom_temperature(self, mock_factory, mock_real_enabled):
@@ -178,7 +178,7 @@ class TestOpenAIProviderExecute:
 class TestOpenAIProviderErrorHandling:
     """Test OpenAI provider error handling"""
 
-    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_provider.HTTP_CLIENT_FACTORY")
     def test_execute_handles_http_error(self, mock_factory, mock_real_enabled):
@@ -197,7 +197,7 @@ class TestOpenAIProviderErrorHandling:
         result = provider.execute("test prompt", "test system")
         assert isinstance(result, str)
 
-    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_provider.HTTP_CLIENT_FACTORY")
     def test_execute_handles_rate_limit(self, mock_factory, mock_real_enabled):
@@ -216,7 +216,7 @@ class TestOpenAIProviderErrorHandling:
         # Should fall back to stub on rate limit
         assert isinstance(result, str)
 
-    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_provider.HTTP_CLIENT_FACTORY")
     def test_execute_handles_malformed_response(self, mock_factory, mock_real_enabled):
@@ -304,7 +304,7 @@ class TestOpenAIProviderAzure:
 class TestOpenAIProviderModelVariants:
     """Test different OpenAI model variants"""
 
-    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_provider.HTTP_CLIENT_FACTORY")
     def test_gpt5_model_no_temperature(self, mock_factory, mock_real_enabled):
@@ -328,7 +328,7 @@ class TestOpenAIProviderModelVariants:
         # GPT-5 models should not have temperature in payload
         assert "temperature" not in payload or payload.get("temperature") is None
 
-    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_provider.HTTP_CLIENT_FACTORY")
     def test_o_series_model_no_temperature(self, mock_factory, mock_real_enabled):

@@ -19,14 +19,14 @@ from nexuscore.llm.providers.moonshot_provider import MoonshotLLM
 class TestMoonshotProviderInit:
     """Test Moonshot provider initialization"""
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_init_without_api_key_uses_stub_mode(self):
         """Should use stub mode when API key is missing"""
         provider = MoonshotLLM("kimi-1")
         assert provider.real_calls is False
         assert provider.api_key is None
 
-    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_init_with_api_key_uses_real_mode(self, mock_factory, mock_real_enabled):
@@ -55,7 +55,7 @@ class TestMoonshotProviderInit:
         provider = MoonshotLLM("kimi-1")
         assert provider.base_url == "https://custom.moonshot.com"
 
-    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_init_without_http_factory_falls_back_to_stub(self, mock_factory, mock_real_enabled):
@@ -70,7 +70,7 @@ class TestMoonshotProviderInit:
 class TestMoonshotProviderExecute:
     """Test Moonshot provider execute method"""
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_execute_stub_mode_returns_default_content(self):
         """Should return default stub content in stub mode"""
         provider = MoonshotLLM("kimi-1")
@@ -79,7 +79,7 @@ class TestMoonshotProviderExecute:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_real_mode_calls_api(self, mock_factory, mock_real_enabled):
@@ -107,7 +107,7 @@ class TestMoonshotProviderExecute:
         assert call_args[1]["json"]["messages"][1]["role"] == "user"
         assert call_args[1]["json"]["messages"][1]["content"] == "test prompt"
 
-    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_with_custom_temperature(self, mock_factory, mock_real_enabled):
@@ -153,7 +153,7 @@ class TestMoonshotProviderExecute:
         call_args = mock_session.post.call_args
         assert call_args[1]["json"]["max_tokens"] == 2000
 
-    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_with_json_mode(self, mock_factory, mock_real_enabled):
@@ -179,7 +179,7 @@ class TestMoonshotProviderExecute:
 class TestMoonshotProviderErrorHandling:
     """Test Moonshot provider error handling"""
 
-    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_handles_http_error(self, mock_factory, mock_real_enabled):
@@ -199,7 +199,7 @@ class TestMoonshotProviderErrorHandling:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_handles_rate_limit(self, mock_factory, mock_real_enabled):
@@ -218,7 +218,7 @@ class TestMoonshotProviderErrorHandling:
         # Should fall back to stub content
         assert isinstance(result, str)
 
-    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"KIMI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_handles_malformed_response(self, mock_factory, mock_real_enabled):
@@ -241,19 +241,19 @@ class TestMoonshotProviderErrorHandling:
 class TestMoonshotProviderModels:
     """Test different Moonshot/Kimi model variants"""
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_supports_kimi_1(self):
         """Should support kimi-1 model"""
         provider = MoonshotLLM("kimi-1")
         assert provider.model_name == "kimi-1"
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_supports_moonshot_v1(self):
         """Should support moonshot-v1 model"""
         provider = MoonshotLLM("moonshot-v1-8k")
         assert provider.model_name == "moonshot-v1-8k"
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_supports_moonshot_v1_32k(self):
         """Should support moonshot-v1-32k model"""
         provider = MoonshotLLM("moonshot-v1-32k")

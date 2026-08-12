@@ -5,7 +5,7 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from nexuscore.llm.helpers import DEFAULT_STUB_CONTENT, normalize_model
+from nexuscore.llm.helpers import DEFAULT_STUB_CONTENT, _env_flag, normalize_model
 from nexuscore.llm.http_client import RequestsHTTPError
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -130,10 +130,14 @@ class BaseLLM:
             except Exception:  # noqa: BLE001 — HTTPレスポンスボディ取得の防御的キャッチ
                 pass
             self.log_error("REAL-CALL HTTP error (after retries)", e, body)
-            return self._stub_fallback_response(provider_name, as_json=as_json)
+            if _env_flag("NEXUSCORE_ALLOW_STUB_FALLBACK", False):
+                return self._stub_fallback_response(provider_name, as_json=as_json)
+            raise
         except Exception as e:  # noqa: BLE001 — リアルコール全体のフォールバック
             self.log_error("REAL-CALL failed (after retries)", e)
-            return self._stub_fallback_response(provider_name, as_json=as_json)
+            if _env_flag("NEXUSCORE_ALLOW_STUB_FALLBACK", False):
+                return self._stub_fallback_response(provider_name, as_json=as_json)
+            raise
 
 
 __all__ = ["BaseLLM"]

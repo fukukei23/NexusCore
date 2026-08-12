@@ -83,14 +83,14 @@ def _restore_genai_mock():
 class TestGeminiProviderInit:
     """Test Gemini provider initialization"""
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_init_without_api_key_uses_stub_mode(self):
         """Should use stub mode when API key is missing"""
         provider = GeminiLLM("gemini-2.5-flash")
         assert provider.real_calls is False
         assert provider.client is None
 
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.gemini_provider._real_call_enabled", return_value=True)
     def test_init_with_api_key_uses_real_mode(self, mock_real_enabled):
         """Should use real mode when API key is set"""
@@ -104,7 +104,7 @@ class TestGeminiProviderInit:
         finally:
             _restore_genai_mock()
 
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.gemini_provider._real_call_enabled", return_value=True)
     @pytest.mark.xfail(
         reason="フルテスト実行時のフレーク（test_generator 機能改善時に解消）— 2026-07-08"
@@ -127,7 +127,7 @@ class TestGeminiProviderInit:
 class TestGeminiProviderExecute:
     """Test Gemini provider execute method"""
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_execute_stub_mode_returns_default_content(self):
         """Should return default stub content in stub mode"""
         provider = GeminiLLM("gemini-2.5-flash")
@@ -136,7 +136,7 @@ class TestGeminiProviderExecute:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.gemini_provider._real_call_enabled", return_value=True)
     def test_execute_real_mode_calls_api(self, mock_real_enabled):
         """Should call Gemini API in real mode"""
@@ -163,7 +163,7 @@ class TestGeminiProviderExecute:
         finally:
             _restore_genai_mock()
 
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.gemini_provider._real_call_enabled", return_value=True)
     def test_execute_with_custom_temperature(self, mock_real_enabled):
         """Should support custom temperature"""
@@ -205,7 +205,7 @@ class TestGeminiProviderExecute:
         finally:
             _restore_genai_mock()
 
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.gemini_provider._real_call_enabled", return_value=True)
     def test_execute_with_json_mode(self, mock_real_enabled):
         """Should support JSON mode with response_mime_type"""
@@ -228,7 +228,7 @@ class TestGeminiProviderExecute:
 class TestGeminiProviderErrorHandling:
     """Test Gemini provider error handling"""
 
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.gemini_provider._real_call_enabled", return_value=True)
     def test_execute_handles_generation_error(self, mock_real_enabled):
         """Should handle generation errors gracefully"""
@@ -247,7 +247,7 @@ class TestGeminiProviderErrorHandling:
         finally:
             _restore_genai_mock()
 
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.gemini_provider._real_call_enabled", return_value=True)
     def test_execute_handles_model_init_error(self, mock_real_enabled):
         """Should handle model initialization errors"""
@@ -264,7 +264,7 @@ class TestGeminiProviderErrorHandling:
         finally:
             _restore_genai_mock()
 
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.gemini_provider._real_call_enabled", return_value=True)
     def test_execute_handles_empty_response(self, mock_real_enabled):
         """Should handle empty responses"""
@@ -289,19 +289,19 @@ class TestGeminiProviderErrorHandling:
 class TestGeminiProviderModels:
     """Test different Gemini model variants"""
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_supports_gemini_flash(self):
         """Should support gemini-flash models"""
         provider = GeminiLLM("gemini-2.5-flash")
         assert provider.model_name == "gemini-2.5-flash"
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_supports_gemini_pro(self):
         """Should support gemini-pro models"""
         provider = GeminiLLM("gemini-2.5-pro")
         assert provider.model_name == "gemini-2.5-pro"
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_supports_gemini_3(self):
         """Should support gemini-3.0 models"""
         provider = GeminiLLM("gemini-3.0-pro")

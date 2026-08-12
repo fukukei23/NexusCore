@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-from nexuscore.llm.helpers import _real_call_enabled, _strip_jsonish
+from nexuscore.llm.helpers import _env_flag, _real_call_enabled, _strip_jsonish
 from nexuscore.llm.http_client import RequestsHTTPError
 from nexuscore.llm.runtime import HTTP_CLIENT_FACTORY, REQUEST_TIMEOUT
 
@@ -135,11 +135,15 @@ class OpenAICompatLLM(BaseLLM):
                 except Exception:  # noqa: BLE001 — HTTPレスポンスボディ取得の防御的キャッチ
                     pass
                 self.log_error("REAL-CALL HTTP error", e, body)
-                return self._stub_fallback_response(self.stub_label, as_json=as_json)
+                if _env_flag("NEXUSCORE_ALLOW_STUB_FALLBACK", False):
+                    return self._stub_fallback_response(self.stub_label, as_json=as_json)
+                raise
 
             except Exception as e:  # noqa: BLE001 — リアルコール全体のフォールバック
                 self.log_error("REAL-CALL failed", e)
-                return self._stub_fallback_response(self.stub_label, as_json=as_json)
+                if _env_flag("NEXUSCORE_ALLOW_STUB_FALLBACK", False):
+                    return self._stub_fallback_response(self.stub_label, as_json=as_json)
+                raise
 
         return self._stub_response(self.stub_label, as_json=as_json)
 

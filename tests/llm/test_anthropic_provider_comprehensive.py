@@ -19,14 +19,14 @@ from nexuscore.llm.providers.anthropic_provider import AnthropicLLM
 class TestAnthropicProviderInit:
     """Test Anthropic provider initialization"""
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_init_without_api_key_uses_stub_mode(self):
         """Should use stub mode when API key is missing"""
         provider = AnthropicLLM("claude-sonnet-4.5")
         assert provider.real_calls is False
         assert provider.api_key is None
 
-    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.anthropic_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.anthropic_provider.HTTP_CLIENT_FACTORY")
     def test_init_with_api_key_uses_real_mode(self, mock_factory, mock_real_enabled):
@@ -55,7 +55,7 @@ class TestAnthropicProviderInit:
         provider = AnthropicLLM("claude-sonnet-4.5")
         assert provider.base_url == "https://custom.api.com"
 
-    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.anthropic_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.anthropic_provider.HTTP_CLIENT_FACTORY")
     def test_init_without_http_factory_falls_back_to_stub(self, mock_factory, mock_real_enabled):
@@ -70,7 +70,7 @@ class TestAnthropicProviderInit:
 class TestAnthropicProviderExecute:
     """Test Anthropic provider execute method"""
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_execute_stub_mode_returns_default_content(self):
         """Should return default stub content in stub mode"""
         provider = AnthropicLLM("claude-sonnet-4.5")
@@ -79,7 +79,7 @@ class TestAnthropicProviderExecute:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.anthropic_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.anthropic_provider.HTTP_CLIENT_FACTORY")
     def test_execute_real_mode_calls_api(self, mock_factory, mock_real_enabled):
@@ -105,7 +105,7 @@ class TestAnthropicProviderExecute:
         assert call_args[1]["json"]["messages"][0]["content"] == "test prompt"
         assert call_args[1]["json"]["system"] == "test system"
 
-    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.anthropic_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.anthropic_provider.HTTP_CLIENT_FACTORY")
     def test_execute_with_custom_temperature(self, mock_factory, mock_real_enabled):
@@ -157,7 +157,7 @@ class TestAnthropicProviderExecute:
 class TestAnthropicProviderErrorHandling:
     """Test Anthropic provider error handling"""
 
-    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.anthropic_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.anthropic_provider.HTTP_CLIENT_FACTORY")
     def test_execute_handles_http_error(self, mock_factory, mock_real_enabled):
@@ -177,7 +177,7 @@ class TestAnthropicProviderErrorHandling:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.anthropic_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.anthropic_provider.HTTP_CLIENT_FACTORY")
     def test_execute_handles_rate_limit(self, mock_factory, mock_real_enabled):
@@ -196,7 +196,7 @@ class TestAnthropicProviderErrorHandling:
         # Should fall back to stub content
         assert isinstance(result, str)
 
-    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.anthropic_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.anthropic_provider.HTTP_CLIENT_FACTORY")
     def test_execute_handles_malformed_response(self, mock_factory, mock_real_enabled):
@@ -219,7 +219,7 @@ class TestAnthropicProviderErrorHandling:
 class TestAnthropicProviderHeaders:
     """Test Anthropic-specific headers"""
 
-    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.anthropic_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.anthropic_provider.HTTP_CLIENT_FACTORY")
     def test_execute_includes_anthropic_version_header(self, mock_factory, mock_real_enabled):
@@ -243,7 +243,7 @@ class TestAnthropicProviderHeaders:
         assert "anthropic-version" in headers
         assert headers["anthropic-version"] == "2023-06-01"
 
-    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.anthropic_provider._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.anthropic_provider.HTTP_CLIENT_FACTORY")
     def test_execute_includes_authorization_header(self, mock_factory, mock_real_enabled):
@@ -270,19 +270,19 @@ class TestAnthropicProviderHeaders:
 class TestAnthropicProviderModels:
     """Test different Claude model variants"""
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_supports_claude_sonnet(self):
         """Should support Claude Sonnet models"""
         provider = AnthropicLLM("claude-sonnet-4.5")
         assert provider.model_name == "claude-sonnet-4.5"
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_supports_claude_opus(self):
         """Should support Claude Opus models"""
         provider = AnthropicLLM("claude-opus-4.5")
         assert provider.model_name == "claude-opus-4.5"
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_supports_claude_haiku(self):
         """Should support Claude Haiku models"""
         provider = AnthropicLLM("claude-haiku-4.5")

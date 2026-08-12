@@ -45,6 +45,7 @@ def test_openai_stub_and_fallback(monkeypatch):
 
     # fallback path when real_calls + http raises
     monkeypatch.setenv("OPENAI_API_KEY", "dummy")
+    monkeypatch.setenv("NEXUSCORE_ALLOW_STUB_FALLBACK", "1")  # C5: フラグONで従来stub維持
     monkeypatch.setenv("OPENAI_BASE_URL", "https://api.example.com")
     fake_session = FakeSession()
     monkeypatch.setattr(oai, "real_calls", True)
@@ -70,6 +71,7 @@ def test_gemini_stub_and_no_text_fallback(monkeypatch):
 
     # real_calls path but no text -> stub-fallback
     monkeypatch.setenv("GEMINI_API_KEY", "key")
+    monkeypatch.setenv("NEXUSCORE_ALLOW_STUB_FALLBACK", "1")  # C5: フラグONで従来stub維持
     monkeypatch.setattr(gem, "real_calls", True)
     monkeypatch.setattr(gem, "client", "ok")
     monkeypatch.delitem(sys.modules, "google.generativeai", raising=False)
@@ -102,6 +104,7 @@ def test_gemini_stub_and_no_text_fallback(monkeypatch):
 
 def _provider_fallback(provider_cls, env_key, monkeypatch):
     monkeypatch.setenv(env_key, "key")
+    monkeypatch.setenv("NEXUSCORE_ALLOW_STUB_FALLBACK", "1")  # C5: フラグONで従来stub維持
     prov = provider_cls("model-x")
     monkeypatch.setattr(prov, "real_calls", True)
     monkeypatch.setattr(prov, "session", FakeSession())

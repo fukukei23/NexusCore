@@ -19,14 +19,14 @@ from nexuscore.llm.providers.deepseek_provider import DeepSeekLLM
 class TestDeepSeekProviderInit:
     """Test DeepSeek provider initialization"""
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_init_without_api_key_uses_stub_mode(self):
         """Should use stub mode when API key is missing"""
         provider = DeepSeekLLM("deepseek-chat")
         assert provider.real_calls is False
         assert provider.api_key is None
 
-    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_init_with_api_key_uses_real_mode(self, mock_factory, mock_real_enabled):
@@ -55,7 +55,7 @@ class TestDeepSeekProviderInit:
         provider = DeepSeekLLM("deepseek-chat")
         assert provider.base_url == "https://custom.deepseek.com"
 
-    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_init_without_http_factory_falls_back_to_stub(self, mock_factory, mock_real_enabled):
@@ -70,7 +70,7 @@ class TestDeepSeekProviderInit:
 class TestDeepSeekProviderExecute:
     """Test DeepSeek provider execute method"""
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_execute_stub_mode_returns_default_content(self):
         """Should return default stub content in stub mode"""
         provider = DeepSeekLLM("deepseek-chat")
@@ -79,7 +79,7 @@ class TestDeepSeekProviderExecute:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_real_mode_calls_api(self, mock_factory, mock_real_enabled):
@@ -107,7 +107,7 @@ class TestDeepSeekProviderExecute:
         assert call_args[1]["json"]["messages"][1]["role"] == "user"
         assert call_args[1]["json"]["messages"][1]["content"] == "test prompt"
 
-    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_with_custom_temperature(self, mock_factory, mock_real_enabled):
@@ -155,7 +155,7 @@ class TestDeepSeekProviderExecute:
         call_args = mock_session.post.call_args
         assert call_args[1]["json"]["max_tokens"] == 2000
 
-    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_with_json_mode(self, mock_factory, mock_real_enabled):
@@ -181,7 +181,7 @@ class TestDeepSeekProviderExecute:
 class TestDeepSeekProviderErrorHandling:
     """Test DeepSeek provider error handling"""
 
-    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_handles_http_error(self, mock_factory, mock_real_enabled):
@@ -201,7 +201,7 @@ class TestDeepSeekProviderErrorHandling:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_handles_rate_limit(self, mock_factory, mock_real_enabled):
@@ -220,7 +220,7 @@ class TestDeepSeekProviderErrorHandling:
         # Should fall back to stub content
         assert isinstance(result, str)
 
-    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=True)
+    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key", "NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     @patch("nexuscore.llm.providers.openai_compat._real_call_enabled", return_value=True)
     @patch("nexuscore.llm.providers.openai_compat.HTTP_CLIENT_FACTORY")
     def test_execute_handles_malformed_response(self, mock_factory, mock_real_enabled):
@@ -243,19 +243,19 @@ class TestDeepSeekProviderErrorHandling:
 class TestDeepSeekProviderModels:
     """Test different DeepSeek model variants"""
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_supports_deepseek_chat(self):
         """Should support deepseek-chat model"""
         provider = DeepSeekLLM("deepseek-chat")
         assert provider.model_name == "deepseek-chat"
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_supports_deepseek_coder(self):
         """Should support deepseek-coder model"""
         provider = DeepSeekLLM("deepseek-coder")
         assert provider.model_name == "deepseek-coder"
 
-    @patch.dict(os.environ, {}, clear=True)
+    @patch.dict(os.environ, {"NEXUSCORE_ALLOW_STUB_FALLBACK": "1"}, clear=True)
     def test_supports_deepseek_r1(self):
         """Should support deepseek-r1 reasoning model"""
         provider = DeepSeekLLM("deepseek-r1")
