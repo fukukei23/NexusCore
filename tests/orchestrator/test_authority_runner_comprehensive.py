@@ -872,7 +872,7 @@ class TestResumeRun:
     @patch("nexuscore.orchestrator.run_lock._get_lock_refresh_seconds", return_value=0.01)
     def test_uses_factory_over_global(self, mock_refresh, mock_val, mock_int, mock_lock, mock_release, mock_update):
         """orchestrator_factory が優先される"""
-        state = {"run_id": "r1", "status": "PAUSED"}
+        state = {"run_id": "r1", "status": "PAUSED", "next_phase": "planning"}
         factory_orch = MagicMock()
         global_orch = MagicMock()
 
@@ -892,9 +892,10 @@ class TestResumeRun:
             finally:
                 ar._RESUME_ORCHESTRATOR = old
 
-        # factory_orch.start should be called, not global_orch
-        # NOTE: 元は式文(検証ゼロ)・assert化すると factory 優先が機能せず fail(実バグ)・別タスクで修正
-        factory_orch.start.called or not global_orch.start.called  # noqa: B018
+        # factory_orch にフェーズが委譲され、global_orch は使われない
+        # NOTE: 元は「検証ゼロの式文」(orchestrator.start は実装に存在しない・2026-08-14 修正)
+        assert factory_orch.run_planning_phase.called
+        assert not global_orch.run_planning_phase.called
 
 
 # ============================================================================
