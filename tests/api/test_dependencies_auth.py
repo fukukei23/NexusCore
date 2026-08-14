@@ -39,7 +39,7 @@ class TestLoadApiKey:
         # Path(__file__) の親を tmp_path にモック
         with patch.dict(os.environ, {}, clear=True):
             with patch.object(auth, "__file__", str(tmp_path / "fake.py")):
-                result = auth.load_api_key()
+                auth.load_api_key()
         # 環境変数なしなので secrets.json ルートを探すが、
         # 実際は Path(__file__).parent... の計算先にあるかどうか
         # このテストでは環境変数優先のテストが主目的

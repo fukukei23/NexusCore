@@ -370,7 +370,7 @@ class TestWebhookEdgeCases:
             )
 
         # Exception in _post_pr_comment_if_configured is caught by outer try/except
-        data = resp.get_json()
+        resp.get_json()
         assert resp.status_code == 500
 
     @patch("nexuscore.api.github_webhook_handler._send_slack_notification_if_configured")
@@ -394,5 +394,5 @@ class TestWebhookEdgeCases:
             )
 
         # Exception in _send_slack_notification_if_configured is caught by outer try/except
-        data = resp.get_json()
+        resp.get_json()
         assert resp.status_code == 500

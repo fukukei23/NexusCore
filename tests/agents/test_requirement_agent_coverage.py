@@ -58,7 +58,7 @@ class TestStateMachine:
 
         agent = RequirementAgent()
         sm = StateMachine(agent)
-        result = sm.transition()
+        sm.transition()
         assert sm.state["state"] == "COLLECTING"
 
 
@@ -162,7 +162,7 @@ class TestRequirementAgentHeadless:
         })
         agent = RequirementAgent()
         agent.set_initial_requirement("初期要件")
-        result = agent.analyze_requirement("")
+        agent.analyze_requirement("")
         # prompt内に "初期要件" が使われる
         assert mock_llm.called
 

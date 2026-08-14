@@ -117,7 +117,7 @@ class TestGLMLLMExecute:
         mock_session.post.side_effect = RequestsHTTPError("500", response=mock_error)
         llm.session = mock_session
 
-        result = llm.execute("prompt", "system")
+        llm.execute("prompt", "system")
         assert llm.last_call_mode == "stub-fallback"
 
     def test_real_call_http_error_with_bad_response_attr(self):
@@ -141,7 +141,7 @@ class TestGLMLLMExecute:
         mock_session.post.side_effect = RuntimeError("connection failed")
         llm.session = mock_session
 
-        result = llm.execute("prompt", "system")
+        llm.execute("prompt", "system")
         assert llm.last_call_mode == "stub-fallback"
 
     def test_real_call_as_json_strips_json(self):
@@ -174,7 +174,7 @@ class TestGLMLLMExecute:
         llm.session = mock_session
 
         # Empty text triggers RuntimeError → caught by generic except → stub-fallback
-        result = llm.execute("prompt", "system")
+        llm.execute("prompt", "system")
         assert llm.last_call_mode == "stub-fallback"
 
     @patch.dict(os.environ, {"NEXUS_DEFAULT_MAX_OUT_TOKENS": "1024"})

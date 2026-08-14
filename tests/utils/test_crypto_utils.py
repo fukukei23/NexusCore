@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 
 import pytest
+from cryptography.exceptions import InvalidTag
 
 from nexuscore.utils.crypto_utils import (
     decrypt_string,
@@ -33,7 +34,7 @@ def test_encrypt_produces_different_ciphertext_each_time(monkeypatch: pytest.Mon
 
 def test_decrypt_raises_on_invalid_ciphertext(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("NEXUS_ENCRYPTION_KEY", generate_encryption_key())
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidTag):
         decrypt_string("not-valid-base64-ciphertext!!")
 
 

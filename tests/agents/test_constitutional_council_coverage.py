@@ -128,7 +128,6 @@ class TestArchiveAmendmentRetryFail:
     def test_all_rename_attempts_fail(self, mock_sleep, agent):
         pending = agent.amendments_dir / "pending_test.json"
         pending.write_text("{}")
-        original_replace = Path.replace
         def _fail_replace(self, *a, **kw):
             raise OSError("cross-device")
         with patch.object(Path, "replace", _fail_replace):
@@ -235,7 +234,6 @@ class TestFlaskWebUI:
         """Call run_web_ui() with Flask.run patched to capture the real app, then return it."""
         from flask import Flask
         captured_app = None
-        original_run = Flask.run
         def _capture_run(self_app, *args, **kwargs):
             nonlocal captured_app
             captured_app = self_app

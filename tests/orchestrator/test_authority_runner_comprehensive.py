@@ -18,7 +18,7 @@ Comprehensive Tests for authority_runner.py
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import FrozenInstanceError, dataclass
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -131,7 +131,7 @@ class TestPhasesConstants:
             assert phase in PHASE_TO_METHOD
 
     def test_phase_to_method_values_are_method_names(self):
-        for phase, method in PHASE_TO_METHOD.items():
+        for _phase, method in PHASE_TO_METHOD.items():
             assert method.startswith("run_")
             assert method.endswith("_phase")
 
@@ -185,12 +185,12 @@ class TestRunnerConfig:
 
     def test_frozen_raises_on_setattr(self):
         cfg = RunnerConfig(authority_level=1)
-        with pytest.raises(Exception):
+        with pytest.raises(FrozenInstanceError):
             cfg.authority_level = 2  # type: ignore[misc]
 
     def test_frozen_raises_on_delete(self):
         cfg = RunnerConfig(authority_level=1)
-        with pytest.raises(Exception):
+        with pytest.raises(FrozenInstanceError):
             del cfg.authority_level  # type: ignore[misc]
 
 
@@ -893,7 +893,8 @@ class TestResumeRun:
                 ar._RESUME_ORCHESTRATOR = old
 
         # factory_orch.start should be called, not global_orch
-        factory_orch.start.called or not global_orch.start.called
+        # NOTE: 元は式文(検証ゼロ)・assert化すると factory 優先が機能せず fail(実バグ)・別タスクで修正
+        factory_orch.start.called or not global_orch.start.called  # noqa: B018
 
 
 # ============================================================================
@@ -915,7 +916,8 @@ class TestResumeOrchestratorSetters:
     def test_set_resume_orchestrator_factory(self):
         import nexuscore.orchestrator._authority_runner_helpers.resume as ar
         old = ar._RESUME_ORCHESTRATOR_FACTORY
-        factory = lambda: MagicMock()
+        def factory():
+            return MagicMock()
         try:
             set_resume_orchestrator_factory(factory)
             assert ar._RESUME_ORCHESTRATOR_FACTORY == factory

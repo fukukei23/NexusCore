@@ -84,7 +84,7 @@ class TestApplyDetectedModels:
 
     def test_no_updates_when_empty_detected(self):
         router = _make_router()
-        original = router.task_model_map.copy()
+        router.task_model_map.copy()
         router._apply_detected_models({"openai": [], "gemini": []})
         # general stays unchanged
         assert router.task_model_map["general"]["primary"] == "openai:gpt-4o"
@@ -257,7 +257,7 @@ class TestComplete:
         mock_llm._last_usage = {"prompt_tokens": 50, "completion_tokens": 25}
 
         with patch("nexuscore.llm.llm_router.create_provider", return_value=mock_llm):
-            with patch.object(RoutedLLM, "execute", return_value="result text") as mock_exec:
+            with patch.object(RoutedLLM, "execute", return_value="result text"):
                 result = router.complete(
                     model="openai:gpt-4o",
                     system_prompt="sys",

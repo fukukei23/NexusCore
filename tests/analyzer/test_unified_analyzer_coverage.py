@@ -26,7 +26,7 @@ from nexuscore.analyzer.unified_analyzer import (
 )
 
 try:
-    from tree_sitter_language_pack import get_parser
+    from tree_sitter_language_pack import get_parser  # noqa: F401
 
     HAS_TS = True
 except ImportError:
@@ -59,7 +59,7 @@ class TestAnalyzerCache:
         env_dir = tmp_path / "env_cache"
         with patch.dict("os.environ", {"NEXUS_ANALYZER_CACHE_DIR": str(env_dir)}):
             # CONFIG を再評価させるため環境変数経由でテスト
-            cache = AnalyzerCache(tmp_path)
+            AnalyzerCache(tmp_path)
             # 環境変数が設定されていて cache_dir 引数が None の場合に使用される
             # ただし CONFIG は既に評価済みなので、cache_dir_env に依存
             pass
@@ -563,7 +563,7 @@ def outer():
         source = "obj.attr_method()\n"
         engine, root = self._parse(source)
         # Query 失敗をシミュレートして manual_extract を呼ぶ
-        info = defaultdict(list)
+        defaultdict(list)
         with patch("nexuscore.analyzer.unified_analyzer.Query", side_effect=Exception("forced")):
             engine._extract_semantic_info("python", root)
         # manual_extract が呼ばれることを確認（info に何か追加される）

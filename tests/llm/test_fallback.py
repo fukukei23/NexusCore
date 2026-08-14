@@ -50,14 +50,16 @@ class TestFallbackTracker:
 
     def test_next_candidate_returns_first_available(self):
         tracker = FallbackTracker()
-        family_fn = lambda m: m.split(":")[0]
+        def family_fn(m):
+            return m.split(":")[0]
         result = tracker.next_candidate(["openai:gpt-4o", "anthropic:claude"], family_fn)
         assert result == "openai:gpt-4o"
 
     def test_next_candidate_skips_cooldown_provider(self):
         tracker = FallbackTracker()
         tracker.record_429("openai")
-        family_fn = lambda m: m.split(":")[0]
+        def family_fn(m):
+            return m.split(":")[0]
         result = tracker.next_candidate(["openai:gpt-4o", "anthropic:claude"], family_fn)
         assert result == "anthropic:claude"
 
@@ -65,7 +67,8 @@ class TestFallbackTracker:
         tracker = FallbackTracker()
         tracker.record_429("openai")
         tracker.record_429("anthropic")
-        family_fn = lambda m: m.split(":")[0]
+        def family_fn(m):
+            return m.split(":")[0]
         result = tracker.next_candidate(["openai:gpt-4o", "anthropic:claude"], family_fn)
         assert result is None
 

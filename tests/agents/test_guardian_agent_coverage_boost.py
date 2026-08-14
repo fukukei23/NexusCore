@@ -93,7 +93,7 @@ class TestGenerateDiffSummaryEdge:
         ):
             # generate_diff_summary calls _summarize_diff_for_llm internally
             # or does its own processing - check by passing bad input
-            result = agent.generate_diff_summary(
+            agent.generate_diff_summary(
                 before_code="x" * 10000,
                 after_code="y" * 10000,
             )

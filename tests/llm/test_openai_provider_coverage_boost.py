@@ -108,7 +108,7 @@ class TestOpenAIExecute:
         mock_session.post.return_value = mock_resp
         llm.session = mock_session
 
-        result = llm.execute("prompt", "system")
+        llm.execute("prompt", "system")
         call_url = mock_session.post.call_args[1].get("url") or mock_session.post.call_args[0][0]
         assert "deployments" in call_url
 
@@ -122,7 +122,7 @@ class TestOpenAIExecute:
         mock_session.post.side_effect = RequestsHTTPError("500", response=mock_error)
         llm.session = mock_session
 
-        result = llm.execute("prompt", "system")
+        llm.execute("prompt", "system")
         assert llm.last_call_mode == "stub-fallback"
 
     def test_real_call_http_error_bad_response_attr(self):
@@ -146,7 +146,7 @@ class TestOpenAIExecute:
         mock_session.post.side_effect = RuntimeError("timeout")
         llm.session = mock_session
 
-        result = llm.execute("prompt", "system")
+        llm.execute("prompt", "system")
         assert llm.last_call_mode == "stub-fallback"
 
     def test_real_call_no_text_fallback(self):
@@ -162,7 +162,7 @@ class TestOpenAIExecute:
         mock_session.post.return_value = mock_resp
         llm.session = mock_session
 
-        result = llm.execute("prompt", "system")
+        llm.execute("prompt", "system")
         assert llm.last_call_mode == "stub-fallback"
 
     def test_gpt5_no_temperature(self):
@@ -208,6 +208,6 @@ class TestOpenAIExecute:
         mock_session = MagicMock()
         llm.session = mock_session
 
-        result = llm.execute("prompt", "system")
+        llm.execute("prompt", "system")
         # Should fall through to stub-fallback
         assert llm.last_call_mode == "stub-fallback"

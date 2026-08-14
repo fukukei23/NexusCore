@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 try:
-    import streamlit as _st
+    import streamlit as _st  # noqa: F401
     HAS_STREAMLIT = True
 except ImportError:
     HAS_STREAMLIT = False

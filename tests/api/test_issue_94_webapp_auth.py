@@ -49,7 +49,7 @@ class TestRequireAuthDecorator:
             def protected_view():
                 return "secret"
 
-            result = protected_view()
+            protected_view()
             mock_redirect.assert_called_once()
 
     def test_require_auth_with_user_passes_through(self):

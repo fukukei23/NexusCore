@@ -12,8 +12,8 @@ pytest.skip("Flask server.py archived; use FastAPI tests", allow_module_level=Tr
 
 @pytest.fixture
 def client():
-    """Flask テストクライアント"""
-    return app.test_client()
+    """Flask テストクライアント（archived: module-level skip で未実行）"""
+    return app.test_client()  # noqa: F821
 
 
 def test_execute_unauthorized_no_header(client, monkeypatch):

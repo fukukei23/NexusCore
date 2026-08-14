@@ -56,7 +56,7 @@ class TestLoadApiKey:
                 mock_path = MagicMock()
                 mock_path.resolve.return_value.parent.parent.parent.parent.__truediv__.return_value.exists.return_value = False
                 MockPath.__file__ = "/fake/path"
-                result = load_api_key()
+                load_api_key()
                 # 環境変数なし + secrets.jsonなし = None
 
     def test_env_takes_priority_over_secrets(self):

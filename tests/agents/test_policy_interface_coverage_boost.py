@@ -122,8 +122,6 @@ class TestInternalCallbackFunctions:
             pi.create_gradio_interface()
 
         # Radio, CheckboxGroup モックのchangeメソッドが呼ばれている
-        radio_mocks = mock_gr.Radio.call_args_list
-        checkbox_mocks = mock_gr.CheckboxGroup.call_args_list
 
         # すべてのコンポーネントでchangeが呼ばれる
         all_components = [mock_gr.Radio.return_value, mock_gr.CheckboxGroup.return_value]
@@ -162,8 +160,6 @@ class TestLaunchGradioExceptionPrint:
 
         with patch.object(pi_module, "gr", mock_gr):
             pi = PolicyInterface()
-            # Thread.start()が実際にtargetを実行するようにする
-            original_thread = __import__("threading").Thread
 
             def mock_thread_init(target=None, args=(), kwargs=None, daemon=None, **kw):
                 if target:
@@ -178,7 +174,7 @@ class TestLaunchGradioExceptionPrint:
 
             with patch.object(pi_module, "_logger") as mock_logger:
                 with patch("threading.Thread", side_effect=mock_thread_init):
-                    result = pi.launch_and_wait_for_input(timeout=0.01)
+                    pi.launch_and_wait_for_input(timeout=0.01)
 
         assert any(
             "Gradio起動エラー" in str(call.args[0]) for call in mock_logger.error.call_args_list

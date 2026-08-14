@@ -130,7 +130,7 @@ class TestRequirementAgent:
         agent.set_initial_requirement("Fallback requirement")
         agent.execute_llm_task = MagicMock(return_value="bad json")
 
-        result = agent.analyze_requirement("")
+        agent.analyze_requirement("")
         # execute_llm_taskに渡るpromptにinitial_requirementが含まれる
         call_args = agent.execute_llm_task.call_args[0][0]
         assert "Fallback requirement" in call_args

@@ -403,9 +403,9 @@ class TestSelfHealingServiceInit:
 
     def test_init_with_project_root(self):
         from nexuscore.services.self_healing_service import SelfHealingService
-        with patch("nexuscore.services.self_healing_service.SessionController") as MockSC, \
-             patch("nexuscore.services.self_healing_service.PatchApplier") as MockPA, \
-             patch("nexuscore.services.self_healing_service.RunHistoryLogger") as MockRHL, \
+        with patch("nexuscore.services.self_healing_service.SessionController"), \
+             patch("nexuscore.services.self_healing_service.PatchApplier"), \
+             patch("nexuscore.services.self_healing_service.RunHistoryLogger"), \
              patch("nexuscore.services.self_healing_service.SelfHealingConfig") as MockConf:
             MockConf.load.return_value = MagicMock()
             svc = SelfHealingService(project_root="/tmp/test")

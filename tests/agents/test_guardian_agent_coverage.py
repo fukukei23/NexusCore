@@ -228,10 +228,6 @@ class TestGenerateDiffSummary:
         from nexuscore.agents.guardian_agent import GuardianAgent
 
         agent = GuardianAgent()
-        file_diffs = {
-            "a.py": {"before": "x=1", "after": "x=2"},
-            "b.py": {"before": "", "after": ""},  # 空の場合
-        }
         with patch.object(agent, "generate_diff_summary", side_effect=lambda **kw: "要約結果" if kw.get("before_code") else "空"):
             # _generate_multi_file_diff_summaryを直接テスト
             pass

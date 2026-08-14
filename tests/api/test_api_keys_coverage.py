@@ -47,7 +47,7 @@ def _make_query_with_auth(auth_key_obj, **overrides):
     """認証 + カスタムチェーン対応のモッククエリ"""
     mock_query = MagicMock()
     mock_query.filter_by.return_value.first.return_value = auth_key_obj
-    for attr, val in overrides.items():
+    for attr, _val in overrides.items():
         obj = mock_query.filter_by.return_value
         for part in attr.split("."):
             obj = getattr(obj, part)

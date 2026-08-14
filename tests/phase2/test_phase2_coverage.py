@@ -261,7 +261,7 @@ class TestFormatExplainability:
 
         lines = []
         _format_explainability(lines, {"why_code": "E001", "why": "fallback"})
-        assert any("E001" in l for l in lines)
+        assert any("E001" in line for line in lines)
 
     def test_empty_fields(self):
         """Lines 154-158: Empty values don't add lines"""
@@ -332,7 +332,6 @@ class TestLoadApiKey:
         # Direct approach: patch the secrets_path variable
         import nexuscore.api.dependencies.auth as auth_mod
 
-        original_resolve = Path.resolve
         with patch.object(Path, "resolve", return_value=secrets_file):
             with patch.object(Path, "exists", return_value=True):
                 with patch("builtins.open", MagicMock(return_value=[json.dumps({"NEXUSCORE_API_KEY": "file-key-456"})])):

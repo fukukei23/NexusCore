@@ -24,4 +24,4 @@ def test_getattr_unknown_raises():
     import brownfield
     import pytest
     with pytest.raises(AttributeError):
-        brownfield.nonexistent_attr
+        brownfield.nonexistent_attr  # noqa: B018
