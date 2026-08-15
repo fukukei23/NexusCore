@@ -83,8 +83,8 @@ async def trigger_project_run(
 
         if use_celery:
             # C3: producer 側ガード（重複 enqueue 防止）＋決定論的 task_id（broker レベルで重複拒否）
-            from fastapi import HTTPException
-
+            # ※ HTTPException は module level import（関数内 import にすると未実行パスで
+            #    except 節の isinstance が UnboundLocalError になる・2026-08-15 修正）
             from nexuscore.webapp import task_lock
 
             redis_client = task_lock.get_redis()

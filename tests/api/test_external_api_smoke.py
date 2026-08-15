@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import fakeredis
 import pytest
 from fastapi.testclient import TestClient
 
@@ -146,8 +147,13 @@ def test_post_run_with_api_key(client: TestClient, mock_api_key, mock_db_models)
     with (
         patch("nexuscore.webapp.orchestrator_helper.run_orchestrator_inline"),
         patch("nexuscore.webapp.celery_app.run_orchestrator_task"),
-        patch("os.getenv", return_value="1"),
-    ):  # Celery 使用を強制（202 を返す）
+        # NEXUS_USE_CELERY のみ "1"（Celery 使用を強制し 202 を返す）。
+        # ※ 全 getenv を "1" にすると C3 の task_lock.get_redis() が REDIS_URL="1" を
+        #   読んで接続エラー→500 になった（C3 追加以降の潜在不良・2026-08-15 修正）。
+        #   Redis 依存は fakeredis で置換しローカル/CI 環境不問にする
+        patch("os.getenv", side_effect=lambda name, default=None: "1" if name == "NEXUS_USE_CELERY" else default),
+        patch("nexuscore.webapp.task_lock.get_redis", return_value=fakeredis.FakeRedis()),
+    ):
         resp = client.post(url, headers=headers, json=payload)
 
         # 非同期 = 202 / 同期 = 200 を許容

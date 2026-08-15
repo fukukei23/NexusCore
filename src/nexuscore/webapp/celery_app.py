@@ -230,6 +230,7 @@ def _register_tasks(celery_instance: Celery) -> None:
         """
         import logging
         import os
+        import uuid
 
         logger = logging.getLogger(__name__)
 
@@ -239,7 +240,11 @@ def _register_tasks(celery_instance: Celery) -> None:
             return
 
         # C3: 冪等ガード（SUCCESS skip + Redis SETNX ロック・Race Condition 回避）
-        can_run, redis_client, lock_key = _acquire_execution_lock(run, self.request.id)
+        # ※ self.request.id はタスク直接呼び出し（テスト等）では None になる。
+        #    そのまま渡すと redis SET の値が None で DataError のため uuid にフォールバック
+        #    （broker 経由の実運行では常に request.id が設定される）
+        worker_id = self.request.id or f"direct-{uuid.uuid4().hex}"
+        can_run, redis_client, lock_key = _acquire_execution_lock(run, worker_id)
         if not can_run:
             logger.info(f"Run {run_db_id} skipped by idempotency guard (status={run.status} or locked)")
             return
@@ -301,7 +306,7 @@ def _register_tasks(celery_instance: Celery) -> None:
         finally:
             # C3: ロック解放（所有者のみ・例外時も確実に解放）
             from nexuscore.webapp import task_lock
-            task_lock.release_lock(redis_client, lock_key, self.request.id)
+            task_lock.release_lock(redis_client, lock_key, worker_id)
 
     run_orchestrator_task = _run_orchestrator_task_internal
 

@@ -18,6 +18,7 @@ from nexuscore.utils.tree_sitter._config import (
     CONFIG,  # noqa: F401 — legacy re-export（tests/utils/test_tree_sitter_checker_* が利用・2026-08-15復元）
     TREE_SITTER_AVAILABLE,  # noqa: F401 — legacy re-export（同上）
     Fore,
+    Style,  # noqa: F401 — legacy re-export（test_tree_sitter_checker_symbols が monkeypatch で参照・同上）
 )
 from nexuscore.utils.tree_sitter._report import ReportGenerator
 
