@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 api_key = os.getenv("MINIMAX_API_KEY")
 api_base = os.getenv("MINIMAX_API_BASE", "https://api.minimax.chat/v1")
-model = os.getenv("MINIMAX_MODEL", "MiniMax-M2.7")
+model = os.getenv("MINIMAX_MODEL", "MiniMax-M3")
 
 if not api_key:
     print("❌ .env に MINIMAX_API_KEY が定義されていません。")

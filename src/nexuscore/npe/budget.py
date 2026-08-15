@@ -19,6 +19,8 @@ DEFAULT_COST_TABLE = {
     "glm-5.1": {"prompt": 0.5, "completion": 0.5},
     "minimax-m2.7": {"prompt": 0.3, "completion": 0.3},
     "MiniMax-M2.7": {"prompt": 0.3, "completion": 0.3},
+    # M2.7行は過去実績ログ（M2.7利用分）のコスト計算用に残す
+    "MiniMax-M3": {"prompt": 0.3, "completion": 0.3},  # 仮置き・実単価確認後に更新
 }
 
 
