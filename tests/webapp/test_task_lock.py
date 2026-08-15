@@ -4,6 +4,7 @@ C3 Celery 冪等性のための Redis SETNX 分散ロック機能を検証。
 """
 import fakeredis
 import pytest
+
 from nexuscore.webapp.task_lock import (
     acquire_lock,
     deterministic_task_id,
