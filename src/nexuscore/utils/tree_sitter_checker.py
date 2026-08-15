@@ -14,7 +14,11 @@ from pathlib import Path
 
 from nexuscore.analyzer.unified_analyzer import AnalysisResult  # noqa: F401 — legacy re-export
 from nexuscore.utils.tree_sitter._analyzer import SemanticAnalyzer
-from nexuscore.utils.tree_sitter._config import Fore
+from nexuscore.utils.tree_sitter._config import (
+    CONFIG,  # noqa: F401 — legacy re-export（tests/utils/test_tree_sitter_checker_* が利用・2026-08-15復元）
+    TREE_SITTER_AVAILABLE,  # noqa: F401 — legacy re-export（同上）
+    Fore,
+)
 from nexuscore.utils.tree_sitter._report import ReportGenerator
 
 _logger = _logging.getLogger(__name__)
