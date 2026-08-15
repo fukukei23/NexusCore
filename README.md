@@ -29,7 +29,7 @@
   <img src="docs/screenshots/test-results.png" width="500" alt="テスト結果">
 </p>
 
-> 5,465テストが全て通過（カバレッジ84.69%・CI実測 2026-07-09）。agents / llm / core / api / npe / governance / guard 等、全モジュールがユニットテスト・統合テストで保護されています。静的解析は Bandit（セキュリティ・CI必須ゲート）+ ruff（変更ファイル単位で検証）+ gitleaks（シークレット走査）で担保。ruff 全走査での既存違反と mypy は段階的に CI 導入予定（C6 で順次厳密化）。
+> 5,465テストが全て通過（カバレッジ84.69%・CI実測 2026-07-09）。agents / llm / core / api / npe / governance / guard 等、全モジュールがユニットテスト・統合テストで保護されています。静的解析は Bandit（セキュリティ・CI必須ゲート）+ ruff（src/tests 全走査・CI必須ゲート 2026-08-15）+ gitleaks（シークレット走査・CI必須ゲート 2026-08-15）で担保。mypy は src/ 残17エラーの解消後に CI 導入予定（C6 で順次厳密化）。
 
 ### 統合UI（Gradio）
 

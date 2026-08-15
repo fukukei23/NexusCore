@@ -88,7 +88,36 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
-        continue-on-error: true  # 警告モード（初回導入・既存検出でCI赤にしない・順次厳密化）
+        # 2026-08-15 実効化: 導入(2026-08-05)以降の検出ゼロを確認済みのため警告モード解除
+        # （検出でCI赤＝シークレット混入をマージブロック・C6監査CRITICAL#6対応）
+
+  # ============================================================================
+  # Lint (ruff) / 静的解析（src/ + tests/ 範囲・2026-08-15 追加・C6）
+  # ============================================================================
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: |
+          python -m pip install --upgrade pip
+          # src/tests 緑を実測済みのローカル 0.15.x に揃える（requirements-dev.txt の範囲内）
+          pip install "ruff>=0.15.0,<1.0.0"
+
+      - name: Run ruff (src/ + tests/)
+        run: |
+          # 走査範囲は src/ tests/ のみ（scripts/tools は P2 の残存違反解消後に拡張）
+          # pyproject.toml [tool.ruff] の設定（exclude含む）を自動適用
+          ruff check --output-format=github src/ tests/
 
   # ============================================================================
   # Test and Coverage / テスト実行とカバレッジ測定
