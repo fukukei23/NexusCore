@@ -133,8 +133,12 @@ class NexusConfig:
         sh_config = cls._load_self_healing_config(config_file)
 
         # 各サブシステムの設定を作成
+        # ※ flask_secret_key は str 型（本番で未設定なら空文字=Flaskが起動拒否・旧Noneは型違反だった）
+        flask_secret = os.getenv("FLASK_SECRET_KEY") or (
+            "dev-secret-key-change-in-production" if os.getenv("ENV") != "production" else ""
+        )
         config = cls(
-            flask_secret_key=os.getenv("FLASK_SECRET_KEY", "dev-secret-key-change-in-production" if os.getenv("ENV") != "production" else None),
+            flask_secret_key=flask_secret,
             database=DatabaseConfig.from_env(),
             celery=CeleryConfig.from_env(),
             autonomy=AutonomyConfig.from_env(),

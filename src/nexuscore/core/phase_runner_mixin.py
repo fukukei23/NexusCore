@@ -31,7 +31,9 @@ if TYPE_CHECKING:
     from nexuscore.core.session_controller import SessionController
     from nexuscore.llm.router import LLMRouter
 
+    from nexuscore.agents.architect_agent import ArchitectAgent
     from nexuscore.agents.base_agent import BaseAgent
+    from nexuscore.agents.guardian_agent import GuardianAgent
 
 
 class PhaseRunnerMixin:
@@ -46,6 +48,10 @@ class PhaseRunnerMixin:
         logger: logging.Logger
         session_controller: SessionController | None
         llm_router: LLMRouter
+        # ホスト(Orchestrator)が提供する属性（orchestrator.py の dataclass フィールドと同一・mypy用契約）
+        architect_agent: ArchitectAgent
+        guardian_agent: GuardianAgent
+        constitution: dict[str, Any]
         requirement_agent: BaseAgent
         planner_agent: BaseAgent
         coder_agent: BaseAgent

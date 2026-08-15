@@ -154,7 +154,7 @@ def _classify_and_should_retry(
 ) -> tuple[bool, str]:
     """エラーを分類し、リトライ可否を判定する。return (should_retry, error_class)"""
     try:
-        if retry_on is not None and isinstance(error, tuple(retry_on)):  # type: ignore[arg-type]
+        if retry_on is not None and isinstance(error, tuple(retry_on)):
             return True, "user_specified"
         error_class = classify_error(error)
         if error_class == "unexpected":

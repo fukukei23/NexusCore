@@ -171,6 +171,15 @@ jobs:
           # pytest-xdist は requirements-dev.txt に既に含まれるが、並列実行しないため不要
           # （2026-07-08 フレーク根絶のため -n auto オプション削除）
 
+      - name: Run mypy (src/)
+        run: |
+          # C6 Step3（2026-08-16）: 型チェックをCI必須ゲート化
+          # ※ 依存未インストール環境では結果が変わる（pydantic等の型情報が必要）ため
+          #    依存インストール後のこのジョブ内で実行する（別job化しない理由）
+          # ※ ローカル検証済みバージョンに固定（unused-ignore 判定がバージョンで変わるため）
+          pip install "mypy==1.20.2"
+          mypy src/
+
       - name: Run tests and generate coverage report
         run: |
           # --cov=src measures coverage for entire src folder

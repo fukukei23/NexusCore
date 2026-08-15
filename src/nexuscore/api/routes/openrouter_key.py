@@ -9,7 +9,7 @@ from nexuscore.utils.crypto_utils import encrypt_string
 from nexuscore.webapp import db
 from nexuscore.webapp.models import User
 
-from ..dependencies.auth import AuthenticatedUser, get_current_user
+from ..dependencies.auth import AuthenticatedUser, get_current_user, get_user_id_from_auth
 
 router = APIRouter(prefix="/user", tags=["openrouter"])
 logger = logging.getLogger(__name__)
@@ -25,7 +25,8 @@ async def save_openrouter_key(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> dict[str, str]:
     """OpenRouterキーを暗号化してDBに保存"""
-    user = db.session.get(User, current_user.id)
+    # AuthenticatedUser に id 属性は無い（user_id: str）→ 変換アダプタ経由（mypy/実行時両対応）
+    user = db.session.get(User, get_user_id_from_auth(current_user))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     try:
@@ -42,7 +43,8 @@ async def delete_openrouter_key(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> dict[str, str]:
     """保存済みOpenRouterキーを削除"""
-    user = db.session.get(User, current_user.id)
+    # AuthenticatedUser に id 属性は無い（user_id: str）→ 変換アダプタ経由（mypy/実行時両対応）
+    user = db.session.get(User, get_user_id_from_auth(current_user))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user.openrouter_key_enc = None
@@ -55,7 +57,8 @@ async def get_openrouter_key_status(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> dict[str, bool]:
     """OpenRouterキーが設定済みかを返す"""
-    user = db.session.get(User, current_user.id)
+    # AuthenticatedUser に id 属性は無い（user_id: str）→ 変換アダプタ経由（mypy/実行時両対応）
+    user = db.session.get(User, get_user_id_from_auth(current_user))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return {"configured": user.openrouter_key_enc is not None}

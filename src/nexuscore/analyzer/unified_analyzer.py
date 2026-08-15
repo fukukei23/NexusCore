@@ -155,6 +155,8 @@ class UnifiedAnalyzer:
         file_hashes: dict[Path, str],
     ) -> None:
         """分析結果をキャッシュに保存する。"""
+        if self.cache is None:  # キャッシュ無効時は何もしない（Optional判定・mypy）
+            return
         cache_entries: dict[str, dict] = {}
         for file_path, file_hash in file_hashes.items():
             if file_hash:
@@ -169,11 +171,11 @@ class UnifiedAnalyzer:
         for result in results:
             if result.success and result.data.get("file_path"):
                 result_file_path = Path(result.data["file_path"])
-                file_hash = file_hashes.get(result_file_path)
-                if file_hash:
+                result_file_hash = file_hashes.get(result_file_path)
+                if result_file_hash:
                     try:
                         rel_path = str(result_file_path.relative_to(self.project_root))
-                        cache_entries[rel_path] = {"hash": file_hash, "result": result.to_dict()}
+                        cache_entries[rel_path] = {"hash": result_file_hash, "result": result.to_dict()}
                     except ValueError:
                         pass
 

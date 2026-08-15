@@ -56,7 +56,8 @@ class GuardianAgent(BaseAgent):
         # cred 出所の集約ポイント（A'案）: model/api_key は GuardianAgent 内で env を参照する。
         # 呼出側は GuardianAgent() 引数なしで統一（3経路すべて）。api_key は後方互換のため引数保持。
         # ※ api_key はデッド変数（実際のLLM認証は LLMRouter 層）。引数は外部プラグイン互換のため残置。
-        self.model = model or os.getenv("GUARDIAN_MODEL", "")
+        # ※ `or` 合成は mypy 上 str|None になるため条件式で str に確定（空文字フォールバックは同じ）
+        self.model: str = model if model else os.getenv("GUARDIAN_MODEL", "")
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
         try:
             self.vcs = GitController()
