@@ -450,13 +450,19 @@ class TestGenerateFixedCodePythonPrefix:
             result = agent._generate_fixed_code("err", "file.py", "code", "fix it")
             assert result == "print('hi')"
 
-    def test_diff_prefix_stripped(self):
+    def test_unapplicable_diff_returns_none(self):
+        """2026-08-17 仕様変更: 適用不能なdiffはfixed_codeとして返さずNone（生成失敗扱い）.
+
+        旧期待値「diff本文をそのまま返す」は説明文混入事故と同根のバグ挙動だった
+        （nexuscore-bench Phase 0で修正・詳細は tests/agents/test_extract_code_from_response.py）。
+        """
         agent = DebuggerAgent.__new__(DebuggerAgent)
         agent.logger = Mock()
 
-        with patch.object(agent, "execute_llm_task", return_value="```diff\n--- a/f.py\n+++ b/f.py\n```"):
+        with patch.object(agent, "execute_llm_task", return_value="```diff\n--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n-code\n+fixed\n```"):
             result = agent._generate_fixed_code("err", "file.py", "code", "fix it")
-            assert result == "--- a/f.py\n+++ b/f.py"
+            # 元ソース"code"に適用できるdiffなら再構成される
+            assert result == "fixed"
 
     def test_no_prefix_returns_as_is(self):
         agent = DebuggerAgent.__new__(DebuggerAgent)
