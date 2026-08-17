@@ -11,6 +11,20 @@ jobs:
   tests:
     name: Run safe test suite
     runs-on: ubuntu-latest
+
+    # C3 冪等性テスト（test_celery_job_state_machine 等）が実 Redis localhost:6379 を参照するため
+    # サービスコンテナで提供（ci.yml と同一構成・2026-08-18 Safe Tests 赤対策）
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       # CI モードフラグ（コード側で参照して、実 LLM 呼び出しを禁止する想定）
       NEXUSCORE_CI: "1"
