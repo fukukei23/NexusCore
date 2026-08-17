@@ -14,7 +14,7 @@ import os
 import re
 from typing import Any
 
-from sqlalchemy import JSON, Column, DateTime, Integer, String, create_engine, func, select
+from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String, create_engine, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -44,6 +44,8 @@ class KnowledgeEntry(Base):
     target = Column(String)          # 例: 'source_file' | 'test_file' | 'both'
     solution_pattern = Column(JSON)  # 例: {"action": "edit", "file": "...", ...}
     description = Column(String)
+    # 論理削除（無効化）フラグ（nexuscore-bench Phase 0・汚染スパイラル対策）
+    disabled = Column(Boolean, default=False, nullable=False, server_default="false")
 
 
 class KnowledgeBase:
@@ -250,6 +252,60 @@ class KnowledgeBase:
                 }
                 for r in rows
             ]
+        finally:
+            session.close()
+
+    # ---- FKBスナップショット+論理削除（nexuscore-bench Phase 0・汚染対策） --------
+    def snapshot(self, out_path: str) -> str:
+        """FKB全エントリ（無効化済み含む）をJSONに書き出す。Phase毎スナップショット用."""
+        if not self._engine or not self._Session:
+            raise RuntimeError("KnowledgeBase not ready")
+        session = self._Session()
+        try:
+            rows = session.query(KnowledgeEntry).all()
+            data = [
+                {
+                    "id": r.id,
+                    "error_signature": r.error_signature,
+                    "cause": r.cause,
+                    "solution_pattern": r.solution_pattern,
+                    "disabled": bool(r.disabled),
+                }
+                for r in rows
+            ]
+        finally:
+            session.close()
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return out_path
+
+    def deactivate(self, knowledge_id: int) -> bool:
+        """knowledge_idを論理削除（無効化）する。物理削除しない."""
+        if not self._engine or not self._Session:
+            return False
+        session = self._Session()
+        try:
+            entry = session.get(KnowledgeEntry, knowledge_id)
+            if entry is None:
+                return False
+            entry.disabled = True
+            session.commit()
+            return True
+        except Exception:
+            session.rollback()
+            logger.error("deactivate failed", exc_info=True)
+            return False
+        finally:
+            session.close()
+
+    def list_active(self) -> list[dict[str, Any]]:
+        """無効化されていないエントリ一覧を返す."""
+        if not self._engine or not self._Session:
+            return []
+        session = self._Session()
+        try:
+            rows = session.query(KnowledgeEntry).filter_by(disabled=False).all()
+            return [{"id": r.id, "error_signature": r.error_signature} for r in rows]
         finally:
             session.close()
 
