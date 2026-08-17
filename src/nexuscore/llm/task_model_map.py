@@ -247,6 +247,21 @@ def _resolve_primary(task: str, default_profile: str) -> str:
     未知の値（model name 形式や typo 等）の場合は既定にフォールバックし
     警告1回を出力（移行安全性: 既存 .env の古い値でクラッシュしない）。
     """
+    # 壁3(nexuscore-bench Phase 0): タスク単位env上書きがカテゴリ単位より優先。
+    # 例: NEXUS_TASK_MODEL_DEBUG=gemini_secondary → debug系だけGeminiへ(後方互換)。
+    task_env_key = f"NEXUS_TASK_MODEL_{task.upper()}"
+    task_override = os.environ.get(task_env_key, "").strip()
+    if task_override:
+        if get_profile(task_override) is not None:
+            return task_override
+        if task_env_key not in _WARNED_BAD_ENV:
+            _WARNED_BAD_ENV.add(task_env_key)
+            logger.warning(
+                "%s=%r は未知の profile ID です（既定 %r を使用）。",
+                task_env_key, task_override, default_profile,
+            )
+        return default_profile
+
     category = _TASK_CATEGORY.get(task, "general")
     env_key = _CATEGORY_ENV[category]
     override = os.environ.get(env_key, "").strip()
