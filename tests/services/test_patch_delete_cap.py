@@ -53,3 +53,34 @@ class TestDeleteCap:
     def test_cap_default_is_20(self) -> None:
         cfg = SelfHealingConfig()
         assert cfg.max_delete_lines == 20
+
+
+class TestAstSafetyRollback:
+    """壁2-B: 削除適用後のAST安全検証+ロールバック（difflibで有効なdiffを生成）."""
+
+    def test_broken_delete_rolled_back(self, tmp_path: Path) -> None:
+        import difflib
+
+        before = "def f():\n    return 1\nx = f()\n"
+        target = tmp_path / "demo.py"
+        target.write_text(before)
+        after_lines = ["def f():\n", "x = f()\n"]  # 関数本体を削除→IndentationError
+        diff = "".join(
+            difflib.unified_diff(
+                before.splitlines(keepends=True),
+                after_lines,
+                fromfile="demo.py",
+                tofile="demo.py",
+            )
+        )
+        ap = PatchApplier()
+        result = ap.apply_patch(
+            patch_text=diff,
+            project_path=str(tmp_path),
+            allow_deletions=True,
+        )
+        assert result.get("blocked_reason") == "ast_safety_reject"
+        assert result.get("applied") is False
+        assert result.get("human_approval_required") is True
+        # ロールバック確認: ファイルは適用前のまま
+        assert target.read_text() == before

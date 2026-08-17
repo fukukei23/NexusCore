@@ -131,7 +131,22 @@ class PatchApplier:
             self.logger.info(msg)
             return result
 
-        # 4. 実際に適用
+        # 4. 実際に適用（壁2-B: 削除を含む場合は適用前スナップショット取得）
+        snapshots: dict[str, str] = {}
+        if allow_deletions and danger_info["has_delete"]:
+            for item in getattr(patch_set, "items", []):
+                raw_target = getattr(item, "target", "")
+                if isinstance(raw_target, bytes):
+                    raw_target = raw_target.decode("utf-8", errors="replace")
+                target = str(raw_target)
+                if target:
+                    abs_path = os.path.join(project_path, target.lstrip("./"))
+                    if os.path.isfile(abs_path):
+                        try:
+                            with open(abs_path, encoding="utf-8") as f:
+                                snapshots[abs_path] = f.read()
+                        except OSError:
+                            pass
         try:
             # root をプロジェクトのパスに設定
             # strip 引数はオプション（python-patch-ng では strip=0 がデフォルト）
@@ -141,6 +156,35 @@ class PatchApplier:
                 # strip 引数がサポートされていない場合は root のみ
                 success = patch_set.apply(root=project_path)
             if success:
+                # 壁2-B: 削除適用後にAST安全検証（nexuscore-bench Phase 0）
+                if snapshots:
+                    from src.nexuscore.agents._guardian_helpers.ast_safety import (
+                        check_delete_safety,
+                    )
+
+                    for abs_path, before_text in snapshots.items():
+                        if not abs_path.endswith(".py"):
+                            continue
+                        try:
+                            with open(abs_path, encoding="utf-8") as f:
+                                after_text = f.read()
+                        except OSError:
+                            continue
+                        verdict = check_delete_safety(before_text, after_text)
+                        if not verdict["ok"]:
+                            # ロールバック（安全側: 適用前の内容へ復元）
+                            with open(abs_path, "w", encoding="utf-8") as f:
+                                f.write(before_text)
+                            msg = (
+                                f"Guardian AST reject: {verdict['reason']} "
+                                f"({abs_path})。適用をロールバックしました。"
+                            )
+                            result["applied"] = False
+                            result["reason"] = msg
+                            result["blocked_reason"] = "ast_safety_reject"
+                            result["human_approval_required"] = True
+                            self.logger.warning(msg)
+                            return result
                 result["applied"] = True
                 result["reason"] = f"Patch successfully applied in: {project_path}"
                 self.logger.info(result["reason"])
