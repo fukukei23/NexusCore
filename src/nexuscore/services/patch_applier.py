@@ -33,6 +33,7 @@ class PatchApplier:
         project_path: str,
         dry_run: bool = False,
         allow_deletions: bool = False,
+        max_delete_lines: int = 20,
     ) -> dict[str, Any]:
         """
         パッチをプロジェクト配下に適用する。
@@ -41,6 +42,7 @@ class PatchApplier:
         :param project_path: プロジェクトのルートディレクトリ
         :param dry_run: True の場合は適用せず検証のみ行う
         :param allow_deletions: True の場合のみ削除行を許可
+        :param max_delete_lines: 削除許可時の削除行数上限（壁2-Aガード・超過はブロック）
         :return: 結果を表す dict（詳細な情報を含む）
 
         戻り値の例:
@@ -90,6 +92,20 @@ class PatchApplier:
             result["reason"] = msg
             self.logger.warning(msg)
             return result
+
+        # 壁2-A: 削除許可時でも削除行数上限を超えたらブロック（nexuscore-bench Phase 0）
+        if allow_deletions and danger_info["has_delete"]:
+            delete_count = int(danger_info["delete_lines"])
+            if delete_count > max_delete_lines:
+                msg = (
+                    f"削除行数 {delete_count} が上限 {max_delete_lines} を超えたため"
+                    "ブロックしました（壁2-Aガード）"
+                )
+                result["reason"] = msg
+                result["blocked_reason"] = "delete_cap_exceeded"
+                result["max_delete_lines"] = max_delete_lines
+                self.logger.warning(msg)
+                return result
 
         # 2. python-patch でパッチをパース
         try:

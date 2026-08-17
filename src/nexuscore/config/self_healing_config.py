@@ -24,6 +24,10 @@ class SelfHealingConfig:
     # ファイルの削除行 (unified diff の '-') を含む patch を許可するか
     allow_deletions: bool = False
 
+    # 削除許可時の削除行数上限（壁2-A・nexuscore-bench Phase 0）
+    # 根拠: 初期値20行。過去失敗パッチの削除行数分布からPhase 0で確定予定
+    max_delete_lines: int = 20
+
     @classmethod
     def load(cls, project_root: str) -> SelfHealingConfig:
         """
@@ -72,4 +76,5 @@ class SelfHealingConfig:
             test_command=str(test_command),
             allow_test_modification=allow_test_modification,
             allow_deletions=allow_deletions,
+            max_delete_lines=int(data.get("max_delete_lines", cls.max_delete_lines)),
         )
