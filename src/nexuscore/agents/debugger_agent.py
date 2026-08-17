@@ -3,6 +3,7 @@ import json
 import os
 import re
 import sys
+from pathlib import Path
 from typing import Any
 
 from ._fallbacks import BaseAgent
@@ -49,15 +50,51 @@ def _extract_code_from_response(response: str) -> str | None:
 
     観測された事故: LLMが「説明文＋```python コード```」を返した際、応答全体を
     fixed_code として扱うと説明文ごと書き込まれ SyntaxError になる。
-    最初のコードフェンス内容を抽出し、フェンスが無い場合は応答全体（既存互換）。
+    ```python フェンスを最優先し、無ければ最初のコードフェンス、
+    いずれも無ければ応答全体（既存互換）。
     """
     text = response.strip()
     if not text:
         return None
+    py_match = re.search(r"```(?:python|py)[ \t]*\r?\n(.*?)```", text, re.DOTALL)
+    if py_match:
+        return py_match.group(1).strip() or None
     match = re.search(r"```(?:\w+)?[ \t]*\r?\n(.*?)```", text, re.DOTALL)
     if match:
         return match.group(1).strip() or None
     return text
+
+
+def _looks_like_diff(text: str) -> bool:
+    """テキストが unified diff 形式らしいか判定する."""
+    stripped = text.strip()
+    return stripped.startswith("--- ") or "\n+++ " in stripped
+
+
+def _apply_diff_to_source(diff_text: str, original_source: str) -> str | None:
+    """LLMがdiffを返した場合に元ソースへ適用してfixed codeを再構成する.
+
+    適用できない場合は None（呼び出し側は fixed code 生成失敗として扱う）。
+    """
+    try:
+        import patch as patch_lib
+    except ImportError:
+        return None
+    import tempfile
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="nx_diff_") as d:
+            # diffヘッダのパスは不問(1ファイル対象)のため a/ソース名で受ける
+            src = Path(d) / "source.py"
+            src.write_text(original_source, encoding="utf-8")
+            # ヘッダパスを a/source.py 形式に正規化
+            normalized = re.sub(r"^(\+\+\+|---) \S+", lambda m: f"{m.group(1)} a/source.py",
+                                diff_text, flags=re.MULTILINE)
+            patch_set = patch_lib.fromstring(normalized.encode("utf-8"))
+            patch_set.apply(root=d, strip=1)
+            return src.read_text(encoding="utf-8")
+    except Exception:  # noqa: BLE001 — 適用失敗はNoneで伝える
+        return None
 
 
 class DebuggerAgent(BaseAgent):
@@ -165,7 +202,11 @@ class DebuggerAgent(BaseAgent):
         if not response:
             return None
 
-        return _extract_code_from_response(response)
+        code = _extract_code_from_response(response)
+        if code and _looks_like_diff(code):
+            # LLMがdiff形式で回答した場合は元ソースへ適用して再構成
+            code = _apply_diff_to_source(code, source_code)
+        return code
 
     def _create_diff(self, original: str, fixed: str, source_path: str, project_path: str) -> str:
         """

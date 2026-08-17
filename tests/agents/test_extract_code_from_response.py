@@ -38,3 +38,43 @@ class TestExtractCode:
     def test_empty(self) -> None:
         assert _extract_code_from_response("") is None
         assert _extract_code_from_response("説明だけです") == "説明だけです"
+
+
+class TestDiffHandling:
+    """LLMがdiffを返した場合: 元ソースへ適用してfixed codeを再構成する."""
+
+    def test_diff_response_applied_to_source(self) -> None:
+        from src.nexuscore.agents.debugger_agent import _apply_diff_to_source
+
+        original = "def is_prime(n: int) -> bool:\n    return True\n"
+        diff = (
+            "--- a/math_tools.py\n"
+            "+++ b/math_tools.py\n"
+            "@@ -1,2 +1,7 @@\n"
+            " def is_prime(n: int) -> bool:\n"
+            "-    return True\n"
+            "+    if n < 2:\n"
+            "+        return False\n"
+            "+    for i in range(2, int(n ** 0.5) + 1):\n"
+            "+        if n % i == 0:\n"
+            "+            return False\n"
+            "+    return True\n"
+        )
+        fixed = _apply_diff_to_source(diff, original)
+        assert fixed is not None
+        assert "return True" in fixed and "n % i" in fixed
+        import ast
+        ast.parse(fixed)  # 構文的に有効なPython
+
+    def test_garbage_diff_returns_none(self) -> None:
+        from src.nexuscore.agents.debugger_agent import _apply_diff_to_source
+
+        assert _apply_diff_to_source("no diff here", "x = 1\n") is None
+
+    def test_python_fence_preferred_over_diff(self) -> None:
+        resp = (
+            "説明文\n```diff\n--- a/x.py\n+++ b/x.py\n@@ -1 +1 @@\n-a\n+b\n```\n"
+            "```python\ndef f():\n    return 2\n```"
+        )
+        code = _extract_code_from_response(resp)
+        assert code == "def f():\n    return 2"
