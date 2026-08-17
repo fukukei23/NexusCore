@@ -1,4 +1,4 @@
-{"trial": 1, "debug_backend": "glm", "fkb_saved": false, "fkb_referenced": false, "fixed": false, "note": "part1: postmortem=True saved_sig_not_active", "elapsed_sec": 76.9}
-{"trial": 2, "debug_backend": "glm", "fkb_saved": false, "fkb_referenced": false, "fixed": false, "note": "part1: postmortem=True saved_sig_not_active", "elapsed_sec": 52.7}
-{"trial": 3, "debug_backend": "glm", "fkb_saved": false, "fkb_referenced": false, "fixed": false, "note": "part1: postmortem=True saved_sig_not_active", "elapsed_sec": 60.7}
-{"trial": 4, "debug_backend": "glm", "fkb_saved": false, "fkb_referenced": false, "fixed": false, "note": "part1: postmortem=True saved_sig_not_active", "elapsed_sec": 68.5}
+{"trial": 1, "debug_backend": "gemini", "fkb_saved": true, "fkb_referenced": true, "fixed": true, "note": "", "elapsed_sec": 47.3}
+{"trial": 2, "debug_backend": "gemini", "fkb_saved": true, "fkb_referenced": true, "fixed": true, "note": "", "elapsed_sec": 47.0}
+{"trial": 3, "debug_backend": "gemini", "fkb_saved": true, "fkb_referenced": true, "fixed": true, "note": "", "elapsed_sec": 107.2}
+{"trial": 4, "debug_backend": "gemini", "fkb_saved": true, "fkb_referenced": true, "fixed": true, "note": "", "elapsed_sec": 89.4}
