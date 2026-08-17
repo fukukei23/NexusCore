@@ -30,6 +30,19 @@ _ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "src"))
 
+# 注意: task_model_map は nexuscore モジュール import 時に構築されるため、
+# env上書きは import より前に完了している必要がある（argvで早期判定）
+import os  # noqa: E402
+
+if "--gemini-all" in sys.argv:
+    os.environ["NEXUS_TASK_MODEL_DEBUGGING"] = "gemini_secondary"
+    os.environ["NEXUS_TASK_MODEL_DEBUG"] = "gemini_secondary"
+    os.environ["NEXUS_TASK_MODEL_POSTMORTEM_ANALYZE"] = "gemini_secondary"
+    os.environ["NEXUS_TASK_MODEL_SELF_HEAL"] = "gemini_secondary"
+elif "--debug-gemini" in sys.argv:
+    os.environ["NEXUS_TASK_MODEL_DEBUGGING"] = "gemini_secondary"
+    os.environ["NEXUS_TASK_MODEL_DEBUG"] = "gemini_secondary"
+
 from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv()
@@ -174,15 +187,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--debug-gemini", action="store_true",
                         help="Part2のDebuggerをGeminiへ(NEXUS_TASK_MODEL_DEBUG)")
+    parser.add_argument("--gemini-all", action="store_true",
+                        help="postmortem_analyze+debug系を全てGeminiへ（GLM枠枯渇時の検証用）")
+    parser.add_argument("--trials", type=int, default=4,
+                        help="試行回数（既定4=1件必須+リトライ3回）")
     args = parser.parse_args()
     logging.basicConfig(level=logging.WARNING)
-
-    import os
-
-    if args.debug_gemini:
-        # 壁3: タスク単位env上書きでdebug系をGeminiへ（後方互換・未設定なら不変）
-        os.environ["NEXUS_TASK_MODEL_DEBUGGING"] = "gemini_secondary"
-        os.environ["NEXUS_TASK_MODEL_DEBUG"] = "gemini_secondary"
 
     db = os.environ.get("DATABASE_URL", "")
     if not db.startswith("sqlite:") or "fkb_fullloop" not in db:
@@ -193,10 +203,10 @@ def main() -> int:
     kb = KnowledgeBase()
 
     results = []
-    for i in range(1, 5):
-        print(f"--- trial {i}/4 開始 (debug={'gemini' if args.debug_gemini else 'glm'}) ---",
+    for i in range(1, args.trials + 1):
+        print(f"--- trial {i}/{args.trials} 開始 (debug={'gemini' if (args.debug_gemini or args.gemini_all) else 'glm'}) ---",
               flush=True)
-        r = run_trial(i, kb, args.debug_gemini)
+        r = run_trial(i, kb, args.debug_gemini or args.gemini_all)
         print(json.dumps(r, ensure_ascii=False), flush=True)
         results.append(r)
 

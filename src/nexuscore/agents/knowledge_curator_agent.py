@@ -90,11 +90,14 @@ class KnowledgeCuratorAgent(BaseAgent):
                     self.logger.warning("Validation failed: Generated patch could not be applied.")
                     return False
 
-                tests_passed, _ = self._run_tests_in_sandbox(sandbox_path, test_rel)
+                tests_passed, test_output = self._run_tests_in_sandbox(sandbox_path, test_rel)
                 if tests_passed:
                     self.logger.info("Validation successful! The new knowledge correctly fixed the bug.")
                     return True
-                self.logger.warning("Validation failed: Tests still fail after applying the patch.")
+                self.logger.warning(
+                    "Validation failed: Tests still fail after applying the patch. "
+                    "sandbox output tail: %s", (test_output or "")[-800:],
+                )
                 return False
 
             except Exception as e:  # noqa: BLE001

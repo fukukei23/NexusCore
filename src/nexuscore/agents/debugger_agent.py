@@ -44,6 +44,22 @@ except ImportError:
     except ImportError:
         pass
 
+def _extract_code_from_response(response: str) -> str | None:
+    """LLM応答からPythonコード部分を抽出する（nexuscore-bench Phase 0堅牢化）.
+
+    観測された事故: LLMが「説明文＋```python コード```」を返した際、応答全体を
+    fixed_code として扱うと説明文ごと書き込まれ SyntaxError になる。
+    最初のコードフェンス内容を抽出し、フェンスが無い場合は応答全体（既存互換）。
+    """
+    text = response.strip()
+    if not text:
+        return None
+    match = re.search(r"```(?:\w+)?[ \t]*\r?\n(.*?)```", text, re.DOTALL)
+    if match:
+        return match.group(1).strip() or None
+    return text
+
+
 class DebuggerAgent(BaseAgent):
     """
     テスト失敗ログを分析し、コードのバグを特定・修正するエージェント。
@@ -149,14 +165,7 @@ class DebuggerAgent(BaseAgent):
         if not response:
             return None
 
-        sanitized = response.strip()
-        if sanitized.startswith("```"):
-            sanitized = sanitized.strip("`")
-            if sanitized.lower().startswith("diff"):
-                sanitized = sanitized[4:].strip()
-            elif sanitized.lower().startswith("python"):
-                sanitized = sanitized[6:].strip()
-        return sanitized or None
+        return _extract_code_from_response(response)
 
     def _create_diff(self, original: str, fixed: str, source_path: str, project_path: str) -> str:
         """
