@@ -9,9 +9,11 @@ Redis 障害時はすべて no-op（timeout 1s + 60sサーキットブレーカ�
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
+from dataclasses import asdict
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -60,3 +62,71 @@ def get_client() -> Any | None:
 def checkpoint_key(run_db_id: int) -> str:
     """A1: チェックポイント単一キー（last_done+contextを1エントリで保持）"""
     return f"checkpoint:{run_db_id}"
+
+
+def mark_phase_done(client: Any, run_db_id: int, phase: str, context: Any) -> None:
+    """A1: 単一キー1回SET（アトミック）。A5: 512KB超はzlib+base64。"""
+    try:
+        payload = json.dumps(
+            {"schema_version": 1, "last_done": phase, "context": asdict(context)},
+            ensure_ascii=False,
+        ).encode("utf-8")
+        if len(payload) > _SNAPSHOT_MAX_BYTES:
+            import base64
+            import zlib
+
+            payload = b"C" + base64.b64encode(zlib.compress(payload))
+        else:
+            payload = b"R" + payload
+        client.set(checkpoint_key(run_db_id), payload, ex=_CHECKPOINT_TTL)
+        logger.info("checkpoint saved (run_db_id=%s phase=%s bytes=%d)", run_db_id, phase, len(payload))  # A7
+    except TypeError:
+        # A6: シリアライズ不能型の混入＝実装バグ。サイレント退化を防ぐためERRORで可視化
+        logger.error(
+            "checkpoint serialize failed (run_db_id=%s phase=%s): contextにJSON不能型が混入の疑い",
+            run_db_id, phase, exc_info=True,
+        )
+    except Exception:  # noqa: BLE001 — Redis 障害はチェックポイント放棄で継続
+        _note_failure()
+        logger.warning("checkpoint write failed (run_db_id=%s phase=%s)", run_db_id, phase, exc_info=True)
+
+
+def load_checkpoint(client: Any | None, run_db_id: int) -> tuple[str | None, Any | None]:
+    """last_done と復元済み context。無し/破損/スキーマ不一致は (None, None)。"""
+    if client is None:
+        return None, None
+    try:
+        raw = client.get(checkpoint_key(run_db_id))
+        if raw is None:
+            return None, None
+        if raw[:1] == b"C":
+            import base64
+            import zlib
+
+            payload = zlib.decompress(base64.b64decode(raw[1:])).decode("utf-8")
+        else:
+            payload = raw[1:].decode("utf-8")
+        data = json.loads(payload)
+        if data.get("schema_version") != 1:
+            logger.warning("checkpoint schema mismatch (run_db_id=%s) -> discard", run_db_id)
+            return None, None
+        from nexuscore.core.orchestrator_models import OrchestratorContext
+
+        restored = OrchestratorContext(**data["context"])
+        logger.info("checkpoint restore (run_db_id=%s last_done=%s)", run_db_id, data.get("last_done"))  # A7
+        return data.get("last_done"), restored
+    except Exception:  # noqa: BLE001
+        _note_failure()
+        logger.warning("checkpoint load failed (run_db_id=%s)", run_db_id, exc_info=True)
+        return None, None
+
+
+def clear_checkpoints(client: Any | None, run_db_id: int) -> None:
+    """SUCCESS 確定時のみ呼ぶ。FAILED 時は保持して retry の再開に使う。"""
+    if client is None:
+        return
+    try:
+        client.delete(checkpoint_key(run_db_id))
+    except Exception:  # noqa: BLE001
+        _note_failure()
+        logger.warning("checkpoint clear failed (run_db_id=%s)", run_db_id, exc_info=True)
