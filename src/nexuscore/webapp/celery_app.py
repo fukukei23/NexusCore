@@ -292,6 +292,7 @@ def _register_tasks(celery_instance: Celery) -> None:
                 from nexuscore.core import run_checkpoint
                 from nexuscore.webapp import task_lock
 
+                heartbeat_fn: Callable[[], None] | None
                 if redis_client is not None:
                     def heartbeat_fn() -> None:
                         task_lock.heartbeat(redis_client, lock_key, worker_id, ttl=run_checkpoint.LOCK_TTL)
