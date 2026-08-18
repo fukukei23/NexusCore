@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import time
+from collections.abc import Callable
 from dataclasses import asdict
 from typing import Any
 
@@ -130,3 +131,33 @@ def clear_checkpoints(client: Any | None, run_db_id: int) -> None:
     except Exception:  # noqa: BLE001
         _note_failure()
         logger.warning("checkpoint clear failed (run_db_id=%s)", run_db_id, exc_info=True)
+
+
+def run_phases_with_checkpoint(
+    runner: Any,
+    context: Any,
+    client: Any | None,
+    run_db_id: int | None,
+    heartbeat_fn: Callable[[], None] | None = None,
+) -> Any:
+    """phase 直列実行＋チェックポイント。
+
+    runner: run_<name>_phase(context) を持つオブジェクト（Orchestrator 本体）。
+    heartbeat_fn: 各phase完了時に呼ぶ実行ロックTTL延長（A3・依存注入で層序維持）。
+    """
+    last_done, restored = load_checkpoint(client, run_db_id) if run_db_id is not None else (None, None)
+    if restored is not None:
+        context = restored
+        logger.info("resuming run_db_id=%s after phase '%s' (checkpoint restore)", run_db_id, last_done)
+
+    start = 0 if last_done is None else PHASE_INDEX[last_done] + 1
+    for name, method_name in PHASE_SEQUENCE[start:]:
+        context = getattr(runner, method_name)(context)
+        if client is not None and run_db_id is not None:
+            mark_phase_done(client, run_db_id, name, context)
+        if heartbeat_fn is not None:
+            try:
+                heartbeat_fn()
+            except Exception:  # noqa: BLE001 — heartbeat失敗でrunは止めない
+                logger.warning("lock heartbeat failed (run_db_id=%s)", run_db_id, exc_info=True)
+    return context

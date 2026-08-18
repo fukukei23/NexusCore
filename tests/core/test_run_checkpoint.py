@@ -14,6 +14,7 @@ from nexuscore.core.run_checkpoint import (
     get_client,
     load_checkpoint,
     mark_phase_done,
+    run_phases_with_checkpoint,
 )
 
 
@@ -146,3 +147,88 @@ def test_context_roundtrip_ci_guard():
     _, restored = load_checkpoint(fc, 1)
     assert restored.debug_history == ctx.debug_history
     assert restored.review_report == ctx.review_report
+
+
+class FakeRunner:
+    """run_*_phase を持つ duck-typed ランナー"""
+
+    def __init__(self, fail_at: str | None = None):
+        self.executed: list[str] = []
+        self.fail_at = fail_at
+
+    def _run(self, name):
+        def method(context):
+            if name == self.fail_at:
+                raise RuntimeError(f"simulated crash at {name}")
+            self.executed.append(name)
+            context.phase_log.append(name)
+            return context
+        return method
+
+    def __getattr__(self, item):
+        if item.startswith("run_") and item.endswith("_phase"):
+            return self._run(item[len("run_"):-len("_phase")])
+        raise AttributeError(item)
+
+
+def test_runs_all_phases_without_client():
+    ctx = _ctx()
+    result = run_phases_with_checkpoint(FakeRunner(), ctx, client=None, run_db_id=7)
+    assert result.phase_log == [n for n, _ in PHASE_SEQUENCE]
+
+
+def test_resumes_from_checkpoint(fake_client):
+    """testing 完了済みなら review だけ実行・snapshot復元"""
+    ctx = _ctx()
+    ctx.plan = {"done": True}
+    mark_phase_done(fake_client, 7, "testing", ctx)
+
+    runner = FakeRunner()
+    result = run_phases_with_checkpoint(runner, ctx, client=fake_client, run_db_id=7)
+    assert runner.executed == ["review"]
+    assert result.plan == {"done": True}
+
+
+def test_marks_each_phase(fake_client):
+    run_phases_with_checkpoint(FakeRunner(), _ctx(), client=fake_client, run_db_id=8)
+    last_done, _ = load_checkpoint(fake_client, 8)
+    assert last_done == "review"  # 単一キー=最後のphase
+
+
+def test_crash_keeps_earlier_checkpoint(fake_client):
+    """crash例外は伝播させる（実運用ではworker死亡に相当）・直前phaseのcheckpointは保持"""
+    with pytest.raises(RuntimeError, match="simulated crash at implementation"):
+        run_phases_with_checkpoint(FakeRunner(fail_at="implementation"), _ctx(), client=fake_client, run_db_id=9)
+    last_done, _ = load_checkpoint(fake_client, 9)
+    assert last_done == "architecture"  # crash(implementation)直前に完了したphase
+
+    runner2 = FakeRunner()
+    run_phases_with_checkpoint(runner2, _ctx(), client=fake_client, run_db_id=9)
+    assert runner2.executed == ["implementation", "testing", "review"]
+
+
+def test_heartbeat_fn_called_per_phase(fake_client):
+    """A3: 各phase完了後に heartbeat_fn が呼ばれる"""
+    calls: list[str] = []
+    run_phases_with_checkpoint(
+        FakeRunner(), _ctx(), client=fake_client, run_db_id=10,
+        heartbeat_fn=lambda: calls.append("beat"),
+    )
+    assert len(calls) == len(PHASE_SEQUENCE)
+
+
+def test_heartbeat_fn_failure_does_not_break_run(fake_client):
+    """heartbeat_fn が例外を吐いても phase 実行は継続"""
+    def boom():
+        raise ConnectionError("redis down")
+    result = run_phases_with_checkpoint(
+        FakeRunner(), _ctx(), client=fake_client, run_db_id=11, heartbeat_fn=boom,
+    )
+    assert len(result.phase_log) == len(PHASE_SEQUENCE)
+
+
+def test_run_db_id_none_disables_checkpoint(fake_client):
+    runner = FakeRunner()
+    run_phases_with_checkpoint(runner, _ctx(), client=fake_client, run_db_id=None, heartbeat_fn=None)
+    assert len(runner.executed) == len(PHASE_SEQUENCE)
+    assert not fake_client.keys("checkpoint:*")
