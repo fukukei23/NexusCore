@@ -210,7 +210,9 @@ def _acquire_execution_lock(run: Run, worker_id: str, redis_client: Any = None) 
     if run.status == "SUCCESS":
         return (False, client, lock_key)
 
-    if not task_lock.acquire_lock(client, lock_key, worker_id, ttl=30):
+    from nexuscore.core import run_checkpoint
+
+    if not task_lock.acquire_lock(client, lock_key, worker_id, ttl=run_checkpoint.LOCK_TTL):
         return (False, client, lock_key)
 
     return (True, client, lock_key)
@@ -245,9 +247,17 @@ def _register_tasks(celery_instance: Celery) -> None:
         #    （broker 経由の実運行では常に request.id が設定される）
         worker_id = self.request.id or f"direct-{uuid.uuid4().hex}"
         can_run, redis_client, lock_key = _acquire_execution_lock(run, worker_id)
-        if not can_run:
-            logger.info(f"Run {run_db_id} skipped by idempotency guard (status={run.status} or locked)")
+        if run.status == "SUCCESS":
+            logger.info(f"Run {run_db_id} skipped by idempotency guard (already SUCCESS)")
             return
+        if not can_run:
+            # A3: skip-return-ACK だと再配送workerが消えてタスク消失する。
+            # ロック残り<TTL(600s)後に遅延再試行させる（retryはautoretry_forと別系統・
+            # max_retries到達で失敗終了するため有界）
+            from nexuscore.core import run_checkpoint
+
+            logger.info(f"Run {run_db_id} locked by another worker -> retry in {run_checkpoint.LOCK_TTL + 60}s")
+            raise self.retry(countdown=run_checkpoint.LOCK_TTL + 60)
 
         try:
             project: Project = run.project
@@ -279,6 +289,14 @@ def _register_tasks(celery_instance: Celery) -> None:
                 run.started_at = datetime.now(UTC)
                 db.session.commit()
 
+                from nexuscore.core import run_checkpoint
+                from nexuscore.webapp import task_lock
+
+                if redis_client is not None:
+                    def heartbeat_fn() -> None:
+                        task_lock.heartbeat(redis_client, lock_key, worker_id, ttl=run_checkpoint.LOCK_TTL)
+                else:
+                    heartbeat_fn = None
                 run_orchestrator_sync(
                     project_path=project.local_path,
                     user_requirement=run.requirement,
@@ -286,11 +304,18 @@ def _register_tasks(celery_instance: Celery) -> None:
                     autonomy_level=run.autonomy_level or 1,
                     language="ja",
                     fast_lane=False,
+                    heartbeat_fn=heartbeat_fn,
                 )
 
                 state_machine.complete(details={"run_db_id": run.id, "project_name": project.name})
                 run.status = "SUCCESS"
                 final_status = "success"
+
+                # C3 Plan2: SUCCESS 確定時のみチェックポイント掃除
+                # （FAILED は保持→autoretry の再実行が途中再開する・TTL 24h で自動消滅）
+                from nexuscore.core import run_checkpoint as _rc
+
+                _rc.clear_checkpoints(_rc.get_client(), run.id)
 
             except Exception as exc:  # noqa: BLE001
                 logger.error(f"Orchestrator execution failed for run_id={run.id}: {exc}", exc_info=True)

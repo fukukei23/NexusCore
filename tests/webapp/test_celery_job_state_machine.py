@@ -7,8 +7,10 @@ from __future__ import annotations
 import tempfile
 from unittest.mock import MagicMock, patch
 
+import fakeredis
 import pytest
 
+from nexuscore.core import run_checkpoint as rc
 from nexuscore.core.job_state_machine import (
     CompletedState,
     FailedState,
@@ -319,3 +321,99 @@ class TestAsyncJobProcessing:
                 state_data = json.load(f)
                 assert state_data["last_phase"] == "state_completed"
                 assert state_data["metadata"]["state"] == "completed"
+
+
+class TestC3Plan2LockTtlRetryHeartbeat:
+    """C3 Plan2: ロックTTL600s・ロック失敗retry・heartbeat_fn注入・SUCCESS時clear"""
+
+    def _make_mocks(self, run_id: int):
+        mock_run = MagicMock()
+        mock_run.id = run_id
+        mock_run.run_id = f"test-run-{run_id}"
+        mock_run.requirement = "Test requirement"
+        mock_run.autonomy_level = 1
+        mock_run.status = "PENDING"
+        mock_run.started_at = None
+        mock_run.finished_at = None
+        mock_project = MagicMock()
+        mock_project.local_path = "/tmp/test-project"
+        mock_project.name = "Test Project"
+        mock_run.project = mock_project
+        return mock_run, mock_project
+
+    @pytest.mark.skipif(not HAS_WEBAPP, reason="webapp modules not available")
+    def test_lock_ttl_and_retry_on_lock_failure(self):
+        """A3: (1) ロックTTL=LOCK_TTL(600) (2) ロック失敗時はskipでなく遅延retry（タスク消失防止）"""
+        from celery.exceptions import Retry
+
+        with (
+            patch("nexuscore.webapp.celery_app.Run") as mock_run_class,
+            patch("nexuscore.webapp.celery_app.Project") as mock_project_class,
+            patch("nexuscore.webapp.celery_app.db") as mock_db,
+            patch("nexuscore.webapp.celery_app.run_orchestrator_sync") as mock_ros,
+            patch("nexuscore.webapp.task_lock.get_redis", return_value=fakeredis.FakeStrictRedis()),
+            patch("nexuscore.webapp.task_lock.acquire_lock", side_effect=lambda c, k, w, ttl=30: (_ for _ in ()).throw(AssertionError(f"unexpected ttl={ttl}")) if ttl != rc.LOCK_TTL else False) as mock_acquire,
+        ):
+            mock_run, mock_project = self._make_mocks(201)
+            mock_run_class.query.get.return_value = mock_run
+            mock_project_class.query.get.return_value = mock_project
+            mock_db.session = MagicMock()
+
+            from nexuscore.webapp.celery_app import run_orchestrator_task
+
+            # (2) ロック失敗 → Retry（skip-return-ACKでないこと）
+            with pytest.raises(Retry):
+                run_orchestrator_task(201)
+            mock_ros.assert_not_called()
+
+        # (1) TTL は LOCK_TTL(600) で呼ばれていること（side_effect内でttl!=600ならAssertionError）
+        assert mock_acquire.called
+
+    @pytest.mark.skipif(not HAS_WEBAPP, reason="webapp modules not available")
+    def test_heartbeat_fn_passed_to_run(self):
+        """A3: celeryタスクがheartbeat_fnをorchestratorへ注入する"""
+        captured: dict = {}
+        with (
+            patch("nexuscore.webapp.celery_app.Run") as mock_run_class,
+            patch("nexuscore.webapp.celery_app.Project") as mock_project_class,
+            patch("nexuscore.webapp.celery_app.db") as mock_db,
+            patch("nexuscore.webapp.celery_app.run_orchestrator_sync", side_effect=lambda **kw: captured.update(kw)),
+            patch("nexuscore.webapp.task_lock.get_redis", return_value=fakeredis.FakeStrictRedis()),
+        ):
+            mock_run, mock_project = self._make_mocks(202)
+            mock_run_class.query.get.return_value = mock_run
+            mock_project_class.query.get.return_value = mock_project
+            mock_db.session = MagicMock()
+
+            from nexuscore.webapp.celery_app import run_orchestrator_task
+
+            run_orchestrator_task(202)
+            assert callable(captured.get("heartbeat_fn"))
+
+    @pytest.mark.skipif(not HAS_WEBAPP, reason="webapp modules not available")
+    def test_clear_checkpoints_on_success(self):
+        """SUCCESS確定時に checkpoint がクリアされる"""
+        fc = fakeredis.FakeStrictRedis()
+        # 何らかのcheckpointが残っている状態を模擬（markは実interfaceで）
+        from nexuscore.core.orchestrator_models import OrchestratorContext
+
+        rc.mark_phase_done(fc, 203, "planning", OrchestratorContext(task_id="t", user_requirement="r"))
+        assert rc.load_checkpoint(fc, 203)[0] == "planning"
+
+        with (
+            patch("nexuscore.webapp.celery_app.Run") as mock_run_class,
+            patch("nexuscore.webapp.celery_app.Project") as mock_project_class,
+            patch("nexuscore.webapp.celery_app.db") as mock_db,
+            patch("nexuscore.webapp.celery_app.run_orchestrator_sync"),
+            patch("nexuscore.webapp.task_lock.get_redis", return_value=fakeredis.FakeStrictRedis()),
+            patch("nexuscore.core.run_checkpoint.get_client", return_value=fc),
+        ):
+            mock_run, mock_project = self._make_mocks(203)
+            mock_run_class.query.get.return_value = mock_run
+            mock_project_class.query.get.return_value = mock_project
+            mock_db.session = MagicMock()
+
+            from nexuscore.webapp.celery_app import run_orchestrator_task
+
+            run_orchestrator_task(203)
+            assert rc.load_checkpoint(fc, 203) == (None, None)
