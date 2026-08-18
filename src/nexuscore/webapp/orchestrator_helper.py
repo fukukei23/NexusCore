@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -82,6 +83,7 @@ def run_orchestrator_sync(
     autonomy_level: int = 1,
     language: str = "ja",
     fast_lane: bool = False,
+    heartbeat_fn: Callable[..., None] | None = None,
 ) -> None:
     """
     Orchestrator を同期的に実行する（フェーズ1用）。
@@ -107,6 +109,7 @@ def run_orchestrator_sync(
         language=language,
         fast_lane=fast_lane,
         run_db_id=run_db_id,
+        heartbeat_fn=heartbeat_fn,
     )
 
 

@@ -18,6 +18,24 @@ from nexuscore.core.run_checkpoint import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _isolate_logging():
+    """フルスイート実行時の caplog 取りこぼし防止。
+
+    他テストがエージェントを生成すると nexuscore ロガーの propagate が
+    False に設定され、caplog（root ハンドラ）まで ERROR が伝播しなくなる
+    （test_plan_contract.py と同一対処）。
+    """
+    logging.disable(logging.NOTSET)
+    names = ["nexuscore", "nexuscore.core", "nexuscore.core.run_checkpoint"]
+    saved = {n: logging.getLogger(n).propagate for n in names}
+    for n in names:
+        logging.getLogger(n).propagate = True
+    yield
+    for n, value in saved.items():
+        logging.getLogger(n).propagate = value
+
+
 @pytest.fixture
 def fake_client():
     return fakeredis.FakeStrictRedis()
@@ -232,3 +250,32 @@ def test_run_db_id_none_disables_checkpoint(fake_client):
     run_phases_with_checkpoint(runner, _ctx(), client=fake_client, run_db_id=None, heartbeat_fn=None)
     assert len(runner.executed) == len(PHASE_SEQUENCE)
     assert not fake_client.keys("checkpoint:*")
+
+
+def test_run_full_project_delegates_to_checkpoint(monkeypatch, tmp_path):
+    """run_full_project が run_phases_with_checkpoint へ phase 実行と heartbeat_fn を委譲する"""
+    from nexuscore.core import orchestrator as orch_mod
+    from nexuscore.core.orchestrator import Orchestrator
+
+    calls: dict = {}
+
+    def fake_run_phases(runner, context, client, run_db_id, heartbeat_fn=None):
+        calls["run_db_id"] = run_db_id
+        calls["heartbeat_fn"] = heartbeat_fn
+        return context
+
+    monkeypatch.setattr(orch_mod, "run_phases_with_checkpoint", fake_run_phases)
+
+    def beat():
+        return None
+
+    orch = Orchestrator.__new__(Orchestrator)
+    orch.project_path = str(tmp_path)
+    orch.constitution = {"automation_policy": {}}
+    orch.logger = logging.getLogger("test-orch")
+    orch._maybe_stop = lambda phase, extra=None: None
+    orch._log_orch_event = lambda *a, **k: None
+
+    orch.run_full_project(user_requirement="req", run_db_id=42, heartbeat_fn=beat)
+    assert calls["run_db_id"] == 42
+    assert calls["heartbeat_fn"] is beat

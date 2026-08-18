@@ -6,6 +6,7 @@ import os
 import sys
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
@@ -52,6 +53,7 @@ from nexuscore.core.agent_factory import (
 )
 from nexuscore.core.orchestrator_models import OrchestratorContext
 from nexuscore.core.phase_runner_mixin import PhaseRunnerMixin
+from nexuscore.core.run_checkpoint import run_phases_with_checkpoint
 from nexuscore.core.session_control import SessionController
 from nexuscore.llm.llm_router import LLMRouter
 from nexuscore.services.patch_applier import PatchApplier
@@ -143,6 +145,7 @@ class Orchestrator(PhaseRunnerMixin):
         language: str = "ja",
         fast_lane: bool = False,
         run_db_id: int | None = None,
+        heartbeat_fn: Callable[[], None] | None = None,
     ) -> OrchestratorContext | None:
         """高レベルな「フルプロジェクト」実行フロー。"""
         self.logger.info(f"=== Full Project Run Start === requirement='{user_requirement}'")
@@ -161,13 +164,13 @@ class Orchestrator(PhaseRunnerMixin):
 
         try:
             self._maybe_stop("start", {"task_id": task_id, "requirement": user_requirement})
-            context = self.run_context_phase(context)
-            context = self.run_requirements_phase(context)
-            context = self.run_planning_phase(context)
-            context = self.run_architecture_phase(context)
-            context = self.run_implementation_phase(context)
-            context = self.run_testing_phase(context)
-            context = self.run_review_phase(context)
+            from nexuscore.core.run_checkpoint import get_client as _checkpoint_client
+
+            checkpoint_client = _checkpoint_client() if run_db_id is not None else None
+            context = run_phases_with_checkpoint(
+                self, context, client=checkpoint_client, run_db_id=run_db_id,
+                heartbeat_fn=heartbeat_fn,
+            )
 
             if fast_lane:
                 code_result = context.implementation.get("code", "")
