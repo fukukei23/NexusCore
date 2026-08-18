@@ -11,9 +11,21 @@ from typing import TYPE_CHECKING, Any
 
 from nexuscore.core.orchestrator_models import OrchestratorContext
 from nexuscore.core.retry_policy import _env_int
+from nexuscore.core.run_checkpoint import (
+    get_client as _rc_get_client,
+)
+from nexuscore.core.run_checkpoint import llm_cache_get, llm_cache_key, llm_cache_set
 from nexuscore.core.sandbox_executor import run_in_sandbox
 from nexuscore.npe.engine import guarded_llm_call
 from nexuscore.utils.syntax_validator import validate_python_syntax
+
+
+def _llm_cache_client() -> Any | None:
+    """LLM キャッシュ用 Redis client（NEXUSCORE_LLM_CACHE=0 で None）。"""
+    if os.getenv("NEXUSCORE_LLM_CACHE", "1") == "0":
+        return None
+    return _rc_get_client()
+
 
 DEBUG_MAX_RETRIES: int = _env_int("NEXUS_DEBUG_MAX_RETRIES", 3)
 """デバッグループ（テスト失敗→debugger修正→再テスト）の最大リトライ回数（spec §4-5）"""
@@ -90,6 +102,16 @@ class PhaseRunnerMixin:
             "If metadata.as_json is True, return strictly valid JSON."
         )
 
+        cache_client = _llm_cache_client()
+        cache_key = llm_cache_key(
+            model=model, task=task_type, system_prompt=system_prompt, user_prompt=prompt,
+        )
+        cached = llm_cache_get(cache_client, cache_key)
+        if cached is not None:
+            self.logger.info(f"[NPE] LLM cache hit (task='{task_type}')")  # A7
+            return cached
+        self.logger.info(f"[NPE] LLM cache miss (task='{task_type}')")  # A7
+
         result = guarded_llm_call(
             model=model,
             task=task_type,
@@ -106,9 +128,12 @@ class PhaseRunnerMixin:
         try:
             from nexuscore.utils.clean_output import clean_output
 
-            return clean_output(content)
+            cleaned = clean_output(content)
         except Exception:  # noqa: BLE001 — clean_output失敗時は生テキストを返す
-            return content
+            cleaned = content
+
+        llm_cache_set(cache_client, cache_key, cleaned)
+        return cleaned
 
     @staticmethod
     def _coerce_plan(plan_output: Any) -> dict[str, Any]:

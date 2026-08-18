@@ -311,3 +311,63 @@ def test_llm_cache_failure_is_passthrough(fake_client, monkeypatch):
     assert llm_cache_get(fake_client, k) is None
     monkeypatch.setattr(fake_client, "set", boom)
     llm_cache_set(fake_client, k, "v", ttl=60)  # 例外なし
+
+
+def test_execute_task_via_npe_uses_llm_cache(fake_client, monkeypatch):
+    """同一 prompt の2回目は LLM を呼ばずキャッシュを返す"""
+    from nexuscore.core import phase_runner_mixin as prm
+
+    call_count = {"n": 0}
+
+    def fake_guarded_llm_call(**kwargs):
+        call_count["n"] += 1
+        return {"content": "LLM said: hello"}
+
+    class _StubRouter:
+        task_model_map: dict = {}
+        default_model = "stub"
+
+        def complete(self, *a, **k):
+            return ""
+
+    class DummyMixin(prm.PhaseRunnerMixin):
+        logger = logging.getLogger("test-mixin")
+        llm_router = _StubRouter()
+
+    monkeypatch.setattr(prm, "guarded_llm_call", fake_guarded_llm_call)
+    monkeypatch.setattr(prm, "_llm_cache_client", lambda: fake_client)
+    mixin = DummyMixin()
+
+    first = mixin._execute_task_via_npe("build a function", {"task_type": "code"})
+    second = mixin._execute_task_via_npe("build a function", {"task_type": "code"})
+    assert first == second
+    assert call_count["n"] == 1
+
+
+def test_execute_task_via_npe_cache_disabled(monkeypatch):
+    """kill-switch（client=None）では毎回 LLM を呼ぶ"""
+    from nexuscore.core import phase_runner_mixin as prm
+
+    call_count = {"n": 0}
+
+    def fake_guarded_llm_call(**kwargs):
+        call_count["n"] += 1
+        return {"content": "fresh"}
+
+    class _StubRouter:
+        task_model_map: dict = {}
+        default_model = "stub"
+
+        def complete(self, *a, **k):
+            return ""
+
+    class DummyMixin(prm.PhaseRunnerMixin):
+        logger = logging.getLogger("test-mixin")
+        llm_router = _StubRouter()
+
+    monkeypatch.setattr(prm, "guarded_llm_call", fake_guarded_llm_call)
+    monkeypatch.setattr(prm, "_llm_cache_client", lambda: None)
+    mixin = DummyMixin()
+    mixin._execute_task_via_npe("p", {"task_type": "code"})
+    mixin._execute_task_via_npe("p", {"task_type": "code"})
+    assert call_count["n"] == 2

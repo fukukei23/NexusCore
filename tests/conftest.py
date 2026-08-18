@@ -8,6 +8,7 @@ Flask SaaS UI のスモークテストで使用する共通フィクスチャを
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -18,6 +19,14 @@ import pytest
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption("--run-integration", action="store_true", default=False, help="Run integration tests")
+
+
+# C3 Plan2: テスト環境では LLM 結果キャッシュを既定無効化。
+# 実 Redis が稼働している環境（CI redis service / ローカル開発）で
+# llm_cache:* キーがテスト間で衝突し、guarded_llm_call が呼ばれない/
+# 別テストの結果が hit する非決定性が生じるため。
+# キャッシュ機能自体のテストは _llm_cache_client を monkeypatch するため影響なし。
+os.environ.setdefault("NEXUSCORE_LLM_CACHE", "0")
 
 
 # ============================================================================
