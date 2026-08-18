@@ -12,6 +12,9 @@ from nexuscore.core.run_checkpoint import (
     checkpoint_key,
     clear_checkpoints,
     get_client,
+    llm_cache_get,
+    llm_cache_key,
+    llm_cache_set,
     load_checkpoint,
     mark_phase_done,
     run_phases_with_checkpoint,
@@ -279,3 +282,32 @@ def test_run_full_project_delegates_to_checkpoint(monkeypatch, tmp_path):
     orch.run_full_project(user_requirement="req", run_db_id=42, heartbeat_fn=beat)
     assert calls["run_db_id"] == 42
     assert calls["heartbeat_fn"] is beat
+
+
+def test_llm_cache_key_format():
+    """A4: フルハッシュ64hex×2"""
+    k = llm_cache_key(model="m1", task="code", system_prompt="sp", user_prompt="up")
+    parts = k.split(":")
+    assert len(parts) == 3 and len(parts[1]) == 64 and len(parts[2]) == 64
+
+
+def test_llm_cache_key_distinguishes_inputs():
+    assert llm_cache_key("m", "t", "sp", "a") != llm_cache_key("m", "t", "sp", "b")
+
+
+def test_llm_cache_set_get_roundtrip(fake_client):
+    k = llm_cache_key("m", "t", "sp", "up")
+    assert llm_cache_get(fake_client, k) is None
+    llm_cache_set(fake_client, k, "cached result", ttl=60)
+    assert llm_cache_get(fake_client, k) == "cached result"
+
+
+def test_llm_cache_failure_is_passthrough(fake_client, monkeypatch):
+    def boom(*a, **kw):
+        raise ConnectionError("redis down")
+
+    k = llm_cache_key("m", "t", "sp", "up")
+    monkeypatch.setattr(fake_client, "get", boom)
+    assert llm_cache_get(fake_client, k) is None
+    monkeypatch.setattr(fake_client, "set", boom)
+    llm_cache_set(fake_client, k, "v", ttl=60)  # 例外なし

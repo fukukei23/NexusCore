@@ -9,6 +9,7 @@ Redis 障害時はすべて no-op（timeout 1s + 60sサーキットブレーカ�
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -161,3 +162,31 @@ def run_phases_with_checkpoint(
             except Exception:  # noqa: BLE001 — heartbeat失敗でrunは止めない
                 logger.warning("lock heartbeat failed (run_db_id=%s)", run_db_id, exc_info=True)
     return context
+
+
+def llm_cache_key(model: str, task: str, system_prompt: str, user_prompt: str) -> str:
+    """llm_cache:{prompt_hash}:{input_hash}（A4: フル64hex・衝突回避）。"""
+    prompt_hash = hashlib.sha256(f"{model}|{task}|{system_prompt}".encode()).hexdigest()
+    input_hash = hashlib.sha256(user_prompt.encode("utf-8")).hexdigest()
+    return f"llm_cache:{prompt_hash}:{input_hash}"
+
+
+def llm_cache_get(client: Any | None, key: str) -> str | None:
+    if client is None:
+        return None
+    try:
+        raw = client.get(key)
+        return raw.decode("utf-8") if raw is not None else None
+    except Exception:  # noqa: BLE001
+        _note_failure()
+        return None
+
+
+def llm_cache_set(client: Any | None, key: str, value: str, ttl: int = 86400) -> None:
+    if client is None:
+        return
+    try:
+        client.set(key, value, ex=ttl)
+    except Exception:  # noqa: BLE001
+        _note_failure()
+        logger.warning("llm_cache set failed (key=%s...)", key[:32], exc_info=True)
