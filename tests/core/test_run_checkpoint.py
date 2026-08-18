@@ -371,3 +371,20 @@ def test_execute_task_via_npe_cache_disabled(monkeypatch):
     mixin._execute_task_via_npe("p", {"task_type": "code"})
     mixin._execute_task_via_npe("p", {"task_type": "code"})
     assert call_count["n"] == 2
+
+
+def test_unknown_last_done_falls_back_to_full_rerun(fake_client):
+    """未知のphase名（新バージョンが書いたcheckpoint等）で KeyError クラッシュせずフル再実行"""
+    import json as _json
+    from dataclasses import asdict as _asdict
+
+    payload = b'R' + _json.dumps(
+        {"schema_version": 1, "last_done": "planning2", "context": _asdict(_ctx())},
+        ensure_ascii=False,
+    ).encode("utf-8")
+    fake_client.set(checkpoint_key(12), payload)
+
+    runner = FakeRunner()
+    result = run_phases_with_checkpoint(runner, _ctx(), client=fake_client, run_db_id=12)
+    assert len(runner.executed) == len(PHASE_SEQUENCE)  # クラッシュせず全phase実行
+    assert len(result.phase_log) == len(PHASE_SEQUENCE)

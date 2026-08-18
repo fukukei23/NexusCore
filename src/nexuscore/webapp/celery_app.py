@@ -247,6 +247,7 @@ def _register_tasks(celery_instance: Celery) -> None:
         #    （broker 経由の実運行では常に request.id が設定される）
         worker_id = self.request.id or f"direct-{uuid.uuid4().hex}"
         can_run, redis_client, lock_key = _acquire_execution_lock(run, worker_id)
+        final_status = "error"  # finally参照のため早期初期化（空requirement早期returnでも束縛保証）
         if run.status == "SUCCESS":
             logger.info(f"Run {run_db_id} skipped by idempotency guard (already SUCCESS)")
             return
@@ -282,7 +283,6 @@ def _register_tasks(celery_instance: Celery) -> None:
                 job_type="orchestrator",
             )
 
-            final_status = "error"
             try:
                 state_machine.start()
                 run.status = "RUNNING"
@@ -312,12 +312,6 @@ def _register_tasks(celery_instance: Celery) -> None:
                 run.status = "SUCCESS"
                 final_status = "success"
 
-                # C3 Plan2: SUCCESS 確定時のみチェックポイント掃除
-                # （FAILED は保持→autoretry の再実行が途中再開する・TTL 24h で自動消滅）
-                from nexuscore.core import run_checkpoint as _rc
-
-                _rc.clear_checkpoints(_rc.get_client(), run.id)
-
             except Exception as exc:  # noqa: BLE001
                 logger.error(f"Orchestrator execution failed for run_id={run.id}: {exc}", exc_info=True)
                 state_machine.fail(
@@ -330,6 +324,14 @@ def _register_tasks(celery_instance: Celery) -> None:
                 _finalize_run(run, project, final_status)
 
         finally:
+            # C3 Plan2: SUCCESS確定（_finalize_run内でDB commit）後にのみチェックポイント掃除
+            # （try内でclearすると commit前クラッシュ→再配送が checkpoint喪失でフル再実行する窓がある・
+            #   FAILED は保持→autoretry の再実行が途中再開する・TTL 24h で自動消滅）
+            if final_status == "success":
+                from nexuscore.core import run_checkpoint as _rc
+
+                _rc.clear_checkpoints(_rc.get_client(), run.id)
+
             # C3: ロック解放（所有者のみ・例外時も確実に解放）
             from nexuscore.webapp import task_lock
             task_lock.release_lock(redis_client, lock_key, worker_id)

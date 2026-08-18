@@ -417,3 +417,28 @@ class TestC3Plan2LockTtlRetryHeartbeat:
 
             run_orchestrator_task(203)
             assert rc.load_checkpoint(fc, 203) == (None, None)
+
+    @pytest.mark.skipif(not HAS_WEBAPP, reason="webapp modules not available")
+    def test_missing_requirement_releases_lock(self):
+        """空requirementの早期return経路でも実行ロックは解放される（リーク回帰防止）"""
+        fc = fakeredis.FakeStrictRedis()
+        with (
+            patch("nexuscore.webapp.celery_app.Run") as mock_run_class,
+            patch("nexuscore.webapp.celery_app.Project"),
+            patch("nexuscore.webapp.celery_app.db") as mock_db,
+            patch("nexuscore.webapp.task_lock.get_redis", return_value=fc),
+        ):
+            mock_run = MagicMock()
+            mock_run.id = 301
+            mock_run.run_id = "test-run-301"
+            mock_run.requirement = None
+            mock_run.status = "PENDING"
+            mock_run.project = MagicMock()
+            mock_run_class.query.get.return_value = mock_run
+            mock_db.session = MagicMock()
+
+            from nexuscore.webapp.celery_app import run_orchestrator_task
+
+            run_orchestrator_task(301)
+
+            assert fc.keys("lock:run:*") == []  # ロック残存なし

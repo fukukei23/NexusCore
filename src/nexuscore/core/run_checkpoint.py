@@ -9,6 +9,7 @@ Redis 障害時はすべて no-op（timeout 1s + 60sサーキットブレーカ�
 """
 from __future__ import annotations
 
+import atexit
 import hashlib
 import json
 import logging
@@ -17,6 +18,8 @@ import time
 from collections.abc import Callable
 from dataclasses import asdict
 from typing import Any
+
+from nexuscore.core.orchestrator_models import OrchestratorContext
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +39,24 @@ _SNAPSHOT_MAX_BYTES = 512 * 1024  # A5: 超過時はzlib圧縮
 LOCK_TTL = 600                 # A3: 1phase（LLM数回×数十秒）をカバーし visibility_timeout(7200) < に収める
 
 # A2: 簡易サーキットブレーカ（Redis失敗後60s間はget_client即None）
+# ※ブレーカ状態はプロセスローカル（prefork環境ではworkerプロセス毎に独立・
+#   共有化するとRedis依存のブレーカになるため意図的にローカル）
 _BREAKER_COOLDOWN = 60.0
 _breaker_until = 0.0
+_client_cache: dict[str, Any] = {}  # URL -> client（接続プール再利用）
+
+
+def _close_cached_clients() -> None:
+    """interpreter shutdown時の __del__ ノイズ防止（os tear-down後のgetpid AttributeError回避）"""
+    for c in _client_cache.values():
+        try:
+            c.close()
+        except Exception:  # noqa: BLE001
+            pass
+    _client_cache.clear()
+
+
+atexit.register(_close_cached_clients)
 
 
 def _note_failure() -> None:
@@ -54,8 +73,10 @@ def get_client() -> Any | None:
     try:
         import redis
 
-        url = os.getenv("REDIS_URL") or os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
-        return redis.from_url(url, socket_connect_timeout=1.0, socket_timeout=1.0)
+        url = str(os.getenv("REDIS_URL") or os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0"))
+        if url not in _client_cache:
+            _client_cache[url] = redis.from_url(url, socket_connect_timeout=1.0, socket_timeout=1.0)
+        return _client_cache[url]
     except Exception:  # noqa: BLE001
         _note_failure()
         return None
@@ -112,8 +133,6 @@ def load_checkpoint(client: Any | None, run_db_id: int) -> tuple[str | None, Any
         if data.get("schema_version") != 1:
             logger.warning("checkpoint schema mismatch (run_db_id=%s) -> discard", run_db_id)
             return None, None
-        from nexuscore.core.orchestrator_models import OrchestratorContext
-
         restored = OrchestratorContext(**data["context"])
         logger.info("checkpoint restore (run_db_id=%s last_done=%s)", run_db_id, data.get("last_done"))  # A7
         return data.get("last_done"), restored
@@ -151,7 +170,13 @@ def run_phases_with_checkpoint(
         context = restored
         logger.info("resuming run_db_id=%s after phase '%s' (checkpoint restore)", run_db_id, last_done)
 
-    start = 0 if last_done is None else PHASE_INDEX[last_done] + 1
+    if last_done is None:
+        start = 0
+    else:
+        idx = PHASE_INDEX.get(last_done, -1)
+        if idx < 0:
+            logger.warning("unknown phase '%s' in checkpoint (run_db_id=%s) -> full rerun", last_done, run_db_id)
+        start = idx + 1
     for name, method_name in PHASE_SEQUENCE[start:]:
         context = getattr(runner, method_name)(context)
         if client is not None and run_db_id is not None:
@@ -166,7 +191,8 @@ def run_phases_with_checkpoint(
 
 def llm_cache_key(model: str, task: str, system_prompt: str, user_prompt: str) -> str:
     """llm_cache:{prompt_hash}:{input_hash}（A4: フル64hex・衝突回避）。"""
-    prompt_hash = hashlib.sha256(f"{model}|{task}|{system_prompt}".encode()).hexdigest()
+    model_part = model if model else "default"  # task_model_map未登録時のNoneガード
+    prompt_hash = hashlib.sha256(f"{model_part}|{task}|{system_prompt}".encode()).hexdigest()
     input_hash = hashlib.sha256(user_prompt.encode("utf-8")).hexdigest()
     return f"llm_cache:{prompt_hash}:{input_hash}"
 
