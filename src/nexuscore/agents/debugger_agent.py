@@ -145,7 +145,11 @@ class DebuggerAgent(BaseAgent):
             )
             instruction = (
                 f"A known solution was found: {solution.get('cause')}. "
-                f"Apply the following pattern: {json.dumps(solution.get('solution_pattern'), ensure_ascii=False)}"
+                "Note: the same error signature can have different root causes, "
+                "so treat this as a candidate, not a confirmed fix. "
+                "Verify that the root cause of the current error actually matches before applying it "
+                "(if it does not match, discard this candidate and analyze the error normally). "
+                f"Candidate pattern: {json.dumps(solution.get('solution_pattern'), ensure_ascii=False)}"
             )
 
         fixed_code = self._generate_fixed_code(error_log, source_path, source_code, instruction)
