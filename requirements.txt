@@ -8,6 +8,9 @@
 # --- Core AI and Machine Learning ---
 google-generativeai>=0.4.0,<1.0.0
 scipy>=1.11.0,<2.0.0
+# networkx: analyzer/graph_builder.py が直接import (2026-08-29 追加・従来は torch の
+# 推移依存で暗黙供給されていたが torch 削除に伴い明示化・CI新規環境で収集エラー3件の実績)
+networkx>=3.0,<4.0
 
 # --- Testing Framework ---
 # pytest 9系: PYSEC-2026-1845 (7.4.4 未満に既知脆弱性・Fix 9.0.3) 対応・2026-08-29 A群(3)
