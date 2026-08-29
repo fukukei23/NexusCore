@@ -236,7 +236,7 @@ class SemanticAnalyzer:
             misses = self._profiling_stats["cache_misses"]
             cache_hit_rate = hits / (hits + misses) if (hits + misses) > 0 else 0
             logger.info(
-                "Analysis complete: %d files, %.2fs total, %.4fs avg/file, cache hit rate: %.1%%",
+                "Analysis complete: %d files, %.2fs total, %.4fs avg/file, cache hit rate: %.1f%%",
                 len(target_files), total_time, avg_time, cache_hit_rate,
             )
 
