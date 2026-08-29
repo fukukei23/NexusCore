@@ -6,14 +6,12 @@
 # ===================================================
 
 # --- Core AI and Machine Learning ---
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.2.2+cpu
-tensorflow>=2.14.0,<3.0.0
 google-generativeai>=0.4.0,<1.0.0
 scipy>=1.11.0,<2.0.0
 
 # --- Testing Framework ---
-pytest>=7.4.0,<8.0.0
+# pytest 9系: PYSEC-2026-1845 (7.4.4 未満に既知脆弱性・Fix 9.0.3) 対応・2026-08-29 A群(3)
+pytest>=9.0.3,<10.0.0
 pytest-cov>=4.1.0,<5.0.0
 anyio>=4.0.0,<5.0.0  # Mainブランチの修正を採用（正しいパッケージ名）
 pytest-mock>=3.12.0,<4.0.0
@@ -22,12 +20,12 @@ pytest-mock>=3.12.0,<4.0.0
 gradio>=4.16.0,<7.0.0  # <5.0.0→<7.0.0: gradio 4.xは古いhuggingface_hub API(HfFolder)に依存しCI非互換・6.xは.venv実証済み(2026-07-09)
 fastapi>=0.110.0,<1.0.0 # Mainの新しいバージョンを採用
 uvicorn>=0.27.0,<1.0.0  # Mainの新しいバージョンを採用
-websockets>=12.0,<13.0
 streamlit>=1.29.0,<2.0.0
 Flask>=3.0.0,<4.0.0     # あなたのPRのアップグレードを採用
 Flask-SQLAlchemy>=3.1.0,<4.0.0
 Flask-Migrate>=4.0.0,<5.0.0
-Flask-CORS>=4.0.0,<5.0.0
+# Flask-CORS 6系: PYSEC-2026-1383/-1384/-1385 (4.0.2 に既知脆弱性・Fix 6.0.0) 対応・2026-08-29 A群(3)
+Flask-CORS>=6.0.0,<7.0.0
 Flask-Login>=0.6.0,<1.0.0
 authlib>=1.3.0,<2.0.0
 celery>=5.3.0,<6.0.0
@@ -36,10 +34,12 @@ pydantic>=2.0.0,<3.0.0  # For data validation and settings management
 matplotlib>=3.8.0,<4.0.0
 
 # --- Audio Processing ---
-SpeechRecognition>=3.10.0,<4.0.0
+# 2026-08-29 A群(4): SpeechRecognition は実import 0件で削除
+# pydub/standard-aifc は維持 — gradio が import 時に pydub を要求する実行時推移依存
+# (pytest コレクションエラー4件で実測・直接import 0件でも削除不可)
 pydub>=0.25.0,<1.0.0
-sounddevice>=0.4.6,<1.0.0
 standard-aifc; python_version < '3.13'
+sounddevice>=0.4.6,<1.0.0
 
 # --- Translation ---
 google-cloud-translate>=3.15.0,<4.0.0
@@ -51,7 +51,6 @@ httpx>=0.25.0,<1.0.0
 httpcore>=1.0.0,<2.0.0
 requests>=2.31.0,<3.0.0  # For Slack notifications
 python-dotenv>=1.0.0,<2.0.0
-psutil>=5.9.0,<6.0.0  # System monitoring and resource management
 
 termcolor>=2.4.0,<3.0.0
 pyyaml>=6.0.0,<7.0.0  # For test strategy config and constitution file

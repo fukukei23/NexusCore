@@ -24,7 +24,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          # pyproject.toml requires-python >=3.12 に統一（2026-08-29 A群(6)・Bandit実行用だが宣言不一致解消）
+          python-version: "3.12"
 
       - name: Install Bandit
         run: |
@@ -90,6 +91,42 @@ jobs:
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
         # 2026-08-15 実効化: 導入(2026-08-05)以降の検出ゼロを確認済みのため警告モード解除
         # （検出でCI赤＝シークレット混入をマージブロック・C6監査CRITICAL#6対応）
+
+  # ============================================================================
+  # Dependency Audit (pip-audit) / 依存脆弱性走査（SCA・2026-08-29 A群(5)追加）
+  # ============================================================================
+  # 2026-08-29 pip-audit 実走で flask-cors 4.0.2 (PYSEC-2026-1383/84/85) と
+  # pytest 7.4.4 (PYSEC-2026-1845) を検出済み → 6.0.0/9.0.3+ へ更新済み（同日）。
+  # ゲート化: 既知脆弱性の混入をマージブロックする。
+  sca-scan:
+    name: Dependency Audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-audit-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-audit-
+
+      - name: Install pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pip-audit==2.10.1"
+
+      - name: Run pip-audit (requirements.txt)
+        run: |
+          # ランタイム依存のみゲート化（requirements-dev は監査ツール自体のCVEでノイズになりやすいため対象外）
+          pip-audit -r requirements.txt
 
   # ============================================================================
   # Lint (ruff) / 静的解析（src/ + tests/ 範囲・2026-08-15 追加・C6）
