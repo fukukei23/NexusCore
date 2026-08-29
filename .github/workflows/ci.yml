@@ -73,24 +73,9 @@ jobs:
           fi
 
   # ============================================================================
-  # Secret Scan (gitleaks) / シークレット走査（git 履歴含む・2026-08-05 追加・C6段階的）
+  # Secret Scan (gitleaks) は独立 workflow に切り出し（2026-08-29 A群(8)）
+  # → .github/workflows/secret-scan.yml（push/PR=差分走査 + 週次schedule=全履歴走査）
   # ============================================================================
-  secret-scan:
-    name: Secret Scan (gitleaks)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository (full history)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # git 履歴全体を走査するため
-
-      - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
-        # 2026-08-15 実効化: 導入(2026-08-05)以降の検出ゼロを確認済みのため警告モード解除
-        # （検出でCI赤＝シークレット混入をマージブロック・C6監査CRITICAL#6対応）
 
   # ============================================================================
   # Dependency Audit (pip-audit) / 依存脆弱性走査（SCA・2026-08-29 A群(5)追加）
