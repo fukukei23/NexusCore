@@ -28,6 +28,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 # キャッシュ機能自体のテストは _llm_cache_client を monkeypatch するため影響なし。
 os.environ.setdefault("NEXUSCORE_LLM_CACHE", "0")
 
+# 2026-08-29: テスト中の実ネットワーク呼び出しを禁止する。
+# LLMRouter.__init__ は _detect_and_update_models で OpenAI/Gemini の models.list に
+# 実HTTPSリクエストを送る（cProfile実測: 単一テストで28リクエスト・20.5秒、SSL read待ち14.7s）。
+# これによりスイート全体がネットワーク応答速度に左右され 123s → 876s と約7倍ブレた実測がある。
+# NEXUS_DISABLE_MODEL_DETECTION は llm_router.py:127 の既存スキップスイッチ（静的task_model_map維持）。
+os.environ.setdefault("NEXUS_DISABLE_MODEL_DETECTION", "1")
+
 
 # ============================================================================
 # sys.modules 隔離: テスト間のモック汚染を防止
