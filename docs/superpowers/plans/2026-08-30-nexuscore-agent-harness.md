@@ -1579,24 +1579,21 @@ class AskSession:
         return AskResult.APPROVED if ans.strip().lower() == "y" else AskResult.DENIED_USER
 
 def _readline_with_timeout(prompt: str, timeout: float) -> str | None:
-    # 簡易実装（Phase 2ではthreading.Timerで実装）
-    import sys
+    # ⚠️ round7修正(G#1 critical): threading.Timerはメインスレッドのstdinブロックを
+    # 割り込めないため不可。select(2)ベースに変更（動作環境はLinux/WSL前提・spec §10）。
+    import select, sys
     print(prompt, end="", flush=True)
-    result = []
-    got = [False]
-    def on_timeout():
-        if not got[0]:
-            print("\n[timeout]")
-            result.append(None); got[0] = True
-    t = threading.Timer(timeout, on_timeout)
-    t.start()
-    try:
-        line = sys.stdin.readline()
-    except EOFError:
-        line = ""
-    got[0] = True
-    t.cancel()
-    return line if line else None
+    ready, _, _ = select.select([sys.stdin], [], [], timeout)
+    if not ready:
+        print("\n[timeout]")
+        return None
+    return sys.stdin.readline()
+
+def _ask_supported() -> bool:
+    # round7採用(MiniMax#4): ask_supported判定ロジック
+    # TTY対話時のみask可・CI/pipe起動はask不可（=default denyに落ちる・安全側）
+    import sys
+    return sys.stdin.isatty()
 ```
 
 - [ ] **Step 2: tool_policy.yaml 拡張（write系をaskに）**
@@ -1933,3 +1930,49 @@ mkdir -p ~/projects/obsidian-ssot/01_DECISIONS/NexusCore
 - Phase 0で撤退基準に該当した場合 → A案版planが必要（別spec）
 - 既存テスト5,000+件の非改変保証は各Phase後に `pytest tests/ -q --ignore=tests/harness -x` で確認
 - spec §10のDiscord webhook運用は環境変数 `NEXUSCORE_DISCORD_WEBHOOK` 設定が前提（未設定時はログのみ）
+
+---
+
+## round7レビュー反映（実装時修正条項・26件採用）
+
+要約渡しでの3機レビューの結果を task に統合。要約渡しのため Fact Check はスキップ済み。
+
+| Task | 反映内容（要修正） |
+|---|---|
+| Task 4 | **A案フォールバック具体化**: ①各providerクラスに直接complete_with_toolsを実装（コスト高・保守低）②CapabilityTable廃止し全プロバイダ一律有効化（リスク高）③webappのみで提供（CLIなし）。A1を第一候補・Task 1〜3の計測結果がMRO衝突/上書き不可/リトライ差分3種以上のいずれかならA1着手 |
+| Task 6 | **stub分岐をmock_provider側へ集約**: OpenAILLMの`_call_http_tool`は「real_calls=True ならHTTP／False なら固定エラー応答を返す」（tool_callを返さない）に変更。tool_call固定応答はmock_providerに集約しテストはMagicMockで |
+| Task 9 | **force_429モード追加**: `LocalToolCallDummyLLM(force_429=True)` で常にHTTPError(429)を返す。Task 16の中断→復帰e2eテストで使用 |
+| Task 11 | **1MB超過のtool_result通知**: read_fileが上限超過時 `ToolResult(status="too_large", size, allowed_max)` を返す。list_dirはdeny_pathsを**事前にフィルタ**してから返す（LLMに見せない） |
+| Task 12 | **orphan temp検出とsave戻り値区分**: 起動時 scanで `*.tmp` を発見→同一run_idのチェックサム+本体があれば本体採用・なければquarantine化。save()は Success/PartialFailure を返却・PartialFailureならloopがabort判断 |
+| Task 12 | **RunState拡張**: `breaker_state` に加え `breaker_opened_at: str|None`・`probe_attempts: int`・`probe_results: list[bool]` を追加・breaker復帰判定をstate経由で可能に |
+| Task 13 | **BACKOFF_MAX=300秒の意味を明示**: cooldownは固定値300秒（HALF_OPEN遷移までの待ち）。Retry-After未指定時の待機とは別・後者は指数バックオフ（base 2.0秒・full jitter） |
+| Task 14 | **loop↔breaker連携順序固定**: (1)LLM呼出前にbreaker.allow_request()チェック→OPENならstate書込+graceful exit (2)HTTP応答429検出→breaker.record_failure(is_429=True) (3)OPEN遷移→state.save()→raiseを順序固定 (4)tokens/wall=90%でstate.save()+graceful exit（warn80%はログのみ・90%でabort） (5)Ctrl+C SIGINTでstate.save()+exit |
+| Task 14 | **deny時のtool_result形式**: `{"role":"tool","tool_call_id":tc.id,"content":"denied: "+reason}` をprovider形式で送る（OpenAI/Anthropic/Geminiでadapterが変換） |
+| Task 14 | **exec呼出前のbudget確認**: wall/tool残り使用量をexec呼出前に累計チェック・超過見込みなら `ToolResult(status="would_exceed_limit")` を返し実行せず |
+| Task 16 | **チェックポイントを自動e2eテストに昇格**: mock providerのforce_429モードで「429×3→state書込→プロセスexit→新プロセスでstate load→完走」をCIに組み込む（手動確認のみは不可） |
+| Task 17 | **edit_fileの複数マッチ挙動**: マッチ0件=status="not_found"・1件=実行・2件以上=status="ambiguous"(match_count返却・実行せず・LLMに明示) |
+| Task 18 | **ask.py select化（済・本plan修正済み）**+ TTY判定(`_ask_supported()`): non-TTY起動はask経路に入らず即deny・TTY起動のみask_supported=True |
+| Task 20 | **exec.py cap末尾残し**: stdout/stderrは末尾5KBを保持（先頭ではない・エラー根本原因は末尾に出ることが多い） |
+| Task 23 | **status/resumeエンドポイント追加**: GET /harness/status/{run_id}・POST /harness/resume/{run_id}。webapp経由でも中断→復帰を完結可能に |
+| Task 23 | **webapp timeout**: uvicorn timeout=wall+α・長尺タスクはbackground実行+polling（httpx切断でstate消失を防ぐ） |
+| Task 5 | **provider prefix in id**: sanitize後に `(provider, original_id)` のタプルをstateに保持・プロバイダ切替時のID衝突を防止 |
+| Task 8 | **mock実行時はcapability更新禁止**: CapabilityTable更新はloop経由のみ・mock_provider単体実行ではcapabilityがmock値で上書きされないことをテストで保証 |
+
+### 検証4要素
+
+(a) fail条件: ①Task 9に force_429モードを追加→e2e中断復帰テストがCI可能に（手動チェックポイントの脆弱性を構造的に解消） ②Task 12にorphan検出+save戻り値区分→書込途中死の3状態を区別可能に ③抽出valid≥50% → **実行結果: gemini 5/5・or 5/5・MiniMax 16件inline** ④要約渡しのためFact Checkは規約通りスキップ（spec根拠は全コードがplan内に実在・grep可能）
+(b) 生ログ: `gemini: finish=STOP total=5 valid=5` / `or: finish=stop total=5 valid=5` / `GEMINI_EXIT=0` / `OR_EXIT=0`
+(c) 閾値: 抽出 valid/total ≥ 0.5（SKILL.md規定）→ 5/5・5/5・16/16 で合格
+(d) `[fp:2026-08-30T22:39:14/l1=6.6.87.2-microsoft-standard-WSL2]`
+
+### 合格宣言
+
+**「実装計画 round7レビュー（26件）」は合格（限定条件: 要約渡しのためFact Checkはスキップ済み・全26件を採用または部分採用・却下ゼロ）**
+
+---
+
+## 実行方式の最終判断（テンプレート再評価）
+
+テンプレートは `Subagent-Driven (recommended)` を推奨しているが、本planは逐次依存が強い（Phase 0判定→Phase 1・Phase間チェックポイントでふくけい承認必須・実API呼出あり・既存5,000テスト非改変保証の各Taskに内蔵）ため **subagent並列の利点が薄い**。
+
+**推奨: 「別セッションで Inline（executing-plans）+ Phase単位のチェックポイント + ふくけい承認ゲート」**（本日plan完成・実行開始は新規セッションで）
