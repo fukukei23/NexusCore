@@ -160,3 +160,9 @@ src/sandbox_logs/
 .nexus/api_runs/.nexus_context.json
 .auto-loop/
 run_unified_ui.py
+
+# Phase 0 計測出力・チェックポイントログ（git管理外・plan規定）
+artifacts/phase0/*
+!artifacts/phase0/CHECKLIST.template.md
+!artifacts/phase0/CRITERIA.md
+artifacts/checkpoints/
