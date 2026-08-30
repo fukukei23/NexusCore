@@ -93,7 +93,7 @@ NexusCore（Python製LLMアプリ・プロバイダアダプタ11種・エージ
 - **成果目標**: Web UI版デモシナリオ完遂
 - テストマトリクス: 単体（**Retry-After解析のエッジケース**を含む）+State machine（ブレーカ遷移）+事故パターン再現（429連発→切替→全OPEN→状態保存）をMVP層で必須
 
-## 8.5. 用語の統一（G#1 critical対応）
+## 7.5. 用語の統一（G#1 critical対応）
 
 - Phase 1の「**run_state保存**」= ループ全体の状態（履歴・リミット消化数・ブレーカ状態）の保存/再開。Phase 1で必須実装
 - Phase 2の「**tool完了checkpoint**」= べき等記録用のtool単位スナップショット（C10）。**Phase 1のresumeはrun_state保存で実現でき、Phase 2のcheckpointに依存しない**（両者は別物・混同禁止）
