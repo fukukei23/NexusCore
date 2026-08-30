@@ -33,6 +33,7 @@ NexusCore（Python製LLMアプリ・プロバイダアダプタ11種・エージ
 4案比較（A個別拡張/B独立レイヤー/C公式SDK/D Mixin）のL2マトリクスでD案が51点で選定。
 
 - tool calling処理を **Mixinとして1回だけ実装**し、実測で確定した**4クラス**（`OpenAICompatLLM`(5種継承)・`OpenAILLM`・`AnthropicLLM`・`GeminiLLM`）へMix-in
+- **差分フックを最初から設計に含める**: `_adapt_tool_choice` / `_adapt_tool_result`（プロバイダ固有の差を吸収・Mixinは共通処理のみ。ラウンド1レビュー条項5）
 - メソッドは `complete_with_tools()`（既存 `complete()` と別名・**既存メソッドの上書きは絶対にしない**）
 - 既存12エージェント・既存テストへの影響は構造的にゼロ（既存経路を触らない）
 - `LocalLLM` はダミースタブのため本番対象外（実測V3）・テスト用のtool_callダミー応答モードのみ追加
@@ -90,7 +91,12 @@ NexusCore（Python製LLMアプリ・プロバイダアダプタ11種・エージ
 
 - **必須**: ①CLI版デモシナリオ完遂（実プロバイダ+権限ゲート込み・本番ログ添付）②新規テスト12件緑（Phase配分 5/3/2/2・Phase1着手時最低件数未達なら次Phase着手不可）③既存テスト非改変証明（git diff添付）④全体pytest緑 ⑤resume検証合格
 - **成果目標**: Web UI版デモシナリオ完遂
-- テストマトリクス: 単体（C6エッジケース含む）+State machine（ブレーカ遷移）+事故パターン再現（429連発→切替→全OPEN→状態保存）をMVP層で必須
+- テストマトリクス: 単体（**Retry-After解析のエッジケース**を含む）+State machine（ブレーカ遷移）+事故パターン再現（429連発→切替→全OPEN→状態保存）をMVP層で必須
+
+## 8.5. 用語の統一（G#1 critical対応）
+
+- Phase 1の「**run_state保存**」= ループ全体の状態（履歴・リミット消化数・ブレーカ状態）の保存/再開。Phase 1で必須実装
+- Phase 2の「**tool完了checkpoint**」= べき等記録用のtool単位スナップショット（C10）。**Phase 1のresumeはrun_state保存で実現でき、Phase 2のcheckpointに依存しない**（両者は別物・混同禁止）
 
 ## 8. リスクと既知の前提
 
@@ -103,3 +109,34 @@ NexusCore（Python製LLMアプリ・プロバイダアダプタ11種・エージ
 - 複数エージェント協調（planner/worker）・MCP経由のtool・サブエージェント並列（強化層以降で再評価）
 - orchestrator/CR承認フローとの統合（再検討条件: harness から orchestrator 機能の呼出が必要になった時点）
 - 同一セッション内マルチプロバイダ切替（発生したらメッセージ形式フォークをreopen）
+
+## 10. 実装時に固定する詳細契約（round6 specレビュー・28件採用分）
+
+Phase実装時に参照する詳細契約（ラウンド6で3機が指摘した曖昧箇所の確定値・実装着手前にここを正とする）:
+
+| 項目 | 確定値 |
+|---|---|
+| Phase 0出力パス | `artifacts/phase0/<ISO8601>/` 配下に固定（CHECKLIST記入が完了条件・雛形をコミット） |
+| 「既存メソッド上書き」の定義 | 子クラスでのインスタンスメソッド新規定義のみを「上書き」とカウント（`__init_subclass__`注入・Mixin自体の新メソッド追加は許容） |
+| 撤退判定 | `artifacts/phase0/CRITERIA.md` に凍結・「リトライ実装差」=バックオフ戦略/Retry-After解析/最大試行回数の実装有無の差分を指す |
+| capability tableスキーマ | `{provider_id, supports_tool_calling: bool, last_verified_at, schema_version}`・更新契機3系統（Phase 0バルク書込/Mixin初期化時/明示的refreshコマンド） |
+| tool call id生成 | provider側idを優先保持・無ければMixin内でUUID v4補完・フォーマット `^[a-zA-Z0-9_-]{1,64}$` にサニタイズ |
+| メッセージ変換のネスト深度上限 | 32階層・超過時はValueError→abort（abort_reason=致命的エラー） |
+| バックオフ既定値 | base=2.0秒・max=300秒・full jitter（Retry-After未指定時） |
+| ファイルロック | `fcntl.flock` に固定・動作環境はLinux（WSL含む）前提・Windows対応はPhase 5以降のバックログ |
+| resume確認の主体 | CLI対話ユーザー・非対話モードは明示トークンopt-in時のみ無人resume可・**確認不在時のデフォルト=abort+状態保存（自動続行禁止）** |
+| askタイムアウト後のフロー | deny結果をtool_resultとしてLLMへ返し継続を試みる・継続不能判断時はabort（abort_reason=権限拒否） |
+| ask待ちの状態保存 | ask確認待ちもrun_stateに保存（プロセス再起動後もask状態から復帰） |
+| プロバイダ切替順序 | `tool_policy.yaml` の `provider_priority` 配列で固定（ラウンドロビン/コスト最適化は強化層） |
+| 切替時のLLMインスタンス | ループはステップ毎にcapabilityチェック→routerから取得し直す（インスタンスを保持し続けない） |
+| 禁止リストの粒度 | MVPはグローバルdeny（粗い・安全側）・道具別コンテキスト考慮はPhase 3で精緻化 |
+| 要対応フラグの解消 | `--ack-run-state <id>` の明示ACKのみ（自動ACK禁止・CLI起動時バナー+Web UIダッシュボードに表示） |
+| Discord通知の管理 | Webhook URLは環境変数 `NEXUSCORE_DISCORD_WEBHOOK` のみ・設定ファイルに書かない・未設定時はログのみ |
+| Phase 4着手条件 | UIスタック決定は**Phase 3完了時まで**（決定ADRをPhase 3の成果物に含める） |
+| Phase 5のGo/No-Go | 計測6項目に参考閾値案を付記（最終閾値はdogfooding開始時に確定・判定書はテンプレ化し前Phase比を記載） |
+| 実測V3の出典 | 2026-08-30の `src/nexuscore/llm/providers/local_provider.py` 実測（レビュー出力 `00_SYSTEM/マルチLLMレビュー/2026-08-30_NexusCoreハーネス方式選定/revised_proposal.md` 証跡3） |
+
+## 11. レビュー履歴
+
+- 設計レビュー5ラウンド（78件）+ spec本文レビュー1ラウンド（28件）= 計106件を統合
+- 出典: `obsidian-ssot/00_SYSTEM/マルチLLMレビュー/2026-08-30_NexusCoreハーネス方式選定/`（review_log 6本・revised_proposal 6本）
