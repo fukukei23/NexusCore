@@ -89,3 +89,53 @@ def test_adapt_request_passes_model_and_tools():
     assert body["model"] == llm.model_name
     assert body["messages"] == [{"role": "user", "content": "hi"}]
     assert body["tools"] == [{"type": "function", "function": {"name": "echo"}}]
+
+
+# --- セキュリティレビュー対応（push後 feedback 2件）のガード検証 ---
+
+
+def test_adapt_response_handles_empty_choices():
+    """不正応答: choices が空でも KeyError を出さず空の tool_calls を返す（finding 2 対応）"""
+    llm = _make_openai_llm_stub()
+    out = llm._adapt_response_native_to_internal({"choices": [], "usage": {"total_tokens": 0}})
+    assert out == {"content": "", "tool_calls": [], "usage": {"total_tokens": 0}}
+
+
+def test_adapt_response_handles_missing_message():
+    """不正応答: message が不在でも AttributeError を出さない"""
+    llm = _make_openai_llm_stub()
+    out = llm._adapt_response_native_to_internal({"choices": [{}]})
+    assert out["tool_calls"] == []
+    assert out["content"] is None
+
+
+def test_adapt_response_skips_tool_call_without_function_name():
+    """不正応答: tool_call に function.name が無いものはスキップ"""
+    llm = _make_openai_llm_stub()
+    raw = {
+        "choices": [
+            {
+                "message": {
+                    "tool_calls": [
+                        {"id": "bad", "type": "function", "function": {}},  # name 不在
+                        {
+                            "id": "ok",
+                            "type": "function",
+                            "function": {"name": "echo", "arguments": "{}"},
+                        },
+                    ]
+                }
+            }
+        ]
+    }
+    out = llm._adapt_response_native_to_internal(raw)
+    assert len(out["tool_calls"]) == 1
+    assert out["tool_calls"][0].name == "echo"
+
+
+def test_call_http_tool_stub_path_unchanged():
+    """stub モード（real_calls=False）はセキュリティ指摘後も同じ固定 echo 応答を返す"""
+    llm = _make_openai_llm_stub()
+    out = llm._call_http_tool({"model": "x"})
+    assert out["choices"][0]["message"]["tool_calls"][0]["function"]["name"] == "echo"
+    assert "usage" in out

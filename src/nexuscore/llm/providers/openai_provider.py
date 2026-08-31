@@ -133,9 +133,20 @@ class OpenAILLM(ToolCallingMixin, BaseLLM):
         """OpenAI chat completions response → {content, tool_calls, usage} へ変換
 
         OpenAI は tool_calls を `choices[0].message.tool_calls` に `[OpenAI形式TC, ...]` で持つ。
+        不正応答（choices 空 / message 不在 / tool_call に function.name 不在等）は
+        KeyError/AttributeError で silent crash させないよう防御的にスキップする。
         """
-        choice = raw["choices"][0]["message"]
-        tcs = [InternalToolCall.from_openai(t) for t in choice.get("tool_calls") or []]
+        choices = raw.get("choices") or []
+        if not choices:
+            return {"content": "", "tool_calls": [], "usage": raw.get("usage") or {}}
+        choice = choices[0].get("message") or {}
+        tcs = []
+        for t in choice.get("tool_calls") or []:
+            func = (t or {}).get("function") or {}
+            if not func.get("name"):
+                # function.name 不在の tool_call はスキップ（不正応答への防御）
+                continue
+            tcs.append(InternalToolCall.from_openai(t))
         return {
             "content": choice.get("content"),
             "tool_calls": tcs,
@@ -147,6 +158,8 @@ class OpenAILLM(ToolCallingMixin, BaseLLM):
 
         既存の self.session / self.real_calls / Azure 設定を再利用する。
         stub 分岐は Task 9 の force_429 経路と区別するため、固定の echo 応答を返す。
+        real_calls 経路は execute_real_or_fallback に包んで C5(silent-fallback)対策と
+        NEXUSCORE_ALLOW_STUB_FALLBACK の互換性を維持する。
         """
         if not getattr(self, "real_calls", False):
             # stub モード: 固定の echo tool_calls を返す（Task 9 の force_429 とは別経路）
@@ -169,7 +182,8 @@ class OpenAILLM(ToolCallingMixin, BaseLLM):
                 "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
             }
 
-        # real_calls=True: 既存の HTTP 経路を流用
+        # real_calls=True: 既存 execute() と同じ execute_real_or_fallback 経路に乗せる
+        # (C5 対策の stub-fallback 制御 / NEXUSCORE_ALLOW_STUB_FALLBACK 互換性を維持)
         if self.azure:
             url = (
                 f"{self.base_url}/openai/deployments/{self.azure_deployment}/chat/completions"
@@ -182,9 +196,13 @@ class OpenAILLM(ToolCallingMixin, BaseLLM):
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             }
-        r = self.session.post(url, headers=headers, json=body, timeout=REQUEST_TIMEOUT)
-        r.raise_for_status()
-        return r.json()
+
+        def _call() -> dict:
+            r = self.session.post(url, headers=headers, json=body, timeout=REQUEST_TIMEOUT)
+            r.raise_for_status()
+            return r.json()
+
+        return self.execute_real_or_fallback("openai", _call, as_json=False)
 
 
 __all__ = ["OpenAILLM"]
