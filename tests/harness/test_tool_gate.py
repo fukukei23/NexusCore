@@ -96,3 +96,58 @@ def test_decision_carries_reason():
     d: GateDecision = g.evaluate(tool="read_file", args={}, ask_supported=False)
     assert d.mode == Mode.DENY
     assert "fail-closed" in d.reason
+
+
+def test_nested_args_deny_path_blocked(tmp_path):
+    """ネストされた引数（list/dict内の文字列）もdeny_paths走査の対象（3機レビュー採用）"""
+    p = tmp_path / "p.yaml"
+    p.write_text(
+        "tools:\n  write_files:\n    default: allow\n    deny_paths: ['denied*']\n"
+    )
+    g = ToolGate(policy_path=p)
+    d = g.evaluate(
+        tool="write_files", args={"paths": ["denied1.txt", "ok.txt"]}, ask_supported=False
+    )
+    assert d.mode == Mode.DENY
+
+
+def test_traversal_path_normalized_before_match(tmp_path):
+    """../ を含むパスは正規化してからパターンマッチする（3機レビュー採用）"""
+    p = tmp_path / "p.yaml"
+    p.write_text(
+        "tools:\n  write_file:\n    default: allow\n    deny_paths: ['.git/**']\n"
+    )
+    g = ToolGate(policy_path=p)
+    d = g.evaluate(
+        tool="write_file", args={"path": "src/../.git/HEAD"}, ask_supported=False
+    )
+    assert d.mode == Mode.DENY
+
+
+def test_non_regular_file_policy_denies(tmp_path):
+    """FIFO等の特殊ファイルは通常ファイル扱いせず fail-closed（レビューfail条件採用）"""
+    import os
+
+    fifo = tmp_path / "p.yaml"
+    os.mkfifo(fifo)
+    g = ToolGate(policy_path=fifo)
+    d = g.evaluate(tool="read_file", args={"path": "a"}, ask_supported=False)
+    assert d.mode == Mode.DENY
+
+
+def test_invalid_encoding_policy_denies(tmp_path):
+    """デコード不能バイト列のポリシーも deny-all（UnicodeDecodeError捕捉）"""
+    p = tmp_path / "p.yaml"
+    p.write_bytes(b"\xff\xfe\x00broken")
+    g = ToolGate(policy_path=p)
+    d = g.evaluate(tool="read_file", args={"path": "a"}, ask_supported=False)
+    assert d.mode == Mode.DENY
+
+
+def test_tools_section_null_denies(tmp_path):
+    """tools: null（明示null）も破損扱いで deny-all"""
+    p = tmp_path / "p.yaml"
+    p.write_text("tools:\n")
+    g = ToolGate(policy_path=p)
+    d = g.evaluate(tool="read_file", args={"path": "a"}, ask_supported=False)
+    assert d.mode == Mode.DENY
