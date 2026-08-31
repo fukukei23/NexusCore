@@ -3,7 +3,9 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, cast
 
+from nexuscore.harness.tool_calling_mixin import InternalToolCall, ToolCallingMixin  # noqa: F401
 from nexuscore.llm.helpers import _real_call_enabled, _strip_jsonish
+from nexuscore.llm.runtime import REQUEST_TIMEOUT
 
 from .base import BaseLLM
 
@@ -12,10 +14,14 @@ if TYPE_CHECKING:
     from google.generativeai.types import GenerationConfigDict  # pragma: no cover
 
 
-class GeminiLLM(BaseLLM):
+class GeminiLLM(ToolCallingMixin, BaseLLM):
     """
     gemini-3.1-pro / gemini-2.5-flash 等のGoogle/Geminiモデル想定
     (v2.3.4: Hotfix 3 適用済)
+
+    Task 7: ToolCallingMixin を Mix-in。Gemini `generateContent` 形式 ↔ OpenAI 形式の専用 adapter。
+    既存 `execute()` は SDK 経由 (`google.generativeai`) を使うが、`complete_with_tools` は
+    HTTP 直接 (`/v1beta/models/{model}:generateContent?key=...`) で叩く。
     """
 
     def __init__(self, model_name: str):
@@ -92,6 +98,108 @@ class GeminiLLM(BaseLLM):
                 return self._stub_fallback_response("gemini", preview="Init failed. Fallback to stub.", as_json=as_json)
             return self.execute_real_or_fallback("gemini", call_fn, as_json=as_json)
         return self._stub_response("gemini", as_json=as_json)
+
+    # --- ToolCallingMixin 3差分フック実装（Task 7・Gemini 専用変換） ---
+
+    def _adapt_request_openai_to_native(
+        self, messages: list[dict], tools: list[dict], **kwargs: object
+    ) -> dict:
+        """OpenAI 形式 → Gemini `generateContent` 形式
+
+        主な変換:
+        - system ロールは `systemInstruction.parts[].text` に分離
+        - user/assistant は `contents[].parts[].text` に変換（assistant → model）
+        - tools は `tools[].functionDeclarations[]` に変換
+        """
+        sys_msg = next((m.get("content") for m in messages if m.get("role") == "system"), None)
+        sys_msg_str = sys_msg if isinstance(sys_msg, str) else ""
+        contents = [
+            {
+                "role": "model" if m.get("role") == "assistant" else "user",
+                "parts": [{"text": m.get("content", "")}],
+            }
+            for m in messages
+            if m.get("role") != "system"
+        ]
+        return {
+            "contents": contents,
+            "systemInstruction": {"parts": [{"text": sys_msg_str}]} if sys_msg_str else None,
+            "tools": [
+                {
+                    "functionDeclarations": [
+                        {
+                            "name": t["function"]["name"],
+                            "parameters": t["function"].get(
+                                "parameters", {"type": "object", "properties": {}}
+                            ),
+                        }
+                        for t in tools
+                    ]
+                }
+            ],
+            **kwargs,
+        }
+
+    def _adapt_response_native_to_internal(self, raw: dict) -> dict:
+        """Gemini `generateContent` response → 中立 {content, tool_calls, usage}
+
+        Gemini は `candidates[0].content.parts[]` に text/functionCall ブロックを混在させる。
+        防御ガード付き（candidates空/parts不在等）。
+        """
+        candidates = raw.get("candidates") or []
+        if not candidates:
+            return {
+                "content": "",
+                "tool_calls": [],
+                "usage": {"input_tokens": 0, "output_tokens": 0},
+            }
+        parts = ((candidates[0] or {}).get("content") or {}).get("parts") or []
+        if not isinstance(parts, list):
+            parts = []
+        tcs = []
+        text_parts = []
+        for p in parts:
+            if not isinstance(p, dict):
+                continue
+            if "functionCall" in p:
+                fc = p["functionCall"] or {}
+                if not fc.get("name"):
+                    continue  # name 不在はスキップ
+                tcs.append(InternalToolCall.from_gemini(fc))
+            if "text" in p and p["text"]:
+                text_parts.append(str(p["text"]))
+        usage_meta = raw.get("usageMetadata") or {}
+        return {
+            "content": "\n".join(text_parts),
+            "tool_calls": tcs,
+            "usage": {
+                "input_tokens": usage_meta.get("promptTokenCount", 0),
+                "output_tokens": usage_meta.get("candidatesTokenCount", 0),
+            },
+        }
+
+    def _call_http_tool(self, body: dict) -> dict:
+        """tool 用 HTTP 呼び出し: `/v1beta/models/{model}:generateContent?key=...` にPOST。
+        stub 時は固定 functionCall 応答"""
+        if not getattr(self, "real_calls", False):
+            return {
+                "candidates": [
+                    {"content": {"parts": [{"functionCall": {"name": "echo", "args": {"x": "hi"}}}]}}
+                ],
+                "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1},
+            }
+
+        url = f"{self.base_url}/v1beta/models/{self.model_name}:generateContent"
+
+        # api_key を query string に乗せる形（既存 Gemini 仕様）
+        params = {"key": self.api_key} if getattr(self, "api_key", None) else None
+
+        def _call() -> dict:
+            r = self.session.post(url, params=params, json=body, timeout=REQUEST_TIMEOUT)
+            r.raise_for_status()
+            return r.json()
+
+        return self.execute_real_or_fallback("gemini", _call, as_json=False)
 
 
 __all__ = ["GeminiLLM"]

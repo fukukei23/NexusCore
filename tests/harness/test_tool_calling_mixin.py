@@ -7,7 +7,14 @@ plan雛形をベースに、plan修正条項・既存実装・Task 9の force_42
 """
 from __future__ import annotations
 
+import pytest
+
 from nexuscore.harness.tool_calling_mixin import InternalToolCall
+from nexuscore.llm.providers.anthropic_provider import (
+    AnthropicLLM,  # noqa: F401 — factory closure で参照
+)
+from nexuscore.llm.providers.gemini_provider import GeminiLLM
+from nexuscore.llm.providers.openai_compat import OpenAICompatLLM
 from nexuscore.llm.providers.openai_provider import OpenAILLM
 
 
@@ -139,3 +146,63 @@ def test_call_http_tool_stub_path_unchanged():
     out = llm._call_http_tool({"model": "x"})
     assert out["choices"][0]["message"]["tool_calls"][0]["function"]["name"] == "echo"
     assert "usage" in out
+
+
+# --- Task 7: 残り3クラス Mix-in 検証 ---
+
+
+def _force_stub(llm):
+    """どのproviderでもreal_calls=Falseに強制してstub分岐を踏ませる"""
+    llm.real_calls = False
+    return llm
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda: _force_stub(OpenAICompatLLM(model_name="test-model")),
+        lambda: _force_stub(AnthropicLLM(model_name="test-model")),
+        lambda: _force_stub(GeminiLLM(model_name="test-model")),
+    ],
+    ids=["OpenAICompat", "Anthropic", "Gemini"],
+)
+def test_other_providers_complete_with_tools_stub(factory):
+    """残り3プロバイダーも stub モードで complete_with_tools が動作する"""
+    llm = factory()
+    out = llm.complete_with_tools(
+        messages=[{"role": "user", "content": "x"}],
+        tools=[
+            {
+                "type": "function",
+                "function": {
+                    "name": "echo",
+                    "parameters": {"type": "object", "properties": {}, "required": []},
+                },
+            }
+        ],
+    )
+    assert "tool_calls" in out, f"missing tool_calls in {out}"
+    assert "content" in out, f"missing content in {out}"
+    assert "usage" in out, f"missing usage in {out}"
+    assert isinstance(out["tool_calls"], list)
+    assert len(out["tool_calls"]) >= 1, f"expected at least one tool_call in stub: {out['tool_calls']}"
+    tc = out["tool_calls"][0]
+    assert isinstance(tc, InternalToolCall)
+    assert tc.name == "echo"
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda: _force_stub(OpenAICompatLLM(model_name="test-model")),
+        lambda: _force_stub(AnthropicLLM(model_name="test-model")),  # noqa: F841
+        lambda: _force_stub(GeminiLLM(model_name="test-model")),
+    ],
+    ids=["OpenAICompat", "Anthropic", "Gemini"],
+)
+def test_other_providers_mro_includes_mixin(factory):
+    """残り3プロバイダーの MRO に ToolCallingMixin が含まれる"""
+    llm = factory()
+    mro_names = [c.__name__ for c in type(llm).__mro__]
+    assert "ToolCallingMixin" in mro_names, f"ToolCallingMixin not in MRO: {mro_names}"
+    assert mro_names.index("ToolCallingMixin") < mro_names.index("BaseLLM"), mro_names

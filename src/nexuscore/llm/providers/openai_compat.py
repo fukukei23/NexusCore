@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import os
 
+from nexuscore.harness.tool_calling_mixin import (  # noqa: F401 — adapter で使用
+    InternalToolCall,
+    ToolCallingMixin,
+)
 from nexuscore.llm.helpers import _env_flag, _real_call_enabled, _strip_jsonish
 from nexuscore.llm.http_client import RequestsHTTPError
 from nexuscore.llm.runtime import HTTP_CLIENT_FACTORY, REQUEST_TIMEOUT
@@ -9,13 +13,15 @@ from nexuscore.llm.runtime import HTTP_CLIENT_FACTORY, REQUEST_TIMEOUT
 from .base import BaseLLM
 
 
-class OpenAICompatLLM(BaseLLM):
+class OpenAICompatLLM(ToolCallingMixin, BaseLLM):
     """
     OpenAI互換 chat/completions API の共通基底クラス。
 
     GLM, MiniMax, DeepSeek, Moonshot など、/v1/chat/completions または
     /chat/completions エンドポイントを持つプロバイダーはこのクラスを継承し、
     クラス属性のみで設定する。
+
+    Task 7: ToolCallingMixin を Mix-in。OpenAI 互換のため adapter は OpenAILLM と同一構造。
     """
 
     # --- サブクラスで上書きするクラス属性 ---
@@ -146,6 +152,70 @@ class OpenAICompatLLM(BaseLLM):
                 raise
 
         return self._stub_response(self.stub_label, as_json=as_json)
+
+    # --- ToolCallingMixin 3差分フック実装（Task 7・OpenAI互換） ---
+
+    def _adapt_request_openai_to_native(
+        self, messages: list[dict], tools: list[dict], **kwargs: object
+    ) -> dict:
+        """OpenAI 形式 → OpenAI 互換 request body（identity・OpenAILLM と同じ）"""
+        return {"model": self.model_name, "messages": messages, "tools": tools, **kwargs}
+
+    def _adapt_response_native_to_internal(self, raw: dict) -> dict:
+        """OpenAI 互換 chat completions response → {content, tool_calls, usage}
+
+        OpenAILLM と同じ防御ガードを適用（Task 6 のセキュリティレビュー対応と整合）
+        """
+        choices = raw.get("choices") or []
+        if not choices:
+            return {"content": "", "tool_calls": [], "usage": raw.get("usage") or {}}
+        choice = choices[0].get("message") or {}
+        tcs = []
+        for t in choice.get("tool_calls") or []:
+            func = (t or {}).get("function") or {}
+            if not func.get("name"):
+                continue
+            tcs.append(InternalToolCall.from_openai(t))
+        return {
+            "content": choice.get("content"),
+            "tool_calls": tcs,
+            "usage": raw.get("usage") or {},
+        }
+
+    def _call_http_tool(self, body: dict) -> dict:
+        """tool 用 HTTP 呼び出し: 既存self.session/URL/header 設定を再利用。stub 時は固定 echo 応答"""
+        if not getattr(self, "real_calls", False):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": "call_test",
+                                    "type": "function",
+                                    "function": {"name": "echo", "arguments": '{"x":"hi"}'},
+                                }
+                            ],
+                        }
+                    }
+                ],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            }
+
+        url = f"{self.base_url}{self.api_path}"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        def _call() -> dict:
+            r = self.session.post(url, headers=headers, json=body, timeout=REQUEST_TIMEOUT)
+            r.raise_for_status()
+            return r.json()
+
+        return self.execute_real_or_fallback(self.provider_name, _call, as_json=False)
 
 
 __all__ = ["OpenAICompatLLM"]
