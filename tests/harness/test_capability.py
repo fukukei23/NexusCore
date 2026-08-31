@@ -84,3 +84,32 @@ def test_no_tmp_file_left_after_write(tmp_path):
     f = tmp_path / "cap.json"
     CapabilityTable(path=f).set("openai", supports_tool_calling=True)
     assert not (tmp_path / "cap.json.tmp").exists()
+
+
+def test_corrupted_json_fails_fast(tmp_path):
+    """破損JSON読込時は例外で fail-fast（黙って空tableとして動かない・仕様固定）"""
+    import pytest
+
+    f = tmp_path / "cap.json"
+    f.write_text("{not-valid-json")
+    with pytest.raises(json.JSONDecodeError):
+        CapabilityTable(path=f)
+
+
+def test_deep_missing_parent_dirs_created(tmp_path):
+    """親ディレクトリが無い深いパスでも自動作成して保存できること"""
+    f = tmp_path / "a" / "b" / "cap.json"
+    t = CapabilityTable(path=f)
+    t.set("openai", supports_tool_calling=True)
+    assert json.loads(f.read_text())["openai"]["supports_tool_calling"] is True
+
+
+def test_set_refresh_updates_last_verified_at(tmp_path):
+    """refresh系統: set() 再呼び出しで last_verified_at が更新されること"""
+    f = tmp_path / "cap.json"
+    t = CapabilityTable(path=f)
+    t.set("openai", supports_tool_calling=True)
+    first = json.loads(f.read_text())["openai"]["last_verified_at"]
+    t.set("openai", supports_tool_calling=False)
+    second = json.loads(f.read_text())["openai"]["last_verified_at"]
+    assert second > first  # ISO形式（同タイムゾーン）は辞書順=時刻順
