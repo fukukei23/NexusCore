@@ -113,3 +113,21 @@ def test_set_refresh_updates_last_verified_at(tmp_path):
     t.set("openai", supports_tool_calling=False)
     second = json.loads(f.read_text())["openai"]["last_verified_at"]
     assert second > first  # ISO形式（同タイムゾーン）は辞書順=時刻順
+
+
+def test_flush_failure_propagates(tmp_path):
+    """境界⑤: 書込不可dirで_flush例外が握り潰されず伝播する（fail-fast固定・L438⑤）"""
+    import os
+
+    import pytest
+
+    ro_dir = tmp_path / "ro"
+    ro_dir.mkdir()
+    f = ro_dir / "cap.json"
+    t = CapabilityTable(path=f)
+    os.chmod(ro_dir, 0o500)  # 読取専用化
+    try:
+        with pytest.raises(OSError):
+            t.set("openai", supports_tool_calling=True)
+    finally:
+        os.chmod(ro_dir, 0o700)  # tmp_path後始末のため復元

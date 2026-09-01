@@ -151,3 +151,49 @@ def test_tools_section_null_denies(tmp_path):
     g = ToolGate(policy_path=p)
     d = g.evaluate(tool="read_file", tool_args={"path": "a"}, ask_supported=False)
     assert d.mode == Mode.DENY
+
+
+# ---------------------------------------------------------------------------
+# G1陽性対照用 境界テスト（バックログL438・2026-09-01 監査発覚の未テスト境界）
+# 各テストは「保護が有効であること」をアサートする（round3#3 kill定義）
+# ---------------------------------------------------------------------------
+
+
+def test_deny_paths_non_list_denies_all(tmp_path):
+    """境界①: deny_pathsが非list（文字列等）→ 破損扱いで deny-all（fail-open対策・L438①）
+
+    実測バグ: 文字列 'denied' は1文字ずつマッチして allow を返す
+    （fnmatch('denied.txt'[i], 'denied') は概ね不一致→走査抜け）。
+    保護: 非list型は deny-all。
+    """
+    p = tmp_path / "p.yaml"
+    p.write_text(
+        "tools:\n  write_file:\n    default: allow\n    deny_paths: denied\n"
+    )
+    g = ToolGate(policy_path=p)
+    d = g.evaluate(
+        tool="write_file", tool_args={"path": "anything.txt"}, ask_supported=False
+    )
+    assert d.mode == Mode.DENY
+
+
+def test_empty_policy_file_denies_all(tmp_path):
+    """境界②: 0バイトポリシー → deny-all（fail-closed仕様固定・L438②）"""
+    p = tmp_path / "p.yaml"
+    p.write_text("")
+    g = ToolGate(policy_path=p)
+    d = g.evaluate(
+        tool="read_file", tool_args={"path": "src/x.py"}, ask_supported=False
+    )
+    assert d.mode == Mode.DENY
+
+
+def test_abbreviated_string_config_denies(tmp_path):
+    """境界③: tools配下略記（write_file: ask の文字列conf）→ deny（L438③）"""
+    p = tmp_path / "p.yaml"
+    p.write_text("tools:\n  write_file: ask\n")
+    g = ToolGate(policy_path=p)
+    d = g.evaluate(
+        tool="write_file", tool_args={"path": "a.txt"}, ask_supported=False
+    )
+    assert d.mode == Mode.DENY

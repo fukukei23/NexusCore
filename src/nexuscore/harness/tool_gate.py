@@ -97,7 +97,15 @@ class ToolGate:
             conf = {}
         # deny_paths: default より先に、引数内の全文字列（ネスト含む）を
         # 正規化のうえglobマッチし、1つでも一致したら拒否
-        for pat in conf.get("deny_paths", []) or []:
+        # 非list型（文字列等）は破損扱いで deny-all（L438①・文字列は1文字ずつ
+        # マッチして保護が無効化される fail-open を構造的に排除）
+        deny_paths = conf.get("deny_paths", [])
+        if not isinstance(deny_paths, list):
+            return GateDecision(
+                Mode.DENY,
+                f"deny_paths is not a list (fail-closed, got {type(deny_paths).__name__})",
+            )
+        for pat in deny_paths or []:
             for v in _iter_arg_strings(tool_args):
                 if fnmatch.fnmatch(os.path.normpath(v), pat):
                     return GateDecision(

@@ -93,3 +93,18 @@ def test_mock_never_touches_capability_table(tmp_path):
 
     assert cap_file.read_text() == before  # ファイル無変更
     assert not hasattr(llm, "capability_table")  # 参照も保持しない
+
+
+def test_multi_tools_selects_first(tmp_path):
+    """境界④: 複数tools時は先頭toolを選択する（仕様固定・L438④）"""
+    import copy
+
+    second = copy.deepcopy(_ECHO_TOOL)
+    second["function"]["name"] = "write_file"
+    llm = LocalToolCallDummyLLM()
+    resp = llm.complete_with_tools(
+        messages=[{"role": "user", "content": "hi"}],
+        tools=[_ECHO_TOOL, second],
+    )
+    assert len(resp["tool_calls"]) == 1
+    assert resp["tool_calls"][0].name == "echo"  # 先頭 = _ECHO_TOOL
