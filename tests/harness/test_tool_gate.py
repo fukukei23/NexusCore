@@ -17,7 +17,7 @@ from nexuscore.harness.tool_gate import GateDecision, Mode, ToolGate
 def test_missing_policy_denies_all(tmp_path):
     """ポリシーファイル不在→全拒否（fail-closed・spec §4）"""
     g = ToolGate(policy_path=tmp_path / "missing.yaml")
-    d = g.evaluate(tool="read_file", args={"path": "/etc/passwd"}, ask_supported=False)
+    d = g.evaluate(tool="read_file", tool_args={"path": "/etc/passwd"}, ask_supported=False)
     assert d.mode == Mode.DENY
 
 
@@ -26,7 +26,7 @@ def test_broken_yaml_denies_all(tmp_path):
     p = tmp_path / "p.yaml"
     p.write_text("tools: [broken\n  yaml: : :")
     g = ToolGate(policy_path=p)
-    d = g.evaluate(tool="read_file", args={"path": "a.txt"}, ask_supported=False)
+    d = g.evaluate(tool="read_file", tool_args={"path": "a.txt"}, ask_supported=False)
     assert d.mode == Mode.DENY
 
 
@@ -35,7 +35,7 @@ def test_non_dict_policy_denies_all(tmp_path):
     p = tmp_path / "p.yaml"
     p.write_text("- just\n- a\n- list\n")
     g = ToolGate(policy_path=p)
-    d = g.evaluate(tool="read_file", args={"path": "a.txt"}, ask_supported=False)
+    d = g.evaluate(tool="read_file", tool_args={"path": "a.txt"}, ask_supported=False)
     assert d.mode == Mode.DENY
 
 
@@ -49,8 +49,8 @@ def test_per_call_independent_eval(tmp_path):
     p = tmp_path / "p.yaml"
     p.write_text("tools:\n  write_file:\n    default: ask\n")
     g = ToolGate(policy_path=p)
-    d1 = g.evaluate(tool="write_file", args={"path": "a"}, ask_supported=True)
-    d2 = g.evaluate(tool="write_file", args={"path": "a"}, ask_supported=True)
+    d1 = g.evaluate(tool="write_file", tool_args={"path": "a"}, ask_supported=True)
+    d2 = g.evaluate(tool="write_file", tool_args={"path": "a"}, ask_supported=True)
     assert d1.mode == Mode.ASK and d2.mode == Mode.ASK
 
 
@@ -59,7 +59,7 @@ def test_deny_list_blocks(tmp_path):
     p = tmp_path / "p.yaml"
     p.write_text("tools:\n  write_file:\n    default: ask\n    deny_paths: ['.git/**']\n")
     g = ToolGate(policy_path=p)
-    d = g.evaluate(tool="write_file", args={"path": ".git/HEAD"}, ask_supported=False)
+    d = g.evaluate(tool="write_file", tool_args={"path": ".git/HEAD"}, ask_supported=False)
     assert d.mode == Mode.DENY
 
 
@@ -68,7 +68,7 @@ def test_unconfigured_tool_denies(tmp_path):
     p = tmp_path / "p.yaml"
     p.write_text("tools:\n  write_file:\n    default: ask\n")
     g = ToolGate(policy_path=p)
-    d = g.evaluate(tool="unknown_tool", args={}, ask_supported=False)
+    d = g.evaluate(tool="unknown_tool", tool_args={}, ask_supported=False)
     assert d.mode == Mode.DENY
 
 
@@ -77,7 +77,7 @@ def test_read_tool_allowed(tmp_path):
     p = tmp_path / "p.yaml"
     p.write_text("tools:\n  read_file:\n    default: allow\n")
     g = ToolGate(policy_path=p)
-    d = g.evaluate(tool="read_file", args={"path": "src/x.py"}, ask_supported=False)
+    d = g.evaluate(tool="read_file", tool_args={"path": "src/x.py"}, ask_supported=False)
     assert d.mode == Mode.ALLOW
 
 
@@ -86,14 +86,14 @@ def test_ask_unsupported_denies(tmp_path):
     p = tmp_path / "p.yaml"
     p.write_text("tools:\n  write_file:\n    default: ask\n")
     g = ToolGate(policy_path=p)
-    d = g.evaluate(tool="write_file", args={"path": "a"}, ask_supported=False)
+    d = g.evaluate(tool="write_file", tool_args={"path": "a"}, ask_supported=False)
     assert d.mode == Mode.DENY
 
 
 def test_decision_carries_reason():
     """GateDecision は reason を保持し判定を説明できること"""
     g = ToolGate(policy_path="/nonexistent/policy.yaml")
-    d: GateDecision = g.evaluate(tool="read_file", args={}, ask_supported=False)
+    d: GateDecision = g.evaluate(tool="read_file", tool_args={}, ask_supported=False)
     assert d.mode == Mode.DENY
     assert "fail-closed" in d.reason
 
@@ -106,7 +106,7 @@ def test_nested_args_deny_path_blocked(tmp_path):
     )
     g = ToolGate(policy_path=p)
     d = g.evaluate(
-        tool="write_files", args={"paths": ["denied1.txt", "ok.txt"]}, ask_supported=False
+        tool="write_files", tool_args={"paths": ["denied1.txt", "ok.txt"]}, ask_supported=False
     )
     assert d.mode == Mode.DENY
 
@@ -119,7 +119,7 @@ def test_traversal_path_normalized_before_match(tmp_path):
     )
     g = ToolGate(policy_path=p)
     d = g.evaluate(
-        tool="write_file", args={"path": "src/../.git/HEAD"}, ask_supported=False
+        tool="write_file", tool_args={"path": "src/../.git/HEAD"}, ask_supported=False
     )
     assert d.mode == Mode.DENY
 
@@ -131,7 +131,7 @@ def test_non_regular_file_policy_denies(tmp_path):
     fifo = tmp_path / "p.yaml"
     os.mkfifo(fifo)
     g = ToolGate(policy_path=fifo)
-    d = g.evaluate(tool="read_file", args={"path": "a"}, ask_supported=False)
+    d = g.evaluate(tool="read_file", tool_args={"path": "a"}, ask_supported=False)
     assert d.mode == Mode.DENY
 
 
@@ -140,7 +140,7 @@ def test_invalid_encoding_policy_denies(tmp_path):
     p = tmp_path / "p.yaml"
     p.write_bytes(b"\xff\xfe\x00broken")
     g = ToolGate(policy_path=p)
-    d = g.evaluate(tool="read_file", args={"path": "a"}, ask_supported=False)
+    d = g.evaluate(tool="read_file", tool_args={"path": "a"}, ask_supported=False)
     assert d.mode == Mode.DENY
 
 
@@ -149,5 +149,5 @@ def test_tools_section_null_denies(tmp_path):
     p = tmp_path / "p.yaml"
     p.write_text("tools:\n")
     g = ToolGate(policy_path=p)
-    d = g.evaluate(tool="read_file", args={"path": "a"}, ask_supported=False)
+    d = g.evaluate(tool="read_file", tool_args={"path": "a"}, ask_supported=False)
     assert d.mode == Mode.DENY

@@ -82,9 +82,14 @@ class ToolGate:
         self._policy = data if self._loaded else {"tools": {}}
 
     def evaluate(
-        self, *, tool: str, args: dict[str, Any], ask_supported: bool
+        self, *, tool: str, tool_args: dict[str, Any], ask_supported: bool
     ) -> GateDecision:
-        """道具1回ごとに個別判定する（束ね承認不可・fail-closed）"""
+        """道具1回ごとに個別判定する（束ね承認不可・fail-closed）
+
+        引数名について: mutmut 3.x の生成ラッパーが内部変数 args=[] を作り
+        仮引数 args と衝突するため tool_args に改名（2026-09-01 実測・
+        sentaku C案確定）。仕様 §4 のキー名規定は変化なし。
+        """
         if not self._loaded:
             return GateDecision(Mode.DENY, "policy broken or missing (fail-closed)")
         conf = self._policy.get("tools", {}).get(tool, {})
@@ -93,7 +98,7 @@ class ToolGate:
         # deny_paths: default より先に、引数内の全文字列（ネスト含む）を
         # 正規化のうえglobマッチし、1つでも一致したら拒否
         for pat in conf.get("deny_paths", []) or []:
-            for v in _iter_arg_strings(args):
+            for v in _iter_arg_strings(tool_args):
                 if fnmatch.fnmatch(os.path.normpath(v), pat):
                     return GateDecision(
                         Mode.DENY, f"path {v!r} matches deny pattern {pat!r}"
