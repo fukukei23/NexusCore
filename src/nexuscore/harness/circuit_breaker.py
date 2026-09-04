@@ -73,6 +73,13 @@ class CircuitBreaker:
             return self._state == State.HALF_OPEN
 
     def record_failure(self, *, is_429: bool) -> None:
+        """失敗を記録する（threading.Lock直列化によりスレッドセーフ）
+
+        Args:
+            is_429: True=429系（レート制限）・False=その他（5xx/timeout等）。
+                非CLOSED時の非429は状態遷移にも記録にも影響しない。
+                CLOSED時は非429も窓カウントに含む（plan定義どおり）。
+        """
         with self._lock:
             if not is_429 and self._state != State.CLOSED:
                 return  # 非429は非CLOSED時の状態遷移に影響しない（spec: 連続429が主トリガ）
@@ -85,11 +92,8 @@ class CircuitBreaker:
                 self._opened_at = now
                 self._probe_results.clear()
                 return
-            window_failures = [
-                f for f in self._failures
-                if (now - f).total_seconds() <= self.window_seconds
-            ]
-            if len(window_failures) >= self.threshold:
+            # _trim直後なので self._failures が現在の窓内集合（MLR採用: 二重フィルタ排除）
+            if len(self._failures) >= self.threshold:
                 self._state = State.OPEN
                 self._opened_at = now
 
@@ -106,7 +110,12 @@ class CircuitBreaker:
                 self._opened_at = None
 
     def record_probe_failure(self) -> None:
+        """プローブ失敗→OPEN復帰（MLR採用: HALF_OPEN以外の呼び出しは無視=誤用ガード・
+        probe_attemptsは成功/失敗両方で加算）"""
         with self._lock:
+            if self._state != State.HALF_OPEN:
+                return  # CLOSED/OPEN中の誤呼びで強制OPENしない
+            self._probe_attempts += 1
             self._state = State.OPEN
             self._opened_at = self._now()
             self._probe_results.clear()

@@ -95,3 +95,38 @@ def test_export_state_matches_run_state_fields():
     assert snap["breaker_opened_at"] is not None and snap["breaker_opened_at"].endswith("Z")
     assert snap["probe_attempts"] == 0
     assert snap["probe_results"] == []
+
+
+# ---- MLR Task13レビュー採用分の検証テスト（2026-09-05） ----
+
+def test_record_probe_failure_is_guarded_outside_half_open():
+    """採用: CLOSED中の誤record_probe_failureで強制OPENしない（MiniMax+Gemini指摘）"""
+    cb = CircuitBreaker(provider="x", window_seconds=0, threshold=3, cooldown_seconds=300)
+    cb.record_probe_failure()  # CLOSED中の誤呼び
+    assert cb.state == State.CLOSED
+
+
+def test_cooldown_boundary_exact_second_transitions():
+    """採用: 境界値テスト（cooldown-1秒はOPEN・ちょうどcooldown秒でHALF_OPEN）"""
+    clock = FakeClock()
+    cb = CircuitBreaker(provider="x", window_seconds=0, threshold=1,
+                        cooldown_seconds=300, _now=clock)
+    cb.record_failure(is_429=True)
+    clock.advance(299.9)
+    assert cb.state == State.OPEN  # 直前はまだOPEN
+    clock.advance(0.1)
+    assert cb.state == State.HALF_OPEN  # ちょうど300秒で遷移（>=判定）
+
+
+def test_probe_attempts_counts_both_success_and_failure():
+    """採用: probe_attemptsは成功・失敗の両方で加算（OR指摘・export整合）"""
+    clock = FakeClock()
+    cb = CircuitBreaker(provider="x", window_seconds=0, threshold=1,
+                        cooldown_seconds=300, _now=clock)
+    cb.record_failure(is_429=True)
+    clock.advance(300)
+    assert cb.allow_probe() is True
+    cb.record_probe_failure()
+    snap = cb.export_state()
+    assert snap["probe_attempts"] == 1
+    assert snap["probe_results"] == []
