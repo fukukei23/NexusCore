@@ -78,3 +78,120 @@ def test_run_state_breaker_extension_fields():
     assert d["breaker_opened_at"] == "2026-09-04T00:00:00Z"
     assert d["probe_attempts"] == 2
     assert d["probe_results"] == [True, False]
+
+
+# ---- MLR Task12レビュー採用7件の検証テスト（2026-09-04） ----
+
+def test_load_or_quarantine_takes_lock(tmp_path, monkeypatch):
+    """採用#1: load_or_quarantineも同一ロックで保護（saveと並走競合対策）"""
+    import fcntl
+    p = tmp_path / "state.json"
+    p.write_text("{broken")
+    calls = []
+    real = fcntl.flock
+    def spy(fd, op):
+        calls.append(op)
+        return real(fd, op)
+    monkeypatch.setattr(fcntl, "flock", spy)
+    s = RunStateStore(path=p)
+    s.load_or_quarantine()
+    assert fcntl.LOCK_EX in calls, "load_or_quarantineがロックを取得していない"
+
+
+def test_save_blocks_while_load_holds_lock(tmp_path):
+    """採用#1: loadがロック保持中のsaveは完了しない（並走排他の実動作）"""
+    import fcntl
+    import threading
+    p = tmp_path / "state.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    lock = p.with_suffix(p.suffix + ".lock")
+    s = RunStateStore(path=p)
+    lf = open(lock, "w")
+    fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
+    done = threading.Event()
+
+    def worker():
+        s.save(RunState(loop_steps=1))
+        done.set()
+
+    t = threading.Thread(target=worker)
+    t.start()
+    t.join(timeout=0.5)
+    blocked = not done.is_set()
+    fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
+    lf.close()
+    t.join(timeout=5)
+    assert blocked, "ロック保持中のsaveがブロックしていない"
+    assert done.is_set(), "ロック解放後のsaveが完了していない"
+
+
+def test_checksum_written_inside_lock(tmp_path, monkeypatch):
+    """採用#2: .sha256書込はロック保持中に行う（解放後書込のレース窓対策）"""
+    import fcntl
+    from pathlib import Path as P
+    p = tmp_path / "state.json"
+    lock_held = {"v": False}
+    real_flock = fcntl.flock
+    def spy(fd, op):
+        if op == fcntl.LOCK_EX:
+            lock_held["v"] = True
+        elif op == fcntl.LOCK_UN:
+            lock_held["v"] = False
+        return real_flock(fd, op)
+    monkeypatch.setattr(fcntl, "flock", spy)
+    real_write = P.write_text
+    def write_spy(self, *a, **k):
+        if self.name.endswith(".sha256"):
+            assert lock_held["v"], "checksum書込がロック解放後に行われている"
+        return real_write(self, *a, **k)
+    monkeypatch.setattr(P, "write_text", write_spy)
+    s = RunStateStore(path=p)
+    assert s.save(RunState(loop_steps=1)) == SaveResult.SUCCESS
+
+
+def test_quarantine_names_are_unique(tmp_path):
+    """採用#3: 同一秒に2回quarantineしても上書きしない（一意名）"""
+    p = tmp_path / "state.json"
+    s = RunStateStore(path=p)
+    p.write_text("{broken1")
+    s.load_or_quarantine()
+    p.write_text("{broken2")
+    s.load_or_quarantine()
+    quars = sorted(tmp_path.glob("quarantine-*"))
+    assert len(quars) == 2, f"quarantineが衝突・上書きされた: {quars}"
+
+
+def test_save_failure_removes_tmp_file(tmp_path, monkeypatch):
+    """採用#4: save失敗時に.tmp残骸を残さない"""
+    p = tmp_path / "state.json"
+    s = RunStateStore(path=p)
+    def boom(src, dst):
+        raise OSError(28, "No space left on device")
+    monkeypatch.setattr(os, "replace", boom)
+    r = s.save(RunState(loop_steps=1))
+    assert r == SaveResult.PARTIAL_FAILURE
+    assert not p.with_suffix(p.suffix + ".tmp").exists(), "tmp残骸が残っている"
+
+
+def test_load_rejects_future_schema_version(tmp_path):
+    """採用#5: schema_version不一致は破損扱いでquarantine"""
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"data": {"loop_steps": 1}, "checksum": "x", "schema_version": 999}))
+    s = RunStateStore(path=p)
+    state, reason = s.load_or_quarantine()
+    assert state is None
+    assert reason is not None
+    assert any(tmp_path.glob("quarantine-*.json"))
+
+
+def test_save_fsynces_directory(tmp_path, monkeypatch):
+    """採用#6: os.replace後のディレクトリfsync（クラッシュ耐性）"""
+    fsync_targets = []
+    real = os.fsync
+    def spy(fd):
+        fsync_targets.append(fd)
+        return real(fd)
+    monkeypatch.setattr(os, "fsync", spy)
+    s = RunStateStore(path=tmp_path / "state.json")
+    s.save(RunState(loop_steps=1))
+    assert len(fsync_targets) >= 2, "ファイル本体とディレクトリの2系統のfsyncが無い"
