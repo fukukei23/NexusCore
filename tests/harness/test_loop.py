@@ -21,6 +21,7 @@ import logging
 from pathlib import Path
 
 import pytest
+import requests
 
 from nexuscore.harness.circuit_breaker import CircuitBreaker, State
 from nexuscore.harness.loop import AgentHarness, Limits
@@ -38,12 +39,13 @@ tools:
 """
 
 
-class Exc429(Exception):
-    """requests.HTTPError互換の429例外（response.status_codeを持つ）"""
+class Exc429(requests.exceptions.RequestException):
+    """requests.HTTPError互換の429例外（RequestException継承・status_codeを持つ）"""
 
     def __init__(self) -> None:
         super().__init__("429 too many requests")
         self.response = type("R", (), {"status_code": 429})()
+        self.status_code = 429
 
 
 def _content_resp(content: str, total_tokens: int = 0) -> dict:
@@ -212,6 +214,7 @@ def test_probe_recovery_half_open_to_closed(tmp_path):
     out = h.run("second")  # allow_probe=True→成功→record_probe_success→CLOSED
     assert out["content"] == "recovered"
     assert br.state == State.CLOSED  # 起票fail条件: 復帰が1度は実現
+    assert llm.calls == 2  # 直列実行の契約（probe判定は単一ループ前提・MLR採用）
 
 
 def test_probe_failure_returns_to_open(tmp_path):
@@ -255,14 +258,24 @@ def test_breaker_open_before_llm_call_graceful_exit(tmp_path):
     assert llm.calls == 0
 
 
-def test_non_429_error_also_records_failure(tmp_path):
-    """非429例外→record_failure(is_429=False)・CLOSED中は窓カウントに含む"""
+def test_non_429_provider_error_also_records_failure(tmp_path):
+    """provider系非429例外（Timeout等）→record_failure(is_429=False)で窓カウント"""
     br = CircuitBreaker(provider="test", threshold=1)
-    llm = ScriptedLLM([RuntimeError("timeout-ish")])
+    llm = ScriptedLLM([requests.exceptions.Timeout("timeout-ish")])
+    h, br, _ = _make_harness(tmp_path, llm, breaker=br)
+    with pytest.raises(requests.exceptions.Timeout):
+        h.run("boom")
+    assert br.state == State.OPEN
+
+
+def test_non_provider_error_not_recorded_to_breaker(tmp_path):
+    """プログラミングエラー→ブレーカ記録せずre-raise・CLOSED維持（MLR採用）"""
+    br = CircuitBreaker(provider="test", threshold=1)
+    llm = ScriptedLLM([RuntimeError("programming error-ish")])
     h, br, _ = _make_harness(tmp_path, llm, breaker=br)
     with pytest.raises(RuntimeError):
         h.run("boom")
-    assert br.state == State.OPEN
+    assert br.state == State.CLOSED  # provider障害でないためOPEN化しない
 
 
 # --- 4ハードリミット（warn80/abort90・round7修正条項④） ---
@@ -323,7 +336,7 @@ def test_tool_budget_would_exceed_limit(tmp_path):
                             registry={"echo": counting_echo})
     h.run("budget")
     assert calls["n"] == 1  # 2本目は実行されない
-    tool_msgs = [m for m in llm.seen_messages[2] if m.get("role") == "tool"]
+    tool_msgs = [m for m in llm.seen_messages[-1] if m.get("role") == "tool"]
     assert tool_msgs[-1]["content"].find("would_exceed_limit") >= 0
 
 

@@ -30,15 +30,29 @@ plan雛形からの変更点（実装時判断）:
   （OpenAI契約: tool resultには直前のassistant tool_callsメッセージが必要）
 - state.save()がPartialFailureならresume契約が維持できないため abort_reason=
   "state_save_failed" でabort（Task 12 round7「loopがabort判断」の履行）
+
+3機MLR採用修正（2026-09-05・42指摘中採用11件・却下12種はふくけい承認済み）:
+- SIGINT時に現在のstepで保存（雛形は0固定で進捗が失われる）
+- 道具完了後の保存はin_flight=None（「実行中」でないため。in_flightは将来の
+  ステップ内中断保存用・Phase 2）
+- ブレーカ記録はprovider系例外（requests.RequestException / status_code属性）のみ・
+  プログラミングエラーは記録せずraise（spec §5トリガ=「429×3・タイムアウト連続」）
+- tool_calls_usedは実行試行（error含む）で加算（成功時のみだとerror反復でbudget回避可）
+- _bind_deny_pathsにfunctools.wraps・切詰めtool_resultに[truncated]マーカー
+- probe結線の契約: 本クラスは単一ループ・直列実行前提（複数run()の並行実行で
+  breakerを共有する構成はPhase 1では想定外）
 """
 from __future__ import annotations
 
+import functools
 import inspect
 import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+
+import requests
 
 from nexuscore.harness.circuit_breaker import CircuitBreaker, State
 from nexuscore.harness.run_state import RunState, RunStateStore, SaveResult
@@ -105,8 +119,13 @@ class AgentHarness:
 
     @staticmethod
     def _bind_deny_paths(fn: Callable, deny_paths: list[str]) -> Callable:
-        """道具へpolicyのdeny_pathsを束縛する（LLM引数のdeny_pathsは破棄）"""
+        """道具へpolicyのdeny_pathsを束縛する（LLM引数のdeny_pathsは破棄）
 
+        呼出契約は常に ``fn(**tc.args)``（keyword引数のみ）のため bound への
+        位置引数渡しは発生しない（*argsは防御目的・MLR却下O1の根拠）。
+        """
+
+        @functools.wraps(fn)
         def bound(*args: Any, _fn: Callable = fn, _deny: list[str] = deny_paths,
                   **kwargs: Any) -> Any:
             kwargs.pop("deny_paths", None)  # LLM引数では上書きさせない
@@ -127,20 +146,30 @@ class AgentHarness:
         tool_calls_used = 0
         warned = {"steps": False, "wall": False, "tokens": False}
         try:
+            current_step = 0
             for step in range(self.limits.max_steps):
+                current_step = step
                 # round7(1): LLM呼出前に許可チェック→OPENなら呼出せずgraceful exit
                 if not self.breaker.allow_request():
                     return self._graceful("breaker_open", step, total_tokens)
                 # 起票①probe結線: HALF_OPEN中の呼出はprobeとして扱う
+                # （契約: 単一ループ・直列実行前提。並行run()でのbreaker共有は想定外）
                 is_probe = self.breaker.allow_probe()
                 try:
                     out = self.llm.complete_with_tools(messages=msgs, tools=tools)
                 except Exception as exc:
                     if is_probe:
                         self.breaker.record_probe_failure()
-                    else:
+                    elif _is_provider_error(exc):
                         self.breaker.record_failure(is_429=_is_429(exc))
+                    else:
+                        # プログラミングエラー等はブレーキャ記録対象外
+                        # （spec §5トリガ=「429×3・タイムアウト連続」・MLR採用）
+                        log.warning("non-provider error (%s): not recorded to breaker",
+                                    type(exc).__name__)
                     # round7(3): OPEN遷移→state.save()→raiseの順序固定
+                    # （_gracefulの呼び出しはsave目的・戻り値は破棄してraiseするのが
+                    #  round7(3)の契約）
                     if self.breaker.state == State.OPEN:
                         self._graceful("breaker_open", step, total_tokens)
                     raise
@@ -171,6 +200,9 @@ class AgentHarness:
                         continue
                     d = self.gate.evaluate(tool=tc.name, tool_args=tc.args,
                                            ask_supported=False)
+                    # 判定順序の根拠: gate denyを先に見る（policy不在toolはここで
+                    # 拒否）。「unknown tool」経路はpolicy=allowかつregistry未登録の
+                    # 不整合時のみ到達する（MLR採用: 順序根拠の明記）
                     if d.mode == Mode.DENY:
                         # round7②: denyはpolicy判定・ブレーキャには記録しない
                         msgs.append(self._tool_result(
@@ -181,23 +213,23 @@ class AgentHarness:
                         msgs.append(self._tool_result(
                             tc, f"error: unknown tool {tc.name!r}"))
                         continue
+                    tool_calls_used += 1  # 実行試行で加算（error反復でのbudget回避防止）
                     try:
                         result = fn(**tc.args)
                     except Exception as exc:  # noqa: BLE001 道具障害はLLMへ通知
                         msgs.append(self._tool_result(tc, f"error: {exc}"))
                         continue
                     msgs.append(self._tool_result(tc, result))
-                    tool_calls_used += 1
                 # 1ステップ分の道具処理完了をスナップショット保存
-                if self._save_state(step + 1, total_tokens,
-                                    in_flight=tool_calls[-1].name) is False:
+                # （完了後なのでin_flight=None・in_flightは将来のステップ内中断保存用）
+                if self._save_state(step + 1, total_tokens) is False:
                     return self._graceful("state_save_failed", step + 1,
                                           total_tokens)
             # for-else相当: max_steps消費
             return self._graceful("limits", self.limits.max_steps, total_tokens)
         except KeyboardInterrupt:
-            # round7(5): SIGINT→state.save→graceful return
-            return self._graceful("sigint", 0, total_tokens)
+            # round7(5): SIGINT→state.save→graceful return（現在のstepで保存）
+            return self._graceful("sigint", current_step, total_tokens)
 
     def _graceful(self, reason: str | None, step: int, tokens: int,
                   content: str | None = None) -> dict:
@@ -255,10 +287,14 @@ class AgentHarness:
 
     @staticmethod
     def _tool_result(tc: Any, result: Any) -> dict:
-        """tool resultメッセージを組む（ToolResultはstr化・内容は上限切詰め）"""
+        """tool resultメッセージを組む（ToolResultはstr化・内容は上限切詰め+
+
+        切詰め時は[truncated]マーカーを付けてLLMに続きがあることを通知（MLR採用）
+        """
         content = str(result)
         if len(content) > MAX_TOOL_RESULT_CHARS:
-            content = content[:MAX_TOOL_RESULT_CHARS]
+            content = (content[:MAX_TOOL_RESULT_CHARS]
+                       + f"\n[truncated from {len(content)} chars]")
         return {"role": "tool", "tool_call_id": tc.id, "content": content}
 
     def _tool_defs(self) -> list[dict]:
@@ -275,3 +311,13 @@ def _is_429(exc: BaseException) -> bool:
     if code is None:
         code = getattr(exc, "status_code", None)
     return code == 429
+
+
+def _is_provider_error(exc: BaseException) -> bool:
+    """provider/ネットワーク系例外かを判定する（MLR採用: ブレーカ記録対象の限定）
+
+    requests.RequestException（HTTPError/Timeout/ConnectionError/RetryError含む）
+    またはstatus_code属性を持つ例外をprovider系とみなす。プログラミングエラー
+    （TypeError等）はspec §5トリガ外のため記録しない。
+    """
+    return isinstance(exc, requests.RequestException) or hasattr(exc, "status_code")
