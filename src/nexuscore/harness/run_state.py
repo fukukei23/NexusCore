@@ -111,8 +111,13 @@ class RunStateStore:
                         os.fsync(tf.fileno())
                     os.replace(self._tmp_path, self.path)
                     self._fsync_dir()
-                    # checksum書込もロック内（MLR採用#2・解放後書込のレース窓対策）
-                    self._checksum_path.write_text(checksum)
+                    # checksum書込もロック内+原子化（MLR採用#2・r2採用Gemini#3:
+                    # 中途半端なchecksumが正常な本体を誤隔離させるのを防ぐ）
+                    ck_tmp = self._checksum_path.with_name(
+                        self._checksum_path.name + ".tmp"
+                    )
+                    ck_tmp.write_text(checksum)
+                    os.replace(ck_tmp, self._checksum_path)
                 finally:
                     fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
             return SaveResult.SUCCESS
@@ -125,30 +130,30 @@ class RunStateStore:
             return SaveResult.PARTIAL_FAILURE  # round7修正条項
 
     def load_or_quarantine(self) -> tuple[RunState | None, str | None]:
-        """破損時quarantine+orphan temp検出（MLR採用#1: 全経路を同一ロックで保護）"""
+        """破損時quarantine+orphan temp検出（MLR採用#1+r2採用Gemini#2:
+        読込・隔離ともロック保持中に完結させ、並行saveの正常ファイル誤隔離を防ぐ）"""
         if not self.path.exists() and not self._tmp_path.exists():
             return None, None
-        try:
-            with open(self._lock_path, "w") as lf:
-                fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
+        with open(self._lock_path, "w") as lf:
+            fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
+            try:
                 try:
                     return self._load_locked()
-                finally:
-                    fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
-        except (
-            json.JSONDecodeError,
-            ValueError,
-            OSError,
-            TypeError,
-            KeyError,
-        ) as e:
-            # 破損→quarantine（spec §5 F2: 自動クリア禁止）
-            # 未知キー/型不一致もTypeErrorでここに流れる（fail-safe隔離）
-            self._quarantine(self.path, ".json")
-            tmp = self._tmp_path
-            if tmp.exists():
-                self._quarantine(tmp, ".tmp")
-            return None, str(e)
+                except (
+                    json.JSONDecodeError,
+                    ValueError,
+                    OSError,
+                    TypeError,
+                    KeyError,
+                ) as e:
+                    # 破損→quarantine（spec §5 F2: 自動クリア禁止・ロック内で実施）
+                    # 未知キー/型不一致もTypeErrorでここに流れる（fail-safe隔離）
+                    self._quarantine(self.path, ".json")
+                    if self._tmp_path.exists():
+                        self._quarantine(self._tmp_path, ".tmp")
+                    return None, str(e)
+            finally:
+                fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
 
     def _load_locked(self) -> tuple[RunState | None, str | None]:
         """ロック保持中の読込本体（呼び出し側が例外をquarantineへ変換する）"""

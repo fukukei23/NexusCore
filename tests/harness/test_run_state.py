@@ -195,3 +195,44 @@ def test_save_fsynces_directory(tmp_path, monkeypatch):
     s = RunStateStore(path=tmp_path / "state.json")
     s.save(RunState(loop_steps=1))
     assert len(fsync_targets) >= 2, "ファイル本体とディレクトリの2系統のfsyncが無い"
+
+
+def test_quarantine_happens_while_locked(tmp_path, monkeypatch):
+    """r2採用(Gemini#2): 隔離renameはロック保持中に実行する（解放後だと並行saveの
+    正常ファイルを誤隔離する競合）"""
+    import fcntl
+    from pathlib import Path as P
+    p = tmp_path / "state.json"
+    p.write_text("{broken")
+    lock_held = {"v": False}
+    real_flock = fcntl.flock
+    def spy(fd, op):
+        if op == fcntl.LOCK_EX:
+            lock_held["v"] = True
+        elif op == fcntl.LOCK_UN:
+            lock_held["v"] = False
+        return real_flock(fd, op)
+    monkeypatch.setattr(fcntl, "flock", spy)
+    real_rename = P.rename
+    def rename_spy(self, target):
+        if "quarantine-" in str(target):
+            assert lock_held["v"], "隔離renameがロック解放後に行われている"
+        return real_rename(self, target)
+    monkeypatch.setattr(P, "rename", rename_spy)
+    s = RunStateStore(path=p)
+    state, reason = s.load_or_quarantine()
+    assert state is None and reason is not None
+
+
+def test_checksum_write_is_atomic(tmp_path, monkeypatch):
+    """r2採用(Gemini#3): checksum書込はtmp+os.replaceで原子化（中途半端なchecksumが
+    正常な本体を誤隔離させるのを防ぐ）"""
+    replaces = []
+    real = os.replace
+    def spy(src, dst):
+        replaces.append(str(dst))
+        return real(src, dst)
+    monkeypatch.setattr(os, "replace", spy)
+    s = RunStateStore(path=tmp_path / "state.json")
+    assert s.save(RunState(loop_steps=1)) == SaveResult.SUCCESS
+    assert len(replaces) >= 2, "checksum書込が原子化されていない（replace回数不足）"
