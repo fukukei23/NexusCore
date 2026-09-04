@@ -1,0 +1,9 @@
+# Task 11 Step 3: tool_policy.yaml 初期版（plan本文どおり）
+# ToolGate（Task 10）が読む。未設定キーの既定動作=deny（保守側）。
+provider_priority: [openai, anthropic, gemini, openrouter, glm, minimax, deepseek, moonshot]
+provider_insecure_default: [deepseek, moonshot]  # capability不明時→deny
+tools:
+  read_file:    { default: allow }
+  list_dir:     { default: allow }
+  search_text:  { default: allow }
+  # Phase 2以降で write_file/exec を追加
