@@ -87,9 +87,11 @@ def search_text(
             if _is_denied(str(p), deny_paths):
                 continue
             try:
+                if not p.is_file():
+                    continue  # rglobがディレクトリにマッチした場合（round2採用）
                 if p.stat().st_size > MAX_BYTES:
                     continue  # 巨大ファイルスキップ（メモリ暴走防止）
-                lines = p.read_text(errors="replace").splitlines()
+                lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
             except OSError:
                 continue  # 消えたファイル・権限等（1ファイルで全体が死なない）
             for i, line in enumerate(lines, 1):
