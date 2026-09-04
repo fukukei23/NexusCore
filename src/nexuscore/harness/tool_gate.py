@@ -81,6 +81,20 @@ class ToolGate:
         self._loaded = isinstance(tools, dict)
         self._policy = data if self._loaded else {"tools": {}}
 
+    def deny_paths_for(self, tool: str) -> list[str]:
+        """policyから該当toolのdeny_pathsを返す（Task 14 registry束縛用・C案）
+
+        policy不在・破損・非list型のいずれも[]を返す。破損時はevaluate()が
+        全拒否するため道具が実行されず、束縛値の出番がない（fail-closed維持）。
+        """
+        if not self._loaded:
+            return []
+        conf = self._policy.get("tools", {}).get(tool, {})
+        if not isinstance(conf, dict):
+            return []
+        deny = conf.get("deny_paths", [])
+        return deny if isinstance(deny, list) else []
+
     def evaluate(
         self, *, tool: str, tool_args: dict[str, Any], ask_supported: bool
     ) -> GateDecision:
