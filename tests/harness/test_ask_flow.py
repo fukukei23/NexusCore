@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from nexuscore.harness import ask as ask_module
 from nexuscore.harness.ask import AskResult, AskSession, _ask_supported
 from nexuscore.harness.run_state import RunStateStore
 from nexuscore.harness.tool_gate import Mode, ToolGate
@@ -86,3 +87,26 @@ def test_gate_ask_policy_deny_paths_still_denied(tmp_path: Path) -> None:
                       ask_supported=True)
     assert d.mode == Mode.DENY
     assert "deny pattern" in d.reason
+
+
+# --- 3機MLR採用分のテスト（2026-09-06） ---
+
+def test_default_reader_non_tty_denies() -> None:
+    """MLR採用: 対話チャネル不在（pytestは非TTY）で即None＝deny（fail-closed）
+
+    Gemini#1 criticalの regression guard も兼ねる（既定readerは
+    timeout束縛済み1引数ラッパ・直接呼出でTypeErrorしない）。
+    """
+    out = ask_module._readline_with_timeout("prompt: ", 1.0)
+    assert out is None  # 非TTY環境（pytest）では入力待せず即deny
+
+
+def test_ask_session_default_reader_calls_without_typeerror(tmp_path: Path) -> None:
+    """MLR採用（Gemini#1 critical）: reader未指定でもpromptが動く
+
+    旧実装は _readline_with_timeout(prompt, timeout) を1引数で呼び
+    本番経路で必ずTypeErrorだった。非TTY環境ではNoneが返るため
+    DENIED_TIMEOUT に倒れることまで検証する。
+    """
+    s = AskSession(store=RunStateStore(path=tmp_path / "s.json"))
+    assert s.prompt(tool="write_file", args={"path": "a"}) == AskResult.DENIED_TIMEOUT
