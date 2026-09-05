@@ -6,4 +6,6 @@ tools:
   read_file:    { default: allow }
   list_dir:     { default: allow }
   search_text:  { default: allow }
-  # Phase 2以降で write_file/exec を追加
+  write_file:   { default: ask, deny_paths: ['.git/**', '**/.env', '**/secrets/**'] }
+  edit_file:    { default: ask, deny_paths: ['.git/**', '**/.env', '**/secrets/**'] }
+  # Phase 3以降で exec を追加
