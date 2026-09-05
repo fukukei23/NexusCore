@@ -206,3 +206,106 @@ def test_other_providers_mro_includes_mixin(factory):
     mro_names = [c.__name__ for c in type(llm).__mro__]
     assert "ToolCallingMixin" in mro_names, f"ToolCallingMixin not in MRO: {mro_names}"
     assert mro_names.index("ToolCallingMixin") < mro_names.index("BaseLLM"), mro_names
+
+
+# --- tool-calling 経路の stub fallback 契約（2026-09-05・mypy 12件の実バグ側） ---
+
+
+def _prepare_real_call_attrs(llm):
+    """real 経路を踏ませるために provider 別の必須属性を揃える
+
+    NOTE: GeminiLLM は `__init__` で `self.base_url` / `self.api_key` を設定しないため
+    （`_call_http_tool` が `self.base_url` を参照するのに定義が無い＝real 経路は未完成）、
+    テスト側で注入して他 provider と同じ条件に揃える。この実装欠陥自体は本テストの対象外で、
+    別途バックログへ起票済み（2026-09-05 実測）。
+    """
+    llm.real_calls = True
+    llm.api_key = "dummy-key"
+    if not hasattr(llm, "base_url"):
+        llm.base_url = "https://example.invalid"
+    return llm
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda: OpenAILLM(model_name="gpt-5-mini"),
+        lambda: OpenAICompatLLM(model_name="test-model"),
+        lambda: AnthropicLLM(model_name="test-model"),
+        lambda: GeminiLLM(model_name="test-model"),
+    ],
+    ids=["OpenAI", "OpenAICompat", "Anthropic", "Gemini"],
+)
+def test_tool_call_stub_fallback_returns_dict(monkeypatch, factory):
+    """real call 失敗 + ALLOW_STUB_FALLBACK 時、_call_http_tool は dict を返す
+
+    旧実装は `_stub_fallback_response` が as_json の値に関わらず常に str を返していたため、
+    dict 契約の tool-calling 経路では `_adapt_response_native_to_internal` が
+    `AttributeError: 'str' object has no attribute 'get'` でクラッシュしていた
+    （2026-09-05 実測）。fallback は「失敗時に代替応答を返す」のが目的なので、
+    tool-calling 経路では provider native 形式の dict を返さなければならない。
+    """
+    monkeypatch.setenv("NEXUSCORE_ALLOW_STUB_FALLBACK", "1")
+    llm = factory()
+    _prepare_real_call_attrs(llm)
+
+    class _FailingSession:
+        def post(self, *args, **kwargs):
+            raise RuntimeError("simulated network failure")
+
+    llm.session = _FailingSession()
+
+    raw = llm._call_http_tool({"model": llm.model_name, "messages": [], "tools": []})
+    assert isinstance(raw, dict), f"fallback must return provider-native dict, got {type(raw)}: {raw!r}"
+
+    # dict を受け取ったアダプタが壊れずに内部形式へ変換できること
+    out = llm._adapt_response_native_to_internal(raw)
+    assert isinstance(out, dict)
+    for key in ("content", "tool_calls", "usage"):
+        assert key in out, f"missing {key!r} in adapted fallback response: {out}"
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda: OpenAILLM(model_name="gpt-5-mini"),
+        lambda: OpenAICompatLLM(model_name="test-model"),
+        lambda: AnthropicLLM(model_name="test-model"),
+        lambda: GeminiLLM(model_name="test-model"),
+    ],
+    ids=["OpenAI", "OpenAICompat", "Anthropic", "Gemini"],
+)
+def test_tool_call_raises_when_fallback_disabled(monkeypatch, factory):
+    """ALLOW_STUB_FALLBACK 無効（既定）なら黙って代替せず例外を上げる（C5 silent-fallback 対策の維持）"""
+    monkeypatch.delenv("NEXUSCORE_ALLOW_STUB_FALLBACK", raising=False)
+    llm = factory()
+    _prepare_real_call_attrs(llm)
+
+    class _FailingSession:
+        def post(self, *args, **kwargs):
+            raise RuntimeError("simulated network failure")
+
+    llm.session = _FailingSession()
+
+    with pytest.raises(RuntimeError):
+        llm._call_http_tool({"model": llm.model_name, "messages": [], "tools": []})
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda: OpenAILLM(model_name="gpt-5-mini"),
+        lambda: OpenAICompatLLM(model_name="test-model"),
+        lambda: AnthropicLLM(model_name="test-model"),
+        lambda: GeminiLLM(model_name="test-model"),
+    ],
+    ids=["OpenAI", "OpenAICompat", "Anthropic", "Gemini"],
+)
+def test_tool_call_raises_clear_error_when_session_missing(factory):
+    """session 未初期化のまま real 呼び出しすると、None 属性エラーでなく明示的な RuntimeError になる"""
+    llm = factory()
+    _prepare_real_call_attrs(llm)
+    llm.session = None
+
+    with pytest.raises(RuntimeError, match="session"):
+        llm._call_http_tool({"model": llm.model_name, "messages": [], "tools": []})

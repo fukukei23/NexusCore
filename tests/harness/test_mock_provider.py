@@ -16,7 +16,6 @@ from __future__ import annotations
 import json
 
 from nexuscore.harness.mock_provider import LocalToolCallDummyLLM
-
 from nexuscore.llm.providers.local_provider import LocalLLM
 
 _ECHO_TOOL = {

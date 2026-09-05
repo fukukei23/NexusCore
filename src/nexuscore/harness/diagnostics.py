@@ -20,6 +20,7 @@ import re
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 # ToolCallingMixin が追加予定のメソッド名（override_checkの判定対象）
 MIXIN_METHODS = (
@@ -156,7 +157,8 @@ def cmd_retry_diff(args: argparse.Namespace) -> int:
         ),
     }
 
-    report: dict[str, dict] = {}
+    # provider 別 dict のほかに _shared_layer(dict) と _measured_at(str) を混在させるため Any
+    report: dict[str, Any] = {}
     for name, fqcn in targets.items():
         cls = _import(fqcn)
         names = dir(cls)

@@ -185,24 +185,7 @@ class OpenAICompatLLM(ToolCallingMixin, BaseLLM):
     def _call_http_tool(self, body: dict) -> dict:
         """tool 用 HTTP 呼び出し: 既存self.session/URL/header 設定を再利用。stub 時は固定 echo 応答"""
         if not getattr(self, "real_calls", False):
-            return {
-                "choices": [
-                    {
-                        "message": {
-                            "role": "assistant",
-                            "content": None,
-                            "tool_calls": [
-                                {
-                                    "id": "call_test",
-                                    "type": "function",
-                                    "function": {"name": "echo", "arguments": '{"x":"hi"}'},
-                                }
-                            ],
-                        }
-                    }
-                ],
-                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
-            }
+            return self._tool_stub_response()
 
         url = f"{self.base_url}{self.api_path}"
         headers = {
@@ -211,11 +194,37 @@ class OpenAICompatLLM(ToolCallingMixin, BaseLLM):
         }
 
         def _call() -> dict:
-            r = self.session.post(url, headers=headers, json=body, timeout=REQUEST_TIMEOUT)
+            r = self._require_session().post(
+                url, headers=headers, json=body, timeout=REQUEST_TIMEOUT
+            )
             r.raise_for_status()
             return r.json()
 
-        return self.execute_real_or_fallback(self.provider_name, _call, as_json=False)
+        # stub_factory 必須: 未指定だと fallback が str を返し dict 契約を破る
+        return self.execute_real_or_fallback(
+            self.provider_name, _call, as_json=False, stub_factory=self._tool_stub_response
+        )
+
+    def _tool_stub_response(self) -> dict:
+        """tool-calling 経路の stub 応答（stub モードと real 失敗時の fallback で共用）"""
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_test",
+                                "type": "function",
+                                "function": {"name": "echo", "arguments": '{"x":"hi"}'},
+                            }
+                        ],
+                    }
+                }
+            ],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        }
 
 
 __all__ = ["OpenAICompatLLM"]

@@ -163,24 +163,7 @@ class OpenAILLM(ToolCallingMixin, BaseLLM):
         """
         if not getattr(self, "real_calls", False):
             # stub モード: 固定の echo tool_calls を返す（Task 9 の force_429 とは別経路）
-            return {
-                "choices": [
-                    {
-                        "message": {
-                            "role": "assistant",
-                            "content": None,
-                            "tool_calls": [
-                                {
-                                    "id": "call_test",
-                                    "type": "function",
-                                    "function": {"name": "echo", "arguments": json.dumps({"x": "hi"})},
-                                }
-                            ],
-                        }
-                    }
-                ],
-                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
-            }
+            return self._tool_stub_response()
 
         # real_calls=True: 既存 execute() と同じ execute_real_or_fallback 経路に乗せる
         # (C5 対策の stub-fallback 制御 / NEXUSCORE_ALLOW_STUB_FALLBACK 互換性を維持)
@@ -198,11 +181,37 @@ class OpenAILLM(ToolCallingMixin, BaseLLM):
             }
 
         def _call() -> dict:
-            r = self.session.post(url, headers=headers, json=body, timeout=REQUEST_TIMEOUT)
+            r = self._require_session().post(
+                url, headers=headers, json=body, timeout=REQUEST_TIMEOUT
+            )
             r.raise_for_status()
             return r.json()
 
-        return self.execute_real_or_fallback("openai", _call, as_json=False)
+        # stub_factory 必須: 未指定だと fallback が str を返し dict 契約を破る
+        return self.execute_real_or_fallback(
+            "openai", _call, as_json=False, stub_factory=self._tool_stub_response
+        )
+
+    def _tool_stub_response(self) -> dict:
+        """tool-calling 経路の stub 応答（stub モードと real 失敗時の fallback で共用）"""
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_test",
+                                "type": "function",
+                                "function": {"name": "echo", "arguments": json.dumps({"x": "hi"})},
+                            }
+                        ],
+                    }
+                }
+            ],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        }
 
 
 __all__ = ["OpenAILLM"]

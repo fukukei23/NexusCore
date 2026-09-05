@@ -182,12 +182,7 @@ class GeminiLLM(ToolCallingMixin, BaseLLM):
         """tool 用 HTTP 呼び出し: `/v1beta/models/{model}:generateContent?key=...` にPOST。
         stub 時は固定 functionCall 応答"""
         if not getattr(self, "real_calls", False):
-            return {
-                "candidates": [
-                    {"content": {"parts": [{"functionCall": {"name": "echo", "args": {"x": "hi"}}}]}}
-                ],
-                "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1},
-            }
+            return self._tool_stub_response()
 
         url = f"{self.base_url}/v1beta/models/{self.model_name}:generateContent"
 
@@ -195,11 +190,25 @@ class GeminiLLM(ToolCallingMixin, BaseLLM):
         params = {"key": self.api_key} if getattr(self, "api_key", None) else None
 
         def _call() -> dict:
-            r = self.session.post(url, params=params, json=body, timeout=REQUEST_TIMEOUT)
+            r = self._require_session().post(
+                url, params=params, json=body, timeout=REQUEST_TIMEOUT
+            )
             r.raise_for_status()
             return r.json()
 
-        return self.execute_real_or_fallback("gemini", _call, as_json=False)
+        # stub_factory 必須: 未指定だと fallback が str を返し dict 契約を破る
+        return self.execute_real_or_fallback(
+            "gemini", _call, as_json=False, stub_factory=self._tool_stub_response
+        )
+
+    def _tool_stub_response(self) -> dict:
+        """tool-calling 経路の stub 応答（stub モードと real 失敗時の fallback で共用）"""
+        return {
+            "candidates": [
+                {"content": {"parts": [{"functionCall": {"name": "echo", "args": {"x": "hi"}}}]}}
+            ],
+            "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1},
+        }
 
 
 __all__ = ["GeminiLLM"]

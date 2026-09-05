@@ -3,13 +3,16 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from nexuscore.llm.helpers import DEFAULT_STUB_CONTENT, _env_flag, normalize_model
 from nexuscore.llm.http_client import RequestsHTTPError
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from requests import Session
+
+# real_call_fn の戻り値型。execute() 経路は str、tool-calling 経路は provider native dict。
+_R = TypeVar("_R")
 
 
 class BaseLLM:
@@ -101,12 +104,47 @@ class BaseLLM:
     ) -> str:  # pragma: no cover - interface
         raise NotImplementedError("Subclasses must implement execute()")
 
+    def _require_session(self) -> Session:
+        """HTTP セッションを取得する（未初期化なら明示的に落とす）
+
+        `self.session` は `Session | None` のため、未初期化のまま real 呼び出しすると
+        `'NoneType' object has no attribute 'post'` という原因の分かりにくい
+        AttributeError になる。各 provider で None チェックを重複させないよう
+        ここに集約する（mypy の union-attr も同時に解消）。
+        """
+        if self.session is None:
+            raise RuntimeError(
+                f"{self.__class__.__name__}: HTTP session is not initialized "
+                "(session が None のまま real 呼び出しが行われました)"
+            )
+        return self.session
+
+    @overload
     def execute_real_or_fallback(
         self,
         provider_name: str,
         real_call_fn: Callable[[], str],
+        as_json: bool = ...,
+        stub_factory: None = ...,
+    ) -> str: ...
+
+    @overload
+    def execute_real_or_fallback(
+        self,
+        provider_name: str,
+        real_call_fn: Callable[[], _R],
+        as_json: bool = ...,
+        *,
+        stub_factory: Callable[[], _R],
+    ) -> _R: ...
+
+    def execute_real_or_fallback(
+        self,
+        provider_name: str,
+        real_call_fn: Callable[[], Any],
         as_json: bool = False,
-    ) -> str:
+        stub_factory: Callable[[], Any] | None = None,
+    ) -> Any:
         """Execute a real LLM call with standardized error handling.
 
         Wraps the common try/except pattern: real call → HTTP error log →
@@ -115,9 +153,16 @@ class BaseLLM:
 
         Args:
             provider_name: Display name for log messages (e.g. "openai").
-            real_call_fn: Callable that performs the actual HTTP/SDK call
-                and returns the response text.
-            as_json: Whether to return JSON-formatted stub on fallback.
+            real_call_fn: Callable that performs the actual HTTP/SDK call.
+                Returns str on the `execute()` path, provider-native dict on
+                the tool-calling path.
+            as_json: Whether to return JSON-formatted stub on fallback
+                (`stub_factory` 未指定時のみ有効)。
+            stub_factory: fallback 応答を `real_call_fn` と同じ型で作る callable。
+                tool-calling 経路のように戻り値が str でない場合は**必須**。
+                未指定だと str の stub が返り、呼び出し側の契約（dict 等）を破る
+                （2026-09-05 に AttributeError として実測）。overload により
+                mypy が渡し忘れを検出する。
         """
         try:
             result = real_call_fn()
@@ -131,13 +176,25 @@ class BaseLLM:
                 pass
             self.log_error("REAL-CALL HTTP error (after retries)", e, body)
             if _env_flag("NEXUSCORE_ALLOW_STUB_FALLBACK", False):
-                return self._stub_fallback_response(provider_name, as_json=as_json)
+                return self._build_fallback(provider_name, as_json, stub_factory)
             raise
         except Exception as e:  # noqa: BLE001 — リアルコール全体のフォールバック
             self.log_error("REAL-CALL failed (after retries)", e)
             if _env_flag("NEXUSCORE_ALLOW_STUB_FALLBACK", False):
-                return self._stub_fallback_response(provider_name, as_json=as_json)
+                return self._build_fallback(provider_name, as_json, stub_factory)
             raise
+
+    def _build_fallback(
+        self,
+        provider_name: str,
+        as_json: bool,
+        stub_factory: Callable[[], Any] | None,
+    ) -> Any:
+        """fallback 応答を組み立てる（stub_factory があれば呼び出し側の型に合わせる）"""
+        if stub_factory is not None:
+            self.last_call_mode = "stub-fallback"
+            return stub_factory()
+        return self._stub_fallback_response(provider_name, as_json=as_json)
 
 
 __all__ = ["BaseLLM"]

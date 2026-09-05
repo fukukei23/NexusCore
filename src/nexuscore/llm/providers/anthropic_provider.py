@@ -144,12 +144,7 @@ class AnthropicLLM(ToolCallingMixin, BaseLLM):
     def _call_http_tool(self, body: dict) -> dict:
         """tool 用 HTTP 呼び出し: `/v1/messages` にPOST。stub 時は固定 tool_use 応答"""
         if not getattr(self, "real_calls", False):
-            return {
-                "content": [
-                    {"type": "tool_use", "id": "call_test", "name": "echo", "input": {"x": "hi"}}
-                ],
-                "usage": {"input_tokens": 1, "output_tokens": 1},
-            }
+            return self._tool_stub_response()
 
         url = f"{self.base_url}/v1/messages"
         headers = {
@@ -159,11 +154,25 @@ class AnthropicLLM(ToolCallingMixin, BaseLLM):
         }
 
         def _call() -> dict:
-            r = self.session.post(url, headers=headers, json=body, timeout=REQUEST_TIMEOUT)
+            r = self._require_session().post(
+                url, headers=headers, json=body, timeout=REQUEST_TIMEOUT
+            )
             r.raise_for_status()
             return r.json()
 
-        return self.execute_real_or_fallback("anthropic", _call, as_json=False)
+        # stub_factory 必須: 未指定だと fallback が str を返し dict 契約を破る
+        return self.execute_real_or_fallback(
+            "anthropic", _call, as_json=False, stub_factory=self._tool_stub_response
+        )
+
+    def _tool_stub_response(self) -> dict:
+        """tool-calling 経路の stub 応答（stub モードと real 失敗時の fallback で共用）"""
+        return {
+            "content": [
+                {"type": "tool_use", "id": "call_test", "name": "echo", "input": {"x": "hi"}}
+            ],
+            "usage": {"input_tokens": 1, "output_tokens": 1},
+        }
 
 
 __all__ = ["AnthropicLLM"]
