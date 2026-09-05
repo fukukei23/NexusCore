@@ -9,6 +9,14 @@ plan雛形からの意図的変更（実契約突合の結果・Task 14と同様
   済みプロバイダを直接生成する。RoutedLLMのtool対応はスコープ外・別途起票。
 - --provider mock で LocalToolCallDummyLLM を選択可能（オフライン動作確認用）
 - テスト注入のため main(argv, llm_factory)・--state-path・--model を追加
+
+3機MLR採用分（2026-09-05・review_log参照）:
+- CLIは毎回新規run（既存stateのresume読込はTask 16チェックポイントで対応予定）
+- policy不在（gate fail-closed全拒否）時、tool要求を続けるLLMならlimits abortで
+  終了する＝正しいfail-closed挙動・content即答LLMなら完走する
+- 予期せぬ例外はJSON（abort_reason=cli_error）+exit 1で返す（トレースバック不是・
+  SystemExitはargparse同型の意図的経路として透過）
+- abort時は理由をstderrへ1行出力（exitコードは1に統一・spec §6「非ゼロ」どおり）
 """
 from __future__ import annotations
 
@@ -48,22 +56,30 @@ def main(argv: list[str] | None = None,
     """CLI入口。JSON 1行を出力し abort_reason なし=0 / あり=1 を返す"""
     p = argparse.ArgumentParser(prog="nexuscore-harness")
     p.add_argument("task", nargs="+")
-    p.add_argument("--provider", default="openai", choices=TOOL_CAPABLE)
-    p.add_argument("--model", default=None)
+    p.add_argument("--provider", default="openai", choices=TOOL_CAPABLE,
+                   help="mock=オフラインダミー(APIキー不要)・openai以外は--model必須")
+    p.add_argument("--model", default=None, help='実プロバイダ時は"vendor:model"形式')
     p.add_argument("--policy", default="tool_policy.yaml")
     p.add_argument("--state-path", default=None)
     args = p.parse_args(argv)
-    llm = (llm_factory or build_llm)(args.provider, args.model)
-    gate = ToolGate(policy_path=Path(args.policy))
-    store = (RunStateStore(path=Path(args.state_path)) if args.state_path
-             else RunStateStore())
-    reg = {"read_file": read_file, "list_dir": list_dir, "search_text": search_text}
-    br = CircuitBreaker(provider=args.provider)
-    h = AgentHarness(llm=llm, gate=gate, tool_registry=reg,
-                     state_store=store, breaker=br)
-    out = h.run(" ".join(args.task))
+    try:
+        llm = (llm_factory or build_llm)(args.provider, args.model)
+        gate = ToolGate(policy_path=Path(args.policy))
+        store = (RunStateStore(path=Path(args.state_path)) if args.state_path
+                 else RunStateStore())
+        reg = {"read_file": read_file, "list_dir": list_dir,
+               "search_text": search_text}
+        br = CircuitBreaker(provider=args.provider)
+        h = AgentHarness(llm=llm, gate=gate, tool_registry=reg,
+                         state_store=store, breaker=br)
+        out = h.run(" ".join(args.task))
+    except Exception as exc:  # noqa: BLE001 CLI観測可能性: JSONで異常を返す
+        out = {"abort_reason": "cli_error", "error": str(exc)}
+    reason = out.get("abort_reason")
+    if reason:
+        print(f"aborted: {reason}", file=sys.stderr)
     print(json.dumps(out, ensure_ascii=False, default=str))
-    return 0 if out.get("abort_reason") is None else 1
+    return 0 if reason is None else 1
 
 
 if __name__ == "__main__":

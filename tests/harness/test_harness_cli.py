@@ -57,10 +57,21 @@ def _run_cli(tmp_path: Path, llm_factory=None, *extra: str) -> tuple[int, dict, 
 
 
 def test_cli_content_response_exit0(tmp_path: Path) -> None:
-    """正常系: content応答なら exit 0・JSONにabort_reason=None"""
+    """正常系: content応答なら exit 0・JSON 1行・run戻り値キー網羅"""
     code, out, raw = _run_cli(tmp_path, llm_factory=lambda p, m: _ContentLLM("done"))
     assert (code, out["abort_reason"], out["content"]) == (0, None, "done")
-    assert raw.count("\n") >= 1  # JSON 1行出力
+    assert len(raw.strip().splitlines()) == 1  # JSON 1行出力（末尾改行のみ許容）
+    assert set(out) >= {"content", "loop_steps", "tokens_used", "abort_reason"}
+
+
+def test_cli_factory_exception_returns_cli_error_json(tmp_path: Path) -> None:
+    """異常系: 予期せぬ例外はJSON(abort_reason=cli_error)+exit 1（MLR採用M10）"""
+    def _boom(provider: str, model: str | None) -> object:
+        raise ValueError("factory failed")
+    code, out, raw = _run_cli(tmp_path, llm_factory=_boom)
+    assert (code, out["abort_reason"], out["error"]) == (1, "cli_error",
+                                                         "factory failed")
+    assert len(raw.strip().splitlines()) == 1
 
 
 def test_cli_mock_always_tool_calls_exits_limits(tmp_path: Path) -> None:
@@ -80,12 +91,16 @@ def test_cli_state_saved_to_state_path(tmp_path: Path) -> None:
 
 
 def test_cli_missing_policy_fail_closed_no_crash(tmp_path: Path) -> None:
-    """異常系: policy不在でもGate fail-closedでクラッシュせず完走する"""
+    """異常系: policy不在でもGate fail-closedでクラッシュせず健全完走する"""
     state = tmp_path / "state.json"
     argv = ["hello", "--provider", "mock", "--policy",
             str(tmp_path / "missing.yaml"), "--state-path", str(state)]
-    code = harness_cli.main(argv, llm_factory=lambda p, m: _ContentLLM())
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        code = harness_cli.main(argv, llm_factory=lambda p, m: _ContentLLM())
+    out = json.loads(buf.getvalue())
     assert code == 0  # gateは全拒否するがループ自体は継続・content応答で正常終了
+    assert out["abort_reason"] is None  # MLR採用M5: fail-closedでも健全完走を明示
 
 
 def test_cli_unsupported_provider_systemexit() -> None:
