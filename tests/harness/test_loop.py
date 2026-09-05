@@ -435,3 +435,74 @@ def test_local_dummy_llm_smoke(tmp_path):
     out = h.run("smoke")
     # ダミーは常にtools[0]のtool_callを返す→max_steps内で完了しない=limits abort
     assert out["abort_reason"] in (None, "limits")
+
+
+# --- Task 19: ask結線（Mode.ASK→AskSession.prompt） ---
+
+POLICY_ASK_EDIT = POLICY_ALL_ALLOW.replace(
+    "list_dir:   { default: allow }",
+    "list_dir:   { default: allow }\n  edit_file:  { default: ask }")
+
+
+def _make_edit_tool():
+    def edit_file(path: str, old: str, new: str) -> str:
+        return f"edited {path}"
+    return edit_file
+
+
+def _ask_harness(tmp_path, llm, reader):
+    """ask_session注入済みharness（edit_file=ask policy）"""
+    from nexuscore.harness.ask import AskSession
+    gate = _make_policy(tmp_path / "cfg", POLICY_ASK_EDIT)
+    store = RunStateStore(path=tmp_path / "state.json")
+    ask_session = AskSession(store=store, reader=reader)
+    tools = {"edit_file": _make_edit_tool(), "list_dir": list_dir}
+    return AgentHarness(llm=llm, gate=gate, tool_registry=tools,
+                        state_store=store,
+                        breaker=CircuitBreaker(provider="test"),
+                        ask_session=ask_session)
+
+
+def test_ask_approved_executes_tool(tmp_path):
+    """ask承認→道具実行される"""
+    llm = ScriptedLLM([_tool_resp("edit_file", {"path": "a.txt", "old": "A", "new": "B"}),
+                       _content_resp("done")])
+    h = _ask_harness(tmp_path, llm, lambda _p: "y\n")
+    out = h.run("edit it")
+    assert out["abort_reason"] is None
+    tool_msgs = [m for m in llm.seen_messages[1] if m.get("role") == "tool"]
+    assert tool_msgs[0]["content"] == "edited a.txt"  # 実行されている
+
+
+def test_ask_denied_by_user_does_not_execute(tmp_path):
+    """ask拒否→道具は実行されずLLMへdenied通知"""
+    llm = ScriptedLLM([_tool_resp("edit_file", {"path": "a.txt", "old": "A", "new": "B"}),
+                       _content_resp("ok")])
+    h = _ask_harness(tmp_path, llm, lambda _p: "n\n")
+    out = h.run("edit it")
+    assert out["abort_reason"] is None
+    tool_msgs = [m for m in llm.seen_messages[1] if m.get("role") == "tool"]
+    assert "denied" in tool_msgs[0]["content"]
+    assert "edited" not in tool_msgs[0]["content"]
+
+
+def test_ask_timeout_denies(tmp_path):
+    """askタイムアウト（reader=None）→deny"""
+    llm = ScriptedLLM([_tool_resp("edit_file", {"path": "a.txt", "old": "A", "new": "B"}),
+                       _content_resp("ok")])
+    h = _ask_harness(tmp_path, llm, lambda _p: None)
+    out = h.run("edit it")
+    tool_msgs = [m for m in llm.seen_messages[1] if m.get("role") == "tool"]
+    assert "denied" in tool_msgs[0]["content"]
+
+
+def test_no_ask_session_ask_policy_denies(tmp_path):
+    """ask_session未注入ならask policyはDENY（現行挙動維持・fail-closed）"""
+    llm = ScriptedLLM([_tool_resp("edit_file", {"path": "a.txt", "old": "A", "new": "B"}),
+                       _content_resp("ok")])
+    h, _, _ = _make_harness(tmp_path, llm, policy_body=POLICY_ASK_EDIT,
+                            registry={"edit_file": _make_edit_tool(),
+                                      "list_dir": list_dir})
+    h.run("edit it")
+    tool_msgs = [m for m in llm.seen_messages[1] if m.get("role") == "tool"]
+    assert "denied" in tool_msgs[0]["content"]

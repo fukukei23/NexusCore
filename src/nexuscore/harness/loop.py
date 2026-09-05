@@ -54,6 +54,7 @@ from typing import Any
 
 import requests
 
+from nexuscore.harness.ask import AskResult, AskSession
 from nexuscore.harness.circuit_breaker import CircuitBreaker, State
 from nexuscore.harness.run_state import RunState, RunStateStore, SaveResult
 from nexuscore.harness.tool_gate import Mode, ToolGate
@@ -102,9 +103,13 @@ class AgentHarness:
         state_store: RunStateStore,
         breaker: CircuitBreaker,
         limits: Limits | None = None,
+        ask_session: AskSession | None = None,
     ) -> None:
         self.llm = llm
         self.gate = gate
+        # Task 19: ask確認フロー結線。Noneならask policyはDENYに倒る（fail-closed）。
+        # AskSession側でも非TTYはdenyに倒るため二重防御。
+        self.ask_session = ask_session
         # C案: policyが唯一の情報源。deny_paths引数を持つ道具だけ束縛対象
         # （read_file等の非対応道具に渡すとTypeErrorになるためsignature検査）
         self.tools: dict[str, Callable] = {}
@@ -199,7 +204,14 @@ class AgentHarness:
                             status="would_exceed_limit")))
                         continue
                     d = self.gate.evaluate(tool=tc.name, tool_args=tc.args,
-                                           ask_supported=False)
+                                           ask_supported=self.ask_session is not None)
+                    if d.mode == Mode.ASK:
+                        # Task 19: ask確認→承認のみ実行（拒否/タイムアウトはdeny通知）
+                        verdict = self.ask_session.prompt(tool=tc.name, args=tc.args)
+                        if verdict is not AskResult.APPROVED:
+                            msgs.append(self._tool_result(
+                                tc, f"denied: ask {verdict.value}"))
+                            continue
                     # 判定順序の根拠: gate denyを先に見る（policy不在toolはここで
                     # 拒否）。「unknown tool」経路はpolicy=allowかつregistry未登録の
                     # 不整合時のみ到達する（MLR採用: 順序根拠の明記）

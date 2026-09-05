@@ -27,12 +27,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from nexuscore.harness.ask import AskSession
 from nexuscore.harness.circuit_breaker import CircuitBreaker
 from nexuscore.harness.loop import AgentHarness
 from nexuscore.harness.mock_provider import LocalToolCallDummyLLM
 from nexuscore.harness.run_state import RunStateStore
 from nexuscore.harness.tool_gate import ToolGate
 from nexuscore.harness.tools import list_dir, read_file, search_text
+from nexuscore.harness.tools.write import edit_file, write_file
 
 # 実在確認済みモデルのみ（2026-09-05 Task 16実測: gpt-5.1-instantは404・アカウントに無し。
 # gpt-5.1は/v1/models一覧で実在確認・deepseek-chatはチェックポイント実行で実測）
@@ -63,6 +65,8 @@ def main(argv: list[str] | None = None,
     p.add_argument("--model", default=None, help='実プロバイダ時は"vendor:model"形式')
     p.add_argument("--policy", default="tool_policy.yaml")
     p.add_argument("--state-path", default=None)
+    p.add_argument("--ask", action="store_true",
+                   help="書く系道具の対話確認を有効化（TTY必須・非TTYはdenyに倒る）")
     args = p.parse_args(argv)
     try:
         llm = (llm_factory or build_llm)(args.provider, args.model)
@@ -71,9 +75,14 @@ def main(argv: list[str] | None = None,
                  else RunStateStore())
         reg = {"read_file": read_file, "list_dir": list_dir,
                "search_text": search_text}
+        if args.ask:
+            # 書く系をregistryへ追加（policy default: ask → AskSessionで確認）
+            reg["write_file"] = write_file
+            reg["edit_file"] = edit_file
+        ask_session = (AskSession(store=store) if args.ask else None)
         br = CircuitBreaker(provider=args.provider)
         h = AgentHarness(llm=llm, gate=gate, tool_registry=reg,
-                         state_store=store, breaker=br)
+                         state_store=store, breaker=br, ask_session=ask_session)
         out = h.run(" ".join(args.task))
     except Exception as exc:  # noqa: BLE001 CLI観測可能性: JSONで異常を返す
         out = {"abort_reason": "cli_error", "error": str(exc)}
