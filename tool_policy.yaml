@@ -8,4 +8,4 @@ tools:
   search_text:  { default: allow }
   write_file:   { default: ask, deny_paths: ['.git/**', '**/.env', '**/secrets/**'] }
   edit_file:    { default: ask, deny_paths: ['.git/**', '**/.env', '**/secrets/**'] }
-  # Phase 3以降で exec を追加
+  run_command:  { default: ask, deny_patterns: ['rm -rf', 'sudo ', 'git push --force', ':(){:|:&};:', 'mkfs', 'dd if='] }

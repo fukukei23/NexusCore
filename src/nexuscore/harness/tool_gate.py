@@ -125,6 +125,21 @@ class ToolGate:
                     return GateDecision(
                         Mode.DENY, f"path {v!r} matches deny pattern {pat!r}"
                     )
+        # Task 20: deny_patterns（コマンド文字列の部分一致・撃つ系用）
+        # deny_pathsと対称に非list型は破損扱いdeny-all（fail-closed）
+        deny_patterns = conf.get("deny_patterns", [])
+        if not isinstance(deny_patterns, list):
+            return GateDecision(
+                Mode.DENY,
+                f"deny_patterns is not a list (fail-closed, "
+                f"got {type(deny_patterns).__name__})",
+            )
+        for pat in deny_patterns or []:
+            for v in _iter_arg_strings(tool_args):
+                if pat in v:
+                    return GateDecision(
+                        Mode.DENY, f"arg {v!r} matches deny pattern {pat!r}"
+                    )
         # 既定動作: 未設定=deny（保守側）
         default = conf.get("default", "deny")
         if default == "allow":

@@ -491,7 +491,7 @@ def test_ask_timeout_denies(tmp_path):
     llm = ScriptedLLM([_tool_resp("edit_file", {"path": "a.txt", "old": "A", "new": "B"}),
                        _content_resp("ok")])
     h = _ask_harness(tmp_path, llm, lambda _p: None)
-    out = h.run("edit it")
+    h.run("edit it")
     tool_msgs = [m for m in llm.seen_messages[1] if m.get("role") == "tool"]
     assert "denied" in tool_msgs[0]["content"]
 
