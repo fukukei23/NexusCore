@@ -34,8 +34,10 @@ from nexuscore.harness.run_state import RunStateStore
 from nexuscore.harness.tool_gate import ToolGate
 from nexuscore.harness.tools import list_dir, read_file, search_text
 
-# llm_router.py cheap_map の実在値のみ・他providerは --model 必須（捏造防止）
-DEFAULT_MODELS: dict[str, str] = {"openai": "openai:gpt-5.1-instant"}
+# 実在確認済みモデルのみ（2026-09-05 Task 16実測: gpt-5.1-instantは404・アカウントに無し。
+# gpt-5.1は/v1/models一覧で実在確認・deepseek-chatはチェックポイント実行で実測）
+DEFAULT_MODELS: dict[str, str] = {"openai": "openai:gpt-5.1",
+                                  "deepseek": "deepseek:deepseek-chat"}
 TOOL_CAPABLE = ("openai", "anthropic", "google", "glm", "minimax",
                 "deepseek", "moonshot", "openrouter", "mock")
 
