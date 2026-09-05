@@ -506,3 +506,28 @@ def test_no_ask_session_ask_policy_denies(tmp_path):
     h.run("edit it")
     tool_msgs = [m for m in llm.seen_messages[1] if m.get("role") == "tool"]
     assert "denied" in tool_msgs[0]["content"]
+
+
+# --- Task 19: tool_defスキーマ自動生成（空properties問題の解消） ---
+
+def test_tool_defs_generate_signature_schema(tmp_path):
+    """_tool_defs: シグネチャからparametersを自動生成する（空properties問題解消）"""
+    def edit_file(path: str, old: str, new: str) -> str:
+        """ファイル内のold→newを置換する"""
+        return "ok"
+
+    llm = ScriptedLLM([_content_resp("ok")])
+    h, _, _ = _make_harness(tmp_path, llm, registry={"edit_file": edit_file})
+    defs = {d["function"]["name"]: d["function"] for d in h._tool_defs()}
+    params = defs["edit_file"]["parameters"]
+    assert set(params["properties"]) == {"path", "old", "new"}
+    assert params["required"] == ["path", "old", "new"]
+    assert "old→newを置換" in defs["edit_file"]["description"]
+
+
+def test_tool_defs_exclude_denied_paths_param(tmp_path):
+    """_tool_defs: policy束縛対象のdeny_pathsはLLMに公開しない"""
+    llm = ScriptedLLM([_content_resp("ok")])
+    h, _, _ = _make_harness(tmp_path, llm)  # list_dirはdeny_paths束縛対象
+    defs = {d["function"]["name"]: d["function"] for d in h._tool_defs()}
+    assert "deny_paths" not in defs["list_dir"]["parameters"]["properties"]

@@ -310,10 +310,32 @@ class AgentHarness:
         return {"role": "tool", "tool_call_id": tc.id, "content": content}
 
     def _tool_defs(self) -> list[dict]:
-        return [{"type": "function",
-                 "function": {"name": n, "parameters": {"type": "object",
-                                                        "properties": {}}}}
-                for n in self.tools]
+        """道具定義をシグネチャから自動生成する
+
+        Task 19 E2E実測（2026-09-06）: 旧実装の空 ``properties: {}`` ではLLMが
+        引数名を推測して誤名（file_path/old_string等）を渡しTypeErrorになり、
+        実タスクが完遂できない（Phase 1チェックポイント項目①「空properties問題」
+        の顕在化）。policy束縛対象のdeny_pathsはLLMに公開しない。
+        """
+        defs: list[dict] = []
+        for name, fn in self.tools.items():
+            props: dict[str, dict] = {}
+            required: list[str] = []
+            for pname, param in inspect.signature(fn).parameters.items():
+                if pname == "deny_paths":
+                    continue  # policy束縛済み・LLM引数は破棄されるため公開しない
+                if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
+                    continue
+                props[pname] = {"type": "string"}
+                if param.default is param.empty:
+                    required.append(pname)
+            doc = (inspect.getdoc(fn) or "").split("\n")[0]
+            defs.append({"type": "function",
+                         "function": {"name": name, "description": doc,
+                                      "parameters": {"type": "object",
+                                                     "properties": props,
+                                                     "required": required}}})
+        return defs
 
 
 def _is_429(exc: BaseException) -> bool:
