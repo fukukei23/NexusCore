@@ -15,31 +15,12 @@ tool_registry構築時にpolicyのdeny_pathsを束縛して渡すこと（バッ
 """
 from __future__ import annotations
 
-import fnmatch
-import os
 from pathlib import Path
 
-from nexuscore.harness.tools import ToolResult
+from nexuscore.harness.tools import ToolResult, is_denied
 
-MAX_BYTES = 1_000_000  # 1MB cap（暴走防止）
+MAX_BYTES = 1_000_000  # 1MB cap（暴走防止・bytes単位）
 MAX_HITS = 100  # search_textのヒット件数上限（LLMコンテキスト保護）
-
-
-def _is_denied(path: str, deny_paths: list[str] | None) -> bool:
-    """deny_paths照合（glob×normpath・full pathと名前の両方）
-
-    非list型は破損扱いで常にTrue（全隠蔽fail-closed・tool_gate deny-all相当）。
-    名前単体マッチはtool_gateより広い（=隠しすぎる方向・意図的）。
-    """
-    if deny_paths is None:
-        return False
-    if not isinstance(deny_paths, list):
-        return True  # 破損扱い
-    norm = os.path.normpath(path)
-    return any(
-        fnmatch.fnmatch(norm, pat) or fnmatch.fnmatch(os.path.basename(norm), pat)
-        for pat in deny_paths
-    )
 
 
 def read_file(path: str) -> str | ToolResult:
@@ -59,7 +40,7 @@ def list_dir(path: str, deny_paths: list[str] | None = None) -> list[dict]:
             size = e.stat().st_size
         except OSError:
             continue  # 壊れたsymlink等・1エントリで全体が死なない
-        if _is_denied(str(e), deny_paths):
+        if is_denied(str(e), deny_paths):
             continue
         entries.append({"name": e.name, "is_dir": e.is_dir(), "size": size})
     return entries
@@ -84,7 +65,7 @@ def search_text(
     hits: list[dict] = []
     for pat in patterns:
         for p in Path(root).rglob(pat):
-            if _is_denied(str(p), deny_paths):
+            if is_denied(str(p), deny_paths):
                 continue
             try:
                 if not p.is_file():

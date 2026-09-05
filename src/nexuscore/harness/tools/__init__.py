@@ -4,7 +4,27 @@ ToolResultを先に定義してからread.pyをimportする（read.pyが本パ�
 ToolResultをimportするため・定義→importの順序が重要）。Task 17/20 の
 not_found / ambiguous / would_exceed_limit も本型に統一予定。
 """
+import fnmatch
+import os
 from dataclasses import dataclass
+
+
+def is_denied(path: str, deny_paths: list[str] | None) -> bool:
+    """deny_paths照合（glob×normpath・full pathとファイル名単体の両方）
+
+    Task 17 MLR採用分でread.pyの _is_denied からpublic化・共通化した
+    （private importの流用は将来リファクタで壊れるため）。非list型は破損扱いで
+    常にTrue（全拒否fail-closed・tool_gate deny-all相当）。
+    """
+    if deny_paths is None:
+        return False
+    if not isinstance(deny_paths, list):
+        return True  # 破損扱い
+    norm = os.path.normpath(path)
+    return any(
+        fnmatch.fnmatch(norm, pat) or fnmatch.fnmatch(os.path.basename(norm), pat)
+        for pat in deny_paths
+    )
 
 
 @dataclass
