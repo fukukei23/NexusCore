@@ -40,6 +40,7 @@ class ToolResult:
     allowed_max: int | None = None
     match_count: int | None = None  # Task 17 edit_file ambiguous時のマッチ数
     path: str | None = None  # Task 17 denied_path時の対象パス
+    detail: str | None = None  # Task 20 exec_error時の例外文言
 
 
 from nexuscore.harness.tools.read import list_dir, read_file, search_text

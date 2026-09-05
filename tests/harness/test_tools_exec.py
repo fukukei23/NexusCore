@@ -40,10 +40,37 @@ def test_run_command_timeout_returns_toolresult() -> None:
     """タイムアウトはToolResult通知（生例外でLLMを汚さない）"""
     r = run_command("sleep 5", timeout_seconds=1)
     assert isinstance(r, ToolResult) and r.status == "timeout"
-    assert r.allowed_max == 1
+    assert r.allowed_max == 600  # クランプ上限（MLR採用でallowed_maxは上限値に統一）
 
 
 def test_run_command_missing_binary_reports_error() -> None:
     r = run_command("definitely_not_a_command_xyz")
     assert r["rc"] != 0
     assert r["stderr"] != ""
+
+
+# --- 3機MLR採用分のテスト（2026-09-06） ---
+
+def test_run_command_binary_output_no_crash() -> None:
+    """MLR採用: errors=replaceでバイナリ出力もクラッシュしない"""
+    r = run_command("printf '\\xff\\xfe\\x00bad'")
+    assert isinstance(r, dict) and r["rc"] == 0
+    assert isinstance(r["stdout"], str)
+
+
+def test_run_command_timeout_clamped_to_max() -> None:
+    """MLR採用: 巨大/負/非数のtimeoutは正規化される（巨大値で待機しない）"""
+    r = run_command("echo hi", timeout_seconds=999_999)
+    assert isinstance(r, dict)  # クランプ[1,600]内で即完了
+    r2 = run_command("echo hi", timeout_seconds="not_a_number")  # type: ignore[arg-type]
+    assert isinstance(r2, dict) and r2["rc"] == 0  # 不正値は既定値へ
+
+
+def test_run_command_stdin_devnull_no_hang() -> None:
+    """MLR採用: 対話型コマンド（stdin読み）がハングしない"""
+    import time
+    start = time.monotonic()
+    r = run_command("read line; echo got:$line", timeout_seconds=5)
+    elapsed = time.monotonic() - start
+    assert isinstance(r, dict)
+    assert elapsed < 4  # DEVNULLで即EOF・タイムアウト待機しない

@@ -61,3 +61,44 @@ def test_tool_without_deny_patterns_unaffected(tmp_path: Path) -> None:
     d = g.evaluate(tool="echo_tool", tool_args={"text": "hello"},
                    ask_supported=False)
     assert d.mode == Mode.ALLOW
+
+
+# --- MLR採用分: ループ統合テスト（Gate→loop→execの結合・2026-09-06） ---
+
+def test_loop_denies_deny_pattern_before_execution(tmp_path: Path) -> None:
+    """MLR採用: harnessループ経由でもdeny_patternsは実行前に遮断される"""
+    from nexuscore.harness.circuit_breaker import CircuitBreaker
+    from nexuscore.harness.loop import AgentHarness
+    from nexuscore.harness.mock_provider import LocalToolCallDummyLLM  # noqa: F401
+    from nexuscore.harness.run_state import RunStateStore
+    from nexuscore.harness.tool_calling_mixin import InternalToolCall
+    from nexuscore.harness.tools.exec import run_command
+
+    policy = tmp_path / "tool_policy.yaml"
+    policy.write_text("tools:\n  run_command: { default: allow, "
+                      "deny_patterns: ['cat>rophic'] }\n")
+    llm_executed: list[dict] = []
+
+    def _spy_run(cmd: str) -> dict:
+        llm_executed.append({"cmd": cmd})
+        return run_command(cmd)
+
+    class _ScriptedLLM:
+        calls = 0
+
+        def complete_with_tools(self, messages, tools, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                return {"content": "", "tool_calls": [InternalToolCall(
+                    name="run_command", args={"cmd": "echo cat>rophic"}, id="tc-1")],
+                    "usage": {}}
+            return {"content": "done", "tool_calls": [], "usage": {}}
+
+    gate = ToolGate(policy_path=policy)
+    store = RunStateStore(path=tmp_path / "state.json")
+    h = AgentHarness(llm=_ScriptedLLM(), gate=gate,
+                     tool_registry={"run_command": _spy_run},
+                     state_store=store, breaker=CircuitBreaker(provider="t"))
+    out = h.run("run it")
+    assert out["abort_reason"] is None
+    assert llm_executed == []  # denyされたため道具は実行されない
