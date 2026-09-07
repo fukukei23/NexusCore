@@ -52,7 +52,7 @@ def _keep_tail(text: str, keep: int = KEEP_BYTES) -> str:
 def _sanitize_timeout(value: object) -> int:
     """LLM指定timeoutをintへ正規化し[1, 600]へクランプ（不正値は既定値）"""
     try:
-        seconds = int(value)  # type: ignore[arg-type]
+        seconds = int(value)  # type: ignore[call-overload]
     except (TypeError, ValueError):
         return TIMEOUT_SECONDS
     return max(1, min(seconds, MAX_TIMEOUT_SECONDS))

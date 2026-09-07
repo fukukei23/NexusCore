@@ -144,7 +144,11 @@ class AgentHarness:
         LLM例外（429含む）はブレーキャ記録後にre-raiseする（リトライはprovider層・
         Task 5-7 urllib3 Retryの管轄。本ループは握りつぶさない）。
         """
-        msgs = list(messages) if messages else [{"role": "user", "content": task}]
+        # tool_calls付きassistantメッセージを連結するため値型はAny（OpenAI契約・
+        # dict[str, str]だとmypy dict-item誤検知になる）
+        msgs: list[dict[str, Any]] = (
+            list(messages) if messages else [{"role": "user", "content": task}]
+        )
         tools = self._tool_defs()
         started = time.monotonic()
         total_tokens = 0
@@ -207,6 +211,13 @@ class AgentHarness:
                                            ask_supported=self.ask_session is not None)
                     if d.mode == Mode.ASK:
                         # Task 19: ask確認→承認のみ実行（拒否/タイムアウトはdeny通知）
+                        # fail-closed: ASKはask_supported=True（ask_session非None）でしか
+                        # 返らない（tool_gate.evaluate契約）が、到達不能経路でも承認なし
+                        # 実行の抜け道を作らないため明示拒否（mypy narrow兼ねる）
+                        if self.ask_session is None:
+                            msgs.append(self._tool_result(
+                                tc, "error: ask_session missing"))
+                            continue
                         verdict = self.ask_session.prompt(tool=tc.name, args=tc.args)
                         if verdict is not AskResult.APPROVED:
                             msgs.append(self._tool_result(
