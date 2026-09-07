@@ -37,6 +37,9 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(api_keys.router, prefix="/api/v1")
     app.include_router(openrouter_key.router, prefix="/api/v1")
     app.include_router(run_view.canonical_router, prefix="/api/v1")
+    # Task 23: ハーネスWeb UI薄い実装（ADR-002決定A・prefix=/harness）
+    from nexuscore.api.harness_routes import router as harness_router
+    app.include_router(harness_router)
 
 
 def _register_exception_handlers(app: FastAPI) -> None:
