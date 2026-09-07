@@ -103,6 +103,24 @@ def test_cli_missing_policy_fail_closed_no_crash(tmp_path: Path) -> None:
     assert out["abort_reason"] is None  # MLR採用M5: fail-closedでも健全完走を明示
 
 
+def test_cli_ask_registry_includes_exec_tool() -> None:
+    """Task 21: --ask時はrun_command（ask必須の撃つ系）もregistryへ登録する
+
+    plan Task 21のE2E（pytest実行をask承認込みでCLI経由）に必要。
+    policy既定（tool_policy.yaml）は run_command: { default: ask } のため
+    AskSessionありの文脈でのみ登録する（ask無しではfail-closed維持）。
+    """
+    reg = harness_cli.build_registry(ask=True)
+    assert set(reg) == {"read_file", "list_dir", "search_text",
+                        "write_file", "edit_file", "run_command"}
+
+
+def test_cli_default_registry_is_read_only() -> None:
+    """Task 21: --ask無しのregistryは読む系のみ（exec/writeは登録しない）"""
+    reg = harness_cli.build_registry(ask=False)
+    assert set(reg) == {"read_file", "list_dir", "search_text"}
+
+
 def test_cli_unsupported_provider_systemexit() -> None:
     """異常系: 未対応providerはSystemExit（BuildErrorを握りつぶさない）"""
     with pytest.raises(SystemExit):

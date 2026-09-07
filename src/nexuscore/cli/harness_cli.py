@@ -34,6 +34,7 @@ from nexuscore.harness.mock_provider import LocalToolCallDummyLLM
 from nexuscore.harness.run_state import RunStateStore
 from nexuscore.harness.tool_gate import ToolGate
 from nexuscore.harness.tools import list_dir, read_file, search_text
+from nexuscore.harness.tools.exec import run_command
 from nexuscore.harness.tools.write import edit_file, write_file
 
 # 実在確認済みモデルのみ（2026-09-05 Task 16実測: gpt-5.1-instantは404・アカウントに無し。
@@ -45,7 +46,7 @@ TOOL_CAPABLE = ("openai", "anthropic", "google", "glm", "minimax",
 
 
 def build_llm(provider: str, model: str | None) -> Any:
-    """provider名から complete_with_tools を持つLLMを構築する（mockはオフライン）"""
+    """provider名から complete_with_tools を持つLLM実体を構築する（mockはオフライン）"""
     if provider == "mock":
         return LocalToolCallDummyLLM()
     name = model or DEFAULT_MODELS.get(provider)
@@ -53,6 +54,22 @@ def build_llm(provider: str, model: str | None) -> Any:
         raise SystemExit(f"unsupported provider: {provider} (--model で指定可)")
     from nexuscore.llm.provider_factory import create_provider
     return create_provider(name)
+
+
+def build_registry(ask: bool) -> dict[str, Any]:
+    """Task 21: CLIのtool registry構築を抽出（テスト可能化）
+
+    --ask=True 時は書く系（write_file/edit_file）と撃つ系（run_command・
+    policy既定 default: ask のためAskSessionありの文脈でのみ登録）を追加。
+    --ask=False 時は読む系のみ（fail-closed維持・exec/writeは登録しない）。
+    """
+    reg = {"read_file": read_file, "list_dir": list_dir,
+           "search_text": search_text}
+    if ask:
+        reg["write_file"] = write_file
+        reg["edit_file"] = edit_file
+        reg["run_command"] = run_command
+    return reg
 
 
 def main(argv: list[str] | None = None,
@@ -73,12 +90,7 @@ def main(argv: list[str] | None = None,
         gate = ToolGate(policy_path=Path(args.policy))
         store = (RunStateStore(path=Path(args.state_path)) if args.state_path
                  else RunStateStore())
-        reg = {"read_file": read_file, "list_dir": list_dir,
-               "search_text": search_text}
-        if args.ask:
-            # 書く系をregistryへ追加（policy default: ask → AskSessionで確認）
-            reg["write_file"] = write_file
-            reg["edit_file"] = edit_file
+        reg = build_registry(ask=args.ask)
         ask_session = (AskSession(store=store) if args.ask else None)
         br = CircuitBreaker(provider=args.provider)
         h = AgentHarness(llm=llm, gate=gate, tool_registry=reg,
