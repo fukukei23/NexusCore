@@ -14,6 +14,7 @@ plan雛形からの意図的変更（実契約突合・変更記録方式）:
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from fastapi import APIRouter, Form
 from fastapi.responses import HTMLResponse
@@ -43,11 +44,18 @@ _FORM_HTML = """<!DOCTYPE html>
 </html>"""
 
 
+_WEBUI_STATE_PATH = Path("artifacts/harness/run_state_webui.json")
+
+
 def _run_harness(task: str, provider: str) -> str:
-    """harnessを同期実行し結果JSON文字列を返す（ask無し=読む系のみ・fail-closed）"""
+    """harnessを同期実行し結果JSON文字列を返す（ask無し=読む系のみ・fail-closed）
+
+    state保存先をCLI既定（run_state.json）から分離する（2026-09-09実害修正）:
+    Web UIのmockスモークがCLI中断runのresume stateを上書きしないようにする。
+    """
     llm = build_llm(provider, None)
     gate = ToolGate(policy_path="tool_policy.yaml")
-    store = RunStateStore()
+    store = RunStateStore(_WEBUI_STATE_PATH)
     reg = build_registry(ask=False)
     br = CircuitBreaker(provider=provider)
     h = AgentHarness(llm=llm, gate=gate, tool_registry=reg,

@@ -43,6 +43,24 @@ def test_run_renders_harness_result() -> None:
     assert "abort_reason" in resp.text
 
 
+def test_run_does_not_touch_cli_default_state(tmp_path, monkeypatch) -> None:
+    """異常系（回帰・2026-09-09実害）: Web UI実行がCLI既定stateを汚染しない
+
+    実害: _run_harnessがRunStateStore()（既定=artifacts/harness/run_state.json・
+    CWD相対）を使うため、Web UIのmockスモークテストがCLIの中断run stateを
+    上書きした（Task 24 run1のdeepseek stateがpytest検証中に破壊された実測）。
+    封じ手: Web UI実行はrun_state_webui.jsonへ分離。
+    """
+    monkeypatch.chdir(tmp_path)
+    app = FastAPI()
+    app.include_router(harness_router)
+    client = TestClient(app)
+    resp = client.post("/harness/run", data={"task": "hello", "provider": "mock"})
+    assert resp.status_code == 200
+    assert (tmp_path / "artifacts/harness/run_state_webui.json").exists()
+    assert not (tmp_path / "artifacts/harness/run_state.json").exists()
+
+
 def test_router_included_in_app() -> None:
     """結合: create_app() に /harness ルートが組み込まれている（ADR-002統合先）"""
     client = TestClient(create_app())
