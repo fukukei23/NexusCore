@@ -7,6 +7,7 @@ uvicorn をサブプロセスでバックグラウンド起動し、E2E テス�
 from __future__ import annotations
 
 import subprocess
+import sys
 import time
 import urllib.request
 from pathlib import Path
@@ -35,7 +36,7 @@ def start_fastapi_server(
         RuntimeError: サーバーの起動に失敗した場合
     """
     if python_path is None:
-        python_path = "python"
+        python_path = sys.executable
 
     # PYTHONPATH を設定して FastAPI アプリを起動
     env = {
