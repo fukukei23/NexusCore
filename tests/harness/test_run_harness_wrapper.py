@@ -544,3 +544,22 @@ def test_mark_done_duplicate_topics_marks_specified_line(tmp_path: Path) -> None
     lines = p.read_text().splitlines()
     assert lines[3].startswith("- [ ]")  # 1個目は無傷
     assert lines[4].startswith("- [x]")  # 指定された2個目のみ[x]
+
+
+def test_load_history_scale_smoke(tmp_path: Path) -> None:
+    """6周目・劣化スモーク: 5000行履歴（毎日1回で13年分）でもload+watchdogが高速であること。
+    閾値: 2秒未満（2026-09-09実測0.018s・100倍の余白）。これを超えたらO(n²)化の兆候。"""
+    import json as _json
+    import time
+    from scripts.run_harness_task import load_history, watchdog_check
+    p = tmp_path / "hist_big.jsonl"
+    with open(p, "w") as f:
+        for i in range(5000):
+            f.write(_json.dumps({"ts": "2026-09-09T00:00:00+00:00",
+                                 "task_hash": f"h{i}", "tokens_used": 100}) + "\n")
+    t0 = time.monotonic()
+    h = load_history(p)
+    r = watchdog_check(h)
+    elapsed = time.monotonic() - t0
+    assert len(h) == 5000 and r == "ok"
+    assert elapsed < 2.0
