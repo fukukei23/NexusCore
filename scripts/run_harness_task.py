@@ -33,7 +33,9 @@ import re
 import subprocess
 import sys
 import unicodedata
-from datetime import UTC, datetime
+import urllib.request
+from datetime import UTC, datetime, timedelta
+from datetime import timezone as tzmod
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -48,6 +50,8 @@ DEFAULT_MONTHLY_TOKEN_BUDGET = 16_000_000  # P10 暫定（$5相当の概算・�
 WATCHDOG_WARN_UNIQUE = 8     # P9 二段
 WATCHDOG_STOP_UNIQUE = 5
 POOL_LOW_WARN = 3            # P8 題庫残<3で警告
+CRON_EXIT_SKIP = 3           # cron-setup規定: 同日skip
+CRON_EXIT_SELFCHECK = 78     # v2: 起動時selfcheck NG
 
 _SECTIONS = {"無人用（読む系）": "auto", "手動用（書く系）": "manual"}
 _TOPIC_RE = re.compile(r"^- \[( |x)\] ([^:：]+)[:：](.+)$")
@@ -182,6 +186,67 @@ def mark_done(pool_path: Path, line_no: int, topic_text: str = "") -> bool:
 _WRAPPER_LOCK_FP = None  # flock保持用（GCでlockが解放される事故の対策・テストで実測捕捉）
 
 
+def today_jst() -> str:
+    """当日スタンプの日付文字列（JST明示・r1 MiniMax TZ指摘対応）"""
+    return datetime.now(tzmod(timedelta(hours=9))).strftime("%Y-%m-%d")
+
+
+def stamp_path(repo: Path) -> Path:
+    return repo / "artifacts/harness/.stamp-last-success"
+
+
+def check_daily_stamp(repo: Path, force: bool) -> bool:
+    """cron-setup規定: 当日成功スタンプが既にあればskip（成功時のみ書込=失敗翌日再試行可）"""
+    if force:
+        return True
+    sp = stamp_path(repo)
+    try:
+        return sp.read_text().strip() != today_jst()
+    except OSError:
+        return True
+
+
+def write_stamp(repo: Path) -> None:
+    stamp_path(repo).parent.mkdir(parents=True, exist_ok=True)
+    stamp_path(repo).write_text(today_jst())
+
+
+def heartbeat(repo: Path) -> None:
+    """v2 Gemini critical2: 成功時の死活痕跡（mtimeでstale検知）"""
+    hb = repo / "artifacts/harness/heartbeat"
+    hb.parent.mkdir(parents=True, exist_ok=True)
+    hb.touch()
+
+
+def selfcheck(repo: Path) -> str | None:
+    """v2 MiniMax fail条件提案: 起動時自己診断（NG理由を返す・OKはNone）"""
+    if not (repo / ".venv/bin/python").exists():
+        return "venv python不在"
+    pool = repo / "docs/harness_題庫.md"
+    if not pool.exists() or not parse_pool(pool)["auto"] and not parse_pool(pool)["manual"]:
+        if not pool.exists():
+            return "題庫ファイル不在"
+    return None
+
+
+def notify_failure(repo: Path, message: str) -> None:
+    """v2 MiniMax#3: Discord通知はbest-effort・失敗時は.notify.fail退避"""
+    url = os.environ.get("DISCORD_CLAUDE_WEBHOOK")
+    (repo / "artifacts/harness").mkdir(parents=True, exist_ok=True)
+    if not url:
+        with open(repo / "artifacts/harness/.notify.fail", "a") as f:
+            f.write(f"{today_jst()} no-webhook-url: {message}\n")
+        return
+    try:
+        req = urllib.request.Request(
+            url, data=json.dumps({"content": f"[harness cron] {message}"}).encode(),
+            headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=10)
+    except Exception as exc:  # noqa: BLE001 best-effort・通知失敗も退避
+        with open(repo / "artifacts/harness/.notify.fail", "a") as f:
+            f.write(f"{today_jst()} notify_error: {exc}: {message}\n")
+
+
 def acquire_wrapper_lock(repo: Path) -> bool:
     """ラッパー全体の二重起動防止（MiniMax r3-critical・cron多重発火で同一お題二重実行を防ぐ）"""
     global _WRAPPER_LOCK_FP
@@ -205,8 +270,18 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true", help="抽出のみで実行しない")
     ap.add_argument("--monthly-token-budget", type=int,
                     default=DEFAULT_MONTHLY_TOKEN_BUDGET)
+    ap.add_argument("--force", action="store_true",
+                    help="当日スタンプを無視して再実行（手動用・MiniMax r1逆シナリオ対応）")
     args = ap.parse_args()
     repo: Path = args.repo
+    ng = selfcheck(repo)
+    if ng and not args.dry_run:
+        print(f"[wrapper] SELFCHECK NG: {ng} → exit {CRON_EXIT_SELFCHECK}", flush=True)
+        notify_failure(repo, f"selfcheck NG: {ng}")
+        return CRON_EXIT_SELFCHECK
+    if not args.dry_run and not args.force and not check_daily_stamp(repo, False):
+        print("[wrapper] 当日成功済み → skip", flush=True)
+        return CRON_EXIT_SKIP
     if not args.dry_run and not acquire_wrapper_lock(repo):
         return 0
     (repo / "artifacts/harness").mkdir(parents=True, exist_ok=True)  # r2 Gemini#3 親dir不在
@@ -305,6 +380,11 @@ def main() -> int:
 
     if not mark_done(pool_path, topic["line_no"], topic["text"]):
         warnings.append("marker_update_skipped")
+    if final.get("abort_reason") is None:
+        write_stamp(repo)   # cron-setup規定: 成功時のみスタンプ（失敗翌日は再試行可）
+        heartbeat(repo)     # v2 Gemini#2: 成功時死活痕跡
+    else:
+        notify_failure(repo, f"abort: {final.get('abort_reason')} tokens={tokens}")
     subprocess.run([sys.executable, str(repo / "scripts/collect_harness_metrics.py"),
                     "--root", str(repo)], cwd=repo, capture_output=True)
     for w in warnings:

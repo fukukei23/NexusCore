@@ -159,3 +159,44 @@ def test_acquire_wrapper_lock_blocks_second(tmp_path: Path) -> None:
     repo = tmp_path
     assert acquire_wrapper_lock(repo) is True
     assert acquire_wrapper_lock(repo) is False  # 同プロセス内2回目は競合
+
+
+# --- Phase B: stamp/heartbeat/selfcheck（cron-setup規定路線） ---
+
+def test_daily_stamp_skip_and_force(tmp_path: Path) -> None:
+    """当日スタンプ: 同日ならskip(False)・forceなら再実行可"""
+    from scripts.run_harness_task import check_daily_stamp, stamp_path, write_stamp
+    repo = tmp_path
+    assert check_daily_stamp(repo, force=False) is True  # 初回=実行可
+    write_stamp(repo)
+    assert check_daily_stamp(repo, force=False) is False  # 同日=skip
+    assert check_daily_stamp(repo, force=True) is True  # force=再実行可
+    assert stamp_path(repo).read_text().strip()  # 日付が書かれている
+
+
+def test_heartbeat_touches_file(tmp_path: Path) -> None:
+    from scripts.run_harness_task import heartbeat
+    heartbeat(tmp_path)
+    assert (tmp_path / "artifacts/harness/heartbeat").exists()
+
+
+def test_selfcheck_ng_on_missing_venv(tmp_path: Path) -> None:
+    """selfcheck: venv不在でNG理由を返す（exit 78の根拠）"""
+    from scripts.run_harness_task import selfcheck
+    ng = selfcheck(tmp_path)
+    assert ng is not None and "venv" in ng
+
+
+def test_notify_failure_dead_letter_without_webhook(tmp_path: Path) -> None:
+    """webhook未設定時も.notify.failへ退避（デッドレター対策・r1 MiniMax#3）"""
+    import os
+
+    from scripts.run_harness_task import notify_failure
+    old = os.environ.pop("DISCORD_CLAUDE_WEBHOOK", None)
+    try:
+        notify_failure(tmp_path, "test message")
+        assert (tmp_path / "artifacts/harness/.notify.fail").exists()
+        assert "test message" in (tmp_path / "artifacts/harness/.notify.fail").read_text()
+    finally:
+        if old is not None:
+            os.environ["DISCORD_CLAUDE_WEBHOOK"] = old

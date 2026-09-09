@@ -10,7 +10,7 @@
 - [ ] エラー診断: harness全体テストで出る20件のwarningを分類し、修正優先度付きで報告する（修正はしない）
 - [ ] 設定・docs生成: tool_policy.yaml の deny_patterns の網羅性を評価し、防御漏れ候補を報告する（policy変更はしない）
 - [ ] コード読解: loop.py の state.save() 呼び出し経路を全て列挙し、保存漏れシナリオ候補を報告する（実装の変更はしない）
-- [ ] 設定・docs生成: docs/開発ガイド.md と harness_cli --help の不整合を列挙して報告する（修正はしない）
+- [x] 設定・docs生成: docs/開発ガイド.md と harness_cli --help の不整合を列挙して報告する（修正はしない）
 - [ ] エラー診断: run_state の quarantine ファイルが発生する経路を整理して報告する（実装の変更はしない）
 - [ ] コード読解: api/harness_routes.py と cli/harness_cli.py の機能差を一覧化して報告する（実装の変更はしない）
 
