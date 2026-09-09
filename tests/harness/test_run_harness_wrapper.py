@@ -154,7 +154,6 @@ def test_mark_done_skip_when_topic_missing(tmp_path: Path) -> None:
 
 def test_acquire_wrapper_lock_blocks_second(tmp_path: Path) -> None:
     """二重起動: 1つ目が保持中なら2つ目はFalse（MiniMax r3-critical）"""
-    sys.path.insert(0, "/home/yn4416/projects/NexusCore/scripts")
     from scripts.run_harness_task import acquire_wrapper_lock
     repo = tmp_path
     assert acquire_wrapper_lock(repo) is True
@@ -283,9 +282,12 @@ def test_main_dry_run_writes_no_stamp(tmp_path: Path) -> None:
     (repo / "docs/harness_題庫.md").write_text(
         "# 題庫\n\n## 無人用（読む系）\n- [ ] A: テスト用お題\n")
     (repo / "scripts").mkdir(parents=True)
+    import shutil
+
+    from scripts import run_harness_task as _wmod
+    src_dir = Path(_wmod.__file__).resolve().parent
     for f in ("run_harness_task.py", "collect_harness_metrics.py"):
-        import shutil
-        shutil.copy(f"/home/yn4416/projects/NexusCore/scripts/{f}", repo / "scripts" / f)
+        shutil.copy(src_dir / f, repo / "scripts" / f)
     r = subprocess.run(
         [sys.executable, str(repo / "scripts/run_harness_task.py"),
          "--repo", str(repo), "--dry-run"],
@@ -375,3 +377,67 @@ def test_main_watchdog_stop_returns_5(tmp_path: Path) -> None:
         assert w.main() == 5
     finally:
         sys.argv = old_argv
+
+
+# --- 3周目網羅確認: モード・警告の配線 ---
+
+def test_main_manual_mode_picks_from_manual_section(tmp_path: Path, monkeypatch) -> None:
+    """--manual: 手動用セクションから選び interactive/ask_used=Trueを記録する配線"""
+    import json as _json
+    import sys
+
+    from scripts import run_harness_task as w
+    (tmp_path / ".venv/bin").mkdir(parents=True)
+    (tmp_path / ".venv/bin/python").write_text("")
+    (tmp_path / "docs").mkdir(parents=True)
+    (tmp_path / "docs/harness_題庫.md").write_text(
+        "# 題庫\n\n## 無人用（読む系）\n- [ ] A: 自動用\n"
+        "## 手動用（書く系）\n- [ ] B: 手動用\n")
+    hdir = tmp_path / "artifacts/harness"
+    hdir.mkdir(parents=True)
+    hist = hdir / "metrics_history.jsonl"
+
+    def fake_run(repo, task, state_path, timeout):
+        return 0, '{"abort_reason": null, "tokens_used": 10, "loop_steps": 1}', ""
+
+    monkeypatch.setattr(w, "run_harness", fake_run)
+    old_argv = sys.argv
+    sys.argv = ["run_harness_task.py", "--repo", str(tmp_path), "--manual"]
+    try:
+        assert w.main() == 0
+    finally:
+        sys.argv = old_argv
+    rec = _json.loads(hist.read_text().splitlines()[-1])
+    assert rec["mode"] == "manual"
+    assert rec["interactive"] is True and rec["ask_used"] is True
+
+
+def test_main_pool_low_and_budget_warnings(tmp_path: Path, capsys) -> None:
+    """警告配線: pool_low（残≤3）とbudget超過（短冊モード）が出る"""
+    import json
+    import sys
+
+    from scripts import run_harness_task as w
+    (tmp_path / ".venv/bin").mkdir(parents=True)
+    (tmp_path / ".venv/bin/python").write_text("")
+    (tmp_path / "docs").mkdir(parents=True)
+    long_text = "お題がやや長めの文章です" * 5
+    lines = [f"- [ ] A: お題{i} {long_text if i % 2 else '短い'}" for i in range(3)]
+    (tmp_path / "docs/harness_題庫.md").write_text(
+        "# 題庫\n\n## 無人用（読む系）\n" + "\n".join(lines) + "\n")
+    hdir = tmp_path / "artifacts/harness"
+    hdir.mkdir(parents=True)
+    from datetime import UTC, datetime
+    rec = {"ts": datetime.now(UTC).isoformat(), "task_hash": "x" * 16,
+           "tokens_used": 20_000_000}
+    (hdir / "metrics_history.jsonl").write_text(
+        json.dumps(rec, ensure_ascii=False) + "\n")
+    old_argv = sys.argv
+    sys.argv = ["run_harness_task.py", "--repo", str(tmp_path), "--dry-run"]
+    try:
+        assert w.main() == 0
+    finally:
+        sys.argv = old_argv
+    out = capsys.readouterr().out
+    assert "pool_low" in out
+    assert "monthly_budget_exceeded" in out
