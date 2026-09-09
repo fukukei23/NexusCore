@@ -241,7 +241,6 @@ def test_selfcheck_ok_returns_none(tmp_path: Path) -> None:
 
 def test_notify_failure_posts_to_webhook(tmp_path: Path, monkeypatch) -> None:
     """notify_failureのPOST経路（webhook設定時・urlopenはモック）"""
-    import os
     from scripts import run_harness_task as w
     captured = {}
     class FakeResp:
@@ -262,6 +261,7 @@ def test_notify_failure_posts_to_webhook(tmp_path: Path, monkeypatch) -> None:
 def test_run_harness_timeout_raises_to_caller(tmp_path: Path, monkeypatch) -> None:
     """run_harness: timeout時はTimeoutExpiredが呼び出し元へ（mainで捕捉する契約）"""
     import subprocess
+
     from scripts import run_harness_task as w
     def fake_run(*a, **kw):
         raise subprocess.TimeoutExpired(cmd="x", timeout=900)
@@ -276,7 +276,8 @@ def test_run_harness_timeout_raises_to_caller(tmp_path: Path, monkeypatch) -> No
 
 def test_main_dry_run_writes_no_stamp(tmp_path: Path) -> None:
     """統合: --dry-runはstampを書かない（exit 0・mark_doneも呼ばれない）"""
-    import subprocess, sys
+    import subprocess
+    import sys
     repo = tmp_path
     (repo / "docs").mkdir(parents=True)
     (repo / "docs/harness_題庫.md").write_text(
