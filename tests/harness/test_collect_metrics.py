@@ -79,3 +79,13 @@ def test_main_writes_to_custom_out(tmp_path: Path) -> None:
     finally:
         sys.argv = old_argv
     assert rc == 0 and out.exists()
+
+
+def test_collect_unparseable_checkpoint_counts_as_failure(tmp_path: Path) -> None:
+    """collect: 壊れたcheckpoint log→ unparseableとして失敗計上（5周目・裏付け）"""
+    cp = tmp_path / "artifacts/checkpoints/phase1/2026-09-09"
+    cp.mkdir(parents=True)
+    (cp / "log.json").write_text("not json at all")
+    m = collect_metrics(tmp_path)["metrics"]
+    assert m["checkpoint_failure_rate"]["failed"] == 1
+    assert m["checkpoint_failure_rate"]["total"] == 1

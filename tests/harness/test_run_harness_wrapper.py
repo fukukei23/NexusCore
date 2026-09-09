@@ -471,3 +471,76 @@ def test_run_harness_env_override_provider_model(tmp_path: Path, monkeypatch) ->
     w.run_harness(tmp_path, "task", tmp_path / "s.json", 900)
     assert "--provider glm" in " ".join(captured["cmd"])
     assert "--model glm:glm-5.3-flash" in " ".join(captured["cmd"])
+
+
+# --- 5周目網羅確認: 並行・競合・異常入力 ---
+
+def test_mark_done_lock_contention_returns_false(tmp_path: Path) -> None:
+    """flock競合（BlockingIOError）→ False返却（5周目）"""
+    import fcntl
+
+    from scripts.run_harness_task import mark_done
+    p = _pool(tmp_path)
+    # 別プロセス想定でlockファイルを先占有（同一プロセスでは flock は
+    # 別fdを取得するため mock で排他競合を再現）
+    lock = p.with_suffix(".md.lock")
+    lf = open(lock, "w")
+    fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
+    try:
+        assert mark_done(p, 4) is False  # skip・誤[x]化しない
+    finally:
+        fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
+        lf.close()
+
+
+def test_main_run_gap_warnings(tmp_path: Path, capsys) -> None:
+    """run_gap警告: 履歴の最終tsが3日超→候補・5日超→強制（5周目）"""
+    import json as _json
+    import sys
+
+    from scripts import run_harness_task as w
+    (tmp_path / ".venv/bin").mkdir(parents=True)
+    (tmp_path / ".venv/bin/python").write_text("")
+    (tmp_path / "docs").mkdir(parents=True)
+    (tmp_path / "docs/harness_題庫.md").write_text(
+        "# 題庫\n\n## 無人用（読む系）\n- [ ] A: x\n")
+    hdir = tmp_path / "artifacts/harness"
+    hdir.mkdir(parents=True)
+    # 6日前の履歴 → 5日超え → 強制短冊
+    from datetime import UTC, datetime, timedelta
+    old = (datetime.now(UTC) - timedelta(days=6)).isoformat()
+    (hdir / "metrics_history.jsonl").write_text(
+        _json.dumps({"ts": old, "task_hash": "x" * 16, "tokens_used": 10}) + "\n")
+    old_argv = sys.argv
+    sys.argv = ["run_harness_task.py", "--repo", str(tmp_path), "--dry-run"]
+    try:
+        assert w.main() == 0
+    finally:
+        sys.argv = old_argv
+    out = capsys.readouterr().out
+    assert "6日連続欠損（強制短冊モード推奨）" in out
+
+
+def test_parse_pool_handles_crlf_and_malformed_lines() -> None:
+    """CRLF改行と形式不良行（コロン無し）を安全にskip（5周目）"""
+    p = Path("/tmp") / "pool_crlf.md"
+    crlf = ("# 題庫\r\n\r\n## 無人用（読む系）\r\n"
+            "- [ ] A: 正常\r\n"
+            "形式不良行: コロンがない\r\n"
+            "- [ ] B: 正常\r\n")
+    p.write_bytes(crlf.encode("utf-8"))
+    topics = parse_pool(p)["auto"]
+    assert len(topics) == 2
+    assert [t["text"] for t in topics] == ["正常", "正常"]
+
+
+def test_mark_done_duplicate_topics_marks_specified_line(tmp_path: Path) -> None:
+    """同題文の重複: 指定line_noの行（題文照合済み）だけを[x]化（5周目）"""
+    p = tmp_path / "dup.md"
+    p.write_text("# 題庫\n\n## 無人用（読む系）\n"
+                 "- [ ] X: 同題文\n"
+                 "- [ ] X: 同題文\n")
+    assert mark_done(p, 5, "同題文") is True  # 5行目=2個目を指定・題文照合OK
+    lines = p.read_text().splitlines()
+    assert lines[3].startswith("- [ ]")  # 1個目は無傷
+    assert lines[4].startswith("- [x]")  # 指定された2個目のみ[x]
