@@ -223,3 +223,72 @@ def test_selfcheck_empty_pool(tmp_path: Path) -> None:
     (repo / "docs/harness_題庫.md").write_text(
         "# 題庫\n\n## 無人用（読む系）\n\n## 手動用（書く系）\n")
     assert selfcheck(repo) == "題庫が空"
+
+
+# --- テスト網羅確認（self-inspect タイプI・2026-09-09）で判明した欠落の固定化 ---
+
+def test_selfcheck_ok_returns_none(tmp_path: Path) -> None:
+    """正常系: venv在り+題庫に題あり→None（未テストだった正常経路）"""
+    from scripts.run_harness_task import selfcheck
+    repo = tmp_path
+    (repo / ".venv/bin").mkdir(parents=True)
+    (repo / ".venv/bin/python").write_text("")
+    (repo / "docs").mkdir(parents=True)
+    (repo / "docs/harness_題庫.md").write_text(
+        "# 題庫\n\n## 無人用（読む系）\n- [ ] A: x\n")
+    assert selfcheck(repo) is None
+
+
+def test_notify_failure_posts_to_webhook(tmp_path: Path, monkeypatch) -> None:
+    """notify_failureのPOST経路（webhook設定時・urlopenはモック）"""
+    import os
+    from scripts import run_harness_task as w
+    captured = {}
+    class FakeResp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+    def fake_urlopen(req, timeout):
+        captured["url"] = req.full_url
+        captured["data"] = req.data
+        return FakeResp()
+    monkeypatch.setattr(w.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setenv("DISCORD_CLAUDE_WEBHOOK", "https://example.invalid/hook")
+    w.notify_failure(tmp_path, "hello")
+    assert "example.invalid" in captured["url"]
+    assert "hello" in captured["data"].decode()
+    assert not (tmp_path / "artifacts/harness/.notify.fail").exists()
+
+
+def test_run_harness_timeout_raises_to_caller(tmp_path: Path, monkeypatch) -> None:
+    """run_harness: timeout時はTimeoutExpiredが呼び出し元へ（mainで捕捉する契約）"""
+    import subprocess
+    from scripts import run_harness_task as w
+    def fake_run(*a, **kw):
+        raise subprocess.TimeoutExpired(cmd="x", timeout=900)
+    monkeypatch.setattr(w.subprocess, "run", fake_run)
+    try:
+        w.run_harness(tmp_path, "task", tmp_path / "s.json", 900)
+        raised = False
+    except subprocess.TimeoutExpired:
+        raised = True
+    assert raised is True
+
+
+def test_main_dry_run_writes_no_stamp(tmp_path: Path) -> None:
+    """統合: --dry-runはstampを書かない（exit 0・mark_doneも呼ばれない）"""
+    import subprocess, sys
+    repo = tmp_path
+    (repo / "docs").mkdir(parents=True)
+    (repo / "docs/harness_題庫.md").write_text(
+        "# 題庫\n\n## 無人用（読む系）\n- [ ] A: テスト用お題\n")
+    (repo / "scripts").mkdir(parents=True)
+    for f in ("run_harness_task.py", "collect_harness_metrics.py"):
+        import shutil
+        shutil.copy(f"/home/yn4416/projects/NexusCore/scripts/{f}", repo / "scripts" / f)
+    r = subprocess.run(
+        [sys.executable, str(repo / "scripts/run_harness_task.py"),
+         "--repo", str(repo), "--dry-run"],
+        capture_output=True, text=True, cwd=str(repo))
+    assert r.returncode == 0
+    assert not (repo / "artifacts/harness/.stamp-last-success").exists()
+    assert "- [x]" not in (repo / "docs/harness_題庫.md").read_text()
