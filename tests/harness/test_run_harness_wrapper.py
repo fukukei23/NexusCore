@@ -293,3 +293,85 @@ def test_main_dry_run_writes_no_stamp(tmp_path: Path) -> None:
     assert r.returncode == 0
     assert not (repo / "artifacts/harness/.stamp-last-success").exists()
     assert "- [x]" not in (repo / "docs/harness_題庫.md").read_text()
+
+
+# --- 2周目網羅確認: main()のexit code配線（3/4/5/78） ---
+
+def test_main_selfcheck_ng_returns_78(tmp_path: Path, monkeypatch) -> None:
+    """selfcheck NG（venv不在）→exit 78+notify呼出"""
+    from scripts import run_harness_task as w
+    calls: list = []
+    monkeypatch.setattr(w, "notify_failure", lambda r, m: calls.append(m))
+    old_argv = sys.argv
+    sys.argv = ["run_harness_task.py", "--repo", str(tmp_path)]
+    try:
+        rc = w.main()
+    finally:
+        sys.argv = old_argv
+    assert rc == 78
+    assert calls and "venv" in calls[0]
+
+
+def test_main_same_day_skip_returns_3(tmp_path: Path) -> None:
+    """当日スタンプあり→exit 3（skip経路の配線）"""
+    import sys
+
+    from scripts import run_harness_task as w
+    (tmp_path / ".venv/bin").mkdir(parents=True)
+    (tmp_path / ".venv/bin/python").write_text("")
+    (tmp_path / "docs").mkdir(parents=True)
+    (tmp_path / "docs/harness_題庫.md").write_text(
+        "# 題庫\n\n## 無人用（読む系）\n- [ ] A: x\n")
+    (tmp_path / "artifacts/harness").mkdir(parents=True)
+    w.write_stamp(tmp_path)
+    old_argv = sys.argv
+    sys.argv = ["run_harness_task.py", "--repo", str(tmp_path)]
+    try:
+        assert w.main() == 3
+    finally:
+        sys.argv = old_argv
+
+
+def test_main_pool_exhausted_returns_4(tmp_path: Path) -> None:
+    """全お題[x]化→exit 4（pool_exhausted経路の配線）"""
+    import sys
+
+    from scripts import run_harness_task as w
+    (tmp_path / ".venv/bin").mkdir(parents=True)
+    (tmp_path / ".venv/bin/python").write_text("")
+    (tmp_path / "docs").mkdir(parents=True)
+    (tmp_path / "docs/harness_題庫.md").write_text(
+        "# 題庫\n\n## 無人用（読む系）\n- [x] A: x\n")
+    old_argv = sys.argv
+    sys.argv = ["run_harness_task.py", "--repo", str(tmp_path)]
+    try:
+        assert w.main() == 4
+    finally:
+        sys.argv = old_argv
+
+
+def test_main_watchdog_stop_returns_5(tmp_path: Path) -> None:
+    """watchdog緊急停止（10run中ユニーク<5）→exit 5の配線"""
+    import json as _json
+    import sys
+
+    from scripts import run_harness_task as w
+    (tmp_path / ".venv/bin").mkdir(parents=True)
+    (tmp_path / ".venv/bin/python").write_text("")
+    (tmp_path / "docs").mkdir(parents=True)
+    (tmp_path / "docs/harness_題庫.md").write_text(
+        "# 題庫\n\n## 無人用（読む系）\n- [ ] A: x\n")
+    hdir = tmp_path / "artifacts/harness"
+    hdir.mkdir(parents=True)
+    with open(hdir / "metrics_history.jsonl", "w") as f:
+        for i in range(10):
+            f.write(_json.dumps({
+                "ts": "2026-09-09T00:00:00+00:00",
+                "task_hash": f"h{i % 3}",  # ユニーク3種
+                "tokens_used": 100}) + "\n")
+    old_argv = sys.argv
+    sys.argv = ["run_harness_task.py", "--repo", str(tmp_path)]
+    try:
+        assert w.main() == 5
+    finally:
+        sys.argv = old_argv
