@@ -551,6 +551,7 @@ def test_load_history_scale_smoke(tmp_path: Path) -> None:
     閾値: 2秒未満（2026-09-09実測0.018s・100倍の余白）。これを超えたらO(n²)化の兆候。"""
     import json as _json
     import time
+
     from scripts.run_harness_task import load_history, watchdog_check
     p = tmp_path / "hist_big.jsonl"
     with open(p, "w") as f:
