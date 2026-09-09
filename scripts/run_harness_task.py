@@ -199,6 +199,10 @@ def stamp_eligible(final: dict, warnings: list[str]) -> bool:
         return False
     if any(w.startswith("hard_token_limit") for w in warnings):
         return False
+    if any(w.startswith("harness_exit") for w in warnings):
+        # 4周目で発見: rc!=0でもabort_reason=Noneなら当日完了扱いになっていた
+        # （無人運用では「異常終了→翌日再試行」が安全側・2026-09-09）
+        return False
     return True
 
 

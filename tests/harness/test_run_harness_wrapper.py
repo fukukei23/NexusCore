@@ -441,3 +441,33 @@ def test_main_pool_low_and_budget_warnings(tmp_path: Path, capsys) -> None:
     out = capsys.readouterr().out
     assert "pool_low" in out
     assert "monthly_budget_exceeded" in out
+
+
+# --- 4周目網羅確認: rc/abort_reason組合せ+env override+collect CLI ---
+
+def test_stamp_eligible_rejects_nonzero_harness_exit() -> None:
+    """4周目発見: harness異常終了（rc!=0）でもabort無しならstamp不適格にする"""
+    from scripts.run_harness_task import stamp_eligible
+    assert stamp_eligible({"abort_reason": None},
+                          ["harness_exit=1: ModuleNotFoundError"]) is False
+
+
+def test_run_harness_env_override_provider_model(tmp_path: Path, monkeypatch) -> None:
+    """NEXUS_HARNESS_PROVIDER/MODEL envでprovider/modelを差し替えられる"""
+    from scripts import run_harness_task as w
+    captured = {}
+
+    def fake_run(cmd, cwd, capture_output, text, timeout):
+        captured["cmd"] = cmd
+        class P:
+            returncode = 0
+            stdout = '{"abort_reason": null, "tokens_used": 1}'
+            stderr = ""
+        return P()
+
+    monkeypatch.setenv("NEXUS_HARNESS_PROVIDER", "glm")
+    monkeypatch.setenv("NEXUS_HARNESS_MODEL", "glm:glm-5.3-flash")
+    monkeypatch.setattr(w.subprocess, "run", fake_run)
+    w.run_harness(tmp_path, "task", tmp_path / "s.json", 900)
+    assert "--provider glm" in " ".join(captured["cmd"])
+    assert "--model glm:glm-5.3-flash" in " ".join(captured["cmd"])

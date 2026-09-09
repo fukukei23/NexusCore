@@ -63,3 +63,19 @@ def test_extract_last_json_pure_json_with_braces_in_content() -> None:
     text = '{"content": "報告 ```json {a:1}``` 含む", "abort_reason": null}'
     assert _extract_last_json(text) == {"content": "報告 ```json {a:1}``` 含む",
                                         "abort_reason": None}
+
+
+def test_main_writes_to_custom_out(tmp_path: Path) -> None:
+    """collect main(): --out指定で指定パスに書く（CLI経路・4周目網羅）"""
+    import sys
+
+    from scripts import collect_harness_metrics as c
+    out = tmp_path / "custom" / "metrics.json"
+    old_argv = sys.argv
+    sys.argv = ["collect_harness_metrics.py", "--root", str(tmp_path),
+                "--out", str(out)]
+    try:
+        rc = c.main()
+    finally:
+        sys.argv = old_argv
+    assert rc == 0 and out.exists()
