@@ -54,10 +54,15 @@ def test_pick_topic_category_balanced() -> None:
 
 
 def test_pick_topic_budget_mode_prefers_shortest() -> None:
-    topics = parse_pool(_pool(Path("/tmp")))["auto"]
+    pool = Path("/tmp") / "budget_pool.md"
+    pool.write_text(
+        "# 題庫\n\n## 無人用（読む系）\n"
+        "- [ ] A: これはかなり長めのお題本文で短くありません\n"
+        "- [ ] B: 短い\n")
+    topics = parse_pool(pool)["auto"]
     picked, how = pick_topic(topics, "s", True)
     assert how == "budget_mode_shortest"
-    assert "サンプルA" in picked["text"]  # 一番短い題文
+    assert picked["text"] == "短い"  # 先頭でなく最短（先頭固定変異の捕捉）
 
 
 def test_pick_topic_exhausted() -> None:
@@ -69,6 +74,26 @@ def test_pick_topic_exhausted() -> None:
 def test_normalize_and_hash_stable() -> None:
     assert normalize("Hello  World！ テスト") == normalize("hello world! テスト")
     assert task_hash("A B") == task_hash("a  b")
+
+
+def test_task_hash_distinguishes_different_topics() -> None:
+    """mutation用強化: 異なる題文は異なるhash（定数化変異の捕捉）"""
+    assert task_hash("お題A") != task_hash("お題B")
+    assert task_hash("お題A") != ""
+
+
+def test_pick_topic_respects_category_balance_when_uneven() -> None:
+    """mutation用強化: 消化済みが偏っている場合、最少カテゴリから選ぶ（均等化無視変異の捕捉）"""
+    topics = [
+        {"done": True, "category": "X", "text": "x1", "line_no": 1},
+        {"done": True, "category": "X", "text": "x2", "line_no": 2},
+        {"done": False, "category": "X", "text": "x3", "line_no": 3},
+        {"done": False, "category": "Y", "text": "y1", "line_no": 4},
+    ]
+    for _ in range(5):  # 週シードを変えても最少カテゴリYから選ばれる
+        picked, how = pick_topic(topics, f"seed-{_}", False)
+        assert picked["category"] == "Y"
+        assert how == "category_balanced"
 
 
 def test_watchdog_two_stage() -> None:
