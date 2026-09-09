@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -95,7 +96,10 @@ def main(argv: list[str] | None = None,
         br = CircuitBreaker(provider=args.provider)
         h = AgentHarness(llm=llm, gate=gate, tool_registry=reg,
                          state_store=store, breaker=br, ask_session=ask_session)
-        out = h.run(" ".join(args.task))
+        ctx = (f"作業ディレクトリ: {os.getcwd()}\n"
+               "相対パスはこのディレクトリ基準です。/workspace などは存在しません。\n"
+               "cdで移動せず、引数に絶対パスを渡してください。")
+        out = h.run(" ".join(args.task), system_prompt=ctx)
     except Exception as exc:  # noqa: BLE001 CLI観測可能性: JSONで異常を返す
         out = {"abort_reason": "cli_error", "error": str(exc)}
     reason = out.get("abort_reason")

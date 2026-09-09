@@ -130,3 +130,33 @@ def test_cli_unsupported_provider_systemexit() -> None:
 def test_build_llm_mock_returns_dummy() -> None:
     """--provider mock はオフラインダミーを返す（実HTTP不発）"""
     assert isinstance(harness_cli.build_llm("mock", None), LocalToolCallDummyLLM)
+
+
+def test_cli_injects_working_directory_context(tmp_path: Path) -> None:
+    """G-1: CLIがcwdを作業コンテキストとしてsystemロールで注入する（run1迷走対策）"""
+    import contextlib
+    import io
+
+    from nexuscore.cli import harness_cli
+
+    captured: dict = {}
+
+    class _ContentLLM:
+        def complete_with_tools(self, messages, tools, **kw):
+            captured["messages"] = messages
+            return {"content": "done", "usage": {}}
+
+    policy = tmp_path / "tool_policy.yaml"
+    policy.write_text("provider_insecure_default: []\ntools:\n  read_file: {default: allow}\n")
+    state = tmp_path / "state.json"
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        harness_cli.main(
+            ["hello", "--provider", "mock", "--policy", str(policy),
+             "--state-path", str(state)],
+            llm_factory=lambda p, m: _ContentLLM())
+    roles = [m["role"] for m in captured["messages"]]
+    assert roles[0] == "system"
+    import os
+    assert "作業ディレクトリ" in captured["messages"][0]["content"]
+    assert os.getcwd() in captured["messages"][0]["content"]

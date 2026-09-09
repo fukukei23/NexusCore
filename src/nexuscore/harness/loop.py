@@ -138,17 +138,25 @@ class AgentHarness:
 
         return bound
 
-    def run(self, task: str, messages: list[dict] | None = None) -> dict:
+    def run(self, task: str, messages: list[dict] | None = None,
+            *, system_prompt: str | None = None) -> dict:
         """タスクを実行し、完了応答またはabort理由付きdictを返す
 
         LLM例外（429含む）はブレーキャ記録後にre-raiseする（リトライはprovider層・
         Task 5-7 urllib3 Retryの管轄。本ループは握りつぶさない）。
+
+        system_prompt: G-1実行コンテキスト初期注入（cwd/リポジトリパスをLLMに渡す）
+        messages指定時は挿入しない（resume契約でユーザが全メッセージを管理）
         """
         # tool_calls付きassistantメッセージを連結するため値型はAny（OpenAI契約・
         # dict[str, str]だとmypy dict-item誤検知になる）
-        msgs: list[dict[str, Any]] = (
+        base: list[dict[str, Any]] = (
             list(messages) if messages else [{"role": "user", "content": task}]
         )
+        if system_prompt is not None and not messages:
+            msgs = [{"role": "system", "content": system_prompt}] + base
+        else:
+            msgs = base
         tools = self._tool_defs()
         started = time.monotonic()
         total_tokens = 0

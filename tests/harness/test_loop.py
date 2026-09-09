@@ -531,3 +531,40 @@ def test_tool_defs_exclude_denied_paths_param(tmp_path):
     h, _, _ = _make_harness(tmp_path, llm)  # list_dirはdeny_paths束縛対象
     defs = {d["function"]["name"]: d["function"] for d in h._tool_defs()}
     assert "deny_paths" not in defs["list_dir"]["parameters"]["properties"]
+
+
+def _AlwaysAllowBreaker():  # noqa: N802 (fixture的ファクトリ)
+    """G-1テスト用: 本物のCircuitBreaker（CLOSED固定・loop契約を完全遵守）"""
+    from nexuscore.harness.circuit_breaker import CircuitBreaker
+    return CircuitBreaker(provider="test")
+
+
+def _mk_harness(tmp_path: Path, captured: dict) -> AgentHarness:  # noqa: F821
+    from nexuscore.harness.loop import AgentHarness
+
+    class CapLLM:
+        def complete_with_tools(self, messages, tools, **kw):
+            captured["messages"] = messages
+            return {"content": "done", "usage": {}}
+
+    store = RunStateStore(path=tmp_path / "state.json")
+    return AgentHarness(llm=CapLLM(), gate=None, tool_registry={}, state_store=store,
+                        breaker=_AlwaysAllowBreaker(), ask_session=None)
+
+
+def test_run_with_system_prompt_injects_system_message(tmp_path: Path) -> None:
+    """G-1: system_prompt渡しで先頭にsystemロールが挿入される（実行コンテキスト注入）"""
+    captured: dict = {}
+    h = _mk_harness(tmp_path, captured)
+    h.run("タスク", system_prompt="作業ディレクトリ: /repo")
+    assert captured["messages"][0]["role"] == "system"
+    assert "/repo" in captured["messages"][0]["content"]
+    assert captured["messages"][1]["content"] == "タスク"
+
+
+def test_run_without_system_prompt_keeps_user_first(tmp_path: Path) -> None:
+    """後方互換: system_prompt無しは従来どおりuserメッセージが先頭"""
+    captured: dict = {}
+    h = _mk_harness(tmp_path, captured)
+    h.run("タスク")
+    assert captured["messages"][0]["role"] == "user"
