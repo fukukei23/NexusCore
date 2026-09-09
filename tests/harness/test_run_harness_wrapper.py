@@ -211,3 +211,15 @@ def test_stamp_eligible_timeout_and_hard_token() -> None:
     assert stamp_eligible({"abort_reason": None},
                           ["hard_token_limit: 247456 >= 200000"]) is False
     assert stamp_eligible({"abort_reason": "limits"}, []) is False
+
+
+def test_selfcheck_empty_pool(tmp_path: Path) -> None:
+    """selfcheck: venv在り+題庫空（両セクション空）→「題庫が空」（ドラフト初回試用で追加）"""
+    from scripts.run_harness_task import selfcheck
+    repo = tmp_path
+    (repo / ".venv/bin").mkdir(parents=True)
+    (repo / ".venv/bin/python").write_text("")
+    (repo / "docs").mkdir(parents=True)
+    (repo / "docs/harness_題庫.md").write_text(
+        "# 題庫\n\n## 無人用（読む系）\n\n## 手動用（書く系）\n")
+    assert selfcheck(repo) == "題庫が空"
