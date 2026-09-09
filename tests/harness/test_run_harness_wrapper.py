@@ -200,3 +200,14 @@ def test_notify_failure_dead_letter_without_webhook(tmp_path: Path) -> None:
     finally:
         if old is not None:
             os.environ["DISCORD_CLAUDE_WEBHOOK"] = old
+
+
+def test_stamp_eligible_timeout_and_hard_token() -> None:
+    """r3 MiniMax critical/Gemini high: タイムアウト・ハードトークン超過ではstamp不適格"""
+    from scripts.run_harness_task import stamp_eligible
+    assert stamp_eligible({"abort_reason": None}, []) is True
+    assert stamp_eligible({"abort_reason": None},
+                          ["hard_time_limit: 900s超過"]) is False
+    assert stamp_eligible({"abort_reason": None},
+                          ["hard_token_limit: 247456 >= 200000"]) is False
+    assert stamp_eligible({"abort_reason": "limits"}, []) is False

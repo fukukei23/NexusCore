@@ -186,6 +186,22 @@ def mark_done(pool_path: Path, line_no: int, topic_text: str = "") -> bool:
 _WRAPPER_LOCK_FP = None  # flock保持用（GCでlockが解放される事故の対策・テストで実測捕捉）
 
 
+def stamp_eligible(final: dict, warnings: list[str]) -> bool:
+    """stamp書込適格判定（r3 MiniMax critical + 高: タイムアウト・ハードトークン超過は無効扱い）
+
+    v4仕様: ハード上限超過は「無効扱い」= 当日完了として扱わない（翌日別お題で再試行）。
+    TimeoutExpired時は abort_reason が確実に設定されるよう main 側でも制御するが、
+    本ヘルパーで最終防線を張る（final解析失敗時の空dictでも警告で判定）。
+    """
+    if final.get("abort_reason") is not None:
+        return False
+    if any(w.startswith("hard_time_limit") for w in warnings):
+        return False
+    if any(w.startswith("hard_token_limit") for w in warnings):
+        return False
+    return True
+
+
 def today_jst() -> str:
     """当日スタンプの日付文字列（JST明示・r1 MiniMax TZ指摘対応）"""
     return datetime.now(tzmod(timedelta(hours=9))).strftime("%Y-%m-%d")
@@ -219,13 +235,15 @@ def heartbeat(repo: Path) -> None:
 
 
 def selfcheck(repo: Path) -> str | None:
-    """v2 MiniMax fail条件提案: 起動時自己診断（NG理由を返す・OKはNone）"""
+    """v2 MiniMax fail条件提案: 起動時自己診断（NG理由を返す・OKはNone・parse_poolは1回のみ）"""
     if not (repo / ".venv/bin/python").exists():
         return "venv python不在"
     pool = repo / "docs/harness_題庫.md"
-    if not pool.exists() or not parse_pool(pool)["auto"] and not parse_pool(pool)["manual"]:
-        if not pool.exists():
-            return "題庫ファイル不在"
+    if not pool.exists():
+        return "題庫ファイル不在"
+    parsed = parse_pool(pool)
+    if not parsed["auto"] and not parsed["manual"]:
+        return "題庫が空"
     return None
 
 
@@ -380,11 +398,14 @@ def main() -> int:
 
     if not mark_done(pool_path, topic["line_no"], topic["text"]):
         warnings.append("marker_update_skipped")
-    if final.get("abort_reason") is None:
+    if stamp_eligible(final, warnings):
         write_stamp(repo)   # cron-setup規定: 成功時のみスタンプ（失敗翌日は再試行可）
         heartbeat(repo)     # v2 Gemini#2: 成功時死活痕跡
     else:
-        notify_failure(repo, f"abort: {final.get('abort_reason')} tokens={tokens}")
+        reason = final.get("abort_reason") or next(
+            (w.split(":")[0] for w in warnings
+             if w.startswith("hard_")), "unknown")
+        notify_failure(repo, f"abort: {reason} tokens={tokens}")
     subprocess.run([sys.executable, str(repo / "scripts/collect_harness_metrics.py"),
                     "--root", str(repo)], cwd=repo, capture_output=True)
     for w in warnings:
