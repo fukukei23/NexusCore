@@ -27,6 +27,7 @@ import argparse
 import fcntl
 import hashlib
 import json
+import os
 import random
 import re
 import subprocess
@@ -81,7 +82,7 @@ def parse_pool(pool_path: Path) -> dict[str, list[dict]]:
     return topics
 
 
-def pick_topic(topics: list[dict], history_hashes: list[str], week_seed: str,
+def pick_topic(topics: list[dict], week_seed: str,
                budget_mode: bool) -> tuple[dict | None, str]:
     """P3: カテゴリ均等化強制の非復元ランダム抽出（週シード）
 
@@ -105,8 +106,15 @@ def pick_topic(topics: list[dict], history_hashes: list[str], week_seed: str,
 def load_history(history_path: Path) -> list[dict]:
     if not history_path.exists():
         return []
-    return [json.loads(line) for line in history_path.read_text().splitlines()
-            if line.strip()]
+    out = []
+    for line in history_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            out.append(json.loads(line))
+        except json.JSONDecodeError:
+            print(f"[wrapper] WARN: 履歴の破損行をskip: {line[:50]}", flush=True)
+    return out
 
 
 def watchdog_check(history: list[dict]) -> str:
@@ -123,22 +131,32 @@ def watchdog_check(history: list[dict]) -> str:
 def monthly_tokens(history: list[dict]) -> int:
     """当月累積トークン（P10）"""
     now = datetime.now(UTC).strftime("%Y-%m")
-    return sum(h.get("tokens_used") or 0 for h in history
-               if str(h.get("ts", "")).startswith(now))
+    total = 0
+    for h in history:
+        ts = str(h.get("ts", ""))
+        if len(ts) >= 7 and ts[:7] == now:  # 不正形式tsは当月に含めない（r3 OR）
+            total += h.get("tokens_used") or 0
+    return total
 
 
 def run_harness(repo: Path, task: str, state_path: Path, timeout: int) -> tuple[int, str, str]:
     """harness_cli実行（無人=読む系のみ・--ask無し fail-closed）"""
+    provider = os.environ.get("NEXUS_HARNESS_PROVIDER", "deepseek")
+    model = os.environ.get("NEXUS_HARNESS_MODEL", "deepseek:deepseek-chat")
     cmd = [str(repo / ".venv/bin/python"), "-m", "nexuscore.cli.harness_cli",
-           task, "--provider", "deepseek", "--model", "deepseek:deepseek-chat",
+           task, "--provider", provider, "--model", model,
            "--state-path", str(state_path)]
     proc = subprocess.run(cmd, cwd=repo, capture_output=True, text=True,
                           timeout=timeout)
     return proc.returncode, proc.stdout, proc.stderr
 
 
-def mark_done(pool_path: Path, line_no: int) -> bool:
-    """題庫の[x]マーカーを原子的更新（flock失敗時はskip・P9二重消化はwatchdogが検知）"""
+def mark_done(pool_path: Path, line_no: int, topic_text: str = "") -> bool:
+    """題庫の[x]マーカーを原子的更新（flock失敗時はskip）
+
+    r2 Gemini#1/OR#2: line_no単独は実行中の題庫編集で別行を誤[x]化するため、
+    該当行がtopic_textを含むか検証してから置換する（不一致時は題文で再探索）。
+    """
     lock = pool_path.with_suffix(pool_path.suffix + ".lock")
     with open(lock, "w") as lf:
         try:
@@ -147,11 +165,37 @@ def mark_done(pool_path: Path, line_no: int) -> bool:
             print("[wrapper] 題庫lock競合 → [x]更新をskip", flush=True)
             return False
         lines = pool_path.read_text().splitlines()
-        lines[line_no - 1] = lines[line_no - 1].replace("- [ ]", "- [x]", 1)
+        idx = line_no - 1
+        if idx >= len(lines) or topic_text not in lines[idx]:
+            matches = [i for i, ln in enumerate(lines) if topic_text and topic_text in ln]
+            if not matches:
+                print("[wrapper] 題文が題庫に見つからず [x]更新をskip", flush=True)
+                return False
+            idx = matches[0]
+        lines[idx] = lines[idx].replace("- [ ]", "- [x]", 1)
         tmp = pool_path.with_suffix(pool_path.suffix + ".tmp")
         tmp.write_text("\n".join(lines) + "\n")
         tmp.replace(pool_path)  # 原子的置換（Gemini#1 r2）
         return True
+
+
+_WRAPPER_LOCK_FP = None  # flock保持用（GCでlockが解放される事故の対策・テストで実測捕捉）
+
+
+def acquire_wrapper_lock(repo: Path) -> bool:
+    """ラッパー全体の二重起動防止（MiniMax r3-critical・cron多重発火で同一お題二重実行を防ぐ）"""
+    global _WRAPPER_LOCK_FP
+    lock = repo / "artifacts/harness/wrapper.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lf = open(lock, "w")
+    try:
+        fcntl.flock(lf.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        lf.close()
+        print("[wrapper] 二重起動検出 → skip（exit 0）", flush=True)
+        return False
+    _WRAPPER_LOCK_FP = lf  # モジュール参照で保持（解放されない・プロセス終了まで有効）
+    return True
 
 
 def main() -> int:
@@ -163,6 +207,9 @@ def main() -> int:
                     default=DEFAULT_MONTHLY_TOKEN_BUDGET)
     args = ap.parse_args()
     repo: Path = args.repo
+    if not args.dry_run and not acquire_wrapper_lock(repo):
+        return 0
+    (repo / "artifacts/harness").mkdir(parents=True, exist_ok=True)  # r2 Gemini#3 親dir不在
     pool_path = repo / "docs/harness_題庫.md"
     history_path = repo / "artifacts/harness/metrics_history.jsonl"
     mode = "manual" if args.manual else "auto"
@@ -203,7 +250,7 @@ def main() -> int:
         warnings.append(f"watchdog_{wd}")
 
     week_seed = datetime.now(UTC).strftime("%G-W%V") + mode
-    topic, how = pick_topic(topics, history, week_seed, budget_mode)
+    topic, how = pick_topic(topics, week_seed, budget_mode)
     if topic is None:
         print("[wrapper] STOP: 抽出失敗", flush=True)
         return 4
@@ -216,8 +263,15 @@ def main() -> int:
 
     ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     state_path = repo / f"artifacts/harness/run_state_{ts}.json"
-    rc, out, err = run_harness(repo, topic["text"], state_path, HARD_TIME_SEC)
-    duration = HARD_TIME_SEC  # 正確な所要は別計測（簡略・timeout時は上限値）
+    t0 = datetime.now(UTC)
+    try:
+        rc, out, err = run_harness(repo, topic["text"], state_path, HARD_TIME_SEC)
+    except subprocess.TimeoutExpired:
+        rc, out, err = -9, "", f"timeout after {HARD_TIME_SEC}s"
+        warnings.append(f"hard_time_limit: {HARD_TIME_SEC}s超過で強制終了")
+    duration = int((datetime.now(UTC) - t0).total_seconds())
+    if duration >= SOFT_TIME_SEC:
+        warnings.append(f"soft_time_limit: {duration}s >= {SOFT_TIME_SEC}s")
     try:
         final = json.loads(out.strip().splitlines()[-1])
     except (json.JSONDecodeError, IndexError):
@@ -228,7 +282,8 @@ def main() -> int:
     elif tokens >= SOFT_TOKEN_LIMIT:
         warnings.append(f"soft_token_limit: {tokens} >= {SOFT_TOKEN_LIMIT}")
     if rc != 0:
-        warnings.append(f"harness_exit={rc}")
+        err_tail = (err or "").strip().splitlines()[-1][:120] if (err or "").strip() else "stderr空"
+        warnings.append(f"harness_exit={rc}: {err_tail}")  # r2 Gemini#2 stderr握りつぶし対策
 
     rec = {"ts": datetime.now(UTC).isoformat(),
            "task_hash": task_hash(topic["text"]), "category": topic["category"],
@@ -242,10 +297,13 @@ def main() -> int:
            "breaker_state": final.get("breaker_state"),
            "duration_sec": duration, "state_file": str(state_path),
            "warnings": warnings}
-    with open(history_path, "a") as f:
+    hlock = history_path.with_suffix(history_path.suffix + ".lock")
+    with open(hlock, "w") as hl, open(history_path, "a") as f:
+        fcntl.flock(hl.fileno(), fcntl.LOCK_EX)  # r3 MiniMax: 並行追記競合対策
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        f.flush()
 
-    if not mark_done(pool_path, topic["line_no"]):
+    if not mark_done(pool_path, topic["line_no"], topic["text"]):
         warnings.append("marker_update_skipped")
     subprocess.run([sys.executable, str(repo / "scripts/collect_harness_metrics.py"),
                     "--root", str(repo)], cwd=repo, capture_output=True)

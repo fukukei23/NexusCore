@@ -46,7 +46,7 @@ def test_parse_pool_sections() -> None:
 
 def test_pick_topic_category_balanced() -> None:
     topics = parse_pool(_pool(Path("/tmp")))["auto"]
-    picked, how = pick_topic(topics, [], "test-seed", False)
+    picked, how = pick_topic(topics, "test-seed", False)
     assert how == "category_balanced"
     # 全カテゴリ消化数0のうち最小→最初の未消化カテゴリ群から選ばれる
     assert picked is not None
@@ -55,14 +55,14 @@ def test_pick_topic_category_balanced() -> None:
 
 def test_pick_topic_budget_mode_prefers_shortest() -> None:
     topics = parse_pool(_pool(Path("/tmp")))["auto"]
-    picked, how = pick_topic(topics, [], "s", True)
+    picked, how = pick_topic(topics, "s", True)
     assert how == "budget_mode_shortest"
     assert "サンプルA" in picked["text"]  # 一番短い題文
 
 
 def test_pick_topic_exhausted() -> None:
     topics = [{"done": True, "category": "X", "text": "t", "line_no": 1}]
-    picked, how = pick_topic(topics, [], "s", False)
+    picked, how = pick_topic(topics, "s", False)
     assert picked is None and how == "pool_exhausted"
 
 
@@ -104,3 +104,58 @@ def test_load_history_skips_blank() -> None:
     h = load_history(p)
     assert len(h) == 2
     p.unlink()
+
+
+# --- 網羅性点検で追加した回帰テスト（2026-09-09実装レビュー） ---
+
+def test_watchdog_boundary_exact_5_and_8() -> None:
+    """境界: uniq=5はstopでなくwarn（<5がstop）・uniq=8はok（<8がwarn）"""
+    def hist(u: int) -> list[dict]:
+        return [{"task_hash": f"h{i}", "tokens_used": 1} for i in range(u)] * 2
+    assert watchdog_check(hist(5)).startswith("warn")
+    assert watchdog_check(hist(8)) == "ok"
+
+
+def test_load_history_skips_malformed_line() -> None:
+    """破損行が1行あっても全run停止しない（クラッシュ経路・skip+警告）"""
+    p = Path("/tmp") / "hist_bad.jsonl"
+    p.write_text('{"tokens_used": 5}\n{broken json\n{"tokens_used": 7}\n')
+    h = load_history(p)
+    assert len(h) == 2
+    p.unlink()
+
+
+def test_mark_done_noop_on_already_done() -> None:
+    """既に[x]の行を指定しても壊さない（no-op・True返却の挙動を固定）"""
+    p = _pool(Path("/tmp"))
+    mark_done(p, 4)
+    before = p.read_text()
+    assert mark_done(p, 4) is True
+    assert p.read_text() == before
+
+
+def test_mark_done_falls_back_to_text_search(tmp_path: Path) -> None:
+    """line_noがズレていても題文照合で正しい行を[x]化（r2 Gemini#1/OR#2）"""
+    p = _pool(tmp_path)
+    lines = p.read_text().splitlines()
+    lines.insert(4, "")  # 行を1つ挿入してline_noを1行ズラす
+    p.write_text("\n".join(lines) + "\n")
+    assert mark_done(p, 4, "サンプルBのお題本文") is True
+    out = p.read_text()
+    assert "- [x] エラー診断" in out  # 題文照合で正しい行が当たる
+    assert "- [ ] コード読解: サンプルA" in out  # ズレた行は触られていない
+
+
+def test_mark_done_skip_when_topic_missing(tmp_path: Path) -> None:
+    """題文が題庫に存在しない場合はFalse（誤[x]化しない）"""
+    p = _pool(tmp_path)
+    assert mark_done(p, 4, "存在しないお題") is False
+
+
+def test_acquire_wrapper_lock_blocks_second(tmp_path: Path) -> None:
+    """二重起動: 1つ目が保持中なら2つ目はFalse（MiniMax r3-critical）"""
+    sys.path.insert(0, "/home/yn4416/projects/NexusCore/scripts")
+    from scripts.run_harness_task import acquire_wrapper_lock
+    repo = tmp_path
+    assert acquire_wrapper_lock(repo) is True
+    assert acquire_wrapper_lock(repo) is False  # 同プロセス内2回目は競合
