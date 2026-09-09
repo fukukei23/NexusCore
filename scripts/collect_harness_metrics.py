@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 from collections import Counter
 from pathlib import Path
@@ -104,7 +105,10 @@ def main() -> int:
     args = parser.parse_args()
     result = collect_metrics(args.root)
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(result, ensure_ascii=False, indent=2))
+    lock = args.out.with_suffix(args.out.suffix + ".lock")
+    with open(lock, "w") as lf:  # r2 Gemini#4: 手動/cron競合の排他
+        fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
+        args.out.write_text(json.dumps(result, ensure_ascii=False, indent=2))
     print(json.dumps(result["metrics"], ensure_ascii=False, indent=2))
     print(f"saved: {args.out}")
     return 0
