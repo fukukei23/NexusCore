@@ -29,7 +29,7 @@
   <img src="docs/screenshots/test-results.png" width="500" alt="テスト結果">
 </p>
 
-> 5,465テストが全て通過（カバレッジ84.69%・CI実測 2026-07-09）。agents / llm / core / api / npe / governance / guard 等、全モジュールがユニットテスト・統合テストで保護されています。静的解析は Bandit（セキュリティ・CI必須ゲート）+ ruff（src/tests 全走査・CI必須ゲート 2026-08-15）+ gitleaks（シークレット走査・CI必須ゲート 2026-08-15）で担保。mypy（src/ 全走査・CI必須ゲート 2026-08-16）。
+> 5,499テストが全て通過（passed 5,262 / skipped 191 / xfail 37。カバレッジ84.08%・CI実測 2026-09-10・[GitHub Actions run 34479260801](https://github.com/fukukei23/NexusCore/actions/runs/34479260801)）。agents / llm / core / api / npe / governance / guard 等、全モジュールがユニットテスト・統合テストで保護されています。静的解析は Bandit（セキュリティ・CI必須ゲート）+ ruff（src/tests 全走査・CI必須ゲート 2026-08-15）+ gitleaks（シークレット走査・CI必須ゲート 2026-08-15）で担保。mypy（src/ 全走査・CI必須ゲート 2026-08-16）。
 
 ### 統合UI（Gradio）
 
@@ -84,7 +84,7 @@
   <tr>
     <td>CLIの使い方とオプション一覧</td>
     <td>12の専門エージェントの協調動作フロー</td>
-    <td>5,465テストが全て通過（CI実測 2026-07-09）</td>
+    <td>5,499テストが全て通過（CI実測 2026-09-10）</td>
   </tr>
   <tr>
     <td align="center"><b>カバレッジ</b></td>
@@ -97,7 +97,7 @@
     <td><img src="docs/demo/gifs/06_exec.gif" width="250" alt="Pipeline"></td>
   </tr>
   <tr>
-    <td>カバレッジ84.69% — 品質ゲート通過（CI実測 2026-07-09）</td>
+    <td>カバレッジ84.08% — 品質ゲート通過（CI実測 2026-09-10）</td>
     <td>8プロバイダーの自動ルーティング</td>
     <td>要件→設計→実装→テストまで一気通貫</td>
   </tr>
@@ -164,7 +164,7 @@ AIコーディングツール（Claude Code, Cursor等）が普及する中で�
 - **27種のタスクを自動分類**し、最適なLLMにルーティング
 - **予算管理（NPE）** で日次上限・コスト超過を自動制御
 - **12種のポリシーエンジン** でセキュリティ・パフォーマンス問題を自動検出
-- **5,465テストケース** でシステム動作を継続検証（CI実測 2026-07-09）
+- **5,499テストケース** でシステム動作を継続検証（CI実測 2026-09-10）
 
 ---
 
@@ -218,12 +218,14 @@ User / Developer
 
 | 指標 | 値 |
 |------|-----|
-| テスト数 | 5,465 テストケース（CI自動検証・2026-07-09 実測） |
-| カバレッジ | 84.69%（CI実測 2026-07-09・branch 79.64%） |
+| テスト数 | 5,499 テストケース（CI自動検証・2026-09-10 実測） |
+| カバレッジ | 84.08%（CI実測 2026-09-10・branch 79.94%） |
 | エージェント数 | 12専門エージェント |
 | LLMプロバイダー | 8プロバイダー（OpenAI, Anthropic, Google, GLM, MiniMax, DeepSeek, Moonshot, Local） |
 | 品質ゲート | 2層（静的解析 + 動的テスト） |
 | CI | GitHub Actions（push/PR時自動テスト + セキュリティスキャン） |
+
+> 出典: GitHub Actions CI run [34479260801](https://github.com/fukukei23/NexusCore/actions/runs/34479260801)（2026-09-10・main push・success）。カバレッジ84.08%は coverage.py `pytest --cov` の TOTAL 行（statement+branch合算）、branch 79.94%は同一実行の coverage.xml `branch-rate=0.7994`。
 
 ---
 
@@ -245,7 +247,6 @@ NexusCore/
 │   ├── agents/              # AIエージェント（12専門エージェント + BaseAgent）
 │   ├── analyzer/            # コード解析（AST, 依存グラフ）
 │   ├── api/                 # FastAPI公開API（/api/v1/*）
-│   ├── audio/               # 音声入力（Whisper統合）
 │   ├── cli/                 # CLIツール
 │   ├── config/              # 設定・憲法ローダー・ポリシー
 │   ├── core/                # オーケストレーター, リトライポリシー, セッション管理
