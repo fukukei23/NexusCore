@@ -61,7 +61,10 @@ def _sanitize_timeout(value: object) -> int:
 def run_command(cmd: str, timeout_seconds: int = TIMEOUT_SECONDS) -> dict | ToolResult:
     """LLM指定コマンドを実行しstdout/stderr末尾5KB・rcを返す（deny_patterns+ask必須）"""
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+        # nosec B602は下行末尾・根拠はモジュールdocstringのセキュリティ設計参照:
+        # deny_patterns+ask必須+タイムアウトの3層で担保・shellメタ文字経由の
+        # 回避はask承認時の人間確認が最終防線（既知制限として明記済み）
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True,  # nosec B602 — shell=Trueは設計要件・3層防御(docstring参照)+ask承認が最終防線
                            encoding="utf-8", errors="replace",
                            stdin=subprocess.DEVNULL,
                            timeout=_sanitize_timeout(timeout_seconds))

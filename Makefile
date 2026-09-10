@@ -110,8 +110,13 @@ coverage-phase3:
 	$(PYTHON) -m tools.coverage_phase3_report
 	@echo "✅ Phase3 coverage report generated: docs/coverage_phase3_summary.md"
 
+# ==== セキュリティスキャン（CI Bandit jobと同一条件・2026-09-10 L407） ====
+security:
+	$(PYTHON) -m bandit -r $(SRC) --exclude src/sandbox_logs/,src/nexuscore/archive,src/nexuscore/api/archive -ll
+	@echo "✅ Security scan complete"
+
 # ==== 一括品質チェック ====
-qa: format lint-fix typecheck test
+qa: format lint-fix typecheck security test
 	@echo "✅ All quality checks passed!"
 
 # ==== SDK 生成 ====
