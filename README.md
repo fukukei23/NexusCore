@@ -29,7 +29,7 @@
   <img src="docs/screenshots/test-results.png" width="500" alt="テスト結果">
 </p>
 
-> 5,499テストが全て通過（passed 5,262 / skipped 191 / xfail 37・CI実測 2026-09-10・[GitHub Actions run 34479260801](https://github.com/fukukei23/NexusCore/actions/runs/34479260801)。カバレッジ86.38%・ローカル実測 2026-09-11・詳細は下記品質セクション）。agents / llm / core / api / npe / governance / guard 等、全モジュールがユニットテスト・統合テストで保護されています。静的解析は Bandit（セキュリティ・CI必須ゲート）+ ruff（src/tests 全走査・CI必須ゲート 2026-08-15）+ gitleaks（シークレット走査・CI必須ゲート 2026-08-15）で担保。mypy（src/ 全走査・CI必須ゲート 2026-08-16）。
+> 5,490テストが全て通過（passed 5,268 / skipped 182 / deselected 9 / xfail 26 / xpass 5・CI実測 2026-09-12・[GitHub Actions run 34626708696](https://github.com/fukukei23/NexusCore/actions/runs/34626708696)。カバレッジ86.43%・同run実測・詳細は下記品質セクション）。agents / llm / core / api / npe / governance / guard 等、全モジュールがユニットテスト・統合テストで保護されています。静的解析は Bandit（セキュリティ・CI必須ゲート）+ ruff（src/tests 全走査・CI必須ゲート 2026-08-15）+ gitleaks（シークレット走査・CI必須ゲート 2026-08-15）で担保。mypy（src/ 全走査・CI必須ゲート 2026-08-16）。
 
 ### 統合UI（Gradio）
 
@@ -84,7 +84,7 @@
   <tr>
     <td>CLIの使い方とオプション一覧</td>
     <td>12の専門エージェントの協調動作フロー</td>
-    <td>5,499テストが全て通過（CI実測 2026-09-10）</td>
+    <td>5,490テストが全て通過（CI実測 2026-09-12）</td>
   </tr>
   <tr>
     <td align="center"><b>カバレッジ</b></td>
@@ -97,7 +97,7 @@
     <td><img src="docs/demo/gifs/06_exec.gif" width="250" alt="Pipeline"></td>
   </tr>
   <tr>
-    <td>カバレッジ86.38% — 品質ゲート通過（ローカル実測 2026-09-11）</td>
+    <td>カバレッジ86.43% — 品質ゲート通過（CI実測 2026-09-12）</td>
     <td>8プロバイダーの自動ルーティング</td>
     <td>要件→設計→実装→テストまで一気通貫</td>
   </tr>
@@ -164,7 +164,7 @@ AIコーディングツール（Claude Code, Cursor等）が普及する中で�
 - **27種のタスクを自動分類**し、最適なLLMにルーティング
 - **予算管理（NPE）** で日次上限・コスト超過を自動制御
 - **12種のポリシーエンジン** でセキュリティ・パフォーマンス問題を自動検出
-- **5,499テストケース** でシステム動作を継続検証（CI実測 2026-09-10）
+- **5,490テストケース** でシステム動作を継続検証（CI実測 2026-09-12）
 
 ---
 
@@ -218,14 +218,14 @@ User / Developer
 
 | 指標 | 値 |
 |------|-----|
-| テスト数 | 5,499 テストケース（CI自動検証・2026-09-10 実測） |
-| カバレッジ | 86.38%（ローカル実測 2026-09-11・branch 81.84%） |
+| テスト数 | 5,490 テストケース（CI自動検証・2026-09-12 実測） |
+| カバレッジ | 86.43%（CI実測 2026-09-12・branch 81.76% はローカル実測） |
 | エージェント数 | 12専門エージェント |
 | LLMプロバイダー | 8プロバイダー（OpenAI, Anthropic, Google, GLM, MiniMax, DeepSeek, Moonshot, Local） |
 | 品質ゲート | 2層（静的解析 + 動的テスト） |
 | CI | GitHub Actions（push/PR時自動テスト + セキュリティスキャン） |
 
-> 出典: GitHub Actions CI run [34479260801](https://github.com/fukukei23/NexusCore/actions/runs/34479260801)（2026-09-10・main push・success・テスト数 5,499）。カバレッジ86.38%は coverage.py `pytest --cov` の TOTAL 行（statement+branch合算・ローカル serial フルテスト実測 2026-09-11）、branch 81.84%は同一実行の coverage.xml `branch-rate=0.8184`。**2026-09-11 カバレッジ方針変更**（84.08%→86.38%の理由）: ①デッドコード削除 — `core/nexus_os_kernel.py`（src/tests 参照0件・カバレッジ0.00%・スタブ実装）とその壊れたランチャー `scripts/run_vc_scout.py`（ModuleNotFoundError で起動不可）を削除 ②UI描画レイヤーを omit 対象へ追加 — Gradio タブbuilder 9モジュール（実測 25.6%・単体テストで実行経路が確保できないため・`.coveragerc` 参照・詳細は `artifacts/coverage_ui_kernel/EVIDENCE.md`）。`ui/policy_interface.py`（93.33%）は測定継続。次回 CI run で CI 実測値に更新予定。
+> 出典: GitHub Actions CI run [34626708696](https://github.com/fukukei23/NexusCore/actions/runs/34626708696)（2026-09-12・main push・success・テスト数 5,490 = passed 5,268 + skipped 182 + deselected 9 + xfail 26 + xpass 5）。カバレッジ86.43%は同runの coverage.py `pytest --cov` TOTAL 行（statement+branch合算）、branch 81.76%はローカル serial フルテスト実測の coverage.xml `branch-rate`。2026-09-10 実測の 5,499 から 9 減っているのは、streamlit 依存整理（`5c8b9576`）で全 skip だった legacy test 9件を削除したため。**2026-09-11 カバレッジ方針変更**（84.08%→86.38%の理由）: ①デッドコード削除 — `core/nexus_os_kernel.py`（src/tests 参照0件・カバレッジ0.00%・スタブ実装）とその壊れたランチャー `scripts/run_vc_scout.py`（ModuleNotFoundError で起動不可）を削除 ②UI描画レイヤーを omit 対象へ追加 — Gradio タブbuilder 9モジュール（実測 25.6%・単体テストで実行経路が確保できないため・`.coveragerc` 参照・詳細は `artifacts/coverage_ui_kernel/EVIDENCE.md`）。`ui/policy_interface.py`（93.33%）は測定継続。次回 CI run で CI 実測値に更新予定。
 
 ---
 
