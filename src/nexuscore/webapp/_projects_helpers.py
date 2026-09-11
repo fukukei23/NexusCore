@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from flask import render_template
 
-from nexuscore.webapp.models import Project, Run
+from nexuscore.models import Project, Run
 
 
 def _format_duration(duration_sec: float | None) -> str:

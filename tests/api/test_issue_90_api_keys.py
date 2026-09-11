@@ -37,8 +37,8 @@ class TestIssueApiKeyEndpoint:
         mock_apikey_cls = MagicMock()
         mock_apikey_cls.query.filter_by.return_value.count.return_value = MAX_API_KEYS_PER_USER
 
-        with patch("nexuscore.webapp.db", MagicMock()), \
-             patch("nexuscore.webapp.models.ApiKey", mock_apikey_cls):
+        with patch("nexuscore.models.db", MagicMock()), \
+             patch("nexuscore.models.ApiKey", mock_apikey_cls):
             client = TestClient(app)
             resp = client.post(
                 "/api/v1/api-keys",
@@ -64,8 +64,8 @@ class TestIssueApiKeyEndpoint:
 
         mock_db = MagicMock()
 
-        with patch("nexuscore.webapp.db", mock_db), \
-             patch("nexuscore.webapp.models.ApiKey", mock_apikey_cls):
+        with patch("nexuscore.models.db", mock_db), \
+             patch("nexuscore.models.ApiKey", mock_apikey_cls):
             client = TestClient(app)
             resp = client.post(
                 "/api/v1/api-keys",
@@ -90,8 +90,8 @@ class TestIssueApiKeyEndpoint:
         mock_apikey_cls.hash_token.return_value = "hashed"
         mock_apikey_cls.return_value = mock_apikey_instance
 
-        with patch("nexuscore.webapp.db", MagicMock()), \
-             patch("nexuscore.webapp.models.ApiKey", mock_apikey_cls):
+        with patch("nexuscore.models.db", MagicMock()), \
+             patch("nexuscore.models.ApiKey", mock_apikey_cls):
             client = TestClient(app)
             resp = client.post(
                 "/api/v1/api-keys",
@@ -118,7 +118,7 @@ class TestListApiKeyEndpoint:
         mock_apikey_cls = MagicMock()
         mock_apikey_cls.query.filter_by.return_value.order_by.return_value.all.return_value = [mock_key]
 
-        with patch("nexuscore.webapp.models.ApiKey", mock_apikey_cls):
+        with patch("nexuscore.models.ApiKey", mock_apikey_cls):
             client = TestClient(app)
             resp = client.get("/api/v1/api-keys", headers={"X-API-Key": "test-key"})
             assert resp.status_code == 200
@@ -132,7 +132,7 @@ class TestListApiKeyEndpoint:
         mock_apikey_cls = MagicMock()
         mock_apikey_cls.query.filter_by.return_value.order_by.return_value.all.return_value = []
 
-        with patch("nexuscore.webapp.models.ApiKey", mock_apikey_cls):
+        with patch("nexuscore.models.ApiKey", mock_apikey_cls):
             client = TestClient(app)
             resp = client.get("/api/v1/api-keys", headers={"X-API-Key": "test-key"})
             assert resp.status_code == 200
@@ -153,8 +153,8 @@ class TestRevokeApiKeyEndpoint:
         mock_apikey_cls = MagicMock()
         mock_apikey_cls.query.filter_by.return_value.first.return_value = mock_key
 
-        with patch("nexuscore.webapp.db", MagicMock()), \
-             patch("nexuscore.webapp.models.ApiKey", mock_apikey_cls):
+        with patch("nexuscore.models.db", MagicMock()), \
+             patch("nexuscore.models.ApiKey", mock_apikey_cls):
             client = TestClient(app)
             resp = client.delete("/api/v1/api-keys/1", headers={"X-API-Key": "test-key"})
             assert resp.status_code == 204
@@ -166,8 +166,8 @@ class TestRevokeApiKeyEndpoint:
         mock_apikey_cls = MagicMock()
         mock_apikey_cls.query.filter_by.return_value.first.return_value = None
 
-        with patch("nexuscore.webapp.db", MagicMock()), \
-             patch("nexuscore.webapp.models.ApiKey", mock_apikey_cls):
+        with patch("nexuscore.models.db", MagicMock()), \
+             patch("nexuscore.models.ApiKey", mock_apikey_cls):
             client = TestClient(app)
             resp = client.delete("/api/v1/api-keys/999", headers={"X-API-Key": "test-key"})
             assert resp.status_code == 404
@@ -183,8 +183,8 @@ class TestRevokeApiKeyEndpoint:
         mock_apikey_cls = MagicMock()
         mock_apikey_cls.query.filter_by.return_value.first.return_value = mock_key
 
-        with patch("nexuscore.webapp.db", MagicMock()), \
-             patch("nexuscore.webapp.models.ApiKey", mock_apikey_cls):
+        with patch("nexuscore.models.db", MagicMock()), \
+             patch("nexuscore.models.ApiKey", mock_apikey_cls):
             client = TestClient(app)
             resp = client.delete("/api/v1/api-keys/1", headers={"X-API-Key": "test-key"})
             assert resp.status_code == 403

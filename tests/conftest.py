@@ -63,7 +63,7 @@ _saved_modules: dict[str, object] = {}
 _PROTECTED_MODULES = [
     "flask",
     "nexuscore.webapp",
-    "nexuscore.webapp.models",
+    "nexuscore.models",
     "nexuscore.webapp.logging_service",
     "nexuscore.webapp.celery_app",
     "nexuscore.webapp.auth_api",
@@ -209,7 +209,7 @@ def _ensure_webapp():
         return HAS_WEBAPP
     try:
         from nexuscore.webapp import create_app, db
-        from nexuscore.webapp.models import ApiKey, ExecutionLog, PatchRecord, Project, Run, User
+        from nexuscore.models import ApiKey, ExecutionLog, PatchRecord, Project, Run, User
 
         HAS_WEBAPP = True
     except ImportError:

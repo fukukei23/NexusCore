@@ -52,7 +52,7 @@ async def project_success_rate_badge(project_id: int) -> BadgeResponse:
         HTTPException: プロジェクトが見つからない場合（404）または内部エラー時（500）
     """
     try:
-        from nexuscore.webapp.models import Project, Run
+        from nexuscore.models import Project, Run
 
         project = Project.query.filter_by(id=project_id).first()
 
@@ -138,7 +138,7 @@ async def project_last_run_badge(project_id: int) -> BadgeResponse:
         HTTPException: プロジェクトが見つからない場合（404）または内部エラー時（500）
     """
     try:
-        from nexuscore.webapp.models import Project, Run
+        from nexuscore.models import Project, Run
 
         project = Project.query.filter_by(id=project_id).first()
 

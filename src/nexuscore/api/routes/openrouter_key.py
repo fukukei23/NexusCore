@@ -5,9 +5,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from nexuscore.models import User, db
 from nexuscore.utils.crypto_utils import encrypt_string
-from nexuscore.webapp import db
-from nexuscore.webapp.models import User
 
 from ..dependencies.auth import AuthenticatedUser, get_current_user, get_user_id_from_auth
 

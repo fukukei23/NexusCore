@@ -76,8 +76,7 @@ async def issue_api_key(
         HTTPException: 認証失敗（401）、上限超過（403）、内部エラー（500）
     """
     try:
-        from nexuscore.webapp import db
-        from nexuscore.webapp.models import ApiKey
+        from nexuscore.models import ApiKey, db
 
         user_id = get_user_id_from_auth(current_user)
 
@@ -172,7 +171,7 @@ async def list_api_keys(
     注意: token は返されません（セキュリティ上の理由）。
     """
     try:
-        from nexuscore.webapp.models import ApiKey
+        from nexuscore.models import ApiKey
 
         user_id = get_user_id_from_auth(current_user)
 
@@ -237,8 +236,7 @@ async def revoke_api_key(
         HTTPException: 認証失敗（401）、権限なし（403）、見つからない（404）、内部エラー（500）
     """
     try:
-        from nexuscore.webapp import db
-        from nexuscore.webapp.models import ApiKey
+        from nexuscore.models import ApiKey, db
 
         user_id = get_user_id_from_auth(current_user)
 

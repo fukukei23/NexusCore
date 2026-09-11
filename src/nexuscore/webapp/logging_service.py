@@ -6,8 +6,7 @@ from typing import Any
 
 from flask import has_app_context
 
-from nexuscore.webapp import db
-from nexuscore.webapp.models import ExecutionLog
+from nexuscore.models import ExecutionLog, db
 
 
 def _to_json(payload: Any) -> str:

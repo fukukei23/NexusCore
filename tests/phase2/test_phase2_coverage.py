@@ -422,7 +422,7 @@ class TestGetCurrentUser:
         return mock_api_key_obj, mock_user
 
     def _mock_webapp_models(self, mock_api_key_obj=None, mock_user=None):
-        """Helper: nexuscore.webapp.models のモックを作成"""
+        """Helper: nexuscore.models のモックを作成"""
         mock_models = MagicMock()
 
         MockApiKey = MagicMock()
@@ -450,7 +450,7 @@ class TestGetCurrentUser:
             mock_api_key_obj, mock_user = self._make_mock_api_key()
             mock_models, _, _ = self._mock_webapp_models(mock_api_key_obj, mock_user)
 
-            with patch.dict("sys.modules", {"nexuscore.webapp.models": mock_models}):
+            with patch.dict("sys.modules", {"nexuscore.models": mock_models}):
                 result = auth_mod.get_current_user(x_api_key="valid-token")
                 assert result.user_id == "1"
                 assert "api_user" in result.roles
@@ -467,7 +467,7 @@ class TestGetCurrentUser:
         auth_mod._cached_api_key = "test-key"
         try:
             mock_models, _, _ = self._mock_webapp_models(None)
-            with patch.dict("sys.modules", {"nexuscore.webapp.models": mock_models}):
+            with patch.dict("sys.modules", {"nexuscore.models": mock_models}):
                 with pytest.raises(HTTPException) as exc_info:
                     auth_mod.get_current_user(x_api_key="bad-token")
                 assert exc_info.value.status_code == 401
@@ -486,7 +486,7 @@ class TestGetCurrentUser:
             mock_models = MagicMock()
             mock_models.ApiKey.hash_token.return_value = "hashed"
             mock_models.ApiKey.query = None
-            with patch.dict("sys.modules", {"nexuscore.webapp.models": mock_models}):
+            with patch.dict("sys.modules", {"nexuscore.models": mock_models}):
                 with pytest.raises(HTTPException) as exc_info:
                     auth_mod.get_current_user(x_api_key="some-token")
                 assert exc_info.value.status_code == 401
@@ -505,7 +505,7 @@ class TestGetCurrentUser:
             mock_models = MagicMock()
             mock_models.ApiKey.hash_token.return_value = "hashed"
             mock_models.ApiKey.query.filter_by.side_effect = RuntimeError("no app context")
-            with patch.dict("sys.modules", {"nexuscore.webapp.models": mock_models}):
+            with patch.dict("sys.modules", {"nexuscore.models": mock_models}):
                 with pytest.raises(HTTPException) as exc_info:
                     auth_mod.get_current_user(x_api_key="some-token")
                 assert exc_info.value.status_code == 401
@@ -526,7 +526,7 @@ class TestGetCurrentUser:
             mock_models = MagicMock()
             mock_models.ApiKey.hash_token.return_value = "hashed"
             mock_models.ApiKey.query.filter_by.side_effect = SQLAlchemyError("conn error")
-            with patch.dict("sys.modules", {"nexuscore.webapp.models": mock_models}):
+            with patch.dict("sys.modules", {"nexuscore.models": mock_models}):
                 with pytest.raises(HTTPException) as exc_info:
                     auth_mod.get_current_user(x_api_key="some-token")
                 assert exc_info.value.status_code == 500
@@ -545,7 +545,7 @@ class TestGetCurrentUser:
             mock_models = MagicMock()
             mock_models.ApiKey.hash_token.return_value = "hashed"
             mock_models.ApiKey.query.filter_by.side_effect = Exception("no application context")
-            with patch.dict("sys.modules", {"nexuscore.webapp.models": mock_models}):
+            with patch.dict("sys.modules", {"nexuscore.models": mock_models}):
                 with pytest.raises(HTTPException) as exc_info:
                     auth_mod.get_current_user(x_api_key="some-token")
                 assert exc_info.value.status_code == 401
@@ -563,7 +563,7 @@ class TestGetCurrentUser:
         try:
             mock_models = MagicMock()
             mock_models.ApiKey.hash_token.side_effect = TypeError("bad hash")
-            with patch.dict("sys.modules", {"nexuscore.webapp.models": mock_models}):
+            with patch.dict("sys.modules", {"nexuscore.models": mock_models}):
                 with pytest.raises(HTTPException) as exc_info:
                     auth_mod.get_current_user(x_api_key="some-token")
                 assert exc_info.value.status_code == 500
@@ -587,7 +587,7 @@ class TestGetCurrentUser:
             mock_models.ApiKey.hash_token.return_value = "hashed"
             mock_models.ApiKey.query.filter_by.return_value.first.return_value = mock_api_key_obj
             mock_models.User.query = None
-            with patch.dict("sys.modules", {"nexuscore.webapp.models": mock_models}):
+            with patch.dict("sys.modules", {"nexuscore.models": mock_models}):
                 with pytest.raises(HTTPException) as exc_info:
                     auth_mod.get_current_user(x_api_key="some-token")
                 assert exc_info.value.status_code == 401
@@ -613,7 +613,7 @@ class TestGetCurrentUser:
             mock_models.ApiKey.hash_token.return_value = "hashed"
             mock_models.ApiKey.query.filter_by.return_value.first.return_value = mock_api_key_obj
             mock_models.User.query.get.side_effect = SQLAlchemyError("user lookup error")
-            with patch.dict("sys.modules", {"nexuscore.webapp.models": mock_models}):
+            with patch.dict("sys.modules", {"nexuscore.models": mock_models}):
                 with pytest.raises(HTTPException) as exc_info:
                     auth_mod.get_current_user(x_api_key="some-token")
                 assert exc_info.value.status_code == 500
@@ -627,8 +627,8 @@ class TestGetCurrentUser:
 
         auth_mod._cached_api_key = "fallback-key"
         try:
-            # Force ImportError for nexuscore.webapp.models
-            with patch.dict("sys.modules", {"nexuscore.webapp.models": None}):
+            # Force ImportError for nexuscore.models
+            with patch.dict("sys.modules", {"nexuscore.models": None}):
                 result = auth_mod.get_current_user(x_api_key="fallback-key")
                 assert result.user_id == "api_user"
         finally:
@@ -643,7 +643,7 @@ class TestGetCurrentUser:
 
         auth_mod._cached_api_key = "fallback-key"
         try:
-            with patch.dict("sys.modules", {"nexuscore.webapp.models": None}):
+            with patch.dict("sys.modules", {"nexuscore.models": None}):
                 with pytest.raises(HTTPException) as exc_info:
                     auth_mod.get_current_user(x_api_key="wrong-key")
                 assert exc_info.value.status_code == 401
@@ -659,7 +659,7 @@ class TestGetCurrentUser:
         auth_mod._cached_api_key = None
         monkeypatch.delenv("NEXUSCORE_API_KEY", raising=False)
         try:
-            with patch.dict("sys.modules", {"nexuscore.webapp.models": None}):
+            with patch.dict("sys.modules", {"nexuscore.models": None}):
                 # get_api_key() will fail since no key is set
                 with pytest.raises(HTTPException) as exc_info:
                     auth_mod.get_current_user(x_api_key="any")

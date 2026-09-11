@@ -38,7 +38,7 @@ async def list_projects(
     認証: X-API-Key ヘッダー必須
     """
     try:
-        from nexuscore.webapp.models import Project
+        from nexuscore.models import Project
 
         user_id = get_user_id_from_auth(current_user)
 
@@ -92,8 +92,7 @@ async def create_project(
     認証: X-API-Key ヘッダー必須
     """
     try:
-        from nexuscore.webapp import db
-        from nexuscore.webapp.models import Project
+        from nexuscore.models import Project, db
 
         user_id = get_user_id_from_auth(current_user)
 
@@ -154,7 +153,7 @@ async def get_project(
     from ..utils.errors import make_not_found_error
 
     try:
-        from nexuscore.webapp.models import Project
+        from nexuscore.models import Project
 
         user_id = get_user_id_from_auth(current_user)
 

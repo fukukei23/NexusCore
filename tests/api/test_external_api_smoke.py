@@ -38,11 +38,11 @@ def mock_api_key(monkeypatch):
 def mock_db_models():
     """データベースモデルをモック"""
     with (
-        patch("nexuscore.webapp.models.Project") as mock_project_model,
-        patch("nexuscore.webapp.models.Run") as mock_run_model,
-        patch("nexuscore.webapp.models.User") as mock_user_model,
-        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
-        patch("nexuscore.webapp.db") as mock_db,
+        patch("nexuscore.models.Project") as mock_project_model,
+        patch("nexuscore.models.Run") as mock_run_model,
+        patch("nexuscore.models.User") as mock_user_model,
+        patch("nexuscore.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.models.db") as mock_db,
     ):
 
         mock_user = MagicMock()

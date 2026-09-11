@@ -32,9 +32,9 @@ def mock_api_key(monkeypatch):
 def mock_db_models():
     """データベースモデルをモック"""
     with (
-        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
-        patch("nexuscore.webapp.models.User") as mock_user,
-        patch("nexuscore.webapp.db") as mock_db,
+        patch("nexuscore.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.models.User") as mock_user,
+        patch("nexuscore.models.db") as mock_db,
     ):
         # 認証のモックを設定（get_current_user が動作するように）
         # get_current_user は ApiKey.query.filter_by().first().user.id を使用する

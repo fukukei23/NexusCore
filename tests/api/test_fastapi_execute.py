@@ -27,8 +27,8 @@ def mock_auth_token(monkeypatch):
     # 認証のモックを設定（データベースアクセスを回避）
     # get_current_user 内で使用される webapp.models をモック
     with (
-        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
-        patch("nexuscore.webapp.models.User"),
+        patch("nexuscore.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.models.User"),
     ):
         mock_user = MagicMock()
         mock_user.id = 1

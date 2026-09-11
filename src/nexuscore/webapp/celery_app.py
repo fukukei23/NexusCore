@@ -123,8 +123,7 @@ def init_celery() -> Celery:
 from nexuscore.core.job_state_machine import JobStateMachine
 from nexuscore.core.run_history import RunHistoryLogger
 from nexuscore.core.session_control import SessionController
-from nexuscore.webapp import db
-from nexuscore.webapp.models import Project, Run
+from nexuscore.models import Project, Run, db
 from nexuscore.webapp.orchestrator_helper import run_orchestrator_sync
 
 
@@ -147,7 +146,7 @@ def _finalize_run(run: Run, project: Project, status: str) -> None:
         logger.info(f"Run report generated: {report_path}")
 
         try:
-            from nexuscore.webapp.models import ExecutionLog
+            from nexuscore.models import ExecutionLog
 
             db.session.add(ExecutionLog(
                 run_id=run.id,
@@ -166,7 +165,7 @@ def _finalize_run(run: Run, project: Project, status: str) -> None:
         from sqlalchemy.exc import IntegrityError
 
         from nexuscore.core.notifier import get_notifier
-        from nexuscore.webapp.models import NotificationLog
+        from nexuscore.models import NotificationLog
 
         notifier = get_notifier()
         if notifier:

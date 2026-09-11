@@ -83,7 +83,7 @@ def test_log_execution_event_with_run_id():
         db.create_all()
 
         # Run を作成（簡易版）
-        from nexuscore.webapp.models import Project, Run, User
+        from nexuscore.models import Project, Run, User
 
         user = User(
             github_id="123",

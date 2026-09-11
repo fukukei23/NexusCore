@@ -64,9 +64,9 @@ def test_issue_api_key_invalid_user_id(client, mock_api_key):
     auth_key.user.id = "not_a_number"
 
     with (
-        patch("nexuscore.webapp.models.ApiKey") as ApiKey,
-        patch("nexuscore.webapp.models.User"),
-        patch("nexuscore.webapp.db"),
+        patch("nexuscore.models.ApiKey") as ApiKey,
+        patch("nexuscore.models.User"),
+        patch("nexuscore.models.db"),
     ):
         mock_query = MagicMock()
         mock_query.filter_by.return_value.first.return_value = auth_key
@@ -87,9 +87,9 @@ def test_list_api_keys_invalid_user_id(client, mock_api_key):
     auth_key.user.id = "not_a_number"
 
     with (
-        patch("nexuscore.webapp.models.ApiKey") as ApiKey,
-        patch("nexuscore.webapp.models.User"),
-        patch("nexuscore.webapp.db"),
+        patch("nexuscore.models.ApiKey") as ApiKey,
+        patch("nexuscore.models.User"),
+        patch("nexuscore.models.db"),
     ):
         mock_query = MagicMock()
         mock_query.filter_by.return_value.first.return_value = auth_key
@@ -109,9 +109,9 @@ def test_revoke_api_key_invalid_user_id(client, mock_api_key):
     auth_key.user.id = "not_a_number"
 
     with (
-        patch("nexuscore.webapp.models.ApiKey") as ApiKey,
-        patch("nexuscore.webapp.models.User"),
-        patch("nexuscore.webapp.db"),
+        patch("nexuscore.models.ApiKey") as ApiKey,
+        patch("nexuscore.models.User"),
+        patch("nexuscore.models.db"),
     ):
         mock_query = MagicMock()
         mock_query.filter_by.return_value.first.return_value = auth_key
@@ -133,9 +133,9 @@ def test_issue_api_key_sqlalchemy_error(client, mock_api_key):
     auth_key = _make_auth_key_obj()
 
     with (
-        patch("nexuscore.webapp.models.ApiKey") as ApiKey,
-        patch("nexuscore.webapp.models.User"),
-        patch("nexuscore.webapp.db") as mock_db,
+        patch("nexuscore.models.ApiKey") as ApiKey,
+        patch("nexuscore.models.User"),
+        patch("nexuscore.models.db") as mock_db,
     ):
         mock_query = MagicMock()
         mock_query.filter_by.return_value.first.return_value = auth_key
@@ -161,9 +161,9 @@ def test_issue_api_key_sqlalchemy_error(client, mock_api_key):
 def test_issue_api_key_unexpected_exception(client, mock_api_key):
     """予期しない例外 → 500"""
     with (
-        patch("nexuscore.webapp.models.ApiKey") as ApiKey,
-        patch("nexuscore.webapp.models.User"),
-        patch("nexuscore.webapp.db"),
+        patch("nexuscore.models.ApiKey") as ApiKey,
+        patch("nexuscore.models.User"),
+        patch("nexuscore.models.db"),
     ):
         # import 時点で例外を発生させる
         ApiKey.generate_token.side_effect = RuntimeError("boom")
@@ -191,9 +191,9 @@ def test_list_api_keys_sqlalchemy_error(client, mock_api_key):
     auth_key = _make_auth_key_obj()
 
     with (
-        patch("nexuscore.webapp.models.ApiKey") as ApiKey,
-        patch("nexuscore.webapp.models.User"),
-        patch("nexuscore.webapp.db"),
+        patch("nexuscore.models.ApiKey") as ApiKey,
+        patch("nexuscore.models.User"),
+        patch("nexuscore.models.db"),
     ):
         mock_query = MagicMock()
         mock_query.filter_by.return_value.first.return_value = auth_key
@@ -216,9 +216,9 @@ def test_list_api_keys_unexpected_exception(client, mock_api_key):
     auth_key = _make_auth_key_obj()
 
     with (
-        patch("nexuscore.webapp.models.ApiKey") as ApiKey,
-        patch("nexuscore.webapp.models.User"),
-        patch("nexuscore.webapp.db"),
+        patch("nexuscore.models.ApiKey") as ApiKey,
+        patch("nexuscore.models.User"),
+        patch("nexuscore.models.db"),
     ):
         mock_query = MagicMock()
         mock_query.filter_by.return_value.first.return_value = auth_key
@@ -249,9 +249,9 @@ def test_revoke_api_key_sqlalchemy_error(client, mock_api_key):
     target_key.user_id = 1
 
     with (
-        patch("nexuscore.webapp.models.ApiKey") as ApiKey,
-        patch("nexuscore.webapp.models.User"),
-        patch("nexuscore.webapp.db") as mock_db,
+        patch("nexuscore.models.ApiKey") as ApiKey,
+        patch("nexuscore.models.User"),
+        patch("nexuscore.models.db") as mock_db,
     ):
         mock_query = MagicMock()
 
@@ -286,9 +286,9 @@ def test_revoke_api_key_unexpected_exception(client, mock_api_key):
     target_key.user_id = 1
 
     with (
-        patch("nexuscore.webapp.models.ApiKey") as ApiKey,
-        patch("nexuscore.webapp.models.User"),
-        patch("nexuscore.webapp.db") as mock_db,
+        patch("nexuscore.models.ApiKey") as ApiKey,
+        patch("nexuscore.models.User"),
+        patch("nexuscore.models.db") as mock_db,
     ):
         mock_query = MagicMock()
 

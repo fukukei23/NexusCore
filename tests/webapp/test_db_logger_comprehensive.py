@@ -96,7 +96,7 @@ class TestEnhanceLogTransaction:
 
     def test_enhance_log_transaction_with_llm_call_event(self, app, test_run):
         """event="llm_call"のログを正しく処理する"""
-        from nexuscore.webapp.db_logger import enhance_log_transaction
+        from nexuscore.models.db_logger import enhance_log_transaction
 
         log_data = {
             "event": "llm_call",
@@ -120,7 +120,7 @@ class TestEnhanceLogTransaction:
 
     def test_enhance_log_transaction_with_llm_call_failure(self, app, test_run):
         """LLM呼び出し失敗時はERRORレベルになる"""
-        from nexuscore.webapp.db_logger import enhance_log_transaction
+        from nexuscore.models.db_logger import enhance_log_transaction
 
         log_data = {
             "event": "llm_call",
@@ -139,7 +139,7 @@ class TestEnhanceLogTransaction:
 
     def test_enhance_log_transaction_with_llm_blocked_event(self, app, test_run):
         """event="llm_blocked"のログを正しく処理する"""
-        from nexuscore.webapp.db_logger import enhance_log_transaction
+        from nexuscore.models.db_logger import enhance_log_transaction
 
         log_data = {
             "event": "llm_blocked",
@@ -159,7 +159,7 @@ class TestEnhanceLogTransaction:
 
     def test_enhance_log_transaction_with_generic_event(self, app, test_run):
         """一般的なeventのログを処理する"""
-        from nexuscore.webapp.db_logger import enhance_log_transaction
+        from nexuscore.models.db_logger import enhance_log_transaction
 
         log_data = {
             "event": "custom_event",
@@ -179,7 +179,7 @@ class TestEnhanceLogTransaction:
 
     def test_enhance_log_transaction_without_run_id(self, app):
         """run_idがない場合も正しく処理する"""
-        from nexuscore.webapp.db_logger import enhance_log_transaction
+        from nexuscore.models.db_logger import enhance_log_transaction
 
         log_data = {
             "event": "llm_call",
@@ -199,7 +199,7 @@ class TestEnhanceLogTransaction:
         """usageデータがpayloadに含まれる"""
         import json
 
-        from nexuscore.webapp.db_logger import enhance_log_transaction
+        from nexuscore.models.db_logger import enhance_log_transaction
 
         log_data = {
             "event": "llm_call",
@@ -225,7 +225,7 @@ class TestEnhanceLogTransaction:
 
     def test_enhance_log_transaction_with_minimal_data(self, app):
         """最小限のデータでも処理できる"""
-        from nexuscore.webapp.db_logger import enhance_log_transaction
+        from nexuscore.models.db_logger import enhance_log_transaction
 
         log_data = {
             "source": "TEST",
@@ -240,7 +240,7 @@ class TestEnhanceLogTransaction:
 
     def test_enhance_log_transaction_handles_import_error(self, app):
         """logging_service.log_execution_eventのimportエラーを処理する"""
-        from nexuscore.webapp.db_logger import enhance_log_transaction
+        from nexuscore.models.db_logger import enhance_log_transaction
 
         # enhance_log_transaction内でimportエラーが発生した場合の処理をテスト
         # 実装上、try-exceptで握りつぶされるため、例外は発生しない
@@ -258,7 +258,7 @@ class TestEnhanceLogTransaction:
 
     def test_enhance_log_transaction_without_task_type_and_model(self, app, test_run):
         """task_typeとmodelがない場合はフォールバックメッセージを使用"""
-        from nexuscore.webapp.db_logger import enhance_log_transaction
+        from nexuscore.models.db_logger import enhance_log_transaction
 
         log_data = {
             "event": "llm_call",
@@ -276,7 +276,7 @@ class TestEnhanceLogTransaction:
 
     def test_enhance_log_transaction_with_log_file_parameter(self, app, test_run):
         """log_fileパラメータがあっても処理できる（互換性のため）"""
-        from nexuscore.webapp.db_logger import enhance_log_transaction
+        from nexuscore.models.db_logger import enhance_log_transaction
 
         log_data = {
             "event": "llm_call",
@@ -297,7 +297,7 @@ class TestEnhanceLogTransaction:
         """payloadが空の場合はlog_data全体を使用"""
         import json
 
-        from nexuscore.webapp.db_logger import enhance_log_transaction
+        from nexuscore.models.db_logger import enhance_log_transaction
 
         log_data = {
             "event": "custom",
@@ -317,7 +317,7 @@ class TestEnhanceLogTransaction:
 
     def test_enhance_log_transaction_multiple_calls(self, app, test_run):
         """複数回呼び出してもすべてログが保存される"""
-        from nexuscore.webapp.db_logger import enhance_log_transaction
+        from nexuscore.models.db_logger import enhance_log_transaction
 
         for i in range(5):
             log_data = {
@@ -335,7 +335,7 @@ class TestEnhanceLogTransaction:
 
     def test_enhance_log_transaction_with_default_source(self, app, test_run):
         """sourceが指定されていない場合はデフォルト値"NPE"を使用"""
-        from nexuscore.webapp.db_logger import enhance_log_transaction
+        from nexuscore.models.db_logger import enhance_log_transaction
 
         log_data = {
             "event": "llm_call",
@@ -353,7 +353,7 @@ class TestEnhanceLogTransaction:
 
     def test_enhance_log_transaction_with_default_level(self, app, test_run):
         """levelが指定されていない場合はデフォルト値"INFO"を使用"""
-        from nexuscore.webapp.db_logger import enhance_log_transaction
+        from nexuscore.models.db_logger import enhance_log_transaction
 
         log_data = {
             "event": "llm_call",

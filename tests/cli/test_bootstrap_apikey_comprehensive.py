@@ -14,7 +14,7 @@ from nexuscore.cli.bootstrap_apikey import (
     bootstrap_apikey_main,
 )
 from nexuscore.webapp import create_app, db
-from nexuscore.webapp.models import ApiKey, User
+from nexuscore.models import ApiKey, User
 
 
 # ============================================================================

@@ -90,7 +90,7 @@ def finalize_run(
 
     try:
         from nexuscore.integration.run_report_generator import write_run_report_file
-        from nexuscore.webapp.models import Run
+        from nexuscore.models import Run
 
         run = Run.query.filter_by(run_id=run_id).first()
         if run and hasattr(run, "id"):

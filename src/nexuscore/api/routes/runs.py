@@ -66,7 +66,7 @@ async def list_runs(
         HTTPException: 内部エラー時（500）
     """
     try:
-        from nexuscore.webapp.models import Project, Run
+        from nexuscore.models import Project, Run
 
         user_id = get_user_id_from_auth(current_user)
 
@@ -149,7 +149,7 @@ async def get_run(
         HTTPException: Runが見つからない場合（404）または内部エラー時（500）
     """
     try:
-        from nexuscore.webapp.models import Project, Run
+        from nexuscore.models import Project, Run
 
         user_id = get_user_id_from_auth(current_user)
 

@@ -18,7 +18,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 # db は __init__.py からインポート
-from nexuscore.webapp import db
+from nexuscore.models.base import db
 
 
 class User(db.Model):

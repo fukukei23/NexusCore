@@ -33,8 +33,8 @@ def mock_auth():
     """認証をモックするフィクスチャ（全テストで自動適用）"""
     # get_current_user 内で使用される webapp.models をモック
     with (
-        patch("nexuscore.webapp.models.ApiKey") as MockApiKey,
-        patch("nexuscore.webapp.models.User") as MockUser,
+        patch("nexuscore.models.ApiKey") as MockApiKey,
+        patch("nexuscore.models.User") as MockUser,
     ):
 
         # API Key認証のモック
@@ -58,7 +58,7 @@ def mock_auth():
 @pytest.fixture
 def mock_db_session():
     """データベースセッションをモックするフィクスチャ"""
-    with patch("nexuscore.webapp.db.session") as mock_session:
+    with patch("nexuscore.models.db.session") as mock_session:
         yield mock_session
 
 
@@ -91,8 +91,8 @@ def test_trigger_project_run_success(mock_db_session, mock_project, mock_run):
     POST /api/v1/projects/{project_id}/run が正常に動作することを確認
     """
     with (
-        patch("nexuscore.webapp.models.Project") as MockProject,
-        patch("nexuscore.webapp.models.Run") as MockRun,
+        patch("nexuscore.models.Project") as MockProject,
+        patch("nexuscore.models.Run") as MockRun,
         patch("nexuscore.webapp.celery_app.run_orchestrator_task") as mock_celery_task,
     ):
 
@@ -136,8 +136,8 @@ def test_trigger_project_run_sync_mode(mock_db_session, mock_project, mock_run, 
 
     with (
         patch.object(projects_module.os, "getenv") as mock_getenv,
-        patch("nexuscore.webapp.models.Project") as MockProject,
-        patch("nexuscore.webapp.models.Run") as MockRun,
+        patch("nexuscore.models.Project") as MockProject,
+        patch("nexuscore.models.Run") as MockRun,
         patch("nexuscore.webapp.orchestrator_helper.run_orchestrator_inline") as mock_inline,
     ):
 
@@ -182,7 +182,7 @@ def test_trigger_project_run_project_not_found(mock_db_session):
     """
     POST /api/v1/projects/{project_id}/run が存在しないプロジェクトIDで404を返すことを確認
     """
-    with patch("nexuscore.webapp.models.Project") as MockProject:
+    with patch("nexuscore.models.Project") as MockProject:
         # プロジェクトが見つからない場合
         MockProject.query.filter_by.return_value.first.return_value = None
 
@@ -203,7 +203,7 @@ def test_trigger_project_run_missing_requirement(mock_db_session, mock_project):
     """
     POST /api/v1/projects/{project_id}/run が requirement なしで422を返すことを確認
     """
-    with patch("nexuscore.webapp.models.Project") as MockProject:
+    with patch("nexuscore.models.Project") as MockProject:
         # プロジェクトのクエリをモック
         MockProject.query.filter_by.return_value.first.return_value = mock_project
 
@@ -237,8 +237,8 @@ def test_get_latest_run_success(mock_db_session, mock_project, mock_run):
     mock_run.status = "SUCCESS"
 
     with (
-        patch("nexuscore.webapp.models.Project") as MockProject,
-        patch("nexuscore.webapp.models.Run") as MockRun,
+        patch("nexuscore.models.Project") as MockProject,
+        patch("nexuscore.models.Run") as MockRun,
         patch("nexuscore.api.routes._projects_runs.desc") as mock_desc,
     ):
 
@@ -271,8 +271,8 @@ def test_get_latest_run_no_runs(mock_db_session, mock_project):
     GET /api/v1/projects/{project_id}/runs/latest がRunが存在しない場合にnullを返すことを確認
     """
     with (
-        patch("nexuscore.webapp.models.Project") as MockProject,
-        patch("nexuscore.webapp.models.Run") as MockRun,
+        patch("nexuscore.models.Project") as MockProject,
+        patch("nexuscore.models.Run") as MockRun,
         patch("nexuscore.api.routes._projects_runs.desc") as mock_desc,
     ):
 
@@ -301,7 +301,7 @@ def test_get_latest_run_project_not_found(mock_db_session):
     """
     GET /api/v1/projects/{project_id}/runs/latest が存在しないプロジェクトIDで404を返すことを確認
     """
-    with patch("nexuscore.webapp.models.Project") as MockProject:
+    with patch("nexuscore.models.Project") as MockProject:
         # プロジェクトが見つからない場合
         MockProject.query.filter_by.return_value.first.return_value = None
 

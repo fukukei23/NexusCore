@@ -27,8 +27,8 @@ def mock_api_key(monkeypatch):
     # 認証のモックを設定（データベースアクセスを回避）
     # get_current_user 内で使用される webapp.models をモック
     with (
-        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
-        patch("nexuscore.webapp.models.User"),
+        patch("nexuscore.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.models.User"),
     ):
         mock_user = MagicMock()
         mock_user.id = 1
@@ -60,8 +60,8 @@ def test_auth_invalid_api_key_returns_401(client: TestClient, mock_api_key):
     """
     # 不正なAPI Keyの場合、モックが None を返すようにする
     with (
-        patch("nexuscore.webapp.models.ApiKey") as MockApiKey,
-        patch("nexuscore.webapp.models.User"),
+        patch("nexuscore.models.ApiKey") as MockApiKey,
+        patch("nexuscore.models.User"),
     ):
         MockApiKey.hash_token.return_value = "hashed_invalid_key"
         MockApiKey.query.filter_by.return_value.first.return_value = (
@@ -118,8 +118,8 @@ def test_execute_api_requires_authentication(client: TestClient, mock_api_key):
 
         # 不正な API Key でリクエスト
         with (
-            patch("nexuscore.webapp.models.ApiKey") as MockApiKey,
-            patch("nexuscore.webapp.models.User"),
+            patch("nexuscore.models.ApiKey") as MockApiKey,
+            patch("nexuscore.models.User"),
         ):
             MockApiKey.hash_token.return_value = "hashed_wrong_key"
             MockApiKey.query.filter_by.return_value.first.return_value = (
@@ -155,8 +155,8 @@ def test_status_api_requires_authentication(client: TestClient, mock_api_key):
 
         # 不正な API Key でリクエスト
         with (
-            patch("nexuscore.webapp.models.ApiKey") as MockApiKey,
-            patch("nexuscore.webapp.models.User"),
+            patch("nexuscore.models.ApiKey") as MockApiKey,
+            patch("nexuscore.models.User"),
         ):
             MockApiKey.hash_token.return_value = "hashed_wrong_key"
             MockApiKey.query.filter_by.return_value.first.return_value = (
@@ -305,7 +305,7 @@ def test_auth_database_error_returns_500_not_401(client: TestClient, mock_api_ke
     from sqlalchemy.exc import SQLAlchemyError
 
     # DB アクセスエラーをシミュレート
-    with patch("nexuscore.webapp.models.ApiKey") as MockApiKey:
+    with patch("nexuscore.models.ApiKey") as MockApiKey:
         MockApiKey.hash_token.return_value = "hashed_test_key"
         # SQLAlchemyError を発生させる
         MockApiKey.query.filter_by.side_effect = SQLAlchemyError("Database connection error")
@@ -333,8 +333,8 @@ def test_auth_invalid_api_key_returns_401_not_500(client: TestClient, mock_api_k
     """
     # 無効なAPI Keyの場合、モックが None を返すようにする
     with (
-        patch("nexuscore.webapp.models.ApiKey") as MockApiKey,
-        patch("nexuscore.webapp.models.User"),
+        patch("nexuscore.models.ApiKey") as MockApiKey,
+        patch("nexuscore.models.User"),
     ):
         MockApiKey.hash_token.return_value = "hashed_invalid_key"
         MockApiKey.query.filter_by.return_value.first.return_value = (
@@ -365,8 +365,8 @@ def test_auth_user_not_found_returns_401_not_500(client: TestClient, mock_api_ke
     """
     # API Key は見つかるが User が見つからない場合
     with (
-        patch("nexuscore.webapp.models.ApiKey") as MockApiKey,
-        patch("nexuscore.webapp.models.User") as MockUser,
+        patch("nexuscore.models.ApiKey") as MockApiKey,
+        patch("nexuscore.models.User") as MockUser,
     ):
         mock_api_key_obj = MagicMock()
         mock_api_key_obj.user_id = 999  # 存在しないユーザーID

@@ -22,12 +22,14 @@ import os
 
 from flask import Flask
 from flask_migrate import Migrate
-from flask_sqlalchemy import SQLAlchemy
 
 from nexuscore.config.unified_config import get_config
 
-# グローバルなDBインスタンス（models.pyで使用）
-db = SQLAlchemy()
+# db の実体は nexuscore.models.base へ移動した（2026-09-12）。
+# ここでの再エクスポートは既存の `from nexuscore.webapp import db` を壊さないための後方互換。
+# 新規コードは `from nexuscore.models import db` を使うこと。
+from nexuscore.models.base import db
+
 migrate = Migrate()
 
 

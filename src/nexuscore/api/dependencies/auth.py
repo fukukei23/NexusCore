@@ -93,7 +93,7 @@ def _resolve_api_key_obj(x_api_key: str):
     """API Key ハッシュから ApiKey オブジェクトを検索する。見つからない場合は例外を投げる。"""
     from sqlalchemy.exc import SQLAlchemyError
 
-    from nexuscore.webapp.models import ApiKey
+    from nexuscore.models import ApiKey
 
     try:
         token_hash = ApiKey.hash_token(x_api_key)
@@ -121,7 +121,7 @@ def _resolve_user(api_key_obj):
     """ApiKey オブジェクトから User を取得する。見つからない場合は例外を投げる。"""
     from sqlalchemy.exc import SQLAlchemyError
 
-    from nexuscore.webapp.models import User
+    from nexuscore.models import User
 
     try:
         if hasattr(api_key_obj, "user") and api_key_obj.user is not None:

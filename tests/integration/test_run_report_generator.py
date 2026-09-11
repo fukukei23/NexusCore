@@ -34,7 +34,7 @@ def test_format_duration():
 
 
 @pytest.mark.skipif(
-    not hasattr(__import__("nexuscore.webapp.models", fromlist=["Run"]), "Run"),
+    not hasattr(__import__("nexuscore.models", fromlist=["Run"]), "Run"),
     reason="Webapp models not available",
 )
 def test_generate_run_report_markdown():

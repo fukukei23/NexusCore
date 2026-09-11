@@ -32,12 +32,12 @@ def mock_api_key(monkeypatch):
 def mock_db_models():
     """データベースモデルをモック"""
     with (
-        patch("nexuscore.webapp.models.Run") as mock_run,
-        patch("nexuscore.webapp.models.Project") as mock_project,
-        patch("nexuscore.webapp.models.User") as mock_user,
-        patch("nexuscore.webapp.db") as mock_db,
-        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
-        patch("nexuscore.webapp.models.User") as mock_auth_user,
+        patch("nexuscore.models.Run") as mock_run,
+        patch("nexuscore.models.Project") as mock_project,
+        patch("nexuscore.models.User") as mock_user,
+        patch("nexuscore.models.db") as mock_db,
+        patch("nexuscore.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.models.User") as mock_auth_user,
     ):
         yield {
             "Run": mock_run,

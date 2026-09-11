@@ -158,7 +158,7 @@ def _send_slack_notification_if_configured(result: dict[str, Any], payload: dict
         metrics = None
 
         try:
-            from nexuscore.webapp.models import Run
+            from nexuscore.models import Run
 
             # result から run_id を取得（run_id が含まれている場合）
             run_id = result.get("run_id") or result.get("details", {}).get("run_id")

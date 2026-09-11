@@ -165,7 +165,7 @@ class TestRunOrchestratorTask:
     def test_run_orchestrator_task_handles_empty_requirement(self, app, db_session):
         """run_orchestrator_task が空の requirement を処理する"""
         import nexuscore.webapp.celery_app as celery_module
-        from nexuscore.webapp.models import Project, Run, User
+        from nexuscore.models import Project, Run, User
 
         celery_module.celery = None
         celery_module.make_celery(app)
@@ -199,7 +199,7 @@ class TestRunOrchestratorTask:
     def test_run_orchestrator_task_updates_run_status_on_success(self, app, db_session):
         """run_orchestrator_task が成功時に Run ステータスを更新する"""
         import nexuscore.webapp.celery_app as celery_module
-        from nexuscore.webapp.models import Project, Run, User
+        from nexuscore.models import Project, Run, User
 
         celery_module.celery = None
         celery_module.make_celery(app)
@@ -239,7 +239,7 @@ class TestRunOrchestratorTask:
     def test_run_orchestrator_task_updates_run_status_on_failure(self, app, db_session):
         """run_orchestrator_task が失敗時に Run ステータスを更新する"""
         import nexuscore.webapp.celery_app as celery_module
-        from nexuscore.webapp.models import Project, Run, User
+        from nexuscore.models import Project, Run, User
 
         celery_module.celery = None
         celery_module.make_celery(app)

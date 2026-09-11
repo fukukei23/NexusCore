@@ -32,11 +32,11 @@ def mock_api_key(monkeypatch):
 def mock_db_models():
     """データベースモデルをモック"""
     with (
-        patch("nexuscore.webapp.models.Project") as mock_project,
-        patch("nexuscore.webapp.models.User") as mock_user,
-        patch("nexuscore.webapp.db") as mock_db,
-        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
-        patch("nexuscore.webapp.models.User") as mock_auth_user,
+        patch("nexuscore.models.Project") as mock_project,
+        patch("nexuscore.models.User") as mock_user,
+        patch("nexuscore.models.db") as mock_db,
+        patch("nexuscore.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.models.User") as mock_auth_user,
     ):
         yield {
             "Project": mock_project,
@@ -117,8 +117,8 @@ def test_list_projects_requires_authentication(client: TestClient, mock_api_key,
 
     # 不正な API Key でリクエスト
     with (
-        patch("nexuscore.webapp.models.ApiKey") as MockApiKey,
-        patch("nexuscore.webapp.models.User"),
+        patch("nexuscore.models.ApiKey") as MockApiKey,
+        patch("nexuscore.models.User"),
     ):
         MockApiKey.hash_token.return_value = "hashed_invalid_key"
         MockApiKey.query.filter_by.return_value.first.return_value = (

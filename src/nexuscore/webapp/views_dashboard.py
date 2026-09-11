@@ -6,7 +6,7 @@ from typing import Any
 from flask import Blueprint, jsonify, render_template, request
 from sqlalchemy import desc, func
 
-from nexuscore.webapp import db
+from nexuscore.models import ExecutionLog, Run, db
 from nexuscore.webapp.auth import get_current_user, require_auth
 from nexuscore.webapp.db_helpers import (
     project_latest_run,
@@ -16,7 +16,6 @@ from nexuscore.webapp.db_helpers import (
     user_projects_query,
     user_runs_stats,
 )
-from nexuscore.webapp.models import ExecutionLog, Run
 from nexuscore.webapp.views_projects import (
     _compute_run_duration,
     _format_duration,

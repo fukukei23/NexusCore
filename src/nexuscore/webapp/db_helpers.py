@@ -6,7 +6,7 @@ from flask import request
 from sqlalchemy import desc
 from sqlalchemy.orm import Query, subqueryload
 
-from nexuscore.webapp.models import ExecutionLog, PatchRecord, Project, Run
+from nexuscore.models import ExecutionLog, PatchRecord, Project, Run
 
 
 def user_projects_query(user_id: int) -> Query:

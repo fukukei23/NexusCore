@@ -52,8 +52,8 @@ def test_project_success_rate_badge_success(mock_project, mock_runs):
     GET /api/v1/projects/{project_id}/badge/success_rate が正常に動作することを確認
     """
     with (
-        patch("nexuscore.webapp.models.Project") as MockProject,
-        patch("nexuscore.webapp.models.Run") as MockRun,
+        patch("nexuscore.models.Project") as MockProject,
+        patch("nexuscore.models.Run") as MockRun,
         patch("nexuscore.api.routes.badges.desc") as mock_desc,
     ):
 
@@ -83,8 +83,8 @@ def test_project_success_rate_badge_no_runs(mock_project):
     GET /api/v1/projects/{project_id}/badge/success_rate がRunが存在しない場合に0%を返すことを確認
     """
     with (
-        patch("nexuscore.webapp.models.Project") as MockProject,
-        patch("nexuscore.webapp.models.Run") as MockRun,
+        patch("nexuscore.models.Project") as MockProject,
+        patch("nexuscore.models.Run") as MockRun,
         patch("nexuscore.api.routes.badges.desc") as mock_desc,
     ):
 
@@ -113,7 +113,7 @@ def test_project_success_rate_badge_project_not_found():
     """
     GET /api/v1/projects/{project_id}/badge/success_rate が存在しないプロジェクトIDで404を返すことを確認
     """
-    with patch("nexuscore.webapp.models.Project") as MockProject:
+    with patch("nexuscore.models.Project") as MockProject:
         # プロジェクトが見つからない場合
         MockProject.query.filter_by.return_value.first.return_value = None
 
@@ -132,8 +132,8 @@ def test_project_last_run_badge_success(mock_project, mock_latest_run):
     GET /api/v1/projects/{project_id}/badge/last_run が正常に動作することを確認
     """
     with (
-        patch("nexuscore.webapp.models.Project") as MockProject,
-        patch("nexuscore.webapp.models.Run") as MockRun,
+        patch("nexuscore.models.Project") as MockProject,
+        patch("nexuscore.models.Run") as MockRun,
         patch("nexuscore.api.routes.badges.desc") as mock_desc,
     ):
 
@@ -163,8 +163,8 @@ def test_project_last_run_badge_no_runs(mock_project):
     GET /api/v1/projects/{project_id}/badge/last_run がRunが存在しない場合に適切なメッセージを返すことを確認
     """
     with (
-        patch("nexuscore.webapp.models.Project") as MockProject,
-        patch("nexuscore.webapp.models.Run") as MockRun,
+        patch("nexuscore.models.Project") as MockProject,
+        patch("nexuscore.models.Run") as MockRun,
         patch("nexuscore.api.routes.badges.desc") as mock_desc,
     ):
 
@@ -207,8 +207,8 @@ def test_project_last_run_badge_different_statuses(mock_project):
         mock_run.finished_at = None
 
         with (
-            patch("nexuscore.webapp.models.Project") as MockProject,
-            patch("nexuscore.webapp.models.Run") as MockRun,
+            patch("nexuscore.models.Project") as MockProject,
+            patch("nexuscore.models.Run") as MockRun,
             patch("nexuscore.api.routes.badges.desc") as mock_desc,
         ):
 
@@ -231,7 +231,7 @@ def test_project_last_run_badge_project_not_found():
     """
     GET /api/v1/projects/{project_id}/badge/last_run が存在しないプロジェクトIDで404を返すことを確認
     """
-    with patch("nexuscore.webapp.models.Project") as MockProject:
+    with patch("nexuscore.models.Project") as MockProject:
         # プロジェクトが見つからない場合
         MockProject.query.filter_by.return_value.first.return_value = None
 
@@ -250,8 +250,8 @@ def test_badge_endpoints_no_authentication_required(mock_project, mock_runs):
     Badge エンドポイントが認証不要であることを確認
     """
     with (
-        patch("nexuscore.webapp.models.Project") as MockProject,
-        patch("nexuscore.webapp.models.Run") as MockRun,
+        patch("nexuscore.models.Project") as MockProject,
+        patch("nexuscore.models.Run") as MockRun,
         patch("nexuscore.api.routes.badges.desc") as mock_desc,
     ):
 

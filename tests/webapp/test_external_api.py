@@ -60,7 +60,7 @@ def test_user(app):
 def test_api_key(app, test_user):
     """テスト用 API キー"""
     with app.app_context():
-        from nexuscore.webapp.models import ApiKey
+        from nexuscore.models import ApiKey
 
         raw_token = ApiKey.generate_token()
         token_hash = ApiKey.hash_token(raw_token)
@@ -184,7 +184,7 @@ def test_get_latest_run(client, test_user, test_api_key, test_project):
     with client.application.app_context():
         from datetime import datetime
 
-        from nexuscore.webapp.models import Run
+        from nexuscore.models import Run
 
         run = Run(
             project_id=test_project.id,

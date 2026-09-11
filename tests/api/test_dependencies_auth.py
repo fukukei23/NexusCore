@@ -106,7 +106,7 @@ class TestGetCurrentUser:
         """ImportError フォールバック認証成功"""
 
         # webapp.models のインポートを失敗させる
-        with patch.dict("sys.modules", {"nexuscore.webapp.models": None}):
+        with patch.dict("sys.modules", {"nexuscore.models": None}):
             import nexuscore.api.dependencies.auth as auth_mod
             result = auth_mod.get_current_user(x_api_key="test-key")
         assert result.user_id == "api_user"
@@ -117,7 +117,7 @@ class TestGetCurrentUser:
         """ImportError フォールバック認証失敗"""
         from fastapi import HTTPException
 
-        with patch.dict("sys.modules", {"nexuscore.webapp.models": None}):
+        with patch.dict("sys.modules", {"nexuscore.models": None}):
             import nexuscore.api.dependencies.auth as auth_mod
             with pytest.raises(HTTPException) as exc_info:
                 auth_mod.get_current_user(x_api_key="wrong-key")
@@ -136,7 +136,7 @@ class TestGetCurrentUser:
 
         with patch.dict("sys.modules", {
             "nexuscore.webapp": MagicMock(),
-            "nexuscore.webapp.models": MagicMock(ApiKey=mock_api_key_model, User=mock_user_model),
+            "nexuscore.models": MagicMock(ApiKey=mock_api_key_model, User=mock_user_model),
         }):
             import nexuscore.api.dependencies.auth as auth_mod
             with pytest.raises(HTTPException) as exc_info:
@@ -161,7 +161,7 @@ class TestGetCurrentUser:
 
         with patch.dict("sys.modules", {
             "nexuscore.webapp": MagicMock(),
-            "nexuscore.webapp.models": MagicMock(ApiKey=mock_api_key_model, User=mock_user_model),
+            "nexuscore.models": MagicMock(ApiKey=mock_api_key_model, User=mock_user_model),
         }):
             import nexuscore.api.dependencies.auth as auth_mod
             with pytest.raises(HTTPException) as exc_info:
@@ -183,7 +183,7 @@ class TestGetCurrentUser:
 
         with patch.dict("sys.modules", {
             "nexuscore.webapp": MagicMock(),
-            "nexuscore.webapp.models": MagicMock(ApiKey=mock_api_key_model, User=MagicMock()),
+            "nexuscore.models": MagicMock(ApiKey=mock_api_key_model, User=MagicMock()),
         }):
             import nexuscore.api.dependencies.auth as auth_mod
             result = auth_mod.get_current_user(x_api_key="valid-key")
@@ -201,7 +201,7 @@ class TestGetCurrentUser:
 
         with patch.dict("sys.modules", {
             "nexuscore.webapp": MagicMock(),
-            "nexuscore.webapp.models": MagicMock(ApiKey=mock_api_key_model, User=MagicMock()),
+            "nexuscore.models": MagicMock(ApiKey=mock_api_key_model, User=MagicMock()),
         }):
             import nexuscore.api.dependencies.auth as auth_mod
             with pytest.raises(HTTPException) as exc_info:
@@ -213,7 +213,7 @@ class TestGetCurrentUser:
         """サーバー設定エラー（get_api_key が例外）"""
         from fastapi import HTTPException
 
-        with patch.dict("sys.modules", {"nexuscore.webapp.models": None}):
+        with patch.dict("sys.modules", {"nexuscore.models": None}):
             import nexuscore.api.dependencies.auth as auth_mod
             with pytest.raises(HTTPException):
                 auth_mod.get_current_user(x_api_key="any-key")

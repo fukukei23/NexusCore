@@ -6,7 +6,7 @@ def test_finalize_run_slack_idempotent(app):
     """2回 _finalize_run を呼んでも Slack 通知は1回のみ（NotificationLog UNIQUE）"""
     from nexuscore.webapp import db
     from nexuscore.webapp.celery_app import _finalize_run
-    from nexuscore.webapp.models import NotificationLog, Project, Run, User
+    from nexuscore.models import NotificationLog, Project, Run, User
 
     with app.app_context():
         db.create_all()

@@ -6,8 +6,7 @@ logger = logging.getLogger(__name__)
 
 # Webapp モデルはオプショナルインポート
 try:
-    from nexuscore.webapp import db
-    from nexuscore.webapp.models import ExecutionLog, PatchRecord, Run
+    from nexuscore.models import ExecutionLog, PatchRecord, Run, db
 
     HAS_WEBAPP = True
 except ImportError:

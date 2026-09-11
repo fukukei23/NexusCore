@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from nexuscore.webapp import create_app, db
-from nexuscore.webapp.models import ExecutionLog, PatchRecord, Project, Run, User
+from nexuscore.models import ExecutionLog, PatchRecord, Project, Run, User
 
 # ============================================================================
 # Fixtures

@@ -34,9 +34,9 @@ def mock_api_key(monkeypatch):
 def mock_db_models():
     """データベースモデルをモック（認証用）"""
     with (
-        patch("nexuscore.webapp.models.User") as mock_user,
-        patch("nexuscore.webapp.models.ApiKey") as mock_api_key_model,
-        patch("nexuscore.webapp.db") as mock_db,
+        patch("nexuscore.models.User") as mock_user,
+        patch("nexuscore.models.ApiKey") as mock_api_key_model,
+        patch("nexuscore.models.db") as mock_db,
     ):
         # API Key認証のモック
         mock_user_obj = MagicMock()

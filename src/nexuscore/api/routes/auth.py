@@ -8,8 +8,7 @@ from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from nexuscore.webapp import db
-from nexuscore.webapp.models import User
+from nexuscore.models import User, db
 
 logger = logging.getLogger(__name__)
 

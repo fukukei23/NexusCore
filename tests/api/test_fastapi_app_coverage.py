@@ -41,11 +41,11 @@ def test_http_exception_string_detail_via_route(client, monkeypatch):
     mock_user.id = 1
 
     with (
-        patch("nexuscore.webapp.models.Project") as Project,
-        patch("nexuscore.webapp.models.Run") as Run,
-        patch("nexuscore.webapp.db"),
-        patch("nexuscore.webapp.models.ApiKey") as ApiKey,
-        patch("nexuscore.webapp.models.User"),
+        patch("nexuscore.models.Project") as Project,
+        patch("nexuscore.models.Run") as Run,
+        patch("nexuscore.models.db"),
+        patch("nexuscore.models.ApiKey") as ApiKey,
+        patch("nexuscore.models.User"),
     ):
         mock_query = MagicMock()
         mock_query.filter_by.return_value.first.return_value = None
@@ -91,11 +91,11 @@ def test_validation_error_with_field_path(client, monkeypatch):
     mock_user.id = 1
 
     with (
-        patch("nexuscore.webapp.models.Project") as Project,
-        patch("nexuscore.webapp.models.Run") as Run,
-        patch("nexuscore.webapp.db"),
-        patch("nexuscore.webapp.models.ApiKey") as ApiKey,
-        patch("nexuscore.webapp.models.User"),
+        patch("nexuscore.models.Project") as Project,
+        patch("nexuscore.models.Run") as Run,
+        patch("nexuscore.models.db"),
+        patch("nexuscore.models.ApiKey") as ApiKey,
+        patch("nexuscore.models.User"),
     ):
         mock_query = MagicMock()
         mock_query.filter_by.return_value.first.return_value = None

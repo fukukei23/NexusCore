@@ -13,7 +13,7 @@ from nexuscore.core.orchestrator import Orchestrator
 from nexuscore.core.session_control import SessionController
 
 if TYPE_CHECKING:
-    from nexuscore.webapp.models import Project, Run
+    from nexuscore.models import Project, Run
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +129,7 @@ def run_orchestrator_inline(
         autonomy_level: 自動化レベル
         fast_lane: 高速レーン実行フラグ
     """
-    from nexuscore.webapp import db
+    from nexuscore.models import db
 
     status = "SUCCESS"
     try:

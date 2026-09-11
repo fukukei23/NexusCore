@@ -4,10 +4,9 @@ import logging
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
+from nexuscore.models import User, db
 from nexuscore.utils.crypto_utils import encrypt_string
-from nexuscore.webapp import db
 from nexuscore.webapp.auth import get_current_user, require_auth
-from nexuscore.webapp.models import User
 
 logger = logging.getLogger(__name__)
 

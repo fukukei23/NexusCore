@@ -33,8 +33,8 @@ if "PYTHONPATH" not in os.environ:
 elif str(src_path) not in os.environ["PYTHONPATH"].split(os.pathsep):
     os.environ["PYTHONPATH"] = f"{src_path}{os.pathsep}{os.environ['PYTHONPATH']}"
 
-from nexuscore.webapp import create_app, db
-from nexuscore.webapp.models import ApiKey, User
+from nexuscore.models import ApiKey, User, db
+from nexuscore.webapp import create_app
 
 
 def bootstrap_apikey_for_app(

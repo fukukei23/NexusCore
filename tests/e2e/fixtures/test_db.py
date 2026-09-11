@@ -13,7 +13,7 @@ import pytest
 from flask import Flask
 
 from nexuscore.webapp import db
-from nexuscore.webapp.models import ApiKey, Project, User
+from nexuscore.models import ApiKey, Project, User
 
 # E2E テスト用の SQLite DB パス
 E2E_DB_PATH: str | None = None

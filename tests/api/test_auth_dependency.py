@@ -171,7 +171,7 @@ def _patch_db(mock_api_key_cls, mock_user_cls):
     return patch.dict(
         "sys.modules",
         {
-            "nexuscore.webapp.models": MagicMock(
+            "nexuscore.models": MagicMock(
                 ApiKey=mock_api_key_cls, User=mock_user_cls
             ),
         },
@@ -377,7 +377,7 @@ def test_user_unexpected_error_without_context(env_key):
 
 def test_import_error_fallback_success(env_key):
     """webapp.models ImportError → 環境変数比較で成功 (L208-222)"""
-    with patch.dict("sys.modules", {"nexuscore.webapp.models": None}):
+    with patch.dict("sys.modules", {"nexuscore.models": None}):
         user = get_current_user(x_api_key="test-key")
     assert user.user_id == "api_user"
     assert user.roles == ["api_user"]
@@ -385,7 +385,7 @@ def test_import_error_fallback_success(env_key):
 
 def test_import_error_fallback_wrong_key(env_key):
     """webapp.models ImportError → キー不一致で 401"""
-    with patch.dict("sys.modules", {"nexuscore.webapp.models": None}):
+    with patch.dict("sys.modules", {"nexuscore.models": None}):
         with pytest.raises(HTTPException) as exc:
             get_current_user(x_api_key="wrong")
     assert exc.value.status_code == 401
@@ -393,7 +393,7 @@ def test_import_error_fallback_wrong_key(env_key):
 
 def test_import_error_no_api_key(no_env_key):
     """webapp.models ImportError + APIキー未設定 → 500"""
-    with patch.dict("sys.modules", {"nexuscore.webapp.models": None}):
+    with patch.dict("sys.modules", {"nexuscore.models": None}):
         with pytest.raises(HTTPException) as exc:
             get_current_user(x_api_key="key")
     assert exc.value.status_code == 500

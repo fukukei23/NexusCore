@@ -14,7 +14,7 @@ from flask import (
     url_for,
 )
 
-from nexuscore.webapp import db
+from nexuscore.models import Project, Run, db
 from nexuscore.webapp.auth import get_current_user, require_auth
 from nexuscore.webapp.db_helpers import (
     project_latest_run,
@@ -22,7 +22,6 @@ from nexuscore.webapp.db_helpers import (
     run_logs_payload,
     user_project_or_404,
 )
-from nexuscore.webapp.models import Project, Run
 
 from ._projects_helpers import (
     _compute_run_duration,

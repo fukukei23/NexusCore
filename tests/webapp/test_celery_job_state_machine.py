@@ -24,7 +24,7 @@ from nexuscore.core.session_control import SessionController
 # webapp モジュールが利用可能かどうかを確認
 try:
     from nexuscore.webapp import create_app, db  # noqa: F401
-    from nexuscore.webapp.models import Project, Run  # noqa: F401
+    from nexuscore.models import Project, Run  # noqa: F401
 
     HAS_WEBAPP = True
 except ImportError:
@@ -38,7 +38,7 @@ class TestCeleryTaskWithJobStateMachine:
     def test_celery_task_state_transition_success(self):
         """Celery タスクが正常に状態遷移することを確認"""
         # celery_app.py 内のローカル参照を直接パッチ
-        # celery_app.py は `from nexuscore.webapp.models import Run, Project` しているため、
+        # celery_app.py は `from nexuscore.models import Run, Project` しているため、
         # celery_app モジュール内の Run/Project をパッチする必要がある
         with (
             patch("nexuscore.webapp.celery_app.Run") as mock_run_class,

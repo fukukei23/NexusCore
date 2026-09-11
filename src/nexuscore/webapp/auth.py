@@ -7,8 +7,7 @@ import requests
 from authlib.integrations.flask_client import OAuth
 from flask import Blueprint, jsonify, redirect, session, url_for
 
-from nexuscore.webapp import db
-from nexuscore.webapp.models import User
+from nexuscore.models import User, db
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
