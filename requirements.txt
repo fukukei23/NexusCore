@@ -23,7 +23,6 @@ pytest-mock>=3.12.0,<4.0.0
 gradio>=4.16.0,<7.0.0  # <5.0.0→<7.0.0: gradio 4.xは古いhuggingface_hub API(HfFolder)に依存しCI非互換・6.xは.venv実証済み(2026-07-09)
 fastapi>=0.110.0,<1.0.0 # Mainの新しいバージョンを採用
 uvicorn>=0.27.0,<1.0.0  # Mainの新しいバージョンを採用
-streamlit>=1.29.0,<2.0.0
 Flask>=3.0.0,<4.0.0     # あなたのPRのアップグレードを採用
 Flask-SQLAlchemy>=3.1.0,<4.0.0
 Flask-Migrate>=4.0.0,<5.0.0
