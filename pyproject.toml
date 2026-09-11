@@ -82,9 +82,35 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 
+# mutation testing 対象（中核モジュール）: mutation_tester_agent + llm_router +
+# authority_runner + run_lock + run_state_integrity
 [tool.mutmut]
-paths_to_mutate = ["src/nexuscore/agents/mutation_tester_agent.py"]
-tests_dir = ["tests/agents/test_mutation_tester_agent.py", "-m", "not slow"]
+# mutants/ コピー内で依存モジュールを import できるよう src 全体をコピー
+also_copy = ["src"]
+paths_to_mutate = [
+    "src/nexuscore/agents/mutation_tester_agent.py",
+    "src/nexuscore/llm/llm_router.py",
+    "src/nexuscore/orchestrator/authority_runner.py",
+    "src/nexuscore/orchestrator/run_lock.py",
+    "src/nexuscore/orchestrator/run_state_integrity.py",
+]
+tests_dir = [
+    "tests/agents/test_mutation_tester_agent.py",
+    "tests/llm/test_llm_router_classification.py",
+    "tests/llm/test_llm_router_comprehensive.py",
+    "tests/llm/test_llm_router_coverage_boost.py",
+    "tests/llm/test_llm_router_helpers.py",
+    "tests/llm/test_llm_router_selection.py",
+    "tests/llm/test_llm_router_smoke.py",
+    "tests/orchestrator/test_authority_runner.py",
+    "tests/orchestrator/test_authority_runner_comprehensive.py",
+    "tests/orchestrator/test_authority_runner_context_propagation.py",
+    "tests/orchestrator/test_resume_lock_conflict.py",
+    "tests/orchestrator/test_run_lock_refresh.py",
+    "tests/orchestrator/test_run_lock_stale_reclaim.py",
+    "tests/orchestrator/test_run_state_integrity.py",
+    "-m", "not slow",
+]
 
 # ============================================================================
 # Bandit セキュリティスキャン設定
