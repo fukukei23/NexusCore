@@ -40,7 +40,9 @@ except ImportError:
     reason="OPENAI_API_KEY not configured (skipping LLM-based test)",
 )
 @pytest.mark.xfail(
-    reason="フルテスト実行時のフレーク（test_generator 機能改善時に解消）— 2026-07-08"
+    reason="フルテスト実行時のフレーク（test_generator 機能改善時に解消）— 2026-07-08",
+    # strict=False: 実行順に依存し単体では通るため（xfail_strict=true の例外・2026-09-12 明示化）
+    strict=False,
 )
 def test_test_generator_creates_runnable_pytest_file(sample_project_dir, tmp_path):
     """

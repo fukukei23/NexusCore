@@ -410,7 +410,9 @@ class TestGenerateUnitTests:
         assert "test_multiply" in result
 
     @pytest.mark.xfail(
-        reason="フルテスト実行時のフレーク（test_generator 機能改善時に解消）— 2026-07-08"
+        reason="フルテスト実行時のフレーク（test_generator 機能改善時に解消）— 2026-07-08",
+        # strict=False: 実行順に依存し単体では通るため（xfail_strict=true の例外・2026-09-12 明示化）
+        strict=False,
     )
     def test_generate_unit_tests_uses_default_config(self, tmp_path):
         """Uses DEFAULT_CONFIG when config not provided"""

@@ -637,47 +637,135 @@ def pytest_sessionfinish(session, exitstatus):
 # ---------------------------------------------------------------------------
 import pytest as _pytest
 
-_XFAIL_PATTERNS = {
-    # API quality gate tests — completion report docs not yet created
-    "test_completion_report": "Completion report documentation files not yet created",
-    "test_error_code_catalog": "ERROR_CODE_CATALOG.md not yet created",
-    "test_readme_cr_status": "README CR status quality gate — docs not yet created",
-    "test_completed_crs_have_completion_reports": "Completion reports for completed CRs not yet created",
-    # Deprecated endpoint — removed in current codebase
-    "test_deprecated_get_run_view": "Deprecated endpoint removed from codebase",
-    # LLM fallback — feature not yet implemented in RoutedLLM
-    "test_429_triggers_fallback": "LLM fallback on 429 not yet implemented",
-    "test_all_exhausted_raises": "LLM fallback exhaustion not yet implemented",
-    "test_cooldown_skips_provider": "LLM cooldown skipping not yet implemented",
-    # Agents — complex source/mock mismatches after refactoring
-    "test_validate_code_unsupported_language": "check_availability() return type mismatch after refactor",
-    "test_safe_detect_tools_handles_exception": "Exception propagation changed after refactor",
-    "test_review_with_llm_error": "LLM error handling changed after refactor",
-    "test_prepare_branch_repo_not_found": "git mock exception class TypeError — complex fix needed",
-    "test_commit_branch_failure": "RuntimeError not caught in execute_commit_workflow",
-    "test_get_survived_mutants_error": "Exception propagation changed in mutation runner",
-    "test_get_survived_mutants_command_failure": "Exception propagation changed in mutation runner",
-    # Analyzer
-    "test_run_exception_path": "RuntimeError mock interaction changed after refactor",
-    "test_main_block": "Exception mock interaction changed after refactor",
-    # Orchestrator
-    "test_run_full_project_with_gradio_ui": "JSON serialization of MagicMock — mock setup mismatch",
-    "test_run_full_project_raw_requirement_fallback": "subprocess 'python' not found — uses python3",
-    # LLM providers
-    "test_gemini_stub_and_no_text_fallback": "Gemini stub path interaction changed",
-    # Tools
-    "test_check_openapi_generator_mocked": "OpenAPI generator availability check changed",
-    # UI — gradio sys.modules state interference when running full ui/ suite
-    "test_build_unified_ui_creates_blocks": "gradio sys.modules pollution from test_settings_tab conftest — passes in isolation",
-    "test_build_unified_ui_sets_title": "gradio sys.modules pollution from test_settings_tab conftest — passes in isolation",
-    "test_build_unified_ui_initializes_state": "gradio sys.modules pollution from test_settings_tab conftest — passes in isolation",
-    "test_build_unified_ui_uses_soft_theme": "gradio sys.modules pollution from test_settings_tab conftest — passes in isolation",
+# 値は (reason, strict)。
+#   strict=True  … 直ったら XPASS として即検出される（既定。放置を防ぐ）
+#   strict=False … 実行順・環境で結果が変わるフレーク（単体とフルスイートで結果が違うもの）
+#
+# ⚠️ 2026-09-12 改修（部分文字列マッチ廃止）:
+#   旧実装は `if pattern in item.name` の部分文字列マッチで、25パターンが実際には
+#   37 テストへ適用され、うち 12 件が誤爆していた。
+#   例: "test_error_code_catalog" が test_error_code_catalog.py の 6 テスト全部を無効化し、
+#       "test_main_block" が別ファイルの無関係なテストまで巻き込んでいた。
+#   さらに strict=False 固定だったため、既に直ったテストが永久に xfail のまま残り
+#   誰も気付けなかった（XPASS 12 件が常態化）。
+#   NEXUSCORE_DISABLE_AUTO_XFAIL=1 でのフルスイート実測により
+#   「今も本当に失敗する 25 件」を確定し、残りをリストから解放した。
+_XFAIL_TESTS: dict[str, tuple[str, bool]] = {
+    # --- API quality gate: 対応ドキュメントが未作成のため失敗（docs 作成で解消する） ---
+    "test_completion_reports_have_content_quality": (
+        "Completion report documentation files not yet created",
+        True,
+    ),
+    "test_completion_reports_have_required_sections": (
+        "Completion report documentation files not yet created",
+        True,
+    ),
+    "test_completion_reports_from_readme_exist": (
+        "Completion report documentation files not yet created",
+        True,
+    ),
+    "test_completion_reports_exist_for_completed_crs": (
+        "Completion reports for completed CRs not yet created",
+        True,
+    ),
+    "test_completed_crs_have_completion_reports": (
+        "Completion reports for completed CRs not yet created",
+        True,
+    ),
+    "test_error_code_catalog_exists": ("ERROR_CODE_CATALOG.md not yet created", True),
+    # --- Deprecated endpoint — removed in current codebase ---
+    "test_deprecated_get_run_view_still_works": (
+        "Deprecated endpoint removed from codebase",
+        True,
+    ),
+    # --- LLM fallback — feature not yet implemented in RoutedLLM ---
+    "test_429_triggers_fallback": ("LLM fallback on 429 not yet implemented", True),
+    "test_all_exhausted_raises": ("LLM fallback exhaustion not yet implemented", True),
+    "test_cooldown_skips_provider": ("LLM cooldown skipping not yet implemented", True),
+    # --- Agents — complex source/mock mismatches after refactoring ---
+    "test_validate_code_unsupported_language": (
+        "check_availability() return type mismatch after refactor",
+        True,
+    ),
+    "test_safe_detect_tools_handles_exception": (
+        "Exception propagation changed after refactor",
+        True,
+    ),
+    "test_review_with_llm_error": ("LLM error handling changed after refactor", True),
+    "test_prepare_branch_repo_not_found": (
+        "git mock exception class TypeError — complex fix needed",
+        True,
+    ),
+    "test_commit_branch_failure": (
+        "RuntimeError not caught in execute_commit_workflow",
+        True,
+    ),
+    "test_get_survived_mutants_error": (
+        "Exception propagation changed in mutation runner",
+        True,
+    ),
+    "test_get_survived_mutants_command_failure": (
+        "Exception propagation changed in mutation runner",
+        True,
+    ),
+    # --- Analyzer ---
+    "test_run_exception_path": (
+        "RuntimeError mock interaction changed after refactor",
+        True,
+    ),
+    # 単体実行では失敗し、フルスイートでは成功する実行順依存（2026-09-12 実測）
+    "test_main_block": (
+        "Exception mock interaction changed after refactor — 実行順依存",
+        False,
+    ),
+    # --- Orchestrator ---
+    "test_run_full_project_with_gradio_ui": (
+        "JSON serialization of MagicMock — mock setup mismatch",
+        True,
+    ),
+    "test_run_full_project_raw_requirement_fallback": (
+        "subprocess python not found — uses python3",
+        True,
+    ),
+    # --- LLM providers ---
+    "test_gemini_stub_and_no_text_fallback": (
+        "Gemini stub path interaction changed",
+        True,
+    ),
+    # --- UI: gradio の sys.modules 汚染。単体では通るためフレーク扱い（strict=False） ---
+    "test_build_unified_ui_creates_blocks": (
+        "gradio sys.modules pollution from test_settings_tab conftest — passes in isolation",
+        False,
+    ),
+    "test_build_unified_ui_sets_title": (
+        "gradio sys.modules pollution from test_settings_tab conftest — passes in isolation",
+        False,
+    ),
+    "test_build_unified_ui_initializes_state": (
+        "gradio sys.modules pollution from test_settings_tab conftest — passes in isolation",
+        False,
+    ),
+    "test_build_unified_ui_uses_soft_theme": (
+        "gradio sys.modules pollution from test_settings_tab conftest — passes in isolation",
+        False,
+    ),
 }
 
 
 def pytest_collection_modifyitems(items, config):
-    """Auto-apply xfail markers to known-broken tests."""
+    """既知の失敗テストへ xfail を自動付与する（完全一致・テスト単位で strict 指定）。
+
+    NEXUSCORE_DISABLE_AUTO_XFAIL=1 で無効化できる。棚卸し時に
+    「リスト内のどれが今も本当に失敗するか」を実測するために使う。
+    """
+    import os as _os
+
+    if _os.environ.get("NEXUSCORE_DISABLE_AUTO_XFAIL") == "1":
+        return
     for item in items:
-        for pattern, reason in _XFAIL_PATTERNS.items():
-            if pattern in item.name:
-                item.add_marker(_pytest.mark.xfail(reason=reason, strict=False))
+        # パラメータ化テスト（test_x[param]）は基底名で照合する
+        base_name = item.name.split("[")[0]
+        entry = _XFAIL_TESTS.get(base_name)
+        if entry is not None:
+            reason, strict = entry
+            item.add_marker(_pytest.mark.xfail(reason=reason, strict=strict))
