@@ -13,8 +13,8 @@ from nexuscore.cli.bootstrap_apikey import (
     bootstrap_apikey_for_app,
     bootstrap_apikey_main,
 )
-from nexuscore.webapp import create_app, db
 from nexuscore.models import ApiKey, User
+from nexuscore.webapp import create_app, db
 
 
 # ============================================================================

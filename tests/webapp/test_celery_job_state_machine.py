@@ -23,8 +23,8 @@ from nexuscore.core.session_control import SessionController
 
 # webapp モジュールが利用可能かどうかを確認
 try:
-    from nexuscore.webapp import create_app, db  # noqa: F401
     from nexuscore.models import Project, Run  # noqa: F401
+    from nexuscore.webapp import create_app, db  # noqa: F401
 
     HAS_WEBAPP = True
 except ImportError:

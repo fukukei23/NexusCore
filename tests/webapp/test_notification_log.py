@@ -5,8 +5,8 @@ from sqlalchemy.exc import IntegrityError
 
 def test_notification_log_unique_run_event(app):
     """同一 (run_id, event_type) の2件目挿入は失敗（冪等化）"""
-    from nexuscore.webapp import db
     from nexuscore.models import NotificationLog
+    from nexuscore.webapp import db
 
     with app.app_context():
         db.create_all()
@@ -25,8 +25,8 @@ def test_notification_log_unique_run_event(app):
 
 def test_notification_log_allows_different_event_types(app):
     """同一 run でも event_type が異なれば複数件挿入可"""
-    from nexuscore.webapp import db
     from nexuscore.models import NotificationLog
+    from nexuscore.webapp import db
 
     with app.app_context():
         db.create_all()

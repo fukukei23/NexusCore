@@ -208,8 +208,8 @@ def _ensure_webapp():
     if HAS_WEBAPP is not None:
         return HAS_WEBAPP
     try:
-        from nexuscore.webapp import create_app, db
         from nexuscore.models import ApiKey, ExecutionLog, PatchRecord, Project, Run, User
+        from nexuscore.webapp import create_app, db
 
         HAS_WEBAPP = True
     except ImportError:
