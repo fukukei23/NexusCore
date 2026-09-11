@@ -10,6 +10,14 @@ omit =
     */__pycache__/*
     */migrations/*
     */.venv/*
+    # UI描画レイヤー（Gradioタブbuilder）: 単体テストでは実行経路が確保できないため測定対象外。
+    # 2026-09-11 実測（フルテスト+coverage・artifacts/coverage_ui_kernel/EVIDENCE.md）:
+    # 当該9モジュール507 stmts中377 miss=25.6%（tests/ui 111テスト存在下でも同値）。
+    # E2E/Browserテスト導入時に再評価すること。policy_interface.py（93.33%・テスト実在）は測定継続。
+    */nexuscore/ui/unified_gradio_ui.py
+    */nexuscore/ui/_state.py
+    */nexuscore/ui/_llm_init.py
+    */nexuscore/ui/*_tab.py
 
 [report]
 precision = 2
