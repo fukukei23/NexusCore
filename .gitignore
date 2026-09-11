@@ -166,3 +166,7 @@ artifacts/phase0/*
 !artifacts/phase0/CHECKLIST.template.md
 !artifacts/phase0/CRITERIA.md
 artifacts/checkpoints/
+
+# 構造ダンプ（tools/export_structure.py 等の生成物・再生成可能・2026-09-12 追跡解除）
+*_folder_structure.txt
+src/folder_structure.txt
