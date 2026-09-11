@@ -12,7 +12,7 @@
 - [ ] コード読解: loop.py の state.save() 呼び出し経路を全て列挙し、保存漏れシナリオ候補を報告する（実装の変更はしない）
 - [x] 設定・docs生成: docs/開発ガイド.md と harness_cli --help の不整合を列挙して報告する（修正はしない）
 - [ ] エラー診断: run_state の quarantine ファイルが発生する経路を整理して報告する（実装の変更はしない）
-- [ ] コード読解: api/harness_routes.py と cli/harness_cli.py の機能差を一覧化して報告する（実装の変更はしない）
+- [x] コード読解: api/harness_routes.py と cli/harness_cli.py の機能差を一覧化して報告する（実装の変更はしない）
 
 ## 手動用（書く系・ask承認込み・ふくけい付き添いで消化）
 
