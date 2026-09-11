@@ -40,12 +40,11 @@ REVIEW_MAX_RETRIES: int = _env_int("NEXUS_REVIEW_MAX_RETRIES", 2)
 if TYPE_CHECKING:
     import logging
 
-    from nexuscore.core.session_controller import SessionController
-    from nexuscore.llm.router import LLMRouter
-
     from nexuscore.agents.architect_agent import ArchitectAgent
     from nexuscore.agents.base_agent import BaseAgent
     from nexuscore.agents.guardian_agent import GuardianAgent
+    from nexuscore.core.session_controller import SessionController
+    from nexuscore.llm.router import LLMRouter
 
 
 class PhaseRunnerMixin:

@@ -42,6 +42,11 @@ target-version = ["py312"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+# src-layout を明示する。既定は [".", "src"] なので値としては同じだが、
+# 自動検出に頼らず固定する意図を明示する（"src" だけに絞ると main_cli 等
+# ルート直下のモジュールが first-party から外れ、逆に違反が増える・実測7件）。
+src = [".", "src"]
 extend-exclude = [
   ".git",
   ".venv",
@@ -74,6 +79,16 @@ ignore = [
   "B008",  # FastAPI Depends() のデフォルト引数パターン (フレームワーク仕様)
   "E402",  # モジュールレベルimport順序 - sys.path設定後の意図的なimport
 ]
+
+[tool.ruff.lint.isort]
+# first-party を明示する（環境差の遮断）。
+# 未指定だと ruff は「その環境で nexuscore を解決できるか」で first/third-party を推定するため、
+#   ローカル（editable install 済みの .venv 内）: first-party
+#   CI（ruff だけを入れた独立ジョブ）: third-party
+# と判定が割れ、同一コマンド・同一ファイルでもローカル緑 / CI 赤になる。
+# 2026-09-12 に実際に発生（src/nexuscore/archive/views_api_test.py の I001。
+# 当該ファイルは無変更のまま、CI 側 ruff のバージョン更新で判定が変わった）。
+known-first-party = ["nexuscore"]
 
 [tool.ruff.format]
 quote-style = "double"
