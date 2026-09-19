@@ -43,11 +43,12 @@ from nexuscore.harness.tools.write import edit_file, write_file
 DEFAULT_MODELS: dict[str, str] = {"openai": "openai:gpt-5.1",
                                   "deepseek": "deepseek:deepseek-chat"}
 
-# 運用上のトークン上限（2026-09-19）: Limits既定の500_000は「誰も意図していない
-# 実質上限」として機能しており、cron実運用9runのうち8runが43〜49万トークンに
-# 達して計測無効になった。scripts/run_harness_task.py の HARD_TOKEN_LIMIT と
-# 同値であることを test_operational_max_tokens_matches_wrapper が固定する
-OPERATIONAL_MAX_TOKENS = 200_000
+# 運用上のトークン上限（2026-09-19）: 当初 Limits既定の500_000が「誰も意図して
+# いない実質上限」として機能し、cron実運用9runのうち8runが43〜49万トークンに
+# 達して計測無効になった。現在は Limits 側を正典とし、ここは参照するだけにして
+# 二重管理を避ける。scripts/run_harness_task.py の HARD_TOKEN_LIMIT と同値で
+# あることは test_operational_max_tokens_matches_wrapper が固定する
+OPERATIONAL_MAX_TOKENS = Limits().max_tokens
 TOOL_CAPABLE = ("openai", "anthropic", "google", "glm", "minimax",
                 "deepseek", "moonshot", "openrouter", "mock")
 

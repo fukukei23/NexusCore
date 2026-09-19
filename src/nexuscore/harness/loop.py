@@ -64,6 +64,9 @@ log = logging.getLogger(__name__)
 
 MAX_TOOL_RESULT_CHARS = 10_000  # plan雛形どおり・LLMコンテキスト保護
 
+# 畳まれたtool_resultの目印（再圧縮の二重適用を防ぐ判定にも使う）
+OMITTED_PREFIX = "[omitted"
+
 
 @dataclass
 class Limits:
@@ -76,9 +79,19 @@ class Limits:
     max_steps: int = 25
     max_wall_seconds: float = 600.0
     max_tool_calls: int = 40
-    max_tokens: int = 500_000
+    # spec §5 は当初 500_000 だったが、これは履歴圧縮なしの前提値で、同じspecの
+    # 「25ステップ」と両立しなかった（25stepに753,750トークン必要・2026-09-19実測）。
+    # 圧縮導入後は25step完走が約172,000トークンに収まるため運用値200_000へ統一し、
+    # 「宣言する側と実際に効く側」が別の数字を持つ二重管理を解消する
+    max_tokens: int = 200_000
     warn_at_fraction: float = 0.8  # 80%でログ警告（round7: ログのみ）
     abort_at_fraction: float = 0.9  # 90%でabort（round7(4)）
+    # 履歴圧縮（2026-09-19追加）: 本文を残すtool_resultの件数。これを超えた
+    # 古いものは1行インデックスへ畳む。畳まないと毎ステップ全履歴を再送する
+    # ため送信量がステップ数の二次で増え（実測 k≈1,206 tokens/steps^2）、
+    # spec §5の「25ステップ」に753,750トークンが必要になって「500k」と
+    # 両立しない。詳細: docs/superpowers/specs/2026-08-30-...-design.md §5
+    keep_recent_tool_results: int = 3
 
 
 class AgentHarness:
@@ -172,6 +185,8 @@ class AgentHarness:
                 # 起票①probe結線: HALF_OPEN中の呼出はprobeとして扱う
                 # （契約: 単一ループ・直列実行前提。並行run()でのbreaker共有は想定外）
                 is_probe = self.breaker.allow_probe()
+                # 送信直前に古いtool_resultを畳む（二次増加の抑制・2026-09-19）
+                self._compact_history(msgs)
                 try:
                     out = self.llm.complete_with_tools(messages=msgs, tools=tools)
                 except Exception as exc:
@@ -297,6 +312,55 @@ class AgentHarness:
             **snapshot,
         )
         return self.state.save(state) == SaveResult.SUCCESS
+
+    def _compact_history(self, msgs: list[dict[str, Any]]) -> None:
+        """古いtool_resultの本文を1行インデックスへ畳む（msgsを破壊的に更新）
+
+        なぜ必要か（2026-09-19実測）: ループは毎ステップ msgs 全体を再送するため、
+        畳まないと累計送信量がステップ数の**二次**で増える（mock計装 R²=0.9994・
+        実run係数 k≈1,206 tokens/steps^2）。結果 spec §5 の「25ステップ」に
+        753,750トークンが必要となり、同じ spec の「トークン500k」と両立しない。
+
+        何を残すか: 本文を丸ごと捨てるとLLMが同じ道具を再実行してステップが
+        かえって増えるため、tool名・引数・元の長さの1行を残して「もう実行した」
+        と分かるようにする。tool_result メッセージ自体は削除しない
+        （assistantのtool_callsと1対1で対応する必要があるOpenAI契約の維持）。
+
+        冪等: 既に畳んだメッセージ（OMITTED_PREFIX 始まり）は再処理しない。
+        """
+        keep = self.limits.keep_recent_tool_results
+        if keep < 0:
+            return
+        # tool_call_id → (name, args) を assistant 側から引く（畳んだ後も
+        # 何を実行したか書けるようにするため）
+        id_to_call: dict[str, tuple[str, Any]] = {}
+        for m in msgs:
+            if m.get("role") != "assistant":
+                continue
+            for tc in m.get("tool_calls") or []:
+                call_id = tc.get("id")
+                if not call_id:  # id無しは対応付けできない（畳む際は"?"表記）
+                    continue
+                fn = tc.get("function") or {}
+                id_to_call[str(call_id)] = (fn.get("name", "?"),
+                                            fn.get("arguments", ""))
+
+        tool_idx = [i for i, m in enumerate(msgs) if m.get("role") == "tool"]
+        # 直近 keep 件は触らない。それ以前を畳む
+        for i in tool_idx[:max(0, len(tool_idx) - keep)]:
+            m = msgs[i]
+            content = m.get("content") or ""
+            if content.startswith(OMITTED_PREFIX):
+                continue  # 冪等: 二重に畳まない
+            call_id = m.get("tool_call_id")
+            name, args = id_to_call.get(str(call_id), ("?", "")) if call_id \
+                else ("?", "")
+            args_s = str(args)
+            if len(args_s) > 120:  # 引数自体が巨大なケースを抑える
+                args_s = args_s[:120] + "…"
+            msgs[i] = {**m,
+                       "content": f"{OMITTED_PREFIX}: {name}({args_s}) → "
+                                  f"{len(content)} chars]"}
 
     def _over_abort(self, started: float, tokens: int) -> bool:
         """round7(4): wall/tokenが90%到達でTrue"""

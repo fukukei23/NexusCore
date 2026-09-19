@@ -568,3 +568,235 @@ def test_run_without_system_prompt_keeps_user_first(tmp_path: Path) -> None:
     h = _mk_harness(tmp_path, captured)
     h.run("タスク")
     assert captured["messages"][0]["role"] == "user"
+
+
+# --- msgs履歴の圧縮（2026-09-19・二次増加対策） ---
+
+
+def _big_echo(text: str) -> str:
+    """大きなtool_resultを返す道具（履歴圧縮の効果測定用）"""
+    return "R" * 4000
+
+
+def test_old_tool_results_are_compacted(tmp_path):
+    """fail条件ケース: 直近N件を超えた古いtool_resultの本文が畳まれること
+
+    msgsを畳まないと送信量がステップ数の二次で増える（実測 k≈1,206
+    tokens/steps^2・打ち切られていない2runで係数のばらつき1.10倍）。
+    25step完走に753,750トークン必要になり現行上限200,000では到達不能。
+    """
+    script = [_tool_resp("echo", {"text": f"x{i}"}, call_id=f"tc-{i}")
+              for i in range(6)]
+    script.append(_content_resp("done", 1))
+    llm = ScriptedLLM(script)
+    h, _, _ = _make_harness(tmp_path, llm, registry={"echo": _big_echo},
+                            limits=Limits(max_steps=10, keep_recent_tool_results=2))
+    out = h.run("repeat")
+    assert out["abort_reason"] is None
+
+    final = llm.seen_messages[-1]
+    tool_msgs = [m for m in final if m.get("role") == "tool"]
+    assert len(tool_msgs) == 6, "tool_result のメッセージ自体は消さない（契約維持）"
+
+    full = [m for m in tool_msgs if len(m["content"]) > 1000]
+    omitted = [m for m in tool_msgs if m["content"].startswith("[omitted")]
+    assert len(full) == 2, f"本文を残すのは直近2件のみ（実際: {len(full)}）"
+    assert len(omitted) == 4, f"それ以前は畳む（実際: {len(omitted)}）"
+
+
+def test_compacted_result_keeps_tool_identity(tmp_path):
+    """畳んだ後も「何をして何が返ったか」が残ること
+
+    本文を丸ごと捨てるとLLMが同じ道具を再実行し、かえってステップが増える。
+    tool名・引数・元の長さを1行で残して「もう実行した」と分かるようにする。
+    """
+    script = [_tool_resp("echo", {"text": f"x{i}"}, call_id=f"tc-{i}")
+              for i in range(3)]
+    script.append(_content_resp("done", 1))
+    llm = ScriptedLLM(script)
+    h, _, _ = _make_harness(tmp_path, llm, registry={"echo": _big_echo},
+                            limits=Limits(max_steps=10, keep_recent_tool_results=1))
+    h.run("repeat")
+
+    final = llm.seen_messages[-1]
+    omitted = [m for m in final
+               if m.get("role") == "tool" and m["content"].startswith("[omitted")]
+    assert omitted, "畳まれたメッセージが存在すること"
+    body = omitted[0]["content"]
+    assert "echo" in body, f"tool名が残ること: {body}"
+    assert "4000" in body, f"元の長さが残ること: {body}"
+
+
+def test_tool_call_ids_preserved_after_compaction(tmp_path):
+    """境界: 畳んでも tool_call_id の対応が壊れないこと
+
+    OpenAI契約ではassistantのtool_callsと後続toolメッセージのidが
+    1対1で対応している必要がある。壊れるとプロバイダが400を返す。
+    """
+    script = [_tool_resp("echo", {"text": f"x{i}"}, call_id=f"tc-{i}")
+              for i in range(4)]
+    script.append(_content_resp("done", 1))
+    llm = ScriptedLLM(script)
+    h, _, _ = _make_harness(tmp_path, llm, registry={"echo": _big_echo},
+                            limits=Limits(max_steps=10, keep_recent_tool_results=1))
+    h.run("repeat")
+
+    final = llm.seen_messages[-1]
+    assistant_ids = [tc["id"] for m in final if m.get("role") == "assistant"
+                     for tc in (m.get("tool_calls") or [])]
+    tool_ids = [m["tool_call_id"] for m in final if m.get("role") == "tool"]
+    assert assistant_ids == tool_ids, "id対応が保たれること"
+    assert len(set(tool_ids)) == len(tool_ids), "id重複が無いこと"
+
+
+def test_compaction_growth_is_linear_not_quadratic(tmp_path):
+    """効果検証: 圧縮ありなら送信量がステップ数に線形（二次でない）
+
+    無効化(keep=999)との対比で、累計送信量の増加次数が変わることを示す。
+    """
+    def _run(keep: int) -> int:
+        script = [_tool_resp("echo", {"text": f"x{i}"}, call_id=f"tc-{i}")
+                  for i in range(12)]
+        script.append(_content_resp("done", 1))
+        llm = ScriptedLLM(script)
+        h, _, _ = _make_harness(tmp_path / f"k{keep}", llm,
+                                registry={"echo": _big_echo},
+                                limits=Limits(max_steps=20,
+                                              keep_recent_tool_results=keep))
+        h.run("repeat")
+        return sum(sum(len(str(m)) for m in msgs) for msgs in llm.seen_messages)
+
+    compacted = _run(2)
+    unbounded = _run(999)
+    assert compacted < unbounded / 2, (
+        f"圧縮で累計送信量が半分以下になること（圧縮{compacted:,} vs "
+        f"無圧縮{unbounded:,}）")
+
+
+def test_keep_recent_default_preserves_behaviour(tmp_path):
+    """後方互換: keep_recent_tool_results の既定では短いrunの挙動が変わらない"""
+    llm = ScriptedLLM([_tool_resp("echo", {"text": "x"}), _content_resp("done", 7)])
+    h, _, _ = _make_harness(tmp_path, llm)
+    out = h.run("use echo")
+    assert out["content"] == "done"
+    assert out["tokens_used"] == 5 + 7
+    final = llm.seen_messages[-1]
+    tool_msgs = [m for m in final if m.get("role") == "tool"]
+    assert tool_msgs and not tool_msgs[0]["content"].startswith("[omitted")
+
+
+def test_max_steps_is_reachable_within_token_limit():
+    """spec内的不整合の再発防止: max_steps がトークン上限内で到達可能であること
+
+    2026-09-19実測の欠陥: spec §5 は「ステップ25回」と「トークン500k」を同時に
+    定めていたが、履歴圧縮が無いと25stepに753,750トークン必要で両立しなかった
+    （k≈1,206 tokens/steps^2）。圧縮導入で1stepあたりが一定になったため、
+    「1step平均 × max_steps < abort閾値」で機械的に整合を検査する。
+
+    1step平均の基準値: mock実測 24,112文字/step ÷ 3.5文字/token ≒ 6,890 tokens
+    （tool_result 8,000文字・keep=3 の保守的条件）。
+    """
+    lim = Limits()
+    EST_TOKENS_PER_STEP = 6_890  # 上記実測由来の保守値
+    abort_at = lim.max_tokens * lim.abort_at_fraction
+    need = EST_TOKENS_PER_STEP * lim.max_steps
+    assert need < abort_at, (
+        f"max_steps={lim.max_steps} には約{need:,}トークン必要だが "
+        f"abort閾値は{abort_at:,.0f}（max_tokens={lim.max_tokens:,}）。"
+        "max_stepsを下げるか上限を上げるか、履歴圧縮を強めること")
+
+
+def test_compaction_is_idempotent(tmp_path):
+    """境界: 既に畳んだメッセージを再度畳んでも壊れない（毎ステップ呼ばれるため）"""
+    llm = ScriptedLLM([_content_resp("done", 1)])
+    h, _, _ = _make_harness(tmp_path, llm, limits=Limits(keep_recent_tool_results=0))
+    msgs = [
+        {"role": "assistant", "content": "",
+         "tool_calls": [{"id": "a1", "type": "function",
+                         "function": {"name": "echo", "arguments": '{"text":"x"}'}}]},
+        {"role": "tool", "tool_call_id": "a1", "content": "R" * 500},
+    ]
+    h._compact_history(msgs)
+    once = msgs[1]["content"]
+    h._compact_history(msgs)
+    assert msgs[1]["content"] == once, "2回目の呼び出しで内容が変わらないこと"
+    assert "500 chars" in once, f"初回で元の長さが記録されること: {once}"
+
+
+def test_compaction_applies_to_resumed_messages(tmp_path):
+    """未検証領域1: resume経路（run(messages=...)）でも圧縮が効くこと
+
+    specでresumeはPhase 1必須機能。渡された履歴が既に長い場合、圧縮が
+    効かないとresume直後の1回目の送信でトークンを浪費する。
+    """
+    prior: list[dict] = [{"role": "user", "content": "task"}]
+    for i in range(5):
+        prior.append({"role": "assistant", "content": "",
+                      "tool_calls": [{"id": f"p{i}", "type": "function",
+                                      "function": {"name": "echo",
+                                                   "arguments": '{"text":"x"}'}}]})
+        prior.append({"role": "tool", "tool_call_id": f"p{i}", "content": "R" * 3000})
+
+    llm = ScriptedLLM([_content_resp("done", 1)])
+    h, _, _ = _make_harness(tmp_path, llm,
+                            limits=Limits(keep_recent_tool_results=2))
+    h.run("ignored", messages=prior)
+
+    sent = llm.seen_messages[0]
+    omitted = [m for m in sent
+               if m.get("role") == "tool" and m["content"].startswith("[omitted")]
+    full = [m for m in sent
+            if m.get("role") == "tool" and len(m["content"]) > 1000]
+    assert len(omitted) == 3, f"渡された履歴のうち古い3件が畳まれること（{len(omitted)}）"
+    assert len(full) == 2, f"直近2件は本文が残ること（{len(full)}）"
+
+
+def test_compaction_handles_missing_tool_call_id(tmp_path):
+    """未検証領域2: tool_call_id が引けない場合も落ちず "?" で畳むこと
+
+    assistant側にtool_callsが無い／idが欠けたtoolメッセージは通常発生しないが、
+    resumeで外部から渡された履歴やプロバイダ差で起こりうる。ここで例外が出ると
+    ループ全体が落ちる（圧縮は毎ステップ呼ばれるため影響が大きい）。
+    """
+    llm = ScriptedLLM([_content_resp("done", 1)])
+    h, _, _ = _make_harness(tmp_path, llm, limits=Limits(keep_recent_tool_results=0))
+    msgs: list[dict] = [
+        {"role": "tool", "tool_call_id": "unknown-id", "content": "A" * 300},
+        {"role": "tool", "content": "B" * 300},  # tool_call_id そのものが無い
+    ]
+    h._compact_history(msgs)
+    assert msgs[0]["content"] == "[omitted: ?() → 300 chars]"
+    assert msgs[1]["content"] == "[omitted: ?() → 300 chars]"
+
+
+def test_compaction_truncates_huge_arguments(tmp_path):
+    """境界: 引数自体が巨大な場合は120字で切る（畳んだのに1行が長大になるのを防ぐ）"""
+    llm = ScriptedLLM([_content_resp("done", 1)])
+    h, _, _ = _make_harness(tmp_path, llm, limits=Limits(keep_recent_tool_results=0))
+    big_args = '{"text":"' + "Z" * 500 + '"}'
+    msgs: list[dict] = [
+        {"role": "assistant", "content": "",
+         "tool_calls": [{"id": "h1", "type": "function",
+                         "function": {"name": "echo", "arguments": big_args}}]},
+        {"role": "tool", "tool_call_id": "h1", "content": "R" * 300},
+    ]
+    h._compact_history(msgs)
+    body = msgs[1]["content"]
+    assert body.endswith("→ 300 chars]")
+    assert "…" in body, f"引数が切り詰められること: {body[:80]}"
+    assert len(body) < 200, f"1行が長大化しないこと（実際 {len(body)}）"
+
+
+def test_compaction_never_touches_system_or_user(tmp_path):
+    """境界: system / user メッセージは畳まない（タスク本文の消失防止）"""
+    llm = ScriptedLLM([_content_resp("done", 1)])
+    h, _, _ = _make_harness(tmp_path, llm, limits=Limits(keep_recent_tool_results=0))
+    msgs: list[dict] = [
+        {"role": "system", "content": "S" * 5000},
+        {"role": "user", "content": "U" * 5000},
+        {"role": "tool", "tool_call_id": "x", "content": "T" * 5000},
+    ]
+    h._compact_history(msgs)
+    assert len(msgs[0]["content"]) == 5000, "systemは不変"
+    assert len(msgs[1]["content"]) == 5000, "userは不変"
+    assert msgs[2]["content"].startswith("[omitted"), "toolのみ畳む"
