@@ -211,6 +211,34 @@ def test_cli_max_tokens_rejects_non_positive(tmp_path: Path, bad: str) -> None:
         _run_cli(tmp_path, lambda p, m: _ContentLLM(), "--max-tokens", bad)
 
 
+def test_ask_session_records_response_duration() -> None:
+    """G-2: AskSessionがask着手〜応答の所要時間を記録すること
+
+    計測6項目のうち「ask応答時間p95」だけが計装未実装で恒常的にnullだった
+    （collect_harness_metrics.py が ask_instrumentation="not_implemented" を
+    出力し続けていた）。計測できないまま判定書を書く構造をここで解消する。
+    """
+    from nexuscore.harness.ask import AskResult, AskSession
+    from nexuscore.harness.run_state import RunStateStore
+
+    s = AskSession(store=RunStateStore(), reader=lambda prompt: "y")
+    assert s.durations == []
+    assert s.prompt(tool="write_file", args={}) is AskResult.APPROVED
+    assert s.prompt(tool="write_file", args={}) is AskResult.APPROVED
+    assert len(s.durations) == 2
+    assert all(d >= 0.0 for d in s.durations)
+
+
+def test_ask_durations_surface_in_run_output(tmp_path: Path) -> None:
+    """G-2: ask所要時間がrun戻り値（=CLIのJSON出力）まで到達すること
+
+    計装してもJSONに出なければ collect_harness_metrics が拾えず計測は成立しない。
+    """
+    code, out, _raw = _run_cli(tmp_path, lambda p, m: _ContentLLM("done"))
+    assert "ask_durations" in out
+    assert out["ask_durations"] == []  # --ask無し=ask_session None → 空配列
+
+
 def test_operational_max_tokens_matches_wrapper() -> None:
     """二重管理防止: CLI側の運用上限とラッパーのHARD_TOKEN_LIMITが同値であること"""
     import sys

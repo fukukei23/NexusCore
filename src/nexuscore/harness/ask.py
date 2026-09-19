@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import select
 import sys
+import time
 from collections.abc import Callable
 from enum import StrEnum
 
@@ -61,6 +62,10 @@ class AskSession:
                  reader: Callable[[str], str | None] | None = None) -> None:
         self.store = store  # ask履歴べき等記録用（Task 19以降で結線）
         self.timeout = timeout_seconds
+        # G-2 ask応答時間の計装（2026-09-19）: 計測6項目のうちこの1項目だけが
+        # 恒常的にnull（ask_instrumentation="not_implemented"）で、計測できない
+        # まま判定書を書く構造になっていた。prompt()1回ごとの所要秒を貯める
+        self.durations: list[float] = []
         # MLR採用（Gemini#1 critical）: 既定readerはtimeoutを束縛した1引数関数
         # （_readline_with_timeoutを直接渡すとprompt()の1引数呼出でTypeError）
         self._reader = reader or (
@@ -68,7 +73,12 @@ class AskSession:
 
     def prompt(self, *, tool: str, args: dict) -> AskResult:
         msg = f"[ASK] tool={tool} args={args} → approve? (y/N, timeout {self.timeout}s): "
-        ans = self._reader(msg)
+        started = time.monotonic()
+        try:
+            ans = self._reader(msg)
+        finally:
+            # 例外時も記録する（timeout/中断の所要も計測対象・finallyで漏らさない）
+            self.durations.append(time.monotonic() - started)
         if ans is None:
             return AskResult.DENIED_TIMEOUT
         return AskResult.APPROVED if ans.strip().lower() == "y" else AskResult.DENIED_USER

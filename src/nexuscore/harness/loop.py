@@ -277,6 +277,10 @@ class AgentHarness:
             "loop_steps": step,
             "tokens_used": tokens,
             "abort_reason": reason,
+            # G-2（2026-09-19）: ask応答時間を戻り値まで通す。計装しても出力に
+            # 出なければ collect_harness_metrics が拾えず計測が成立しないため
+            "ask_durations": (list(self.ask_session.durations)
+                              if self.ask_session is not None else []),
         }
         out.update(self.breaker.export_state())
         return out

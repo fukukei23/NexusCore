@@ -3,7 +3,9 @@
 計測6項目とデータ源:
 - 429頻度           : 直接ログなし→breaker OPEN回数で代理観測（429→breaker OPENの設計）
 - ブレーカ遷移      : run_state*.json の breaker_state / breaker_opened_at
-- ask応答時間 p95   : 計装未実装→null（強化層候補として記録）
+- ask応答時間 p95   : CLI出力JSONの ask_durations から算出（G-2・2026-09-19計装）。
+                      サンプル0件は null + ask_instrumentation="no_samples"
+                      （「計装が無い」と「計測したがサンプル不足」を区別する）
 - checkpoint失敗率  : artifacts/checkpoints/*/YYYY-MM-DD/log.json の abort_reason
 - abort分布         : run_state*.json の abort_reason カウント
 - トークン量/タスク : run_state*.json の tokens_used
@@ -17,6 +19,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import math
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -38,6 +41,19 @@ def _extract_last_json(text: str) -> dict[str, Any] | None:
         if isinstance(obj, dict):
             return obj
     return None
+
+
+def _p95(values: list[float]) -> float | None:
+    """p95（最近傍順位法）。サンプル0件はNone（0.0と区別する）
+
+    サンプルが少ない間は最大値に一致する。判定書が「計測した上でサンプル不足」
+    と「計装が無い」を区別できるよう、件数は ask_samples で併記する。
+    """
+    if not values:
+        return None
+    ordered = sorted(values)
+    idx = math.ceil(0.95 * len(ordered)) - 1
+    return ordered[max(0, idx)]
 
 
 def collect_metrics(root: Path) -> dict[str, Any]:
@@ -63,12 +79,19 @@ def collect_metrics(root: Path) -> dict[str, Any]:
             tokens.append(r["tokens_used"])
 
     checkpoints: list[dict[str, Any]] = []
+    ask_durations: list[float] = []
     for p in sorted((root / "artifacts/checkpoints").glob("*/2026-*/log.json")):
         obj = _extract_last_json(p.read_text(errors="replace"))
         if obj is None:
             checkpoints.append({"phase": p.parts[-3], "abort_reason": "unparseable"})
             continue
         checkpoints.append({"phase": p.parts[-3], "abort_reason": obj.get("abort_reason")})
+        # G-2（2026-09-19）: ask応答時間はCLI出力JSONに載る（run_stateには
+        # 持たせない＝schema_version据え置きで既存stateのquarantineを避ける）。
+        # bool は int のサブクラスなので明示除外する
+        for d in obj.get("ask_durations") or []:
+            if isinstance(d, (int, float)) and not isinstance(d, bool):
+                ask_durations.append(float(d))
     cp_failed = sum(1 for c in checkpoints if c["abort_reason"] not in (None,))
     cp_total = len(checkpoints)
 
@@ -79,8 +102,10 @@ def collect_metrics(root: Path) -> dict[str, Any]:
         "metrics": {
             "rate_limit_429_proxy_breaker_opens": breaker_opens,
             "breaker_transitions": breaker_opens,
-            "ask_response_time_p95_sec": None,
-            "ask_instrumentation": "not_implemented",
+            "ask_response_time_p95_sec": _p95(ask_durations),
+            "ask_samples": len(ask_durations),
+            "ask_instrumentation": ("instrumented" if ask_durations
+                                    else "no_samples"),
             "checkpoint_failure_rate": {
                 "failed": cp_failed, "total": cp_total,
                 "rate": round(cp_failed / cp_total, 3) if cp_total else None,

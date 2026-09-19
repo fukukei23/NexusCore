@@ -89,3 +89,45 @@ def test_collect_unparseable_checkpoint_counts_as_failure(tmp_path: Path) -> Non
     m = collect_metrics(tmp_path)["metrics"]
     assert m["checkpoint_failure_rate"]["failed"] == 1
     assert m["checkpoint_failure_rate"]["total"] == 1
+
+
+def _write_checkpoint(root: Path, phase: str, payload: dict) -> None:
+    cp = root / f"artifacts/checkpoints/{phase}/2026-09-19"
+    cp.mkdir(parents=True, exist_ok=True)
+    (cp / "log.json").write_text(json.dumps(payload, ensure_ascii=False))
+
+
+def test_ask_p95_computed_from_checkpoint_logs(tmp_path: Path) -> None:
+    """G-2: ask_durations から p95 を実際に算出すること
+
+    計装前は ask_response_time_p95_sec が常にNone・
+    ask_instrumentation="not_implemented" 固定で、計測6項目のうち1項目が
+    恒常的に欠落していた（2026-09-09判定書がその状態で書かれた）。
+    """
+    _write_checkpoint(tmp_path, "phase3", {
+        "abort_reason": None,
+        "ask_durations": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 100.0],
+    })
+    m = collect_metrics(tmp_path)["metrics"]
+    assert m["ask_instrumentation"] == "instrumented"
+    assert m["ask_response_time_p95_sec"] == 100.0  # 10件のp95=最大値側
+    assert m["ask_samples"] == 10
+
+
+def test_ask_p95_none_when_no_samples(tmp_path: Path) -> None:
+    """異常系: ask_durations が1件も無い場合はNone（0.0と区別する）"""
+    _write_checkpoint(tmp_path, "phase1", {"abort_reason": None, "ask_durations": []})
+    m = collect_metrics(tmp_path)["metrics"]
+    assert m["ask_response_time_p95_sec"] is None
+    assert m["ask_instrumentation"] == "no_samples"
+    assert m["ask_samples"] == 0
+
+
+def test_ask_p95_ignores_non_numeric(tmp_path: Path) -> None:
+    """境界: 不正な型が混ざっても落ちず、数値のみで算出する"""
+    _write_checkpoint(tmp_path, "phase2", {
+        "abort_reason": None, "ask_durations": [1.5, "bad", None, 2.5],
+    })
+    m = collect_metrics(tmp_path)["metrics"]
+    assert m["ask_samples"] == 2
+    assert m["ask_response_time_p95_sec"] == 2.5

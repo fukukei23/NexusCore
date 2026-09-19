@@ -422,7 +422,10 @@ def test_main_manual_mode_picks_from_manual_section(tmp_path: Path, monkeypatch)
     hdir.mkdir(parents=True)
     hist = hdir / "metrics_history.jsonl"
 
-    def fake_run(repo, task, state_path, timeout):
+    captured_ask: dict = {}
+
+    def fake_run(repo, task, state_path, timeout, ask=False):
+        captured_ask["ask"] = ask
         return 0, '{"abort_reason": null, "tokens_used": 10, "loop_steps": 1}', ""
 
     monkeypatch.setattr(w, "run_harness", fake_run)
@@ -435,6 +438,9 @@ def test_main_manual_mode_picks_from_manual_section(tmp_path: Path, monkeypatch)
     rec = _json.loads(hist.read_text().splitlines()[-1])
     assert rec["mode"] == "manual"
     assert rec["interactive"] is True and rec["ask_used"] is True
+    # G-3（2026-09-19）: ask_used=True と記録しながら実際には --ask を渡して
+    # いなかった（記録が実態と食い違っていた）。記録と実行を一致させる
+    assert captured_ask["ask"] is True
 
 
 def test_main_pool_low_and_budget_warnings(tmp_path: Path, capsys) -> None:
@@ -613,6 +619,63 @@ def test_run_harness_passes_hard_token_limit_to_cli(tmp_path: Path, monkeypatch)
     cmd = captured["cmd"]
     assert "--max-tokens" in cmd
     assert cmd[cmd.index("--max-tokens") + 1] == str(m.HARD_TOKEN_LIMIT)
+
+
+def test_run_harness_auto_mode_never_passes_ask(tmp_path: Path, monkeypatch) -> None:
+    """fail条件ケース（安全性）: 無人モードでは絶対に --ask を渡さないこと
+
+    ここが破れると無人cronが自動承認で書く系道具を実行できてしまう
+    （fail-closed設計の根幹が崩れる）。ask混入の最も危険な経路。
+    """
+    import subprocess
+
+    from scripts import run_harness_task as m
+
+    captured: dict = {}
+
+    def _fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        return subprocess.CompletedProcess(cmd, 0, "{}", "")
+
+    monkeypatch.setattr(m.subprocess, "run", _fake_run)
+    m.run_harness(tmp_path, "task", tmp_path / "state.json", 900)
+    assert "--ask" not in captured["cmd"]
+    assert "script" not in captured["cmd"]
+
+
+def test_run_harness_ask_mode_uses_pty_and_feeder(tmp_path: Path, monkeypatch) -> None:
+    """G-3: ask実行は script疑似TTY + 継続yフィーダで組み立てること
+
+    実測（Task 24）: パイプ一括投下（printf 'y\\ny\\ny\\n'）はask初期消費で全滅し
+    aborted: limits になった。10秒間隔の継続フィーダで全承認成功（run2/3）。
+    この再現不能だった手順をコード化する。
+    """
+    import subprocess
+
+    from scripts import run_harness_task as m
+
+    captured: dict = {}
+
+    def _fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        return subprocess.CompletedProcess(cmd, 0, "{}", "")
+
+    monkeypatch.setattr(m.subprocess, "run", _fake_run)
+    m.run_harness(tmp_path, "task", tmp_path / "state.json", 900, ask=True)
+
+    cmd = captured["cmd"]
+    assert cmd[0] == "bash" and cmd[1] == "-c"
+    script_line = cmd[2]
+    assert "--ask" in script_line
+    assert "script -q" in script_line          # 疑似TTY（非TTYだとaskは即deny）
+    assert f"sleep {m.ASK_FEED_INTERVAL_SEC}" in script_line  # 継続フィーダ
+    assert "while" in script_line              # 一括投下でなく継続送出
+
+
+def test_script_command_available() -> None:
+    """前提確認: 疑似TTYに使う script(1) が実在すること（無音失敗の防止）"""
+    import shutil
+    assert shutil.which("script"), "util-linux の script(1) が必要（G-3のask実行手順）"
 
 
 def test_notify_failure_sends_user_agent(tmp_path: Path, monkeypatch) -> None:

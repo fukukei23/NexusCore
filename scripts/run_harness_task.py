@@ -30,6 +30,7 @@ import json
 import os
 import random
 import re
+import shlex
 import subprocess
 import sys
 import unicodedata
@@ -42,6 +43,7 @@ REPO = Path(__file__).resolve().parent.parent
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
+ASK_FEED_INTERVAL_SEC = 10   # G-3: ask承認yの送出間隔（一括投下はrun1で全滅した）
 SOFT_TOKEN_LIMIT = 100_000   # P11 ソフト上限（警告）
 HARD_TOKEN_LIMIT = 200_000   # P11 ハード上限（事後検知・無効扱い）
 SOFT_TIME_SEC = 600          # P12 ソフト10分（警告）
@@ -148,8 +150,19 @@ def monthly_tokens(history: list[dict]) -> int:
     return total
 
 
-def run_harness(repo: Path, task: str, state_path: Path, timeout: int) -> tuple[int, str, str]:
-    """harness_cli実行（無人=読む系のみ・--ask無し fail-closed）"""
+def run_harness(repo: Path, task: str, state_path: Path, timeout: int,
+                ask: bool = False) -> tuple[int, str, str]:
+    """harness_cli実行
+
+    ask=False（無人・既定）: --ask を渡さない＝書く系はfail-closedで拒否される。
+    ask=True（手動・--manual）: G-3のask実行標準手順で起動する。
+
+    G-3（2026-09-19実装・判定書Go項目）: askは非TTYだと即denyに倒れる設計のため
+    疑似TTY（script -q）が要る。さらにTask 24実測では、パイプ一括投下
+    （printf 'y\\ny\\ny\\n'）はask開始前に全部消費されてrun1が aborted: limits
+    になった。10秒間隔の継続フィーダにしたrun2/3は全承認に成功している。
+    この再現不能だった手順をここに固定する。
+    """
     provider = os.environ.get("NEXUS_HARNESS_PROVIDER", "deepseek")
     model = os.environ.get("NEXUS_HARNESS_MODEL", "deepseek:deepseek-chat")
     cmd = [str(repo / ".venv/bin/python"), "-m", "nexuscore.cli.harness_cli",
@@ -158,7 +171,15 @@ def run_harness(repo: Path, task: str, state_path: Path, timeout: int) -> tuple[
            # 上限結線（2026-09-19）: ここを渡さないとloop既定500_000の90%=450,000まで
            # 走り、下段の hard_token_limit 判定は事後の「無効扱い」記録にしかならない
            "--max-tokens", str(HARD_TOKEN_LIMIT)]
-    proc = subprocess.run(cmd, cwd=repo, capture_output=True, text=True,
+    if ask:
+        inner = shlex.join([*cmd, "--ask"])
+        # フィーダはscriptの終了に追従して止まる（パイプのSIGPIPEで終了）
+        feeder = f"while true; do printf 'y\\n'; sleep {ASK_FEED_INTERVAL_SEC}; done"
+        line = f"{feeder} | script -q -c {shlex.quote(inner)} /dev/null"
+        run_cmd: list[str] = ["bash", "-c", line]
+    else:
+        run_cmd = cmd
+    proc = subprocess.run(run_cmd, cwd=repo, capture_output=True, text=True,
                           timeout=timeout)
     return proc.returncode, proc.stdout, proc.stderr
 
@@ -375,7 +396,10 @@ def main() -> int:
     state_path = repo / f"artifacts/harness/run_state_{ts}.json"
     t0 = datetime.now(UTC)
     try:
-        rc, out, err = run_harness(repo, topic["text"], state_path, HARD_TIME_SEC)
+        # askは手動モード（--manual・ふくけい付き添い）でのみ有効。無人runへ
+        # 渡るとfail-closedが崩れるため args.manual 以外の条件で真にしない
+        rc, out, err = run_harness(repo, topic["text"], state_path, HARD_TIME_SEC,
+                                   ask=args.manual)
     except subprocess.TimeoutExpired:
         rc, out, err = -9, "", f"timeout after {HARD_TIME_SEC}s"
         warnings.append(f"hard_time_limit: {HARD_TIME_SEC}s超過で強制終了")
