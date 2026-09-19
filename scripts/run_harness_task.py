@@ -53,7 +53,12 @@ POOL_LOW_WARN = 3            # P8 題庫残<3で警告
 CRON_EXIT_SKIP = 3           # cron-setup規定: 同日skip
 CRON_EXIT_SELFCHECK = 78     # v2: 起動時selfcheck NG
 
-_SECTIONS = {"無人用（読む系）": "auto", "手動用（書く系）": "manual"}
+# 見出しは修飾語付きで書かれる（実ファイル例: 「## 手動用（書く系・ask承認込み・
+# ふくけい付き添いで消化）」）ため、閉じ括弧を含めない前方部分でマッチさせる。
+# 2026-09-19実測バグ: 閉じ括弧込みの完全形で判定していたため手動用セクションが
+# 認識されず、書く系お題4件がautoへ混入。無人cron（読む系のみ・ask無し）が
+# 「実装する」お題を引き、完遂不能なまま45万トークンを溶かしていた
+_SECTIONS = {"無人用（読む系": "auto", "手動用（書く系": "manual"}
 _TOPIC_RE = re.compile(r"^- \[( |x)\] ([^:：]+)[:：](.+)$")
 
 
@@ -149,7 +154,10 @@ def run_harness(repo: Path, task: str, state_path: Path, timeout: int) -> tuple[
     model = os.environ.get("NEXUS_HARNESS_MODEL", "deepseek:deepseek-chat")
     cmd = [str(repo / ".venv/bin/python"), "-m", "nexuscore.cli.harness_cli",
            task, "--provider", provider, "--model", model,
-           "--state-path", str(state_path)]
+           "--state-path", str(state_path),
+           # 上限結線（2026-09-19）: ここを渡さないとloop既定500_000の90%=450,000まで
+           # 走り、下段の hard_token_limit 判定は事後の「無効扱い」記録にしかならない
+           "--max-tokens", str(HARD_TOKEN_LIMIT)]
     proc = subprocess.run(cmd, cwd=repo, capture_output=True, text=True,
                           timeout=timeout)
     return proc.returncode, proc.stdout, proc.stderr
@@ -262,7 +270,12 @@ def notify_failure(repo: Path, message: str) -> None:
     try:
         req = urllib.request.Request(
             url, data=json.dumps({"content": f"[harness cron] {message}"}).encode(),
-            headers={"Content-Type": "application/json"})
+            # User-Agent必須（2026-09-19実測）: urllib既定の Python-urllib/3.x は
+            # Discord/Cloudflareに403で弾かれる（既定UA=403 / 明示UA=200・
+            # ドメイン新旧は無関係）。これが無いと通知が全滅し無人運用の
+            # 異常検知手段がゼロになる（2026-09-11〜18に7日連続で発生）
+            headers={"Content-Type": "application/json",
+                     "User-Agent": "NexusCore-harness/1.0 (+cron notifier)"})
         urllib.request.urlopen(req, timeout=10)
     except Exception as exc:  # noqa: BLE001 best-effort・通知失敗も退避
         with open(repo / "artifacts/harness/.notify.fail", "a") as f:

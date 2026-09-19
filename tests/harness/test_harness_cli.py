@@ -160,3 +160,41 @@ def test_cli_injects_working_directory_context(tmp_path: Path) -> None:
     import os
     assert "作業ディレクトリ" in captured["messages"][0]["content"]
     assert os.getcwd() in captured["messages"][0]["content"]
+
+
+class _TokenLLM:
+    """usage で固定トークンを報告する content 応答スタブ（上限結線の実効検証用）"""
+
+    def __init__(self, tokens: int) -> None:
+        self.tokens = tokens
+
+    def complete_with_tools(self, messages, tools, **kwargs) -> dict:
+        return {"content": "done", "tool_calls": [],
+                "usage": {"total_tokens": self.tokens}}
+
+
+def test_cli_max_tokens_option_aborts_run(tmp_path: Path) -> None:
+    """fail条件ケース: --max-tokens が loop の Limits へ実際に届くこと
+
+    10,000トークン消費する応答に対し --max-tokens 5000 を渡すと
+    abort閾値(5000*0.9=4500)を超えて limits abort する。
+    結線が欠けていれば既定500_000が使われ abort しない＝本テストがFAILする
+    （2026-09-11〜18 のcron実測9run中8件が計測無効になった構造欠陥の回帰防止）。
+    """
+    code, out, _raw = _run_cli(tmp_path, lambda p, m: _TokenLLM(10_000),
+                               "--max-tokens", "5000")
+    assert (code, out["abort_reason"]) == (1, "limits")
+
+
+def test_cli_max_tokens_default_does_not_abort(tmp_path: Path) -> None:
+    """対照（正常系）: 同じ10,000トークン応答も既定上限(500_000)では完遂する"""
+    code, out, _raw = _run_cli(tmp_path, lambda p, m: _TokenLLM(10_000))
+    assert (code, out["abort_reason"]) == (0, None)
+
+
+def test_cli_max_tokens_default_matches_limits_dataclass() -> None:
+    """境界: --max-tokens 未指定時の既定は Limits.max_tokens と一致（二重管理防止）"""
+    from nexuscore.harness.loop import Limits
+
+    parser_default = harness_cli.build_arg_parser().get_default("max_tokens")
+    assert parser_default == Limits().max_tokens

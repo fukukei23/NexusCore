@@ -589,3 +589,119 @@ def test_load_history_scale_smoke(tmp_path: Path) -> None:
     elapsed = time.monotonic() - t0
     assert len(h) == 5000 and r == "ok"
     assert elapsed < 2.0
+
+
+def test_run_harness_passes_hard_token_limit_to_cli(tmp_path: Path, monkeypatch) -> None:
+    """fail条件ケース: ラッパーの HARD_TOKEN_LIMIT をCLIへ実際に渡すこと
+
+    これが欠けると loop既定(500_000)の90%=450,000まで走り、ラッパーは事後に
+    「hard_token_limit超過＝無効扱い」と記録するだけになる（2026-09-11〜18の
+    cron実測9run中8件が計測無効になった構造欠陥の回帰防止）。
+    """
+    import subprocess
+
+    from scripts import run_harness_task as m
+
+    captured: dict = {}
+
+    def _fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        return subprocess.CompletedProcess(cmd, 0, "{}", "")
+
+    monkeypatch.setattr(m.subprocess, "run", _fake_run)
+    m.run_harness(tmp_path, "task", tmp_path / "state.json", 900)
+    cmd = captured["cmd"]
+    assert "--max-tokens" in cmd
+    assert cmd[cmd.index("--max-tokens") + 1] == str(m.HARD_TOKEN_LIMIT)
+
+
+def test_notify_failure_sends_user_agent(tmp_path: Path, monkeypatch) -> None:
+    """fail条件ケース: 通知リクエストにUser-Agentを付けること
+
+    urllibの既定UA(Python-urllib/3.x)はDiscord/Cloudflareに403で弾かれる
+    （2026-09-19実測: 既定UA=403 / 明示UA=200・ドメイン差は無関係）。
+    UAが無いと2026-09-11〜18のように7日連続で通知が届かず、無人運用の
+    異常検知手段がゼロになる。
+    """
+    from scripts import run_harness_task as m
+
+    captured: dict = {}
+
+    def _fake_urlopen(req, timeout=None):
+        captured["req"] = req
+        class _R:
+            status = 204
+        return _R()
+
+    monkeypatch.setenv("DISCORD_CLAUDE_WEBHOOK", "https://discord.com/api/webhooks/x/y")
+    monkeypatch.setattr(m.urllib.request, "urlopen", _fake_urlopen)
+    (tmp_path / "artifacts/harness").mkdir(parents=True)
+    m.notify_failure(tmp_path, "test message")
+
+    ua = captured["req"].get_header("User-agent")
+    assert ua and "Python-urllib" not in ua
+    assert not (tmp_path / "artifacts/harness/.notify.fail").exists()
+
+
+POOL_REAL_HEADINGS = """# harness 題庫
+
+## 無人用（読む系）
+- [ ] コード読解: 読む系のお題です
+- [ ] エラー診断: 読む系のお題その2です
+
+## 手動用（書く系・ask承認込み・ふくけい付き添いで消化）
+- [ ] テスト作成: 書く系のお題です
+- [ ] docs修正: 書く系のお題その2です
+"""
+
+
+def test_parse_pool_matches_real_heading_with_modifiers(tmp_path: Path) -> None:
+    """fail条件ケース: 見出しに修飾語が付いても手動用セクションを分離できること
+
+    2026-09-19実測バグ: 実ファイルの見出しは
+    「## 手動用（書く系・ask承認込み・ふくけい付き添いで消化）」だが
+    判定が「手動用（書く系）」完全形の包含だったためマッチせず、書く系お題4件が
+    全てautoへ混入。無人cron（読む系のみ・ask無し）が「実装する」お題を引き、
+    原理的に完遂不能なまま45万トークンを溶かしていた（09-11/09-12/09-18）。
+    テスト側fixtureが短縮見出しを使っていたため検知できなかった。
+    """
+    p = _pool(tmp_path, POOL_REAL_HEADINGS)
+    parsed = parse_pool(p)
+    assert len(parsed["auto"]) == 2
+    assert len(parsed["manual"]) == 2
+    assert all("書く系" in t["text"] for t in parsed["manual"])
+    assert all("読む系" in t["text"] for t in parsed["auto"])
+
+
+def test_parse_pool_real_file_has_no_write_topics_in_auto() -> None:
+    """fixture乖離の再発防止: 実題庫ファイルそのもので混入がないことを確認
+
+    テスト用POOLだけを見ていると実ファイルの見出し変更に気づけない
+    （上記バグの根本原因）。実ファイルを直接パースして分離を担保する。
+    """
+    real = Path(__file__).resolve().parents[2] / "docs/harness_題庫.md"
+    if not real.exists():  # リポジトリ構成変更時に無用な赤を出さない
+        import pytest as _pytest
+        _pytest.skip("題庫ファイル不在")
+    parsed = parse_pool(real)
+    write_categories = {"テスト作成", "docs修正"}
+    leaked = [t for t in parsed["auto"] if t["category"] in write_categories]
+    assert leaked == [], f"書く系お題がautoへ混入: {[t['text'][:40] for t in leaked]}"
+    assert parsed["manual"], "手動用セクションが1件も認識されていない"
+
+
+def test_notify_failure_records_error_on_http_failure(tmp_path: Path,
+                                                      monkeypatch) -> None:
+    """異常系: 送信失敗時は.notify.failへ退避する（best-effort契約の維持）"""
+    from scripts import run_harness_task as m
+
+    def _boom(req, timeout=None):
+        raise OSError("HTTP Error 403: Forbidden")
+
+    monkeypatch.setenv("DISCORD_CLAUDE_WEBHOOK", "https://discord.com/api/webhooks/x/y")
+    monkeypatch.setattr(m.urllib.request, "urlopen", _boom)
+    (tmp_path / "artifacts/harness").mkdir(parents=True)
+    m.notify_failure(tmp_path, "test message")
+
+    body = (tmp_path / "artifacts/harness/.notify.fail").read_text()
+    assert "notify_error" in body and "403" in body

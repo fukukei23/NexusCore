@@ -30,7 +30,7 @@ from typing import Any
 
 from nexuscore.harness.ask import AskSession
 from nexuscore.harness.circuit_breaker import CircuitBreaker
-from nexuscore.harness.loop import AgentHarness
+from nexuscore.harness.loop import AgentHarness, Limits
 from nexuscore.harness.mock_provider import LocalToolCallDummyLLM
 from nexuscore.harness.run_state import RunStateStore
 from nexuscore.harness.tool_gate import ToolGate
@@ -73,9 +73,8 @@ def build_registry(ask: bool) -> dict[str, Any]:
     return reg
 
 
-def main(argv: list[str] | None = None,
-         llm_factory: Callable[[str, str | None], Any] | None = None) -> int:
-    """CLI入口。JSON 1行を出力し abort_reason なし=0 / あり=1 を返す"""
+def build_arg_parser() -> argparse.ArgumentParser:
+    """CLI引数定義（既定値の突合をテストから行えるよう main から抽出）"""
     p = argparse.ArgumentParser(prog="nexuscore-harness")
     p.add_argument("task", nargs="+")
     p.add_argument("--provider", default="openai", choices=TOOL_CAPABLE,
@@ -85,7 +84,18 @@ def main(argv: list[str] | None = None,
     p.add_argument("--state-path", default=None)
     p.add_argument("--ask", action="store_true",
                    help="書く系道具の対話確認を有効化（TTY必須・非TTYはdenyに倒る）")
-    args = p.parse_args(argv)
+    # 上限結線（2026-09-19）: 呼出側（scripts/run_harness_task.py等）が決めた
+    # トークン上限をloopのLimitsへ実際に届ける。既定は Limits.max_tokens と同値
+    # （二重管理防止・test_cli_max_tokens_default_matches_limits_dataclass が固定）
+    p.add_argument("--max-tokens", type=int, default=Limits().max_tokens,
+                   help="loopのトークン上限（90%%到達でabort・既定=Limits既定値）")
+    return p
+
+
+def main(argv: list[str] | None = None,
+         llm_factory: Callable[[str, str | None], Any] | None = None) -> int:
+    """CLI入口。JSON 1行を出力し abort_reason なし=0 / あり=1 を返す"""
+    args = build_arg_parser().parse_args(argv)
     try:
         llm = (llm_factory or build_llm)(args.provider, args.model)
         gate = ToolGate(policy_path=Path(args.policy))
@@ -95,7 +105,8 @@ def main(argv: list[str] | None = None,
         ask_session = (AskSession(store=store) if args.ask else None)
         br = CircuitBreaker(provider=args.provider)
         h = AgentHarness(llm=llm, gate=gate, tool_registry=reg,
-                         state_store=store, breaker=br, ask_session=ask_session)
+                         state_store=store, breaker=br, ask_session=ask_session,
+                         limits=Limits(max_tokens=args.max_tokens))
         ctx = (f"作業ディレクトリ: {os.getcwd()}\n"
                "相対パスはこのディレクトリ基準です。/workspace などは存在しません。\n"
                "cdで移動せず、引数に絶対パスを渡してください。")
