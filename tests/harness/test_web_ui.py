@@ -67,3 +67,35 @@ def test_router_included_in_app() -> None:
     resp = client.get("/harness/")
     assert resp.status_code == 200
     assert "<form" in resp.text
+
+
+def test_webui_applies_operational_limits_and_context(monkeypatch) -> None:
+    """fail条件ケース: Web UI経路もCLIと同じ上限・cwd注入を適用すること
+
+    2026-09-19 self-inspectで発見: 上限結線（--max-tokens）とG-1コンテキスト
+    注入はCLI側にしか実装されておらず、Web UI経由はLimits既定500_000の
+    90%=450,000まで走り、cwd注入も無かった（経路差＝同じ穴が残る）。
+    """
+    from nexuscore.api import harness_routes
+    from nexuscore.cli.harness_cli import OPERATIONAL_MAX_TOKENS
+
+    captured: dict = {}
+
+    class _SpyHarness:
+        def __init__(self, **kwargs):
+            captured["limits"] = kwargs.get("limits")
+
+        def run(self, task, messages=None, *, system_prompt=None):
+            captured["system_prompt"] = system_prompt
+            return {"content": "ok", "abort_reason": None}
+
+    monkeypatch.setattr(harness_routes, "AgentHarness", _SpyHarness)
+    app = FastAPI()
+    app.include_router(harness_router)
+    client = TestClient(app)
+    resp = client.post("/harness/run", data={"task": "hello", "provider": "mock"})
+
+    assert resp.status_code == 200
+    assert captured["limits"] is not None
+    assert captured["limits"].max_tokens == OPERATIONAL_MAX_TOKENS
+    assert captured["system_prompt"] and "作業ディレクトリ" in captured["system_prompt"]

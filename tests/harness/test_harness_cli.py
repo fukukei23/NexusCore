@@ -198,3 +198,24 @@ def test_cli_max_tokens_default_matches_limits_dataclass() -> None:
 
     parser_default = harness_cli.build_arg_parser().get_default("max_tokens")
     assert parser_default == Limits().max_tokens
+
+
+@pytest.mark.parametrize("bad", ["0", "-5"])
+def test_cli_max_tokens_rejects_non_positive(tmp_path: Path, bad: str) -> None:
+    """境界: --max-tokens に0以下を渡すと入口で弾く
+
+    0や負値はloopが初回応答で即abortし全runが即死する（self-inspect境界検証で
+    実測: --max-tokens 0 → loop_steps=0 / abort_reason=limits）。
+    """
+    with pytest.raises(SystemExit):
+        _run_cli(tmp_path, lambda p, m: _ContentLLM(), "--max-tokens", bad)
+
+
+def test_operational_max_tokens_matches_wrapper() -> None:
+    """二重管理防止: CLI側の運用上限とラッパーのHARD_TOKEN_LIMITが同値であること"""
+    import sys
+    from pathlib import Path as _Path
+    sys.path.insert(0, str(_Path(__file__).resolve().parents[2]))
+    from scripts.run_harness_task import HARD_TOKEN_LIMIT
+
+    assert harness_cli.OPERATIONAL_MAX_TOKENS == HARD_TOKEN_LIMIT

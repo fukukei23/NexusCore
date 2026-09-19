@@ -42,6 +42,12 @@ from nexuscore.harness.tools.write import edit_file, write_file
 # gpt-5.1は/v1/models一覧で実在確認・deepseek-chatはチェックポイント実行で実測）
 DEFAULT_MODELS: dict[str, str] = {"openai": "openai:gpt-5.1",
                                   "deepseek": "deepseek:deepseek-chat"}
+
+# 運用上のトークン上限（2026-09-19）: Limits既定の500_000は「誰も意図していない
+# 実質上限」として機能しており、cron実運用9runのうち8runが43〜49万トークンに
+# 達して計測無効になった。scripts/run_harness_task.py の HARD_TOKEN_LIMIT と
+# 同値であることを test_operational_max_tokens_matches_wrapper が固定する
+OPERATIONAL_MAX_TOKENS = 200_000
 TOOL_CAPABLE = ("openai", "anthropic", "google", "glm", "minimax",
                 "deepseek", "moonshot", "openrouter", "mock")
 
@@ -73,6 +79,30 @@ def build_registry(ask: bool) -> dict[str, Any]:
     return reg
 
 
+def build_context_prompt() -> str:
+    """G-1 実行コンテキスト初期注入の本文（CLI/Web UI共用）
+
+    Task 24実測: タスク文への絶対パス明記だけで426k/aborted→8.2kへ（52x差）。
+    CLI側だけに実装されていたためWeb UI経由では注入されていなかった（2026-09-19
+    self-inspectで発見）。共用関数にして経路差を作らない。
+    """
+    return (f"作業ディレクトリ: {os.getcwd()}\n"
+            "相対パスはこのディレクトリ基準です。/workspace などは存在しません。\n"
+            "cdで移動せず、引数に絶対パスを渡してください。")
+
+
+def _positive_int(value: str) -> int:
+    """argparse用: 1以上の整数のみ許可
+
+    0や負値を渡すとloopが初回応答で即abortする（tokens >= N*0.9 が常に真）。
+    設定ミスで全runが即死する事故を入口で弾く（2026-09-19 self-inspect境界検証）。
+    """
+    n = int(value)
+    if n < 1:
+        raise argparse.ArgumentTypeError(f"1以上の整数が必要です: {value}")
+    return n
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     """CLI引数定義（既定値の突合をテストから行えるよう main から抽出）"""
     p = argparse.ArgumentParser(prog="nexuscore-harness")
@@ -87,7 +117,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     # 上限結線（2026-09-19）: 呼出側（scripts/run_harness_task.py等）が決めた
     # トークン上限をloopのLimitsへ実際に届ける。既定は Limits.max_tokens と同値
     # （二重管理防止・test_cli_max_tokens_default_matches_limits_dataclass が固定）
-    p.add_argument("--max-tokens", type=int, default=Limits().max_tokens,
+    p.add_argument("--max-tokens", type=_positive_int, default=Limits().max_tokens,
                    help="loopのトークン上限（90%%到達でabort・既定=Limits既定値）")
     return p
 
@@ -107,10 +137,7 @@ def main(argv: list[str] | None = None,
         h = AgentHarness(llm=llm, gate=gate, tool_registry=reg,
                          state_store=store, breaker=br, ask_session=ask_session,
                          limits=Limits(max_tokens=args.max_tokens))
-        ctx = (f"作業ディレクトリ: {os.getcwd()}\n"
-               "相対パスはこのディレクトリ基準です。/workspace などは存在しません。\n"
-               "cdで移動せず、引数に絶対パスを渡してください。")
-        out = h.run(" ".join(args.task), system_prompt=ctx)
+        out = h.run(" ".join(args.task), system_prompt=build_context_prompt())
     except Exception as exc:  # noqa: BLE001 CLI観測可能性: JSONで異常を返す
         out = {"abort_reason": "cli_error", "error": str(exc)}
     reason = out.get("abort_reason")

@@ -19,9 +19,14 @@ from pathlib import Path
 from fastapi import APIRouter, Form
 from fastapi.responses import HTMLResponse
 
-from nexuscore.cli.harness_cli import build_llm, build_registry
+from nexuscore.cli.harness_cli import (
+    OPERATIONAL_MAX_TOKENS,
+    build_context_prompt,
+    build_llm,
+    build_registry,
+)
 from nexuscore.harness.circuit_breaker import CircuitBreaker
-from nexuscore.harness.loop import AgentHarness
+from nexuscore.harness.loop import AgentHarness, Limits
 from nexuscore.harness.run_state import RunStateStore
 from nexuscore.harness.tool_gate import ToolGate
 
@@ -58,9 +63,13 @@ def _run_harness(task: str, provider: str) -> str:
     store = RunStateStore(_WEBUI_STATE_PATH)
     reg = build_registry(ask=False)
     br = CircuitBreaker(provider=provider)
+    # 上限とG-1コンテキスト注入をCLIと揃える（2026-09-19 self-inspectで発見）:
+    # どちらもCLI側にしか実装されておらず、Web UI経由はLimits既定500_000の
+    # 90%=450,000まで走り、cwd注入も無い状態だった（経路差＝同じ穴が残る）
     h = AgentHarness(llm=llm, gate=gate, tool_registry=reg,
-                     state_store=store, breaker=br, ask_session=None)
-    out = h.run(task)
+                     state_store=store, breaker=br, ask_session=None,
+                     limits=Limits(max_tokens=OPERATIONAL_MAX_TOKENS))
+    out = h.run(task, system_prompt=build_context_prompt())
     return json.dumps(out, ensure_ascii=False, default=str)
 
 
