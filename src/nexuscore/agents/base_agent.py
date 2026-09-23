@@ -129,9 +129,18 @@ class BaseAgent:
                         try:
                             json.loads(result)
                         except json.JSONDecodeError as e:
-                            if HAS_RETRY:
-                                raise InvalidModelOutputError(f"Invalid JSON output: {e}") from None
-                            raise
+                            # LLMが「JSON本体+前置き/後続テキスト」「コードフェンス囲み」を返す
+                            # ケースを許容する（MiniMax plan_generate 実測・2026-09-24）。
+                            # 最長 {...}/[...] 抽出でパースできれば有効とみなし、生文字列を
+                            # 下流（各agentのsanitize_json_like経路）へそのまま渡す。
+                            from ..utils.json_sanitizer import sanitize_json_like
+
+                            if not isinstance(sanitize_json_like(result), (dict, list)):
+                                if HAS_RETRY:
+                                    raise InvalidModelOutputError(
+                                        f"Invalid JSON output: {e}"
+                                    ) from None
+                                raise
                     return result
                 except Exception as e:  # noqa: BLE001
                     # HTTP エラーを NexusCore 例外に変換

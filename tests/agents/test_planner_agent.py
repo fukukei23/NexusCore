@@ -48,6 +48,16 @@ def test_generate_plan_falls_back_when_router_not_real(monkeypatch):
     assert plan["functions_to_implement"][0]["name"].startswith("build_api")
 
 
+def test_generate_plan_recovers_json_with_trailing_text(monkeypatch):
+    """「JSON+後続テキスト」応答でもfallbackでなくLLMのプランを復元する（2026-09-24実測対策）."""
+    sample_plan = json.dumps({"functions_to_implement": [{"name": "task_one"}]})
+    agent = make_agent(monkeypatch, sample_plan + "\n以上がプランのJSONです。")
+
+    plan = agent.generate_plan("Add feature", context={"project_path": "/tmp"})
+    names = [entry["name"] for entry in plan["functions_to_implement"]]
+    assert "task_one" in names, f"LLMプランが復元されずfallbackに落ちた: {names}"
+
+
 def test_get_file_context_limits_output(tmp_path):
     agent = PlannerAgent()
     for idx in range(5):

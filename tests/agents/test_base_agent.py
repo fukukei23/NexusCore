@@ -86,3 +86,37 @@ def test_execute_llm_task_handles_llm_errors(monkeypatch, base_agent_cls):
     agent = SampleAgent()
     assert agent.execute_llm_task("fails") == ""
     assert agent.execute_llm_task("fails-json", as_json=True) == "{}"
+
+
+def test_execute_llm_task_accepts_json_with_trailing_text(monkeypatch, base_agent_cls):
+    """「JSON本体+後続テキスト」（Extra data）を事前検査で弾かない（2026-09-24実測対策）.
+
+    背景: plan_generate の MiniMax 応答が「JSON+余分な文章」だと、base_agent の厳格
+    json.loads 事前検査が InvalidModelOutputError を投げ3リトライ全滅→Planning phase
+    が中断し run 全体が 70-108秒で失敗した（easy tier n10検証 round2・実測2/3）。
+    下流の sanitize_json_like に到達する前に死なないよう、抽出可能なら許容する。
+    """
+    trailing_llm = DummyLLM(response='{"result": "structured"}\n以上がプランのJSONです。')
+    router = DummyRouter(trailing_llm)
+    monkeypatch.setattr(base_agent, "LLMRouter", lambda: router)
+
+    class SampleAgent(base_agent_cls):
+        pass
+
+    agent = SampleAgent()
+    result = agent.execute_llm_task("plan", as_json=True)
+    assert '"result"' in result, f"JSON+後続テキストが事前検査で落ちた: {result!r}"
+
+
+def test_execute_llm_task_accepts_json_in_code_fence(monkeypatch, base_agent_cls):
+    """コードフェンス囲みJSONも事前検査を通過すること（同型対策）."""
+    fenced_llm = DummyLLM(response='```json\n{"result": "structured"}\n```')
+    router = DummyRouter(fenced_llm)
+    monkeypatch.setattr(base_agent, "LLMRouter", lambda: router)
+
+    class SampleAgent(base_agent_cls):
+        pass
+
+    agent = SampleAgent()
+    result = agent.execute_llm_task("plan", as_json=True)
+    assert '"result"' in result, f"フェンス囲みJSONが事前検査で落ちた: {result!r}"

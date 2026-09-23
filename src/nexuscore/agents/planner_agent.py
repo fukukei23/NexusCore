@@ -116,6 +116,13 @@ class PlannerAgent(BaseAgent):
                 sanitized["functions_to_implement"] = existing  # type: ignore[call-overload]
             return sanitized  # type: ignore[return-value]
         except (json.JSONDecodeError, ValueError, TypeError, KeyError):
+            # 「JSON本体+前置き/後続テキスト」応答の復元（base_agent事前検査の後段防御・
+            # 2026-09-24 easy tier 実測対策）。sanitizeで dict が取れ計画検証を通れば
+            # fallback（ヒューリスティック計画）ではなく LLM の実プランを採用する。
+            recovered = sanitize_json_like(response_str)
+            if isinstance(recovered, dict) and self._is_plan_valid(recovered):
+                self.logger.warning("Plan JSON recovered from wrapped response via sanitizer.")
+                return recovered
             self.logger.error(
                 f"Failed to decode or validate JSON plan. Raw response: {response_str}",
                 exc_info=True,
