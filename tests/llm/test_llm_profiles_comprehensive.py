@@ -89,9 +89,21 @@ class TestProfileRegistry:
 
         assert profile.name == "glm_default"
         assert profile.provider == "glm"
-        assert profile.model == "glm-5.2"
+        # 2026-09-23: GLM内でモデルを使い分ける（軽量=Flash / 重要=無印）
+        assert profile.model == "glm-5.3-flash"
         assert profile.description is not None
         assert profile.default_temperature == 0.2
+
+    def test_registry_profile_structure_glm_strict(self):
+        """glm_strictの構造を検証（重要タスク用・軽量版と別モデルであること）"""
+        profile = PROFILE_REGISTRY["glm_strict"]
+
+        assert profile.name == "glm_strict"
+        assert profile.provider == "glm"
+        assert profile.model == "glm-5.3"
+        assert profile.default_temperature == 0.15
+        # 使い分けが成立していること（同一モデルに潰れていない）
+        assert profile.model != PROFILE_REGISTRY["glm_default"].model
 
     def test_registry_profile_structure_minimax_default(self):
         """minimax_defaultの構造を検証"""
@@ -212,7 +224,7 @@ class TestProfileToModelName:
         """glm_defaultを正しく変換"""
         model_name = profile_to_model_name("glm_default")
 
-        assert model_name == "glm:glm-5.2"
+        assert model_name == "glm:glm-5.3-flash"
 
     def test_profile_to_model_name_minimax_default(self):
         """minimax_defaultを正しく変換"""
@@ -258,7 +270,7 @@ class TestProfileToModelName:
         parts = model_name.split(":")
         assert len(parts) == 2
         assert parts[0] == "glm"  # provider
-        assert parts[1] == "glm-5.2"  # model
+        assert parts[1] == "glm-5.3"  # model（重要タスク用・2026-09-23）
 
 
 # ============================================================================

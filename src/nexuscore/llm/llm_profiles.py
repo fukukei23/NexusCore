@@ -57,18 +57,23 @@ PROFILE_REGISTRY: dict[str, LLMProfile] = {
         default_temperature=0.2,
     ),
     # --- GLM (Zhipu AI) profiles ---
+    # 2026-09-23: GLM 内でモデルを使い分ける（ふくけい方針）。
+    # 重要タスク=glm-5.3 / 軽量タスク=glm-5.3-flash。
+    # ⚠️ 環境変数 GLM_MODEL を設定すると providers/openai_compat.py:36 の
+    #    `os.getenv(f"{provider_name.upper()}_MODEL")` が**全GLMタスクを同一モデルへ潰す**ため、
+    #    この使い分けを効かせたい場合は GLM_MODEL を設定しないこと。
     "glm_default": LLMProfile(
         name="glm_default",
         provider="glm",
-        model="glm-5.2",
-        description="GLM-5.2 for lightweight general tasks",
+        model="glm-5.3-flash",
+        description="GLM-5.3 Flash for lightweight tasks (explain / test scaffold / classify)",
         default_temperature=0.2,
     ),
     "glm_strict": LLMProfile(
         name="glm_strict",
         provider="glm",
-        model="glm-5.2",
-        description="GLM-5.2 for lightweight high-accuracy tasks",
+        model="glm-5.3",
+        description="GLM-5.3 for high-stakes tasks (generate / refactor / debug / self-heal / design)",
         default_temperature=0.15,
     ),
     # --- MiniMax profiles ---

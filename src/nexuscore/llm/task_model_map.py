@@ -21,24 +21,27 @@ class TaskModelConfig:
 
 TASK_MODEL_CONFIGS: dict[str, TaskModelConfig] = {
     # ==================================================================
-    # 3LLM集約構成（2026-07-23 テスト用ローカル変更・バックアップあり）
-    #   生成 = GLM(glm_default/glm_strict)
-    #   レビュー = Gemini(gemini_secondary)
-    #   分析/分類 = MiniMax(minimax_default/minimax_analytical)
+    # 2LLM構成（2026-09-23 改訂・ふくけい方針「GLM と MiniMax しか使えない」）
+    #   生成 = GLM
+    #     - 重要タスク（書く・直す・設計・自己修復） = glm_strict  → glm-5.3
+    #     - 軽量タスク（説明・テスト雛形・分類）     = glm_default → glm-5.3-flash
+    #   レビュー/分析 = MiniMax(minimax_default/minimax_analytical)
     #   ※ 生成とレビューを別LLMに（自己チェックの偏り回避）
-    #   ※ OpenAI/Anthropicプロファイルは今回無効化（キー不活性のため）
+    #   ※ Gemini/OpenAI/Anthropic/DeepSeek は全経路から除外
+    #      （2026-09-23 実測: OpenAI は credit_balance_exhausted で HTTP 429。
+    #       Gemini/DeepSeek は技術的には応答するが契約方針の対象外）
     # ==================================================================
-    # --- 生成系: GLM（書く・直す・テスト生成・デバッグ・自己修復）---
-    # ※ secondary から gemini_secondary を意図的に除外（Gemini節約・2026-07-23）
-    #   将来 GLM_strict 品質問題時に Gemini 二次化が必要なら明示的に追加すること
+    # --- 生成系: GLM ---
+    # ※ secondary に他プロバイダを足す時は、契約中のもの（GLM/MiniMax）に限ること。
+    #   非常用フォールバックであっても方針外プロバイダへ黙って流れる経路を作らない。
     "code_generate": TaskModelConfig(
-        primary="glm_default",
+        primary="glm_strict",
         secondary=["minimax_default"],
         fallback="minimax_default",
         temperature=0.2,
     ),
     "code_refactor": TaskModelConfig(
-        primary="glm_default",
+        primary="glm_strict",
         secondary=["minimax_default"],
         fallback="minimax_default",
     ),
@@ -49,7 +52,7 @@ TASK_MODEL_CONFIGS: dict[str, TaskModelConfig] = {
     ),
     "test_generate": TaskModelConfig(
         primary="glm_default",
-        secondary=["minimax_default", "gemini_secondary"],
+        secondary=["minimax_default"],
         fallback="minimax_default",
     ),
     "debug": TaskModelConfig(
@@ -57,9 +60,11 @@ TASK_MODEL_CONFIGS: dict[str, TaskModelConfig] = {
         secondary=["glm_default", "minimax_default"],
         fallback="glm_default",
     ),
-    # --- レビュー系: Gemini（品質チェック・設計・要件・計画・ポリシー・ポストモーテム）---
+    # --- レビュー系: MiniMax（品質チェック・設計・要件・計画・ポリシー・ポストモーテム）---
+    # 2026-09-23: primary を gemini_secondary → minimax_analytical へ変更。
+    # 生成(GLM)とレビュー(MiniMax)を別LLMに保つ設計意図は維持している。
     "code_review": TaskModelConfig(
-        primary="gemini_secondary",
+        primary="minimax_analytical",
         secondary=["minimax_analytical", "glm_strict"],
         fallback="glm_strict",
     ),
@@ -74,12 +79,12 @@ TASK_MODEL_CONFIGS: dict[str, TaskModelConfig] = {
         fallback="glm_strict",
     ),
     "plan_generate": TaskModelConfig(
-        primary="gemini_secondary",
+        primary="minimax_analytical",
         secondary=["minimax_analytical", "glm_strict"],
         fallback="glm_strict",
     ),
     "requirement": TaskModelConfig(
-        primary="gemini_secondary",
+        primary="minimax_analytical",
         secondary=["minimax_analytical", "glm_strict"],
         fallback="glm_strict",
     ),

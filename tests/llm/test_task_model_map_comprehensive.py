@@ -138,20 +138,20 @@ class TestTaskModelConfigs:
             assert len(config.fallback) > 0
 
     def test_code_generate_config(self):
-        """code_generateタスクの設定を検証（3LLM集約+Gemini節約）"""
+        """code_generateタスクの設定を検証（2LLM構成・重要タスクなので glm_strict）"""
         config = TASK_MODEL_CONFIGS["code_generate"]
 
-        assert config.primary == "glm_default"
+        assert config.primary == "glm_strict"  # 2026-09-23: 重要タスク=GLM-5.3
         assert "minimax_default" in config.secondary
-        assert "gemini_secondary" not in config.secondary  # Gemini節約
+        assert "gemini_secondary" not in config.secondary
         assert config.fallback == "minimax_default"
         assert config.temperature == 0.2
 
     def test_code_review_config(self):
-        """code_reviewタスクの設定を検証（3LLM集約: Gemini維持）"""
+        """code_reviewタスクの設定を検証（2LLM構成: レビューは MiniMax）"""
         config = TASK_MODEL_CONFIGS["code_review"]
 
-        assert config.primary == "gemini_secondary"
+        assert config.primary == "minimax_analytical"  # 2026-09-23: Gemini から移行
         assert "minimax_analytical" in config.secondary
         assert config.fallback == "glm_strict"
 
