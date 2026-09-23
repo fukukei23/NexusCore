@@ -332,22 +332,24 @@ class TestErrorHandling:
 class TestBracketPriority:
     """Test handling when both { and [ are present"""
 
-    def test_sanitize_multiple_json_structures_returns_original(self):
-        """Returns original when multiple separate JSON structures present"""
-        # { comes first, but combined extraction creates invalid JSON
+    def test_sanitize_multiple_json_structures_returns_first_valid(self):
+        """複数の独立JSON構造が在る場合、有効な最初のブロックを採用する.
+
+        2026-09-24 契約変更（深修復）: 旧仕様「元文字列を返す」は「Extra data」型の
+        実障害（MiniMax plan_generate）を復元できなかったため、最初の有効ブロック
+        を採用する方式に変更した。
+        """
         input_str = '{"obj": "data"} and [1, 2, 3]'
         result = sanitize_json_like(input_str)
 
-        # Cannot parse two separate structures, returns original
-        assert result == input_str
+        assert result == {"obj": "data"}
 
-    def test_sanitize_array_and_object_returns_original(self):
-        """Returns original when array and object are separate"""
+    def test_sanitize_array_and_object_returns_first_valid(self):
+        """配列とオブジェクトが別在する場合も有効な最初のブロックを採用（同上の契約変更）."""
         input_str = '[1, 2, 3] and {"key": "value"}'
         result = sanitize_json_like(input_str)
 
-        # Cannot parse two separate structures, returns original
-        assert result == input_str
+        assert result == [1, 2, 3]
 
     def test_sanitize_nested_mixed_structures(self):
         """Handles nested mixed structures"""
