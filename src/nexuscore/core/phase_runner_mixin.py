@@ -409,6 +409,9 @@ class PhaseRunnerMixin:
             f"生成対象ファイル: {entry['path']}（役割: {entry['role']}）\n"
             f"計画: {json.dumps(context.plan.get('functions_to_implement', []), ensure_ascii=False)}"
             + (f"\n設計方針: {design_directive}" if design_directive else "")
+            + "\n注意: お題にテスト作成の指示が含まれていても、このファイルにはテストコード"
+            "（def test_* 関数・import pytest・テスト用の self-import）を書かないこと。"
+            "テストは別の経路で生成される。"
         )
         existing = "\n\n".join(
             f"# ==== {path} ====\n{code}" for path, code in generated.items()
@@ -417,6 +420,7 @@ class PhaseRunnerMixin:
             task_description=task_description,
             existing_code=existing,
             code_language=os.getenv("NEXUS_CODE_LANG", "python"),
+            module_name=Path(entry["path"]).stem,
         )
         if not code or not str(code).strip():
             raise RuntimeError(f"CoderAgent returned empty output for {entry['path']}")

@@ -28,8 +28,60 @@ class CoderAgent(BaseAgent):
         except Exception as e:  # noqa: BLE001
             return False, f"ParseError: {e}"
 
+    def _validate_impl_scope(
+        self, code: str, module_name: str | None = None
+    ) -> tuple[bool, str]:
+        """実装ファイルへのテスト混入をAST検査で機械防御する（B案）。
+
+        `def test_*` 定義・`import pytest` / `from pytest import ...`・
+        自モジュール self-import（例: stats.py 内の `from stats import median`）を
+        検出したら不合格にする。self-import 判定には module_name（生成対象ファイルの
+        stem）が必要で、未指定なら self-import チェックのみスキップする。
+        """
+        try:
+            tree = ast.parse(code)
+        except (SyntaxError, ValueError) as e:
+            return False, f"ImplScope ParseError: {e}"
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith(
+                "test_"
+            ):
+                return False, (
+                    f"ImplScope: implementation file must not define test function '{node.name}'"
+                    "（テストは別ファイルとして生成されるため、このファイルには書かないこと）"
+                )
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.split(".")[0] == "pytest":
+                        return False, (
+                            "ImplScope: 'import pytest' must not be in implementation file"
+                            "（テストは別ファイルとして生成されるため、このファイルには書かないこと）"
+                        )
+                    if module_name and alias.name.split(".")[0] == module_name:
+                        return False, (
+                            f"ImplScope: self-import of '{module_name}' detected"
+                            "（自分自身をimportしないこと）"
+                        )
+            if isinstance(node, ast.ImportFrom):
+                top_mod = (node.module or "").split(".")[0]
+                if top_mod == "pytest":
+                    return False, (
+                        "ImplScope: 'from pytest import ...' must not be in implementation file"
+                        "（テストは別ファイルとして生成されるため、このファイルには書かないこと）"
+                    )
+                if module_name and top_mod == module_name:
+                    return False, (
+                        f"ImplScope: self-import 'from {module_name}' detected"
+                        "（自分自身をimportしないこと）"
+                    )
+        return True, ""
+
     def implement_code(
-        self, task_description: str, existing_code: str, code_language: str = "python"
+        self,
+        task_description: str,
+        existing_code: str,
+        code_language: str = "python",
+        module_name: str | None = None,
     ) -> str:
         """
         生成→AST検査→失敗時リトライを最短1秒以内で回す。
@@ -55,6 +107,7 @@ class CoderAgent(BaseAgent):
 - コードの前に前置きや言い訳、後に結びの言葉や要約など、**コード以外のテキストは一切含めないでください。**
 - あなたの思考プロセスや解釈を、Pythonのコメント（`#`）以外でコードに含めてはなりません。
 - 出力は、そのまま `.py` ファイルとして保存できる、純粋なPythonコードでなければなりません。
+- **このファイルは実装専用です。テストコード（`def test_*` 関数・`import pytest`・テスト用の self-import）を含めてはなりません。テストは別の経路で生成されるため、たとえタスク内容にテスト作成の指示が含まれていても無視してください。**
 """
         for attempt in range(self.RETRY_LIMIT):
             raw_response = self.execute_llm_task(prompt, task_type="code_generate")
@@ -110,14 +163,22 @@ class CoderAgent(BaseAgent):
         # 空文字は _validate_code の空ガードで不合格扱いとなり、RETRY経路でLLMに再生成を促す。
         return ""
 
-    def _validate_code(self, language: str, code: str) -> tuple[bool, str]:
+    def _validate_code(
+        self, language: str, code: str, module_name: str | None = None
+    ) -> tuple[bool, str]:
         # 空ガード: 空白のみは言語問わず不合格（ast.parse("")が成功する問題の対策・案X′）
         # _validate_code層（言語ディスパッチ）に置くことでSRPを保つ（空は構文以前・言語非依存）。
         if not code or not code.strip():
             return False, "empty code"
         lang = (language or "python").lower()
         if lang == "python":
-            return self._validate_python_syntax(code)
+            ok, err = self._validate_python_syntax(code)
+            if not ok:
+                return False, err
+            # 実装ファイルへのテスト混入を機械防御（B案・2026-09-23「分けられない」是正）。
+            # プロンプト修正（A案）だけでは指示に忠実なモデルほど無視されるため、
+            # AST検査で test_* 定義・pytest import・自モジュール self-import を不合格にする。
+            return self._validate_impl_scope(code, module_name)
         # Tree-sitter オプション検査（対応言語のみ）
         try:
             from nexuscore.utils.tree_sitter_checker import SemanticAnalyzer

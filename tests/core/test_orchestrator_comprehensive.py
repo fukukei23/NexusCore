@@ -894,6 +894,42 @@ class TestGenerateOneFileWithArchitecture:
         call_kwargs = agents["coder_agent"].implement_code.call_args.kwargs
         assert "レイヤードアーキテクチャで実装せよ" in call_kwargs["task_description"]
 
+    def test_generate_one_file_instructs_no_test_code(self, tmp_path):
+        """task_description に「テストを書かない」指示を含める（A案・分けられない是正）。
+
+        背景: お題全文（要件）に test_stats.py 作成指示が含まれると、coder が
+        1ファイルに実装+テストを同居させ隠しテスト全滅（2026-09-23 実測）。
+        """
+        agents = TestOrchestratorInit._create_mock_agents()
+        agents["coder_agent"].implement_code.return_value = "print('ok')"
+        orchestrator = Orchestrator(
+            project_path=str(tmp_path), constitution={}, llm_router=Mock(spec=LLMRouter), **agents,
+        )
+        context = OrchestratorContext(task_id="t1", user_requirement="req")
+        context.plan = {"functions_to_implement": []}
+
+        orchestrator._generate_one_file(context, {"path": "stats.py", "role": "implementation"}, {})
+
+        task_description = agents["coder_agent"].implement_code.call_args.kwargs["task_description"]
+        assert "テスト" in task_description
+        assert "書かない" in task_description
+
+    def test_generate_one_file_passes_module_name(self, tmp_path):
+        """生成対象ファイルのstemを module_name として coder へ渡す（B案の self-import 検出用）。"""
+        agents = TestOrchestratorInit._create_mock_agents()
+        agents["coder_agent"].implement_code.return_value = "print('ok')"
+        orchestrator = Orchestrator(
+            project_path=str(tmp_path), constitution={}, llm_router=Mock(spec=LLMRouter), **agents,
+        )
+        context = OrchestratorContext(task_id="t1", user_requirement="req")
+        context.plan = {"functions_to_implement": []}
+
+        orchestrator._generate_one_file(context, {"path": "src/stats.py", "role": "implementation"}, {})
+
+        assert (
+            agents["coder_agent"].implement_code.call_args.kwargs["module_name"] == "stats"
+        )
+
 
 @pytest.mark.skipif(not HAS_ORCHESTRATOR, reason="orchestrator module not available")
 class TestTestingPhaseDebugLoop:
