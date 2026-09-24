@@ -8,6 +8,11 @@ from typing import Any
 _FENCE_RE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.DOTALL)
 
 
+def _reject_constant(name: str) -> float:
+    """json.loads の parse_constant 用: NaN/Infinity 等の非標準定数を拒否する（MLR mm#3対策）."""
+    raise ValueError(f"non-standard constant is not allowed: {name}")
+
+
 def _iter_json_blocks(s: str):
     """文字列リテラルを意識しつつ、釣り合う {...} / [...] ブロックを順に走査する.
 
@@ -27,6 +32,7 @@ def _iter_json_blocks(s: str):
         esc = False
         j = i
         closed = False
+        last_opener = -1
         while j < n:
             cur = s[j]
             if in_str:
@@ -40,6 +46,8 @@ def _iter_json_blocks(s: str):
                 in_str = True
             elif cur == open_ch:
                 depth += 1
+                if j > i:
+                    last_opener = j
             elif cur == close_ch:
                 depth -= 1
                 if depth == 0:
@@ -49,9 +57,13 @@ def _iter_json_blocks(s: str):
                     break
             j += 1
         if not closed:
-            # 未閉鎖（truncation）— この開始位置は諦め、後続の有効ブロックを探す
-            # （「壊れた1ブロック目+有効な2ブロック目」の復元・2026-09-24実測対策）
-            i += 1
+            # 未閉鎖（truncation）— 走査中に記録した最後の内側オープナーへ跳び、
+            # ネストした有効ブロックの復元を試みる（gem#1 MLR指摘のO(N²)回避・
+            # 病理入力「{が50000連続」で実測120秒超過→跳び先修正で即時終了を確認）。
+            # last_opener が無い（=自分自身が最後）場合は1文字進める。
+            # ※ last_opener は必ず > i（j > i 条件）のため進行保証・off-by-oneに注意
+            #   （last_opener+1 にするとオープナー自体をスキップする事故・実測で発見）
+            i = last_opener if last_opener != -1 else i + 1
             continue
 
 
@@ -63,7 +75,7 @@ def extract_json_payload(s: str) -> dict | list | str:
     """
     for block in _iter_json_blocks(s):
         try:
-            return json.loads(block, strict=False)
+            return json.loads(block, strict=False, parse_constant=_reject_constant)
         except (json.JSONDecodeError, ValueError):
             continue
     return s

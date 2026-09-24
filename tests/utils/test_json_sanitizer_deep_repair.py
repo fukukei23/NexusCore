@@ -73,3 +73,21 @@ def test_brace_inside_string_does_not_break_scanner():
     """文字列内のブレースで深さ計算が崩れない（Phase1欠落#7）."""
     text = 'x {"a": "}"} y'
     assert sanitize_json_like(text) == {"a": "}"}
+
+
+def test_non_standard_constant_nan_is_rejected():
+    """NaN/Infinity（非標準定数）はパース失敗扱いで元文字列を返す（MLR mm#3対策）."""
+    text = '{"a": NaN}'
+    assert sanitize_json_like(text) == text
+
+
+def test_unclosed_prefix_with_nested_valid_block_jumps_to_inner():
+    """未閉鎖ブロック後は最後の内側オープナーへ跳びネスト有効ブロックを復元（O(N²)回避・gem#1）."""
+    text = '{"a": {"b": 1, "c": 2\nそして本文が続き {"ok": true}'
+    assert sanitize_json_like(text) == {"ok": True}
+
+
+def test_pathological_open_braces_terminates_quickly():
+    """連続開括弧の病理入力でも最後のオープナーへ跳ぶため高速に終了する（gem#1対策）."""
+    text = "{" * 50000
+    assert sanitize_json_like(text) == text
