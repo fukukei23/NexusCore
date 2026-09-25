@@ -34,12 +34,21 @@ class HttpClientFactory:
 
         session = requests.Session()
         if Retry is not None and HTTPAdapter is not None:
-            # 429/5xx を 3 回まで指数バックオフするデフォルト戦略
+            # 方向1v3.1 プラン①′（2026-09-26・Step 0計測 57run解析に基づく再設計）:
+            # - read=1: ReadTimeoutは2試行でfail-fast（120s×2+backoff≈245s・旧設計は3試行
+            #   =最悪360s超・bench実測で「答えは満点・時間だけ切られる」の主要因）
+            # - 429はRetry-After尊重（urllib3既定）+ backoff 2-30s・5xxも同戻略
+            # - 429以外の4xxは status_forcelist 外＝retryしない（即raise）
             retry_strategy = Retry(
                 total=3,
-                backoff_factor=1,
+                connect=1,
+                read=1,
+                status=3,
+                backoff_factor=2,
+                backoff_max=30,
                 status_forcelist=[429, 500, 502, 503, 504],
                 allowed_methods=frozenset({"POST"}),
+                respect_retry_after_header=True,
             )
             adapter = HTTPAdapter(max_retries=retry_strategy)
             session.mount("https://", adapter)

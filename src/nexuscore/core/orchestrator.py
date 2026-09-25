@@ -56,6 +56,7 @@ from nexuscore.core.phase_runner_mixin import PhaseRunnerMixin
 from nexuscore.core.run_checkpoint import run_phases_with_checkpoint
 from nexuscore.core.session_control import SessionController
 from nexuscore.llm.llm_router import LLMRouter
+from nexuscore.llm.run_budget import reset_run_budget
 from nexuscore.services.patch_applier import PatchApplier
 
 # ==============================================================================
@@ -148,6 +149,8 @@ class Orchestrator(PhaseRunnerMixin):
         heartbeat_fn: Callable[[], None] | None = None,
     ) -> OrchestratorContext | None:
         """高レベルな「フルプロジェクト」実行フロー。"""
+        # 方向1v3.1 gem#1: run単位の I/O タイムアウト予算をリセット（1プロセス=1run前提）
+        reset_run_budget()
         self.logger.info(f"=== Full Project Run Start === requirement='{user_requirement}'")
         task_id = uuid.uuid4().hex
 

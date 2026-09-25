@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import os
+import time
 
 from nexuscore.harness.tool_calling_mixin import (  # noqa: F401 — adapter で使用
     InternalToolCall,
@@ -8,9 +10,12 @@ from nexuscore.harness.tool_calling_mixin import (  # noqa: F401 — adapter で
 )
 from nexuscore.llm.helpers import _env_flag, _real_call_enabled, _strip_jsonish
 from nexuscore.llm.http_client import RequestsHTTPError
+from nexuscore.llm.run_budget import RunBudgetExhausted, get_run_budget
 from nexuscore.llm.runtime import HTTP_CLIENT_FACTORY, REQUEST_TIMEOUT
 
 from .base import BaseLLM
+
+logger = logging.getLogger("GLMLLM")
 
 
 class OpenAICompatLLM(ToolCallingMixin, BaseLLM):
@@ -73,6 +78,9 @@ class OpenAICompatLLM(ToolCallingMixin, BaseLLM):
         as_json = kwargs.get("as_json", False)
 
         if self.real_calls and self.session:
+            # 方向1v3.1 gem#1: Run全体タイムアウト予算（消費>=80%で新規呼出fail-fast）
+            budget = get_run_budget()
+            budget.check_available()
             try:
                 url = f"{self.base_url}{self.api_path}"
                 headers = {
@@ -103,9 +111,17 @@ class OpenAICompatLLM(ToolCallingMixin, BaseLLM):
                 if as_json:
                     payload["response_format"] = {"type": "json_object"}
 
-                resp = self.session.post(
-                    url, headers=headers, json=payload, timeout=REQUEST_TIMEOUT
-                )
+                t0 = time.monotonic()
+                try:
+                    resp = self.session.post(
+                        url, headers=headers, json=payload, timeout=REQUEST_TIMEOUT
+                    )
+                except Exception as io_err:
+                    elapsed = time.monotonic() - t0
+                    budget.consume(elapsed)
+                    self._log_structured_timeout(io_err, elapsed, budget)
+                    raise
+                budget.consume(time.monotonic() - t0)
                 resp.raise_for_status()
 
                 data = resp.json()
@@ -130,6 +146,9 @@ class OpenAICompatLLM(ToolCallingMixin, BaseLLM):
                 self.last_call_mode = "real"
                 return _strip_jsonish(text) if as_json else text
 
+            except RunBudgetExhausted:
+                raise  # 予算枯渇はstub fallbackに置き換えない（v3.1 fail-fast契約）
+
             except RequestsHTTPError as e:
                 status = getattr(getattr(e, "response", None), "status_code", 0)
                 if status == 429:
@@ -152,6 +171,33 @@ class OpenAICompatLLM(ToolCallingMixin, BaseLLM):
                 raise
 
         return self._stub_response(self.stub_label, as_json=as_json)
+
+    def _log_structured_timeout(
+        self, err: Exception, elapsed: float, budget: object
+    ) -> None:
+        """タイムアウト階層つき構造化ログ（方向1v3.1 mm#8・2026-09-26）。"""
+        timeout_type = "unknown"
+        etype = type(err).__name__
+        if "ReadTimeout" in etype:
+            timeout_type = "read"
+        elif "ConnectTimeout" in etype:
+            timeout_type = "connect"
+        elif "Timeout" in etype:
+            timeout_type = "other"
+        try:
+            remaining = getattr(budget, "remaining", -1.0)
+        except Exception:  # noqa: BLE001 — ログ補助の防御的キャッチ
+            remaining = -1.0
+        logger.error(
+            "event=llm_timeout timeout_type=%s elapsed_sec=%.1f "
+            "budget_remaining_sec=%.1f provider=%s model=%s err=%s",
+            timeout_type,
+            elapsed,
+            remaining,
+            self.provider_name,
+            self.model_name,
+            etype,
+        )
 
     # --- ToolCallingMixin 3差分フック実装（Task 7・OpenAI互換） ---
 
@@ -194,9 +240,20 @@ class OpenAICompatLLM(ToolCallingMixin, BaseLLM):
         }
 
         def _call() -> dict:
-            r = self._require_session().post(
-                url, headers=headers, json=body, timeout=REQUEST_TIMEOUT
-            )
+            # 方向1v3.1 gem#1: tool呼出経路もRun予算を消費（self-inspectで発見した配線漏れ）
+            budget = get_run_budget()
+            budget.check_available()
+            t0 = time.monotonic()
+            try:
+                r = self._require_session().post(
+                    url, headers=headers, json=body, timeout=REQUEST_TIMEOUT
+                )
+            except Exception as io_err:
+                elapsed = time.monotonic() - t0
+                budget.consume(elapsed)
+                self._log_structured_timeout(io_err, elapsed, budget)
+                raise
+            budget.consume(time.monotonic() - t0)
             r.raise_for_status()
             return r.json()
 

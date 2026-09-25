@@ -183,8 +183,53 @@ class TestHttpClientFactory:
                 if hasattr(max_retries, "total"):
                     assert max_retries.total == 3
 
+    def test_create_session_read_retry_is_1(self):
+        """方向1v3.1: ReadTimeoutのurllib3リトライは1回（2試行でfail-fast・最悪≈245s）"""
+        try:
+            import requests  # noqa: F401
+
+            HAS_DEPS = True
+        except ImportError:
+            HAS_DEPS = False
+
+        if not HAS_DEPS:
+            pytest.skip("requests or urllib3 not installed")
+
+        factory = HttpClientFactory()
+
+        if factory.available:
+            session = factory.create_session()
+
+            if session and "https://" in session.adapters:
+                max_retries = session.adapters["https://"].max_retries
+                # read=1 で2試行（旧設計 total=3 は3試行=最悪360s超だった）
+                assert max_retries.read == 1
+                assert max_retries.connect == 1
+
+    def test_create_session_respects_retry_after(self):
+        """429のRetry-Afterヘッダを尊重する（v3.1 プラン③′）"""
+        try:
+            import requests  # noqa: F401
+
+            HAS_DEPS = True
+        except ImportError:
+            HAS_DEPS = False
+
+        if not HAS_DEPS:
+            pytest.skip("requests or urllib3 not installed")
+
+        factory = HttpClientFactory()
+
+        if factory.available:
+            session = factory.create_session()
+
+            if session and "https://" in session.adapters:
+                max_retries = session.adapters["https://"].max_retries
+                assert max_retries.respect_retry_after_header is True
+                assert max_retries.backoff_max == 30
+
     def test_create_session_backoff_factor(self):
-        """backoff_factor が正しく設定される"""
+        """backoff_factor が正しく設定される（v3.1: 短め指数backoff・初期2秒）"""
         try:
             import requests  # noqa: F401
             from requests.adapters import HTTPAdapter  # noqa: F401
@@ -205,9 +250,9 @@ class TestHttpClientFactory:
                 adapter = session.adapters["https://"]
                 max_retries = adapter.max_retries
 
-                # backoff_factor が 1 に設定されている
+                # backoff_factor が 2 に設定されている（v3.1再設計・旧1）
                 if hasattr(max_retries, "backoff_factor"):
-                    assert max_retries.backoff_factor == 1
+                    assert max_retries.backoff_factor == 2
 
     def test_create_session_allowed_methods(self):
         """retry 対象の HTTP メソッドが正しく設定される"""
