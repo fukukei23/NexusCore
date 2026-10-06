@@ -353,6 +353,11 @@ def main() -> int:
     # P8 題庫枯渇（Phase B: 残<3警告・0停止）
     if not open_topics:
         print("[wrapper] STOP: お題プール枯渇（0題）", flush=True)
+        # 2026-10-04 夜間harness記録停止事案: pool_exhausted は exit 4 のみ
+        # でサイレント停止 → バナー警告が出るまで2.6日誰も気づかなかった。
+        # Discord/best-effortで通知を1本出して検知遅延を縮める。
+        notify_failure(repo, "pool_exhausted: 無人用お題プールが0題です。"
+                                 "題庫補充が必要です（exit 4）。")
         return 4
     if len(open_topics) <= POOL_LOW_WARN:
         warnings.append(f"pool_low: 残り{len(open_topics)}題（警告閾値{POOL_LOW_WARN}）")

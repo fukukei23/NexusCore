@@ -377,6 +377,46 @@ def test_main_pool_exhausted_returns_4(tmp_path: Path) -> None:
         sys.argv = old_argv
 
 
+def test_main_pool_exhausted_invokes_notify_failure(tmp_path: Path,
+                                                     monkeypatch) -> None:
+    """枯渇STOP時にDiscord通知を呼ぶ（2026-10-06 サイレント停止事案の再発防止）
+
+    既存 test_main_pool_exhausted_returns_4 は exit 4 しか見ず notify_failure
+    配線は未検証だった。本テストは monkeypatch で notify_failure を捕まえ、
+    pool_exhausted 経路で1回だけ「pool_exhausted」メッセージと共に呼ばれることを
+    確認する。呼ばれなければメイン経路でサイレント停止が再発する。
+    """
+    import sys
+
+    from scripts import run_harness_task as w
+
+    calls: list[str] = []
+
+    def fake_notify(repo, message):
+        calls.append(message)
+    monkeypatch.setattr(w, "notify_failure", fake_notify)
+    # 環境変数なし→webhook URL未設定でbest-effort退避経路を通らないことを確認
+    monkeypatch.delenv("DISCORD_CLAUDE_WEBHOOK", raising=False)
+
+    (tmp_path / ".venv/bin").mkdir(parents=True)
+    (tmp_path / ".venv/bin/python").write_text("")
+    (tmp_path / "docs").mkdir(parents=True)
+    (tmp_path / "docs/harness_題庫.md").write_text(
+        "# 題庫\n\n## 無人用（読む系）\n- [x] A: x\n")
+
+    old_argv = sys.argv
+    sys.argv = ["run_harness_task.py", "--repo", str(tmp_path)]
+    try:
+        rc = w.main()
+    finally:
+        sys.argv = old_argv
+
+    assert rc == 4
+    assert len(calls) == 1 and calls[0].startswith("pool_exhausted"), (
+        f"枯渴時にnotify_failureが1回呼ばれること（実際: {calls}）"
+    )
+
+
 def test_main_watchdog_stop_returns_5(tmp_path: Path) -> None:
     """watchdog緊急停止（10run中ユニーク<5）→exit 5の配線"""
     import json as _json
