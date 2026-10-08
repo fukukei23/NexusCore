@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import shutil
@@ -36,6 +37,38 @@ pytest失敗(debug_retries)とは独立カウント。将来のA/Bで3に拡張�
 
 REVIEW_MAX_RETRIES: int = _env_int("NEXUS_REVIEW_MAX_RETRIES", 2)
 """レビューループ（guardian REJECT→再実装→再テスト→再レビュー）の最大リトライ回数（spec §4-5）"""
+
+
+def _consensus_to_review_data(consensus: Any) -> dict[str, Any] | None:
+    """Multi-LLM consensus を guardian 互換の review_data dict へ変換する。
+
+    - contributing_models の失敗（"(fail)"接尾）が過半なら None を返す
+      （呼び出し側で従来 guardian 単一レビューへ fallback・レビュー機能喪失防止）
+    - max_severity=high → REJECT（issues を feedback_for_coder へ）
+    - それ以外 → APPROVE（issues は consensus_issues として添付）
+    """
+    models = consensus.contributing_models if consensus else []
+    fail_count = sum(1 for m in models if m.endswith("(fail)"))
+    if not models or fail_count * 2 > len(models):
+        return None
+    issues = list(consensus.issues)
+    max_severity = getattr(consensus, "max_severity", "low")
+    if max_severity == "high":
+        feedback = "\n".join(f"- {i}" for i in issues) or "高深刻度の問題を検出"
+        return {
+            "decision": "REJECT",
+            "reason": "multi-LLM consensus: high severity issue(s)",
+            "feedback_for_coder": feedback,
+            "consensus_confidence": consensus.confidence,
+            "consensus_models": models,
+        }
+    return {
+        "decision": "APPROVE",
+        "reason": "non-high severity only",
+        "consensus_issues": issues,
+        "consensus_confidence": consensus.confidence,
+        "consensus_models": models,
+    }
 
 if TYPE_CHECKING:
     import logging
@@ -646,6 +679,61 @@ class PhaseRunnerMixin:
                 passed = h.get("passed")
                 lines.append(f"  attempt {attempt}: 構文OK・pytest={'通過' if passed else '失敗'}")
         return "\n".join(lines)
+    def _run_multi_llm_review(self, context: OrchestratorContext) -> dict[str, Any] | None:
+        """NEXUS_REVIEW_MODE=multi 時の初回レビュー（Multi-LLM consensus・L143配線）。
+
+        失敗モデル過半・import失敗・consensus実行例外時は None を返し、
+        呼び出し側で従来 guardian 単一レビューへ fallback する（機能喪失防止）。
+        contributing_models をログ出力（fail条件: 2プロバイダ分の review 呼出の証跡）。
+        """
+        try:
+            from nexuscore.workflows.multi_llm_review import (
+                ReviewItem,
+                run_consensus_review,
+            )
+        except ImportError as e:
+            self.logger.warning(
+                f"[{context.task_id}] multi-LLM review import failed, fallback to guardian: {e}"
+            )
+            return None
+
+        items = [
+            ReviewItem(path=p, content=c)
+            for p, c in context.implementation.get("files", {}).items()
+        ]
+        items.append(
+            ReviewItem(path="tests/test_generated.py", content=context.testing.get("tests", ""))
+        )
+        models_str = os.getenv("NEXUS_MULTI_REVIEW_MODELS", "glm:glm-5.3,minimax:MiniMax-M3")
+        models = [m.strip() for m in models_str.split(",") if m.strip()]
+
+        loop = asyncio.new_event_loop()
+        try:
+            consensus = loop.run_until_complete(
+                run_consensus_review(
+                    task=context.user_requirement,
+                    items=items,
+                    models=models,
+                )
+            )
+        except Exception as e:  # noqa: BLE001
+            self.logger.warning(
+                f"[{context.task_id}] multi-LLM review failed, fallback to guardian: {e}"
+            )
+            return None
+        finally:
+            loop.close()
+
+        review_data = _consensus_to_review_data(consensus)
+        if review_data is not None:
+            self.logger.info(
+                f"[{context.task_id}] multi-LLM consensus review: "
+                f"models={consensus.contributing_models} "
+                f"severity={getattr(consensus, 'max_severity', 'low')} "
+                f"confidence={consensus.confidence:.2f}"
+            )
+        return review_data
+
     def run_review_phase(self, context: OrchestratorContext) -> OrchestratorContext:
         self.logger.info(f"[{context.task_id}] Phase 6: Review")
         context.phase_log.append("REVIEW")
@@ -678,9 +766,18 @@ class PhaseRunnerMixin:
         test_result = f"stdout={context.testing.get('stdout', '')}\nstderr={context.testing.get('stderr', '')}"
         constitution_str = json.dumps(self.constitution, ensure_ascii=False)
 
-        review_data = self.guardian_agent.review(
-            code_draft, test_code, test_result, "", constitution_str, context.user_requirement,
-        )
+        review_data = None
+        consensus_meta: dict[str, Any] = {}
+        if os.getenv("NEXUS_REVIEW_MODE", "single").strip().lower() == "multi":
+            review_data = self._run_multi_llm_review(context)
+        if review_data is None:
+            review_data = self.guardian_agent.review(
+                code_draft, test_code, test_result, "", constitution_str, context.user_requirement,
+            )
+        else:
+            consensus_meta = {
+                k: v for k, v in review_data.items() if k.startswith("consensus_")
+            }
 
         while review_data.get("decision") != "APPROVE" and context.review_retries < REVIEW_MAX_RETRIES:
             context.review_retries += 1
@@ -722,6 +819,11 @@ class PhaseRunnerMixin:
             self._write_review_report(
                 context, feedback=review_data.get("feedback_for_coder", review_data.get("reason", ""))
             )
+
+        # consensus 経由の初回レビュー情報を終端 review_data に復元（観測性・fail条件の証跡）
+        if consensus_meta:
+            review_data.update(consensus_meta)
+            context.review = review_data
 
         self._maybe_run_constitutional_review(context)
         return context

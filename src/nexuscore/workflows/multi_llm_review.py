@@ -61,6 +61,7 @@ class ConsensusResult:
     file_fixes: dict[str, str] = field(default_factory=dict)
     confidence: float = 0.0
     contributing_models: list[str] = field(default_factory=list)
+    max_severity: str = "low"  # ok レビューの最大深刻度（low<medium<high・配線用に追加）
 
 
 # ---------------------------- プロンプト ---------------------------- #
@@ -149,11 +150,23 @@ def _merge_consensus(reviews: list[ModelReview]) -> ConsensusResult:
                 merged.append(title)
     confs = [r.summary.get("confidence", 0.0) for r in reviews if isinstance(r.summary, dict)]
     conf = sum(confs) / len(confs) if confs else 0.0
+    # 深刻度の最大値を集約（ok レビューのみ・low<medium<high）
+    _SEV_ORDER = {"low": 0, "medium": 1, "high": 2}
+    severities = [
+        str(r.summary.get("severity", "low")).lower()
+        for r in reviews
+        if isinstance(r.summary, dict) and r.ok
+    ]
+    max_severity = "low"
+    for s in severities:
+        if _SEV_ORDER.get(s, 0) > _SEV_ORDER.get(max_severity, 0):
+            max_severity = s
     return ConsensusResult(
         issues=merged[:5],
         file_fixes={},
         confidence=conf,
         contributing_models=[f"{r.model}{'' if r.ok else ' (fail)'}" for r in reviews],
+        max_severity=max_severity,
     )
 
 
