@@ -199,11 +199,26 @@ class TestReviewPhaseMultiMode:
         # 失敗過半 → 従来 guardian 単一レビューへ fallback
         agents["guardian_agent"].review.assert_called_once()
 
-    def test_default_single_mode_keeps_guardian(self, tmp_path, monkeypatch):
+    def test_default_multi_mode_uses_consensus(self, tmp_path, monkeypatch):
+        """本番適用（2026-10-08 ふくけい承認）: 未設定時の default は multi"""
         monkeypatch.delenv("NEXUS_REVIEW_MODE", raising=False)
+        self._patch_consensus(monkeypatch, _make_consensus(issues=[]))
         agents = _create_mock_agents()
 
-        # consensus が呼ばれたら fail させる（default では呼ばれない）
+        orchestrator = self._make_orchestrator(tmp_path, agents)
+        context = self._context_with_passing_tests(tmp_path)
+
+        result = orchestrator.run_review_phase(context)
+
+        assert result.terminal_state == "APPROVED"
+        agents["guardian_agent"].review.assert_not_called()
+
+    def test_single_mode_optout_keeps_guardian(self, tmp_path, monkeypatch):
+        """rollback経路: NEXUS_REVIEW_MODE=single で従来 guardian に戻せる"""
+        monkeypatch.setenv("NEXUS_REVIEW_MODE", "single")
+        agents = _create_mock_agents()
+
+        # consensus が呼ばれたら fail させる（single では呼ばれない）
         async def _forbidden(**kwargs):
             raise AssertionError("single mode で consensus が呼ばれた")
 

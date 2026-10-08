@@ -768,7 +768,7 @@ class PhaseRunnerMixin:
 
         review_data = None
         consensus_meta: dict[str, Any] = {}
-        if os.getenv("NEXUS_REVIEW_MODE", "single").strip().lower() == "multi":
+        if os.getenv("NEXUS_REVIEW_MODE", "multi").strip().lower() == "multi":
             review_data = self._run_multi_llm_review(context)
         if review_data is None:
             review_data = self.guardian_agent.review(
