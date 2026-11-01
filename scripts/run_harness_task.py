@@ -55,6 +55,13 @@ POOL_LOW_WARN = 3            # P8 題庫残<3で警告
 CRON_EXIT_SKIP = 3           # cron-setup規定: 同日skip
 CRON_EXIT_SELFCHECK = 78     # v2: 起動時selfcheck NG
 
+# D案′ 枯渇STOP恒久改善（2026-11-01・設計正典: obsidian-ssot
+# 60_MLR_LOGS/2026-11-01_harness枯渇STOP恒久改善D案レビュー/revised_proposal.md）
+STOP_TICKET_THRESHOLD = 3    # 連続STOPでバックログ自動起票する晩数
+OBSIDIAN_BACKLOG = Path.home() / "projects/obsidian-ssot/00_SYSTEM/バックログ.md"
+BACKLOG_TICKET_MARKER = "harness題庫補充が必要"
+BACKLOG_PREP_MARKER = "harness題庫補充準備"
+
 # 見出しは修飾語付きで書かれる（実ファイル例: 「## 手動用（書く系・ask承認込み・
 # ふくけい付き添いで消化）」）ため、閉じ括弧を含めない前方部分でマッチさせる。
 # 2026-09-19実測バグ: 閉じ括弧込みの完全形で判定していたため手動用セクションが
@@ -303,6 +310,170 @@ def notify_failure(repo: Path, message: str) -> None:
             f.write(f"{today_jst()} notify_error: {exc}: {message}\n")
 
 
+# ---------- D案′: 枯渇STOP恒久改善（連続STOPカウンタ・エピソード制・自動起票） ----------
+
+def _harness_state_path(repo: Path, name: str) -> Path:
+    return repo / "artifacts/harness" / name
+
+
+def _atomic_write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = Path(str(path) + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+
+
+def read_stop_count(repo: Path) -> int:
+    """連続STOPカウンタの読込（不在・破損は0扱い）"""
+    try:
+        return int(_harness_state_path(
+            repo, "pool_stop_count.txt").read_text().strip())
+    except (OSError, ValueError):
+        return 0
+
+
+def _read_episode(repo: Path) -> str:
+    try:
+        ep = _harness_state_path(
+            repo, "pool_episode.txt").read_text().strip()
+        return ep or today_jst()
+    except OSError:
+        return today_jst()
+
+
+def bump_stop_count(repo: Path) -> tuple[int, str]:
+    """連続STOPを+1し (新カウント, エピソードID) を返す。
+
+    エピソードID=連続STOP開始日（JST）・1晩目に発行し連続中は維持
+    （1回上限の永久無効化を防ぐエピソード単位制御・MLR MiniMax#3）。
+    """
+    count = read_stop_count(repo) + 1
+    episode = today_jst() if count == 1 else _read_episode(repo)
+    _atomic_write_text(
+        _harness_state_path(repo, "pool_stop_count.txt"), str(count))
+    _atomic_write_text(_harness_state_path(repo, "pool_episode.txt"), episode)
+    return count, episode
+
+
+def ticket_flag_episode(repo: Path) -> str | None:
+    """起票済みフラグ（エピソードID）。未起票=None"""
+    try:
+        val = _harness_state_path(
+            repo, "pool_ticket_created.txt").read_text().strip()
+        return val or None
+    except OSError:
+        return None
+
+
+def record_success_reset(repo: Path) -> bool:
+    """正常runでストリークを閉じる。閉じた場合のみ補充完了日を記録しTrueを返す"""
+    had_streak = (read_stop_count(repo) > 0
+                  or ticket_flag_episode(repo) is not None
+                  or _harness_state_path(repo, "pool_episode.txt").exists())
+    for name in ("pool_stop_count.txt", "pool_episode.txt",
+                 "pool_ticket_created.txt"):
+        try:
+            _harness_state_path(repo, name).unlink()
+        except OSError:
+            pass
+    if had_streak:
+        _atomic_write_text(
+            _harness_state_path(repo, "pool_last_replenish.txt"), today_jst())
+    return had_streak
+
+
+def _git_toplevel_name(path: Path) -> str | None:
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if out.returncode != 0:
+        return None
+    return Path(out.stdout.strip()).name
+
+
+def _open_marker_rows(text: str, marker: str) -> int:
+    pat = re.compile(r"^- \[ \].*" + re.escape(marker), re.MULTILINE)
+    return len(pat.findall(text))
+
+
+def _append_backlog_row(backlog_path: Path, row: str) -> None:
+    lock = Path(str(backlog_path) + ".lock")
+    with open(lock, "w") as lf, open(backlog_path, "a", encoding="utf-8") as f:
+        fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
+        f.write("\n" + row + "\n")
+        f.flush()
+
+
+def _mark_prep_done_if_open(backlog_path: Path) -> bool:
+    """P2予防行が未完了なら[x]化してP1へ統合した旨を追記する"""
+    try:
+        text = backlog_path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    pat = re.compile(
+        r"^(- \[ \]（P2・\[AUTO-HARNESS-POOL\][^\n]*"
+        + re.escape(BACKLOG_PREP_MARKER) + r"[^\n]*)$", re.MULTILINE)
+    if not pat.search(text):
+        return False
+
+    def _close(m: re.Match) -> str:
+        return (m.group(1).replace("- [ ]（P2・", "- [x]（P2・", 1)
+                + "（P1起票に統合・自動クローズ）")
+    new_text = pat.sub(_close, text)
+    lock = Path(str(backlog_path) + ".lock")
+    with open(lock, "w") as lf:
+        fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
+        _atomic_write_text(backlog_path, new_text)
+    return True
+
+
+def _ensure_ticket(repo: Path, marker: str, row_builder, backlog_path: Path | None) -> str:
+    """起票の共通本体。tri-state: created / exists / failed（fail-soft）"""
+    bp = backlog_path if backlog_path is not None else OBSIDIAN_BACKLOG
+    try:
+        if not bp.exists():
+            return "failed"
+        if _git_toplevel_name(bp.parent.parent) != "obsidian-ssot":
+            return "failed"
+        if _open_marker_rows(bp.read_text(encoding="utf-8"), marker) > 0:
+            return "exists"
+        _append_backlog_row(bp, row_builder())
+        if marker == BACKLOG_TICKET_MARKER:
+            _mark_prep_done_if_open(bp)
+        return "created"
+    except OSError:
+        return "failed"
+
+
+def ensure_backlog_ticket(repo: Path, count: int,
+                          backlog_path: Path | None = None) -> str:
+    """連続STOP閾値到達時のP1起票（冪等・成功時のみ起票フラグをセット）"""
+    def _row() -> str:
+        return (f"- [ ]（P1・[AUTO-HARNESS-POOL]・{today_jst()}起票）"
+                f"{BACKLOG_TICKET_MARKER}（{count}晩連続STOP・"
+                f"エピソード{_read_episode(repo)}）"
+                f"— 完了条件: 無人用お題を補充し正常runを1回確認")
+    result = _ensure_ticket(repo, BACKLOG_TICKET_MARKER, _row, backlog_path)
+    if result == "created":
+        _atomic_write_text(
+            _harness_state_path(repo, "pool_ticket_created.txt"),
+            _read_episode(repo))
+    return result
+
+
+def ensure_prep_ticket(repo: Path, remaining: int,
+                       backlog_path: Path | None = None) -> str:
+    """予防線: 残≤POOL_LOW_WARNでのP2起票（STOP前に補充タスク化・MLR GLM#7）"""
+    def _row() -> str:
+        return (f"- [ ]（P2・[AUTO-HARNESS-POOL]・{today_jst()}起票）"
+                f"{BACKLOG_PREP_MARKER}（残{remaining}題・枯渇前に補充を）"
+                f"— 完了条件: 無人用お題を補充")
+    return _ensure_ticket(repo, BACKLOG_PREP_MARKER, _row, backlog_path)
+
+
 def acquire_wrapper_lock(repo: Path) -> bool:
     """ラッパー全体の二重起動防止（MiniMax r3-critical・cron多重発火で同一お題二重実行を防ぐ）"""
     global _WRAPPER_LOCK_FP
@@ -356,8 +527,22 @@ def main() -> int:
         # 2026-10-04 夜間harness記録停止事案: pool_exhausted は exit 4 のみ
         # でサイレント停止 → バナー警告が出るまで2.6日誰も気づかなかった。
         # Discord/best-effortで通知を1本出して検知遅延を縮める。
-        notify_failure(repo, "pool_exhausted: 無人用お題プールが0題です。"
-                                 "題庫補充が必要です（exit 4）。")
+        # D案′（2026-11-01）: 連続回数を通知し、3晩連続でobsidian-ssotの
+        # バックログへP1自動起票（冪等・エピソード単位）。検知を
+        # 「読まれる通知」から「拾われるタスク」に変える（10-25〜31の
+        # 7日無対処の構造的封じ手）。
+        streak_note = ""
+        if not args.dry_run:
+            count, _ep = bump_stop_count(repo)
+            streak_note = f"（{count}晩連続）"
+            if count >= STOP_TICKET_THRESHOLD:
+                ticket = ensure_backlog_ticket(repo, count)
+                if ticket == "created":
+                    streak_note += "・バックログ起票済み"
+                elif ticket == "failed":
+                    streak_note += "・起票失敗（翌晩リトライ）"
+        notify_failure(repo, f"pool_exhausted: 無人用お題プールが0題です"
+                             f"{streak_note}。題庫補充が必要です（exit 4）。")
         return 4
     if len(open_topics) <= POOL_LOW_WARN:
         warnings.append(f"pool_low: 残り{len(open_topics)}題（警告閾値{POOL_LOW_WARN}）")
@@ -444,6 +629,11 @@ def main() -> int:
 
     if not mark_done(pool_path, topic["line_no"], topic["text"]):
         warnings.append("marker_update_skipped")
+    # D案′: 正常run（お題を実行できた）でストリークを閉じる+予防起票
+    record_success_reset(repo)
+    remaining_after = max(len(open_topics) - 1, 0)
+    if remaining_after <= POOL_LOW_WARN:
+        ensure_prep_ticket(repo, remaining_after)
     if stamp_eligible(final, warnings):
         write_stamp(repo)   # cron-setup規定: 成功時のみスタンプ（失敗翌日は再試行可）
         heartbeat(repo)     # v2 Gemini#2: 成功時死活痕跡
