@@ -72,7 +72,15 @@ def main(argv: list[str] | None = None) -> int:
     current_hash = compute_sha256(args.skill)
     baseline = load_baseline(args.baseline)
     if args.update_baseline:
-        write_baseline(args.baseline, current_hash or "", note="manual update")
+        if current_hash is None:
+            # W45💡1: 実在しない --skill での空hash書込を baseline 更新前に reject
+            # （同型事故3回実証・be00「--skill誤用（空hash書込）」等）
+            print(
+                f"reject: --skill が実在しないため baseline 書込を中止（空hash書込防止）: {args.skill}",
+                file=sys.stderr,
+            )
+            return 2
+        write_baseline(args.baseline, current_hash, note="manual update")
         print(f"baseline updated: {args.baseline} sha256={current_hash}")
         return 0
     status = detect_drift((baseline or {}).get("sha256"), current_hash)

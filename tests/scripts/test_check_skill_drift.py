@@ -60,3 +60,50 @@ class TestComputeSha256:
         p = tmp_path / "f.md"
         expected = _write(p, "hello")
         assert compute_sha256(str(p)) == expected
+
+
+class TestUpdateBaselineRejectsMissingSkill:
+    """W45💡1: --skill に実在しないパスで --update-baseline を渡すと
+    baseline書込前に reject する（空hash書込の事故防止・同型3回実証済み）。
+
+    fail条件（事前固定）: 実在しない --skill + --update-baseline で baseline
+    ファイルが作成された時＝reject 不成立。
+    """
+
+    def test_update_baseline_with_missing_skill_rejects(self, tmp_path, capsys):
+        from nexuscore.scripts.check_skill_drift import main
+
+        baseline_path = tmp_path / "baseline.sha256"
+        rc = main(
+            ["--skill", str(tmp_path / "nope.md"),
+             "--baseline", str(baseline_path),
+             "--update-baseline"]
+        )
+        assert rc == 2
+        assert "reject" in capsys.readouterr().err
+        assert not baseline_path.exists()  # baseline 未書込＝fail条件の核
+
+    def test_update_baseline_with_existing_skill_writes(self, tmp_path):
+        from nexuscore.scripts.check_skill_drift import main
+
+        skill = tmp_path / "SKILL.md"
+        skill.write_text("content", encoding="utf-8")
+        baseline_path = tmp_path / "baseline.sha256"
+        rc = main(
+            ["--skill", str(skill),
+             "--baseline", str(baseline_path),
+             "--update-baseline"]
+        )
+        assert rc == 0
+        assert baseline_path.exists()
+
+    def test_missing_skill_without_update_still_reports_missing(self, tmp_path, capsys):
+        """update 無しの drift チェックは既存どおり missing 報告（exit 0）。"""
+        from nexuscore.scripts.check_skill_drift import main
+
+        rc = main(
+            ["--skill", str(tmp_path / "nope.md"),
+             "--baseline", str(tmp_path / "b.sha256")]
+        )
+        assert rc == 0
+        assert '"missing"' in capsys.readouterr().out
