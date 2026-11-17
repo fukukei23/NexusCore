@@ -1,11 +1,52 @@
 # Task 11 Step 3: tool_policy.yaml 初期版（plan本文どおり）
 # ToolGate（Task 10）が読む。未設定キーの既定動作=deny（保守側）。
+#
+# 2026-11-17 改訂（Strix診断A案④・nexuscore_bfa5）:
+#   読む系3ツール（read_file/list_dir/search_text）に deny_paths が無く
+#   default: allow のため .env を始めとする機密ファイルが読めた。
+#   ToolGate.evaluate は引数内の全文字列を deny_paths と照合するため、
+#   ここにパターンを載せるだけで拒否される（deny_paths > default の優先順位）。
+#   パターンは basename照合（fnmatch(os.path.basename(norm), pat)）も効くため
+#   相対パス・絶対パスのどちらでも拒否される。『**/.env 』単独ではルート直下の
+#   相対パス `.env` が fnmatch の境界で漏れるため basename 用の明示パターンを併記する。
+#
+#   注意: パターンは5ツールで同一のためインラインで重複記載している
+#   （YAML アンカー `$_deny_secrets` は PyYAML では文字列のまま残る・実測 2026-11-17）。
+#   増減時は5箇所すべてを同じ内容に保つこと。
 provider_priority: [openai, anthropic, gemini, openrouter, glm, minimax, deepseek, moonshot]
 provider_insecure_default: [deepseek, moonshot]  # capability不明時→deny
+
 tools:
-  read_file:    { default: allow }
-  list_dir:     { default: allow }
-  search_text:  { default: allow }
-  write_file:   { default: ask, deny_paths: ['.git/**', '**/.env', '**/secrets/**'] }
-  edit_file:    { default: ask, deny_paths: ['.git/**', '**/.env', '**/secrets/**'] }
-  run_command:  { default: ask, deny_patterns: ['rm -rf', 'sudo ', 'git push --force', ':(){:|:&};:', 'mkfs', 'dd if='] }
+  read_file:
+    default: allow
+    deny_paths: ['.env', '**/.env', '.env.*', '**/.env.*', 'secrets.py', '**/secrets.py',
+                 '**/secrets/**', '*.pem', '**/*.pem', 'id_rsa*', '**/id_rsa*',
+                 'authorized_keys', '**/authorized_keys', '.ssh', '.ssh/**', '**/.ssh/**',
+                 '.git', '.git/**', '**/.git/**']
+  list_dir:
+    default: allow
+    deny_paths: ['.env', '**/.env', '.env.*', '**/.env.*', 'secrets.py', '**/secrets.py',
+                 '**/secrets/**', '*.pem', '**/*.pem', 'id_rsa*', '**/id_rsa*',
+                 'authorized_keys', '**/authorized_keys', '.ssh', '.ssh/**', '**/.ssh/**',
+                 '.git', '.git/**', '**/.git/**']
+  search_text:
+    default: allow
+    deny_paths: ['.env', '**/.env', '.env.*', '**/.env.*', 'secrets.py', '**/secrets.py',
+                 '**/secrets/**', '*.pem', '**/*.pem', 'id_rsa*', '**/id_rsa*',
+                 'authorized_keys', '**/authorized_keys', '.ssh', '.ssh/**', '**/.ssh/**',
+                 '.git', '.git/**', '**/.git/**']
+  write_file:
+    default: ask
+    deny_paths: ['.env', '**/.env', '.env.*', '**/.env.*', 'secrets.py', '**/secrets.py',
+                 '**/secrets/**', '*.pem', '**/*.pem', 'id_rsa*', '**/id_rsa*',
+                 'authorized_keys', '**/authorized_keys', '.ssh', '.ssh/**', '**/.ssh/**',
+                 '.git', '.git/**', '**/.git/**']
+  edit_file:
+    default: ask
+    deny_paths: ['.env', '**/.env', '.env.*', '**/.env.*', 'secrets.py', '**/secrets.py',
+                 '**/secrets/**', '*.pem', '**/*.pem', 'id_rsa*', '**/id_rsa*',
+                 'authorized_keys', '**/authorized_keys', '.ssh', '.ssh/**', '**/.ssh/**',
+                 '.git', '.git/**', '**/.git/**']
+  run_command:
+    default: ask
+    deny_patterns: ['rm -rf', 'sudo ', 'git push --force', ':(){:|:&};:', 'mkfs', 'dd if=']

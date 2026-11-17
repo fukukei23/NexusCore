@@ -16,9 +16,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, Form
+from fastapi import APIRouter, Depends, Form
 from fastapi.responses import HTMLResponse
 
+from nexuscore.api.dependencies.auth import AuthenticatedUser, get_current_user
 from nexuscore.cli.harness_cli import (
     OPERATIONAL_MAX_TOKENS,
     build_context_prompt,
@@ -74,8 +75,15 @@ def _run_harness(task: str, provider: str) -> str:
 
 
 @router.get("/", response_class=HTMLResponse)
-async def index() -> HTMLResponse:
-    """タスク入力フォーム（provider選択・ask承認は将来拡張）"""
+async def index(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+) -> HTMLResponse:
+    """タスク入力フォーム（provider選択・ask承認は将来拡張）
+
+    2026-11-17 改訂（Strix診断A案③）: 認証依赖を付与した。
+    無認証のまま では任意の者がタスク文を送ってLLMエージェントを実行でき、
+    read_file（default: allow）で .env 等の機密ファイルを読み取れた。
+    """
     options = "".join(f'<option value="{p}">{p}</option>' for p in _PROVIDER_CHOICES)
     note = ("ask承認はTTY結合のため本UIでは無効（読む系のみ・fail-closed）"
             "・実承認はCLI --ask で実施")
@@ -83,8 +91,15 @@ async def index() -> HTMLResponse:
 
 
 @router.post("/run")
-async def run(task: str = Form(...), provider: str = Form("mock")) -> HTMLResponse:
-    """フォームからharnessを同期実行し結果JSONを表示する"""
+async def run(
+    task: str = Form(...),
+    provider: str = Form("mock"),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+) -> HTMLResponse:
+    """フォームからharnessを同期実行し結果JSONを表示する
+
+    2026-11-17 改訂（Strix診断A案③）: 認証依赖を付与した（未認証は401）。
+    """
     if provider not in _PROVIDER_CHOICES:
         return HTMLResponse("unsupported provider", status_code=400)
     return HTMLResponse(f"<pre>{_run_harness(task, provider)}</pre>")

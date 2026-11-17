@@ -170,3 +170,7 @@ artifacts/checkpoints/
 # 構造ダンプ（tools/export_structure.py 等の生成物・再生成可能・2026-09-12 追跡解除）
 *_folder_structure.txt
 src/folder_structure.txt
+
+# Strix 診断成果物（AIペネトレーションのスキャン出力・2026-11-17 追加）
+# 診断レポート内に実シークレットが含まれ得るため追跡しない
+strix_runs/

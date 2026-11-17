@@ -94,12 +94,21 @@ class TestGitHubWebhookEndpoint:
         assert data["accepted"] is False
 
     def test_pull_request_invalid_json(self, client):
-        with patch.dict(os.environ, {}, clear=False):
+        """不正JSONは署名検証を通過したうえで 200 + accepted=False で拒否
+
+        2026-11-17 改訂: fail-closed化により secret 未設定は 401 で弾かれるため、
+        本テストの検証対象（不正JSONの扱いに加えて）を失わないよう
+        secret 設定済み＋正しい署名で署名検証を通過させる。
+        """
+        secret = "webhook_secret"
+        body = b"not json"
+        with patch.dict(os.environ, {"GITHUB_WEBHOOK_SECRET": secret}, clear=False):
             response = client.post(
                 "/api/v1/github/webhook",
-                content=b"not json",
+                content=body,
                 headers={
                     "X-GitHub-Event": "pull_request",
+                    "X-Hub-Signature-256": _make_signature(body, secret),
                     "Content-Type": "application/json",
                 },
             )
@@ -108,41 +117,51 @@ class TestGitHubWebhookEndpoint:
         assert data["accepted"] is False
 
     def test_pull_request_invalid_payload_schema(self, client):
-        """Pydantic バリデーション失敗（pull_request.number なし）"""
+        """Pydantic バリデーション失敗（pull_request.number なし）
+
+        2026-11-17 改訂: fail-closed化により secret 未設定は 401 で弾かれるため、
+        secret 設定済み＋正しい署名で署名検証を通過させる。
+        """
         bad_payload = {"action": "opened", "repository": {"full_name": "o/r"}}
-        with patch.dict(os.environ, {}, clear=False):
+        secret = "webhook_secret"
+        body = json.dumps(bad_payload).encode("utf-8")
+        with patch.dict(os.environ, {"GITHUB_WEBHOOK_SECRET": secret}, clear=False):
             response = client.post(
                 "/api/v1/github/webhook",
-                json=bad_payload,
-                headers={"X-GitHub-Event": "pull_request"},
+                content=body,
+                headers={
+                    "X-GitHub-Event": "pull_request",
+                    "X-Hub-Signature-256": _make_signature(body, secret),
+                    "Content-Type": "application/json",
+                },
             )
         assert response.status_code == 200
         data = response.json()
         assert data["accepted"] is False
 
     def test_pull_request_valid_no_secret(self, client):
+        """シークレット未設定は fail-closed で 401（2026-11-17 改訂）
+
+        旧挙動は「secret 未設定なら署名検証をスキップして受理」だった。
+        Strix診断（nexuscore_bfa5）で攻撃者が偽装 pull_request を送り
+        攻撃者リポジトリのコードを実行できる critical として指摘されたため、
+        未設定は原則拒否に変更した（明示 opt-in でのみ fail-open 許可）。
+        """
         payload = _valid_payload()
         with patch.dict(os.environ, {}, clear=False):
-            with patch(
-                "nexuscore.api.github_self_healing_webhook.github_webhook",
-                return_value={"status": "fixed", "summary": "Done"},
-            ) as mock_handler:
+            with patch.dict(os.environ, {"GITHUB_WEBHOOK_ALLOW_UNSIGNED": "0"}):
                 with patch(
-                    "nexuscore.api.routes.github_webhook._post_pr_comment_if_configured"
-                ):
-                    with patch(
-                        "nexuscore.api.routes.github_webhook._send_slack_notification_if_configured"
-                    ):
-                        response = client.post(
-                            "/api/v1/github/webhook",
-                            json=payload,
-                            headers={"X-GitHub-Event": "pull_request"},
-                        )
+                    "nexuscore.api.github_self_healing_webhook.github_webhook",
+                    return_value={"status": "fixed", "summary": "Done"},
+                ) as mock_handler:
+                    response = client.post(
+                        "/api/v1/github/webhook",
+                        json=payload,
+                        headers={"X-GitHub-Event": "pull_request"},
+                    )
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["accepted"] is True
-        mock_handler.assert_called_once()
+        assert response.status_code == 401
+        mock_handler.assert_not_called()
 
     def test_pull_request_valid_with_secret(self, client):
         secret = "webhook_secret"
@@ -191,21 +210,31 @@ class TestGitHubWebhookEndpoint:
         assert response.status_code == 401
 
     def test_handler_import_error(self, client):
+        """ハンドラモジュール取り込み失敗は 500（2026-11-17 改訂: secret設定済み＋署名で通過させる）"""
         payload = _valid_payload()
-        with patch.dict(os.environ, {}, clear=False):
+        secret = "webhook_secret"
+        body = json.dumps(payload).encode("utf-8")
+        with patch.dict(os.environ, {"GITHUB_WEBHOOK_SECRET": secret}, clear=False):
             with patch.dict(
                 "sys.modules", {"nexuscore.api.github_self_healing_webhook": None}
             ):
                 response = client.post(
                     "/api/v1/github/webhook",
-                    json=payload,
-                    headers={"X-GitHub-Event": "pull_request"},
+                    content=body,
+                    headers={
+                        "X-GitHub-Event": "pull_request",
+                        "X-Hub-Signature-256": _make_signature(body, secret),
+                        "Content-Type": "application/json",
+                    },
                 )
         assert response.status_code == 500
 
     def test_handler_exception(self, client):
+        """ハンドラ例外は 200 + accepted=False（2026-11-17 改訂: secret設定済み＋署名で通過させる）"""
         payload = _valid_payload()
-        with patch.dict(os.environ, {}, clear=False):
+        secret = "webhook_secret"
+        body = json.dumps(payload).encode("utf-8")
+        with patch.dict(os.environ, {"GITHUB_WEBHOOK_SECRET": secret}, clear=False):
             with patch(
                 "nexuscore.api.github_self_healing_webhook.github_webhook",
                 side_effect=Exception("boom"),
@@ -218,8 +247,12 @@ class TestGitHubWebhookEndpoint:
                     ):
                         response = client.post(
                             "/api/v1/github/webhook",
-                            json=payload,
-                            headers={"X-GitHub-Event": "pull_request"},
+                            content=body,
+                            headers={
+                                "X-GitHub-Event": "pull_request",
+                                "X-Hub-Signature-256": _make_signature(body, secret),
+                                "Content-Type": "application/json",
+                            },
                         )
 
         assert response.status_code == 200

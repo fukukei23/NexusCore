@@ -1,5 +1,6 @@
 import logging
 import os
+import secrets
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -119,9 +120,23 @@ def create_app(test_db_path: str | None = None) -> FastAPI:
     )
 
     _session_secret = os.getenv("SESSION_SECRET")
-    if not _session_secret and os.getenv("ENV") == "production":
-        raise RuntimeError("SESSION_SECRET must be set in production")
-    app.add_middleware(SessionMiddleware, secret_key=_session_secret or "nexuscore-dev-secret")
+    if not _session_secret:
+        # fail-closed（2026-11-17・Strix診断A案⑤）:
+        # 旧挙動は SESSION_SECRET 未設定でも固定文字列 "nexuscore-dev-secret" で
+        # セッションCookieを署名していた。固定鍵は公開情報なので、攻撃者は
+        # 任意のセッションCookieを偽造できる（Strix PoC で偽造を実証）。
+        # 本番（ENV=production）では従来から RuntimeError だったが、開発・検証
+        # 環境でも同じ固定鍵が使われていたため、本番起動のhindering ではなく
+        # 「ローカル専用の自己完結した鍵」を自動生成する方式へ変更する。
+        # 明示指定がない限り署名は不可能になり、偽造が構造的に閉じる。
+        if os.getenv("ENV") == "production":
+            raise RuntimeError("SESSION_SECRET must be set in production")
+        _session_secret = secrets.token_urlsafe(32)
+        logger.warning(
+            "SESSION_SECRET is not set - using an ephemeral random session secret. "
+            "Sessions will not survive a restart. Set SESSION_SECRET for persistence."
+        )
+    app.add_middleware(SessionMiddleware, secret_key=_session_secret)
 
     from nexuscore.webapp import create_app as create_flask_app
 

@@ -260,10 +260,15 @@ def test_webhook_endpoint_is_documented_in_openapi(client: TestClient):
     # 実際のリクエストではボディが受け入れられることを確認
 
 
-def test_webhook_endpoint_handles_invalid_json(client: TestClient):
+def test_webhook_endpoint_handles_invalid_json(client: TestClient, monkeypatch):
     """
     不正なJSONペイロードの処理
+
+    2026-11-17 改訂: fail-closed化（secret未設定は401）により、検証対象である
+    「不正JSONの扱い」を失わないよう secret 設定済み＋正しい署名で通過させる。
     """
+    secret = "test-secret-value"
+    monkeypatch.setenv("GITHUB_WEBHOOK_SECRET", secret)
     invalid_payload = b"invalid json"
 
     response = client.post(
@@ -272,6 +277,7 @@ def test_webhook_endpoint_handles_invalid_json(client: TestClient):
         headers={
             "X-GitHub-Event": "pull_request",
             "X-GitHub-Delivery": "test-delivery-123",
+            "X-Hub-Signature-256": _create_signature(invalid_payload, secret),
             "Content-Type": "application/json",
         },
     )
@@ -284,10 +290,16 @@ def test_webhook_endpoint_handles_invalid_json(client: TestClient):
 
 def test_webhook_endpoint_without_secret_allows_requests(client: TestClient, monkeypatch):
     """
-    シークレットが設定されていない場合、署名検証をスキップする
+    シークレット未設定は fail-closed で拒否（2026-11-17 改訂）
+
+    旧挙動: secret 未設定なら署名検証をスキップして受理（fail-open）。
+    Strix診断（nexuscore_bfa5）で「偽装payload → 攻撃者リポジトリのコード実行」
+    の critical として指摘されたため、未設定は 401 に変更した。
+    開発用途の fail-open は GITHUB_WEBHOOK_ALLOW_UNSIGNED=1 の明示 opt-in のみ。
     """
     # シークレットを削除
     monkeypatch.delenv("GITHUB_WEBHOOK_SECRET", raising=False)
+    monkeypatch.delenv("GITHUB_WEBHOOK_ALLOW_UNSIGNED", raising=False)
 
     payload = {
         "action": "opened",
@@ -309,7 +321,7 @@ def test_webhook_endpoint_without_secret_allows_requests(client: TestClient, mon
             "summary": "Tests are now passing",
         }
 
-        # 署名ヘッダーなしでもリクエストが通る（開発環境など）
+        # fail-closed: 署名ヘッダーなし・secret未設定は拒否される
         response = client.post(
             "/api/v1/github/webhook",
             content=payload_body,
@@ -320,6 +332,5 @@ def test_webhook_endpoint_without_secret_allows_requests(client: TestClient, mon
             },
         )
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["accepted"] is True
+        assert response.status_code == 401
+        mock_webhook.assert_not_called()

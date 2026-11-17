@@ -11,25 +11,67 @@ plan雛形からの意図的変更（実契約突合・変更記録方式）:
 """
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from nexuscore.api.fastapi_app import create_app
 from nexuscore.api.harness_routes import router as harness_router
 
+# 2026-11-17 改訂（Strix診断A案③）: /harness/* にAPI Key認証が付与されたため、
+# 既存テストは「認証なしで200」前提だった。本テストは認証ヘッダーを送出する
+# 形に更新し、検証対象（フォーム描画・実行結果・state分離・上限結線）は維持する。
 
-def test_index_renders_form() -> None:
+
+@pytest.fixture()
+def api_key(monkeypatch: pytest.MonkeyPatch) -> str:
+    """API Key を設定し、DB 解決をモック化する（既存APIテストと同方式）"""
+    key = "test-api-key-123"
+    monkeypatch.setenv("NEXUSCORE_API_KEY", key)
+
+    mock_auth_user = MagicMock()
+    mock_auth_user.id = 1
+    mock_auth_user.github_login = "testuser"
+    mock_key = MagicMock()
+    mock_key.user = mock_auth_user
+    mock_key.user_id = 1
+    valid_hash = "hash-of-valid-key"
+
+    def _filter_by(token_hash=None, **_kwargs):
+        chain = MagicMock()
+        chain.first.return_value = mock_key if token_hash == valid_hash else None
+        return chain
+
+    mock_query = MagicMock()
+    mock_query.filter_by.side_effect = _filter_by
+    api_key_patcher = patch("nexuscore.models.ApiKey")
+    api_key_mock = api_key_patcher.start()
+    api_key_mock.query = mock_query
+    api_key_mock.hash_token.side_effect = (
+        lambda raw: valid_hash if raw == key else "hash-of-other-key"
+    )
+    patch("nexuscore.models.User").start()
+    patch("nexuscore.models.db").start()
+    try:
+        yield key
+    finally:
+        api_key_patcher.stop()
+
+
+def test_index_renders_form(api_key: str) -> None:
     """正常系: GET /harness/ がタスク入力フォームを返す（plan Task 23 Step 2）"""
     app = FastAPI()
     app.include_router(harness_router)
     client = TestClient(app)
-    resp = client.get("/harness/")
+    resp = client.get("/harness/", headers={"X-API-Key": api_key})
     assert resp.status_code == 200
     assert "<form" in resp.text
     assert 'action="/harness/run"' in resp.text
 
 
-def test_run_renders_harness_result() -> None:
+def test_run_renders_harness_result(api_key: str) -> None:
     """正常系: POST /harness/run がharness実行結果（JSON）を画面へ返す
 
     mockダミーは常時tool_call要求するためregistry（読む系のみ）で消費しきり
@@ -38,12 +80,16 @@ def test_run_renders_harness_result() -> None:
     app = FastAPI()
     app.include_router(harness_router)
     client = TestClient(app)
-    resp = client.post("/harness/run", data={"task": "hello", "provider": "mock"})
+    resp = client.post(
+        "/harness/run",
+        data={"task": "hello", "provider": "mock"},
+        headers={"X-API-Key": api_key},
+    )
     assert resp.status_code == 200
     assert "abort_reason" in resp.text
 
 
-def test_run_does_not_touch_cli_default_state(tmp_path, monkeypatch) -> None:
+def test_run_does_not_touch_cli_default_state(tmp_path, monkeypatch, api_key: str) -> None:
     """異常系（回帰・2026-09-09実害）: Web UI実行がCLI既定stateを汚染しない
 
     実害: _run_harnessがRunStateStore()（既定=artifacts/harness/run_state.json・
@@ -55,21 +101,25 @@ def test_run_does_not_touch_cli_default_state(tmp_path, monkeypatch) -> None:
     app = FastAPI()
     app.include_router(harness_router)
     client = TestClient(app)
-    resp = client.post("/harness/run", data={"task": "hello", "provider": "mock"})
+    resp = client.post(
+        "/harness/run",
+        data={"task": "hello", "provider": "mock"},
+        headers={"X-API-Key": api_key},
+    )
     assert resp.status_code == 200
     assert (tmp_path / "artifacts/harness/run_state_webui.json").exists()
     assert not (tmp_path / "artifacts/harness/run_state.json").exists()
 
 
-def test_router_included_in_app() -> None:
+def test_router_included_in_app(api_key: str) -> None:
     """結合: create_app() に /harness ルートが組み込まれている（ADR-002統合先）"""
     client = TestClient(create_app())
-    resp = client.get("/harness/")
+    resp = client.get("/harness/", headers={"X-API-Key": api_key})
     assert resp.status_code == 200
     assert "<form" in resp.text
 
 
-def test_webui_applies_operational_limits_and_context(monkeypatch) -> None:
+def test_webui_applies_operational_limits_and_context(monkeypatch, api_key: str) -> None:
     """fail条件ケース: Web UI経路もCLIと同じ上限・cwd注入を適用すること
 
     2026-09-19 self-inspectで発見: 上限結線（--max-tokens）とG-1コンテキスト
@@ -93,7 +143,11 @@ def test_webui_applies_operational_limits_and_context(monkeypatch) -> None:
     app = FastAPI()
     app.include_router(harness_router)
     client = TestClient(app)
-    resp = client.post("/harness/run", data={"task": "hello", "provider": "mock"})
+    resp = client.post(
+        "/harness/run",
+        data={"task": "hello", "provider": "mock"},
+        headers={"X-API-Key": api_key},
+    )
 
     assert resp.status_code == 200
     assert captured["limits"] is not None

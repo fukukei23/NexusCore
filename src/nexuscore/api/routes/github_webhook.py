@@ -132,12 +132,27 @@ async def github_webhook_endpoint(
         logger.error(f"Failed to read request body: {e}", exc_info=True)
         raise make_bad_request_error("Failed to read request body") from e
 
-    # 署名検証（オプション）
+    # 署名検証（fail-closed・2026-11-17 Strix診断A案②）
+    #
+    # 旧挙動: GITHUB_WEBHOOK_SECRET 未設定なら検証を丸ごとスキップ（fail-open）。
+    # 攻撃者は偽装 pull_request payload を送れるだけで、self-healing が
+    # 攻撃者リポジトリを clone して中のコードを実行する（Strix PoC 実証済・critical）。
+    # 現挙動: secret 未設定は原則 401。開発用の意図的な fail-open は
+    # GITHUB_WEBHOOK_ALLOW_UNSIGNED=1 の明示 opt-in でのみ許可する。
     webhook_secret = os.getenv("GITHUB_WEBHOOK_SECRET")
     if webhook_secret:
         if not verify_github_signature(payload_body, x_hub_signature_256, webhook_secret):
             logger.warning(f"Invalid signature for delivery {delivery}")
             raise make_unauthorized_error("Invalid signature")
+    elif os.getenv("GITHUB_WEBHOOK_ALLOW_UNSIGNED") != "1":
+        logger.error(
+            "GITHUB_WEBHOOK_SECRET is not configured - rejecting unsigned webhook "
+            "(fail-closed). Set GITHUB_WEBHOOK_SECRET, or opt in explicitly with "
+            "GITHUB_WEBHOOK_ALLOW_UNSIGNED=1 for local development."
+        )
+        raise make_unauthorized_error(
+            "Webhook secret is not configured (signature verification required)"
+        )
 
     # JSON ペイロードをパース
     try:
